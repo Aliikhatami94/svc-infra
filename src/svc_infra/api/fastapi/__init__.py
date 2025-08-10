@@ -7,7 +7,7 @@ from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.app.core.settings import get_app_settings
-from svc_infra.app import ENV
+from svc_infra.app import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,6 @@ def execute_api(
             logger.error(f"Failed to register custom routers from {routers_path}: {e}")
             raise
 
-    logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {ENV}]")
+    logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
 
     return app

@@ -7,7 +7,7 @@ from types import ModuleType
 from typing import Optional
 from fastapi import FastAPI
 
-from svc_infra.app.core.env import get_env, Env
+from svc_infra.app.core.env import get_current_environment, Environment, ALL_ENVIRONMENTS
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def register_all_routers(
         *,
         base_package: Optional[str] = None,
         prefix: str = "",
-        env: Optional[Env | str] = None,
+        environment: Optional[Environment | str] = None,
 ) -> None:
     """
     Recursively discover and register all FastAPI routers under a routers package.
@@ -37,7 +37,7 @@ def register_all_routers(
         base_package: Import path to the root routers package (e.g., "myapp.api.routers").
             If omitted, derived from this module's package.
         prefix: API prefix for all routers (e.g., "/v0").
-        env: The current environment (defaults to get_env()).
+        environment: The current environment (defaults to get_env()).
 
     Behavior:
         - Any module under the package with a top-level `router` variable is included.
@@ -60,7 +60,7 @@ def register_all_routers(
     if not hasattr(package_module, "__path__"):
         raise RuntimeError(f"Provided base_package '{base_package}' is not a package (no __path__).")
 
-    env = get_env() if env is None else (Env(env) if not isinstance(env, Env) else env)
+    environment = get_current_environment() if environment is None else (Environment(environment) if not isinstance(environment, Environment) else environment)
 
     for _, module_name, _ in pkgutil.walk_packages(
             package_module.__path__, prefix=f"{base_package}."
@@ -78,17 +78,23 @@ def register_all_routers(
             # Check for ROUTER_EXCLUDED_ENVIRONMENTS
             router_excluded_envs = getattr(module, "ROUTER_EXCLUDED_ENVIRONMENTS", None)
             if router_excluded_envs is not None:
-                # Normalize to set of Env or str
+                # Support ALL_ENVIRONMENTS as a special value
+                if router_excluded_envs is ALL_ENVIRONMENTS or (
+                    isinstance(router_excluded_envs, set) and router_excluded_envs == ALL_ENVIRONMENTS
+                ):
+                    logger.debug(f"Skipping router module {module_name} due to ALL_ENVIRONMENTS exclusion.")
+                    continue
+                # Normalize to set of Environment or str
                 if not isinstance(router_excluded_envs, (set, list, tuple)):
                     logger.warning(f"ROUTER_EXCLUDED_ENVIRONMENTS in {module_name} must be a set/list/tuple, got {type(router_excluded_envs)}")
                     continue
                 normalized_excluded_envs = set()
                 for e in router_excluded_envs:
                     try:
-                        normalized_excluded_envs.add(Env(e) if not isinstance(e, Env) else e)
+                        normalized_excluded_envs.add(Environment(e) if not isinstance(e, Environment) else e)
                     except Exception:
                         normalized_excluded_envs.add(str(e))
-                if env in normalized_excluded_envs or str(env) in normalized_excluded_envs:
+                if environment in normalized_excluded_envs or str(environment) in normalized_excluded_envs:
                     logger.debug(f"Skipping router module {module_name} due to ROUTER_EXCLUDED_ENVIRONMENTS restriction: {router_excluded_envs}")
                     continue
             # Pick up ROUTER_PREFIX, ROUTER_TAG, and INCLUDE_ROUTER_IN_SCHEMA if present

@@ -7,7 +7,7 @@ from functools import cache
 from typing import NamedTuple
 
 
-class Env(StrEnum):
+class Environment(StrEnum):
     LOCAL = "local"
     DEV   = "dev"
     TEST  = "test"
@@ -15,31 +15,36 @@ class Env(StrEnum):
 
 
 # Map common aliases -> canonical
-SYNONYMS: dict[str, Env] = {
-    "development": Env.DEV,
-    "dev": Env.DEV,
-    "local": Env.LOCAL,
-    "test": Env.TEST,
-    "preview": Env.TEST,
-    "prod": Env.PROD,
-    "production": Env.PROD,
-    "staging": Env.TEST,  # Treat 'staging' as 'test' for environment purposes
+SYNONYMS: dict[str, Environment] = {
+    "development": Environment.DEV,
+    "dev": Environment.DEV,
+    "local": Environment.LOCAL,
+    "test": Environment.TEST,
+    "preview": Environment.TEST,
+    "prod": Environment.PROD,
+    "production": Environment.PROD,
+    "staging": Environment.TEST,  # Treat 'staging' as 'test' for environment purposes
 }
 
-ALL_ENVIRONMENTS = {Env.LOCAL, Env.DEV, Env.TEST, Env.PROD}
+ALL_ENVIRONMENTS = {e for e in Environment}
 
 
-def _normalize(raw: str | None) -> Env | None:
+def _normalize(raw: str | None) -> Environment | None:
+    """
+    Normalize raw environment string to canonical Env enum, case-insensitively.
+    """
     if not raw:
         return None
-    val = raw.strip().lower()
-    if val in (e.value for e in Env):
-        return Env(val)  # exact match
+    val = raw.strip().casefold()  # case-insensitive, handles unicode edge cases
+    # Check against canonical enum values
+    if val in (e.value for e in Environment):
+        return Environment(val)  # exact match
+    # Check against synonyms
     return SYNONYMS.get(val)
 
 
 @cache
-def get_env() -> Env:
+def get_current_environment() -> Environment:
     """
     Resolve the current environment once, with sensible fallbacks.
 
@@ -59,36 +64,35 @@ def get_env() -> Env:
                 RuntimeWarning,
                 stacklevel=2,
             )
-        env = Env.LOCAL
+        env = Environment.LOCAL
     return env
 
 
-class EnvFlags(NamedTuple):
-    env: Env
+class EnvironmentFlags(NamedTuple):
+    environment: Environment
     is_local: bool
     is_dev: bool
     is_test: bool
     is_prod: bool
 
 
-def get_env_flags(env: Env | None = None) -> EnvFlags:
-    e = env or get_env()
-    return EnvFlags(
-        env=e,
-        is_local=(e == Env.LOCAL),
-        is_dev=(e == Env.DEV),
-        is_test=(e == Env.TEST),
-        is_prod=(e == Env.PROD),
+def get_environment_flags(environment: Environment | None = None) -> EnvironmentFlags:
+    e = environment or get_current_environment()
+    return EnvironmentFlags(
+        environment=e,
+        is_local=(e == _normalize("local")),
+        is_dev=(e == _normalize("dev")),
+        is_test=(e == _normalize("test")),
+        is_prod=(e == _normalize("prod")),
     )
 
 
-# Handy accessors (mirror your previous globals)
-ENV: Env = get_env()
-FLAGS: EnvFlags = get_env_flags(ENV)
-IS_LOCAL, IS_DEV, IS_TEST, IS_PROD = FLAGS.is_local, FLAGS.is_dev, FLAGS.is_test, FLAGS.is_prod
+# Handy globals
+CURRENT_ENVIRONMENT: Environment = get_current_environment()
+ENV_FLAGS: EnvironmentFlags = get_environment_flags(CURRENT_ENVIRONMENT)
+IS_LOCAL, IS_DEV, IS_TEST, IS_PROD = ENV_FLAGS.is_local, ENV_FLAGS.is_dev, ENV_FLAGS.is_test, ENV_FLAGS.is_prod
 
 
-# Small helper you’ll use a lot (e.g., for router exclusions, config picking, etc.)
 def pick(*, prod, nonprod, dev=None, test=None, local=None):
     """
     Choose a value based on the active environment.
@@ -96,13 +100,13 @@ def pick(*, prod, nonprod, dev=None, test=None, local=None):
     Example:
         log_level = pick(prod="INFO", nonprod="DEBUG", dev="DEBUG")
     """
-    e = get_env()
-    if e is Env.PROD:
+    e = get_current_environment()
+    if e is Environment.PROD:
         return prod
-    if e is Env.DEV and dev is not None:
+    if e is Environment.DEV and dev is not None:
         return dev
-    if e is Env.TEST and test is not None:
+    if e is Environment.TEST and test is not None:
         return test
-    if e is Env.LOCAL and local is not None:
+    if e is Environment.LOCAL and local is not None:
         return local
     return nonprod
