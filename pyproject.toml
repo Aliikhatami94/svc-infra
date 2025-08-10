@@ -1,4 +1,4 @@
-[project]
+[tool.poetry]
 name = "svc-infra"
 version = "0.0.1"
 description = "Infrastructure for building and deploying prod-ready services"
