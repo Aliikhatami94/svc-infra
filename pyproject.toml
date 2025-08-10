@@ -1,6 +1,6 @@
 [project]
 name = "svc-infra"
-version = "0.1.0"
+version = "0.0.1"
 description = ""
 authors = [
     {name = "Ali Khatami",email = "aliikhatami94@gmail.com"}
