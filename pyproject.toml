@@ -1,14 +1,13 @@
 [project]
 name = "svc-infra"
 version = "0.0.1"
-description = ""
-authors = [
-    {name = "Ali Khatami",email = "aliikhatami94@gmail.com"}
-]
+description = "Infrastructure for building and deploying prod-ready services"
+authors = ["Ali Khatami <aliikhatami94@gmail.com>"]
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
-]
+packages = [{ include = "svc_infra", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
 
 
 [build-system]
