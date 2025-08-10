@@ -10,6 +10,8 @@ packages = [{ include = "svc_infra", from = "src" }]
 python = ">=3.11,<4.0"
 fastapi = "^0.116.1"
 python-dotenv = "^1.1.1"
+sqlalchemy = "^2.0.42"
+pydantic-settings = "^2.10.1"
 
 
 [build-system]

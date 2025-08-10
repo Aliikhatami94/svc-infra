@@ -6,7 +6,7 @@ import pkgutil
 from types import ModuleType
 from typing import Set, Optional
 from fastapi import FastAPI
-from svc_infra.app.env import get_env, Env
+from svc_infra.app.core.env import get_env, Env
 
 logger = logging.getLogger(__name__)
 

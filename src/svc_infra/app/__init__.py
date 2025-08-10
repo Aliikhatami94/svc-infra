@@ -1,1 +1,1 @@
-from svc_infra.app.env import *
+from svc_infra.app.core.env import *
