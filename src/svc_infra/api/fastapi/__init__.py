@@ -12,22 +12,38 @@ from svc_infra.app import ENV
 logger = logging.getLogger(__name__)
 
 def execute_api(
-        name = None,
-        app_version = None,
-        api_version = "/v0",
-        routers_path = None,
-        routers_exclude: dict = None
+    name: str | None = None,
+    app_version: str | None = None,
+    api_version: str = "/v0",
+    routers_path: str | None = None,
+    routers_exclude: dict | None = None,
+    cors_origins: str | None = None,
 ) -> FastAPI:
+    """
+    Create and configure a FastAPI application with robust defaults and production best practices.
+
+    Args:
+        name: Optional app name (overrides default from settings).
+        app_version: Optional app version (overrides default from settings).
+        api_version: API prefix for all routers (e.g., "/v0").
+        routers_path: Optional import path for additional routers.
+        routers_exclude: Optional dict for router exclusions by environment.
+        cors_origins: Optional comma-separated origins for CORS (defaults to localhost).
+
+    Returns:
+        Configured FastAPI app instance.
+    """
     app_settings = get_app_settings(name=name, version=app_version)
     app = FastAPI(
         title=app_settings.name,
         version=app_settings.version
     )
 
-    # Set CORS
+    # CORS setup
+    origins = (cors_origins or os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")).split(",")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000").split(","),
+        allow_origins=[o.strip() for o in origins],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -39,21 +55,29 @@ def execute_api(
     # Register error handlers globally
     register_error_handlers(app)
 
-    # svc_infra routers
-    register_all_routers(
-        app,
-        base_package="svc_infra.api.fastapi.routers",
-        prefix=api_version
-    )
-
-    # Custom routers if provided
-    if routers_path:
+    # Register core routers
+    try:
         register_all_routers(
             app,
-            base_package=routers_path,
-            prefix=api_version,
-            exclude=routers_exclude
+            base_package="svc_infra.api.fastapi.routers",
+            prefix=api_version
         )
+    except Exception as e:
+        logger.error(f"Failed to register core routers: {e}")
+        raise
+
+    # Register custom routers if provided
+    if routers_path:
+        try:
+            register_all_routers(
+                app,
+                base_package=routers_path,
+                prefix=api_version,
+                exclude=routers_exclude
+            )
+        except Exception as e:
+            logger.error(f"Failed to register custom routers from {routers_path}: {e}")
+            raise
 
     logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {ENV}]")
 
