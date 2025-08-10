@@ -9,6 +9,7 @@ packages = [{ include = "svc_infra", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 fastapi = "^0.116.1"
+python-dotenv = "^1.1.1"
 
 
 [build-system]
