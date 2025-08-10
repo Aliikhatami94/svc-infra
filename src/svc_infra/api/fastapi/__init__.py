@@ -12,28 +12,26 @@ from svc_infra.app import ENV
 logger = logging.getLogger(__name__)
 
 def execute_api(
-    name: str | None = None,
+    app_name: str | None = None,
     app_version: str | None = None,
     api_version: str = "/v0",
     routers_path: str | None = None,
-    routers_exclude: dict | None = None,
     cors_origins: str | None = None,
 ) -> FastAPI:
     """
     Create and configure a FastAPI application with robust defaults and production best practices.
 
     Args:
-        name: Optional app name (overrides default from settings).
+        app_name: Optional app name (overrides default from settings).
         app_version: Optional app version (overrides default from settings).
         api_version: API prefix for all routers (e.g., "/v0").
         routers_path: Optional import path for additional routers.
-        routers_exclude: Optional dict for router exclusions by environment.
         cors_origins: Optional comma-separated origins for CORS (defaults to localhost).
 
     Returns:
         Configured FastAPI app instance.
     """
-    app_settings = get_app_settings(name=name, version=app_version)
+    app_settings = get_app_settings(name=app_name, version=app_version)
     app = FastAPI(
         title=app_settings.name,
         version=app_settings.version
@@ -73,7 +71,6 @@ def execute_api(
                 app,
                 base_package=routers_path,
                 prefix=api_version,
-                exclude=routers_exclude
             )
         except Exception as e:
             logger.error(f"Failed to register custom routers from {routers_path}: {e}")
