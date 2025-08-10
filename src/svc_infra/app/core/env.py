@@ -23,7 +23,10 @@ SYNONYMS: dict[str, Env] = {
     "preview": Env.TEST,
     "prod": Env.PROD,
     "production": Env.PROD,
+    "staging": Env.TEST,  # Treat 'staging' as 'test' for environment purposes
 }
+
+ALL_ENVIRONMENTS = {Env.LOCAL, Env.DEV, Env.TEST, Env.PROD}
 
 
 def _normalize(raw: str | None) -> Env | None:
