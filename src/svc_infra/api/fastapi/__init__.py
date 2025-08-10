@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def execute_api(
         name = None,
         app_version = None,
-        api_version = "/0",
+        api_version = "/v0",
         routers_path = None,
         routers_exclude: dict = None
 ) -> FastAPI:
