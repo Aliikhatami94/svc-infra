@@ -55,6 +55,6 @@ def execute_api(
             exclude=routers_exclude
         )
 
-    logger.info(f"{app_settings.version} of {app_settings.name} initialized [env: {ENV}]")
+    logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {ENV}]")
 
     return app
