@@ -3,16 +3,17 @@ from __future__ import annotations
 import logging
 import os
 from logging.config import dictConfig
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
+from enum import StrEnum
 
 from svc_infra.app import IS_PROD
 
 # --- Log Format and Level Options ---
-class LogFormatOptions(str):
+class LogFormatOptions(StrEnum):
     PLAIN = "plain"
     JSON = "json"
 
-class LogLevelOptions(str):
+class LogLevelOptions(StrEnum):
     CRITICAL = "CRITICAL"
     ERROR = "ERROR"
     WARNING = "WARNING"
@@ -25,17 +26,6 @@ class LoggingConfig(BaseModel):
     level: LogLevelOptions | None = None
     fmt: LogFormatOptions | None = None
 
-    @model_validator(mode="before")
-    def validate_fmt_and_level(cls, values):
-        fmt = values.get("fmt")
-        level = values.get("level")
-        allowed_fmt = {LogFormatOptions.PLAIN, LogFormatOptions.JSON}
-        allowed_level = {LogLevelOptions.CRITICAL, LogLevelOptions.ERROR, LogLevelOptions.WARNING, LogLevelOptions.INFO, LogLevelOptions.DEBUG, LogLevelOptions.NOTSET}
-        if fmt is not None and fmt not in allowed_fmt:
-            raise ValueError(f"fmt must be one of {allowed_fmt}")
-        if level is not None and level not in allowed_level:
-            raise ValueError(f"level must be one of {allowed_level}")
-        return values
 
 # --- JSON Formatter for Structured Logs ---
 class JsonFormatter(logging.Formatter):
