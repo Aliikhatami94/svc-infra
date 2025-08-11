@@ -86,7 +86,7 @@ def _read_level() -> str:
     explicit = os.getenv("LOG_LEVEL")
     if explicit:
         return explicit.upper()
-    from svc_infra.app.core.env import pick
+    from svc_infra.app.env import pick
     return pick(
         prod="INFO",
         nonprod="DEBUG",

@@ -7,7 +7,7 @@ from types import ModuleType
 from typing import Optional
 from fastapi import FastAPI
 
-from svc_infra.app.core.env import get_current_environment, Environment, ALL_ENVIRONMENTS
+from svc_infra.app.env import get_current_environment, Environment, ALL_ENVIRONMENTS
 
 logger = logging.getLogger(__name__)
 
