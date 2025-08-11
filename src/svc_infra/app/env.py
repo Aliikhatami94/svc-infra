@@ -93,7 +93,7 @@ ENV_FLAGS: EnvironmentFlags = get_environment_flags(CURRENT_ENVIRONMENT)
 IS_LOCAL, IS_DEV, IS_TEST, IS_PROD = ENV_FLAGS.is_local, ENV_FLAGS.is_dev, ENV_FLAGS.is_test, ENV_FLAGS.is_prod
 
 
-def pick(*, prod, nonprod, dev=None, test=None, local=None):
+def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
     """
     Choose a value based on the active environment.
 
@@ -109,4 +109,6 @@ def pick(*, prod, nonprod, dev=None, test=None, local=None):
         return test
     if e is Environment.LOCAL and local is not None:
         return local
-    return nonprod
+    if nonprod is not None:
+        return nonprod
+    raise ValueError("pick(): No value found for environment and 'nonprod' was not provided.")
