@@ -3,13 +3,43 @@ from __future__ import annotations
 import logging
 import os
 from logging.config import dictConfig
+from pydantic import BaseModel, model_validator
 
-from svc_infra.app import IS_PROD, IS_DEV, IS_TEST, IS_LOCAL
+from svc_infra.app import IS_PROD
 
+# --- Log Format and Level Options ---
+class LogFormatOptions(str):
+    PLAIN = "plain"
+    JSON = "json"
 
+class LogLevelOptions(str):
+    CRITICAL = "CRITICAL"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
+    NOTSET = "NOTSET"
+
+# --- Pydantic Logging Config Model ---
+class LoggingConfig(BaseModel):
+    level: LogLevelOptions | None = None
+    fmt: LogFormatOptions | None = None
+
+    @model_validator(mode="before")
+    def validate_fmt_and_level(cls, values):
+        fmt = values.get("fmt")
+        level = values.get("level")
+        allowed_fmt = {LogFormatOptions.PLAIN, LogFormatOptions.JSON}
+        allowed_level = {LogLevelOptions.CRITICAL, LogLevelOptions.ERROR, LogLevelOptions.WARNING, LogLevelOptions.INFO, LogLevelOptions.DEBUG, LogLevelOptions.NOTSET}
+        if fmt is not None and fmt not in allowed_fmt:
+            raise ValueError(f"fmt must be one of {allowed_fmt}")
+        if level is not None and level not in allowed_level:
+            raise ValueError(f"level must be one of {allowed_level}")
+        return values
+
+# --- JSON Formatter for Structured Logs ---
 class JsonFormatter(logging.Formatter):
     """Structured JSON formatter for prod and CI logs."""
-
     def format(self, record: logging.LogRecord) -> str:  # type: ignore[override]
         import json
         from traceback import format_exception
@@ -45,7 +75,7 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info:
             exc_type = record.exc_info[0].__name__ if record.exc_info[0] else None
             exc_message = str(record.exc_info[1]) if record.exc_info[1] else None
-            stack = "".join(format_exception(*record.exc_info))
+            stack = "".join(format_exception(*record.exc_info, chain=True))
 
             err_obj: dict[str, object] = {}
             if exc_type:
@@ -61,35 +91,43 @@ class JsonFormatter(logging.Formatter):
 
         return json.dumps(payload, ensure_ascii=False)
 
-
+# --- Helpers to Read Level/Format ---
 def _read_level() -> str:
-    # Allow explicit override first
     explicit = os.getenv("LOG_LEVEL")
     if explicit:
         return explicit.upper()
-
-    # Sensible defaults per environment
-    if IS_PROD:
-        return "INFO"
-    # Local / Dev / Test are more verbose by default
-    if IS_LOCAL or IS_DEV or IS_TEST:
-        return "DEBUG"
-
-    # Fallback
-    return "INFO"
-
+    from svc_infra.app.core.env import pick
+    return pick(
+        prod="INFO",
+        nonprod="DEBUG",
+        dev="DEBUG",
+        test="DEBUG",
+        local="DEBUG"
+    ).upper()
 
 def _read_format() -> str:
-    # Prefer env override; otherwise JSON in prod, plain elsewhere
     fmt = os.getenv("LOG_FORMAT")
     if fmt:
         return fmt.lower()
     return "json" if IS_PROD else "plain"
 
-
-def setup_logging() -> None:
-    level = _read_level()
-    fmt = _read_format()
+# --- Main Logging Setup Function ---
+def setup_logging(level: str | None = None, fmt: str | None = None) -> None:
+    """
+    Set up logging for the application.
+    Args:
+        level: Optional log level (e.g., "DEBUG", "INFO"). If not provided, uses environment-based default.
+            You can also use LoggingConfig(level=...) for validation and IDE support.
+        fmt: Optional log format ("json" or "plain"). If not provided, uses environment-based default.
+            You can also use LoggingConfig(fmt=...) for validation and IDE support.
+    """
+    # Validate fmt and level using Pydantic if provided
+    if fmt is not None or level is not None:
+        LoggingConfig(fmt=fmt, level=level)  # raises if invalid
+    if level is None:
+        level = _read_level()
+    if fmt is None:
+        fmt = _read_format()
 
     formatter_name = "json" if fmt == "json" else "plain"
 
