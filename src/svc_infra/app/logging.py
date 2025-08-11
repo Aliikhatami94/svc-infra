@@ -121,6 +121,10 @@ def setup_logging(level: str | None = None, fmt: str | None = None) -> None:
 
     formatter_name = "json" if fmt == "json" else "plain"
 
+    # Silence multipart parser logs in non-debug environments
+    if level.upper() != "DEBUG":
+        logging.getLogger("multipart.multipart").setLevel(logging.WARNING)
+
     dictConfig(
         {
             "version": 1,
