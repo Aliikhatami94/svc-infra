@@ -11,7 +11,7 @@ from svc_infra.app import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
 
-def execute_api(
+def create_and_register_api(
     app_name: str | None = None,
     app_version: str | None = None,
     api_version: str = "/v0",
@@ -19,7 +19,7 @@ def execute_api(
     cors_origins: str | None = None,
 ) -> FastAPI:
     """
-    Create and configure a FastAPI application with robust defaults and production best practices.
+    Create and configure a FastAPI application, register routers, and apply production best practices.
 
     Args:
         app_name: Optional app name (overrides default from settings).
