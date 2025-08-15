@@ -6,7 +6,8 @@ import logging
 from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
-from svc_infra.app.settings import get_app_settings, AppSettings, ApiConfig
+from svc_infra.api.fastapi.settings import ApiConfig
+from svc_infra.app.settings import get_app_settings, AppSettings
 from svc_infra.app import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
