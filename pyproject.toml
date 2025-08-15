@@ -12,6 +12,7 @@ fastapi = "^0.116.1"
 python-dotenv = "^1.1.1"
 sqlalchemy = "^2.0.42"
 pydantic-settings = "^2.10.1"
+mcp = "^1.13.0"
 
 
 [build-system]

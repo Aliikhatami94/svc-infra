@@ -1,5 +1,12 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel
+
+class ApiConfig(BaseModel):
+    version: str = "/v0"
+    routers_path: str | None = None
+    cors_origins: list[str] | None = None
+    mcp_paths: list[dict] | None = None
 
 class AppSettings(BaseSettings):
     # flat = easy env overrides
