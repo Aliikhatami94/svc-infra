@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Sequence
 import logging
 
 from svc_infra.api.fastapi.routers import register_all_routers
@@ -12,91 +13,63 @@ from svc_infra.app import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
 
+def _normalize_origins(origins: str | Sequence[str] | None) -> list[str]:
+    if origins is None:
+        return ["http://localhost:3000"]
+    if isinstance(origins, str):
+        return [o.strip() for o in origins.split(",") if o.strip()]
+    return list(origins)
+
 def create_and_register_api(
-    app_config: AppSettings | None = None,
-    api_config: ApiConfig | None = None,
+        app_config: AppSettings | None = None,
+        api_config: ApiConfig | None = None,
 ) -> FastAPI:
-    """
-    Build and return a fully configured FastAPI application instance.
+    # defaults
+    app_config = app_config or AppSettings()               # <-- avoid None usage
+    api_config = api_config or ApiConfig()
 
-    This helper centralizes the common service bootstrap concerns:
-      * Loads (or reuses) application settings (name, version, etc.).
-      * Applies CORS rules (from ApiConfig.cors_origins or env var CORS_ALLOW_ORIGINS).
-      * Installs a catch‑all exception middleware before custom error handlers.
-      * Registers global error handlers.
-      * Discovers and registers routers (core + optional custom path) honoring the provided API version prefix.
+    app_settings = get_app_settings(name=app_config.name, version=app_config.version)
 
-    Args:
-        app_config:
-            Optional AppSettings instance allowing the caller to override default settings
-            (e.g., name, version). If None, internal get_app_settings() will supply defaults.
-        api_config:
-            Optional ApiConfig instance controlling API surface concerns:
-              - version: String prefix applied to all discovered routers (e.g. "/v1").
-              - routers_path: Additional import base (module path) to auto‑discover extra routers.
-              - cors_origins: Comma separated list of origins for CORS (overrides env var fallback).
-            If None, a default ApiConfig (as defined in settings) is assumed by downstream logic.
-
-    Returns:
-        A configured FastAPI application ready to be served.
-
-    Logging:
-        Emits an info log summarizing initialized app name, version, and active environment.
-
-    Notes:
-        * Router discovery uses register_all_routers which will raise on failure (caught and logged here).
-        * CatchAllExceptionMiddleware is inserted before specific error handlers to ensure last‑resort capture.
-        * CORS origins default to "http://localhost:3000" if neither api_config.cors_origins nor environment var provided.
-    """
-    app_settings = get_app_settings(
-        name=app_config.name,
-        version=app_config.version
-    )
+    # IMPORTANT: root_path makes FastAPI generate /v0/* links without changing internal routes
     app = FastAPI(
         title=app_settings.name,
         version=app_settings.version,
+        root_path=api_config.version,  # e.g. "/v0"
     )
 
-    # CORS setup
-    origins = (api_config.cors_origins or os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")).split(",")
+    origins = _normalize_origins(api_config.cors_origins or os.getenv("CORS_ALLOW_ORIGINS"))
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[o.strip() for o in origins],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # Add catch-all exception middleware before error handlers
     app.add_middleware(CatchAllExceptionMiddleware)
-
-    # Register error handlers globally
     register_error_handlers(app)
 
-    # Register core routers
-    try:
+    # NOTE: no version prefix here
+    register_all_routers(
+        app,
+        base_package="svc_infra.api.fastapi.routers",
+        prefix="",                           # <-- remove version from routes
+    )
+
+    # Optional custom routers
+    if api_config.routers_path:
         register_all_routers(
             app,
-            base_package="svc_infra.api.fastapi.routers",
-            prefix=api_config.version
+            base_package=api_config.routers_path,
+            prefix="",                       # <-- keep clean
         )
-    except Exception as e:
-        logger.error(f"Failed to register core routers: {e}")
-        raise
 
-    # Register custom routers if provided
-    routers_path = api_config.routers_path
-    if routers_path:
-        try:
-            register_all_routers(
-                app,
-                base_package=routers_path,
-                prefix=api_config.version,
-            )
-        except Exception as e:
-            logger.error(f"Failed to register custom routers from {routers_path}: {e}")
-            raise
+    # Inject OpenAPI "servers" so SDKs see the right base
+    def custom_openapi():
+        schema = app.openapi_schema or app.openapi()
+        schema["servers"] = [{"url": api_config.version}]  # relative base e.g. "/v0"
+        return schema
+    app.openapi = custom_openapi  # type: ignore[assignment]
 
-    logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
-
+    logger.info(f"{app_settings.version} of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
     return app
