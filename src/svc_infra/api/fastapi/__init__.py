@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute
 import logging
 
 from svc_infra.api.fastapi.routers import register_all_routers
@@ -12,6 +13,15 @@ from svc_infra.app.settings import get_app_settings, AppSettings
 from svc_infra.app import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
+
+def _gen_operation_id(route: APIRoute) -> str:
+    # prefer an explicit route name, then function name
+    base = (route.name or getattr(route.endpoint, "__name__", "op")).strip().replace(" ", "_")
+    # include tag and method to keep things unique but readable
+    tag = (route.tags[0] if route.tags else "").strip().replace(" ", "_")
+    method = next(iter(route.methods or ["GET"])).lower()
+    parts = [p for p in (tag, base, method) if p]
+    return "_".join(parts)
 
 def _build_child_api(
         app_config: AppSettings | None,
@@ -25,6 +35,7 @@ def _build_child_api(
     child = FastAPI(
         title=app_settings.name,
         version=app_settings.version,
+        generate_unique_id_function=_gen_operation_id,
     )
 
     # CORS
