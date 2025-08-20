@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from typing import Sequence
 import logging
 
@@ -64,12 +65,15 @@ def create_and_register_api(
             prefix="",                       # <-- keep clean
         )
 
-    # Inject OpenAPI "servers" so SDKs see the right base
+    original_openapi = app.openapi
     def custom_openapi():
-        schema = app.openapi_schema or app.openapi()
-        schema["servers"] = [{"url": api_config.version}]  # relative base e.g. "/v0"
-        return schema
-    app.openapi = custom_openapi  # type: ignore[assignment]
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = original_openapi()  # uses FastAPI’s own builder once
+        schema["servers"] = [{"url": api_config.version}]
+        app.openapi_schema = schema
+        return app.openapi_schema
+    app.openapi = custom_openapi
 
     logger.info(f"{app_settings.version} of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
     return app
