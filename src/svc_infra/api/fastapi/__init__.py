@@ -1,8 +1,6 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
-from typing import Sequence
 import logging
 
 from svc_infra.api.fastapi.routers import register_all_routers
@@ -14,32 +12,26 @@ from svc_infra.app import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
 
-def _normalize_origins(origins: str | Sequence[str] | None) -> list[str]:
-    if origins is None:
-        return ["http://localhost:3000"]
-    if isinstance(origins, str):
-        return [o.strip() for o in origins.split(",") if o.strip()]
-    return list(origins)
-
-def create_and_register_api(
-        app_config: AppSettings | None = None,
-        api_config: ApiConfig | None = None,
+def _build_child_api(
+        app_config: AppSettings | None,
+        api_config: ApiConfig | None,
 ) -> FastAPI:
-    # defaults
-    app_config = app_config or AppSettings()               # <-- avoid None usage
-    api_config = api_config or ApiConfig()
-
-    app_settings = get_app_settings(name=app_config.name, version=app_config.version)
-
-    # IMPORTANT: root_path makes FastAPI generate /v0/* links without changing internal routes
-    app = FastAPI(
-        title=app_settings.name,
-        version=app_settings.version,
-        root_path=api_config.version,  # e.g. "/v0"
+    app_settings = get_app_settings(
+        name=app_config.name if app_config else None,
+        version=app_config.version if app_config else None,
     )
 
-    origins = _normalize_origins(api_config.cors_origins or os.getenv("CORS_ALLOW_ORIGINS"))
-    app.add_middleware(
+    child = FastAPI(
+        title=app_settings.name,
+        version=app_settings.version,
+    )
+
+    # CORS
+    origins = (",".join(api_config.cors_origins) if isinstance(api_config.cors_origins, list)
+               else (api_config.cors_origins or os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")))
+    origins = [o.strip() for o in origins.split(",")]
+
+    child.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
@@ -47,33 +39,50 @@ def create_and_register_api(
         allow_headers=["*"],
     )
 
-    app.add_middleware(CatchAllExceptionMiddleware)
-    register_error_handlers(app)
+    # Error handling
+    child.add_middleware(CatchAllExceptionMiddleware)
+    register_error_handlers(child)
 
-    # NOTE: no version prefix here
+    # Register core routers (NO global version prefix here)
     register_all_routers(
-        app,
+        child,
         base_package="svc_infra.api.fastapi.routers",
-        prefix="",                           # <-- remove version from routes
+        prefix="",  # <-- key change
     )
 
     # Optional custom routers
-    if api_config.routers_path:
+    if api_config and api_config.routers_path:
         register_all_routers(
-            app,
+            child,
             base_package=api_config.routers_path,
-            prefix="",                       # <-- keep clean
+            prefix="",  # <-- key change
         )
 
-    original_openapi = app.openapi
-    def custom_openapi():
-        if app.openapi_schema:
-            return app.openapi_schema
-        schema = original_openapi()  # uses FastAPI’s own builder once
-        schema["servers"] = [{"url": api_config.version}]
-        app.openapi_schema = schema
-        return app.openapi_schema
-    app.openapi = custom_openapi
+    logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
+    return child
 
-    logger.info(f"{app_settings.version} of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
-    return app
+
+def create_and_register_api(
+        app_config: AppSettings | None = None,
+        api_config: ApiConfig | None = None,
+) -> FastAPI:
+    """
+    Creates a parent app and mounts the child API under /{base_prefix}/{version}.
+    """
+    api_config = api_config or ApiConfig()
+    base_prefix = (api_config.base_prefix or "").strip("/")
+    version = (api_config.version or "v0").strip("/")
+
+    # Parent app is thin; useful if you later want /healthz, /metrics, multiple versions, etc.
+    parent = FastAPI(title="Service Shell")
+
+    # Build child API without any version prefix
+    child = _build_child_api(app_config, api_config)
+
+    mount_path = f"/{base_prefix}/{version}" if base_prefix else f"/{version}"
+    parent.mount(mount_path, child, name=version)
+
+    # Optional: if behind a reverse proxy that also adds a prefix, set root_path to keep docs/links correct
+    # Example: parent = FastAPI(root_path="/gateway")  # or set via uvicorn --root-path /gateway
+
+    return parent
