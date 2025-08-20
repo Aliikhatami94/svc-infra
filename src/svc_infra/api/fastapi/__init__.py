@@ -1,4 +1,6 @@
 import os
+from collections import defaultdict
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -14,14 +16,39 @@ from svc_infra.app import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
 
-def _gen_operation_id(route: APIRoute) -> str:
-    # prefer an explicit route name, then function name
-    base = (route.name or getattr(route.endpoint, "__name__", "op")).strip().replace(" ", "_")
-    # include tag and method to keep things unique but readable
-    tag = (route.tags[0] if route.tags else "").strip().replace(" ", "_")
-    method = next(iter(route.methods or ["GET"])).lower()
-    parts = [p for p in (tag, base, method) if p]
-    return "_".join(parts)
+def _gen_operation_id_factory():
+    used: dict[str, int] = defaultdict(int)
+
+    def _normalize(s: str) -> str:
+        return "_".join(x for x in s.strip().replace(" ", "_").split("_") if x)
+
+    def _gen(route: APIRoute) -> str:
+        base = route.name or getattr(route.endpoint, "__name__", "op")
+        base = _normalize(base)
+
+        tag = _normalize(route.tags[0]) if route.tags else ""
+        method = next(iter(route.methods or ["GET"])).lower()
+
+        # Prefer the base alone if unique
+        candidate = base
+        if used[candidate]:
+            # Try tag + base if base already taken and tag adds value
+            if tag and not base.startswith(tag):
+                candidate = f"{tag}_{base}"
+            # If still taken, append method
+            if used[candidate]:
+                # avoid double method suffix if user already named it like ping_get
+                if not candidate.endswith(f"_{method}"):
+                    candidate = f"{candidate}_{method}"
+                # If STILL taken, add a disambiguating counter
+                if used[candidate]:
+                    counter = used[candidate] + 1
+                    candidate = f"{candidate}_{counter}"
+
+        used[candidate] += 1
+        return candidate
+
+    return _gen
 
 def _build_child_api(
         app_config: AppSettings | None,
@@ -35,7 +62,7 @@ def _build_child_api(
     child = FastAPI(
         title=app_settings.name,
         version=app_settings.version,
-        generate_unique_id_function=_gen_operation_id,
+        generate_unique_id_function=_gen_operation_id_factory(),
     )
 
     # CORS
@@ -77,9 +104,7 @@ def set_servers(app, base_url: str | None, version: str):
     # fallback to relative if base_url not provided
     base = (base_url.rstrip("/") + f"/{version}") if base_url else f"/{version}"
     def custom_openapi():
-        if app.openapi_schema:
-            app.openapi_schema["servers"] = [{"url": base}]
-            return app.openapi_schema
+        app.openapi_schema = None
         schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
         schema["servers"] = [{"url": base}]
         app.openapi_schema = schema
