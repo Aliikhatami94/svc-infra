@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 import logging
 
 from svc_infra.api.fastapi.routers import register_all_routers
@@ -61,28 +62,31 @@ def _build_child_api(
     logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
     return child
 
+def set_servers(app, base_url: str | None, version: str):
+    # fallback to relative if base_url not provided
+    base = (base_url.rstrip("/") + f"/{version}") if base_url else f"/{version}"
+    def custom_openapi():
+        if app.openapi_schema:
+            app.openapi_schema["servers"] = [{"url": base}]
+            return app.openapi_schema
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        schema["servers"] = [{"url": base}]
+        app.openapi_schema = schema
+        return schema
+    app.openapi = custom_openapi
 
-def create_and_register_api(
-        app_config: AppSettings | None = None,
-        api_config: ApiConfig | None = None,
-) -> FastAPI:
-    """
-    Creates a parent app and mounts the child API under /{base_prefix}/{version}.
-    """
+def create_and_register_api(app_config=None, api_config=None) -> FastAPI:
     api_config = api_config or ApiConfig()
-    base_prefix = (api_config.base_prefix or "").strip("/")
-    version = (api_config.version or "v0").strip("/")
 
-    # Parent app is thin; useful if you later want /healthz, /metrics, multiple versions, etc.
-    parent = FastAPI(title="Service Shell")
+    parent = FastAPI(title="Service Shell")         # thin parent
+    child  = _build_child_api(app_config, api_config)  # your existing builder
 
-    # Build child API without any version prefix
-    child = _build_child_api(app_config, api_config)
+    mount_path = f"/{api_config.version}"           # e.g., "/v0"
+    parent.mount(mount_path, child, name=api_config.version)
 
-    mount_path = f"/{base_prefix}/{version}" if base_prefix else f"/{version}"
-    parent.mount(mount_path, child, name=version)
+    # Make OpenAPI show absolute URL in prod (or relative in dev)
+    set_servers(child, api_config.public_base_url, api_config.version)
 
-    # Optional: if behind a reverse proxy that also adds a prefix, set root_path to keep docs/links correct
-    # Example: parent = FastAPI(root_path="/gateway")  # or set via uvicorn --root-path /gateway
-
+    # If you’re behind a proxy that already prefixes paths, consider:
+    # parent = FastAPI(root_path="/gateway-prefix")  # or uvicorn --root-path ...
     return parent
