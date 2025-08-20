@@ -100,29 +100,38 @@ def _build_child_api(
     logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
     return child
 
-def set_servers(app, base_url: str | None, version: str):
-    # fallback to relative if base_url not provided
-    base = (base_url.rstrip("/") + f"/{version}") if base_url else f"/{version}"
+def set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
+    # mount_path should be like "/v0" or "/v1"
+    base = mount_path if not public_base_url else f"{public_base_url.rstrip('/')}{mount_path}"
     def custom_openapi():
-        app.openapi_schema = None
         schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
         schema["servers"] = [{"url": base}]
         app.openapi_schema = schema
         return schema
     app.openapi = custom_openapi
 
-def create_and_register_api(app_config=None, api_config=None) -> FastAPI:
-    api_config = api_config or ApiConfig()
+def create_and_register_api(
+        versions: list[tuple[AppSettings, ApiConfig]],
+        *,
+        parent_title: str = "Service Shell",
+        parent_cors_origins: list[str] | None = None,
+) -> FastAPI:
+    parent = FastAPI(title=parent_title)
 
-    parent = FastAPI(title="Service Shell")         # thin parent
-    child  = _build_child_api(app_config, api_config)  # your existing builder
+    # Optional: apply CORS once at the parent
+    if parent_cors_origins:
+        parent.add_middleware(
+            CORSMiddleware,
+            allow_origins=parent_cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
-    mount_path = f"/{api_config.version}"           # e.g., "/v0"
-    parent.mount(mount_path, child, name=api_config.version)
+    for app_cfg, api_cfg in versions:
+        child = _build_child_api(app_cfg, api_cfg)
+        mount_path = f"/{api_cfg.version.strip('/')}"  # "/v0", "/v1"
+        parent.mount(mount_path, child, name=api_cfg.version.strip('/'))
+        set_servers(child, api_cfg.public_base_url, mount_path)
 
-    # Make OpenAPI show absolute URL in prod (or relative in dev)
-    set_servers(child, api_config.public_base_url, api_config.version)
-
-    # If you’re behind a proxy that already prefixes paths, consider:
-    # parent = FastAPI(root_path="/gateway-prefix")  # or uvicorn --root-path ...
     return parent
