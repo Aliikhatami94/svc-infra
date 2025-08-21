@@ -65,14 +65,8 @@ def _build_child_api(
         generate_unique_id_function=_gen_operation_id_factory(),
     )
 
-    # CORS
-    origins = (",".join(api_config.cors_origins) if isinstance(api_config.cors_origins, list)
-               else (api_config.cors_origins or os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")))
-    origins = [o.strip() for o in origins.split(",")]
-
     child.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -110,28 +104,57 @@ def set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
         return schema
     app.openapi = custom_openapi
 
+def _setup_cors(app, public_cors_origins: list[str] | str | None = None):
+    """
+    Attach CORS middleware to a FastAPI app.
+
+    - Accepts list or comma-separated str.
+    - Falls back to env var CORS_ALLOW_ORIGINS or http://localhost:3000.
+    - Handles "*" with allow_credentials=True by switching to regex.
+    """
+    if isinstance(public_cors_origins, list):
+        origins = [o.strip() for o in public_cors_origins if o and o.strip()]
+    elif isinstance(public_cors_origins, str):
+        origins = [o.strip() for o in public_cors_origins.split(",") if o and o.strip()]
+    else:
+        fallback = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
+        origins = [o.strip() for o in fallback.split(",") if o and o.strip()]
+
+    if not origins:
+        return  # nothing to do
+
+    cors_kwargs = dict(
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    if "*" in origins:
+        cors_kwargs["allow_origin_regex"] = ".*"
+    else:
+        cors_kwargs["allow_origins"] = origins
+
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
+
 def create_and_register_api(
         versions: list[tuple[AppSettings, ApiConfig]],
         *,
-        parent_title: str = "Service Shell",
-        parent_cors_origins: list[str] | None = None,
+        public_title: str = "Service Shell",
+        public_cors_origins: list[str] | str | None = None,
 ) -> FastAPI:
-    parent = FastAPI(title=parent_title)
+    parent = FastAPI(
+        title=public_title,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
-    # Optional: apply CORS once at the parent
-    if parent_cors_origins:
-        parent.add_middleware(
-            CORSMiddleware,
-            allow_origins=parent_cors_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    # Apply CORS on parent only
+    _setup_cors(parent, public_cors_origins)
 
     for app_cfg, api_cfg in versions:
         child = _build_child_api(app_cfg, api_cfg)
-        mount_path = f"/{api_cfg.version.strip('/')}"  # "/v0", "/v1"
-        parent.mount(mount_path, child, name=api_cfg.version.strip('/'))
+        mount_path = f"/{api_cfg.version.strip('/')}"  # e.g. "/v0"
+        parent.mount(mount_path, child, name=api_cfg.version.strip("/"))
         set_servers(child, api_cfg.public_base_url, mount_path)
 
     return parent
