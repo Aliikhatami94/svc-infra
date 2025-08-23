@@ -42,3 +42,20 @@ svc_infra.db quickstart
 - Troubleshooting
   - postgres:// URLs are normalized to postgresql+asyncpg://
   - For SQLite in-memory, StaticPool is used so multiple sessions share the same DB
+
+
+Examples
+
+- Copy-pasteable model and repo
+  - Model: svc_infra.db.examples.models.Widget (UUIDMixin, TimestampMixin)
+  - Repo: svc_infra.db.examples.repo.WidgetRepository (Repository[Widget])
+
+- Sample FastAPI router
+  - Import: from svc_infra.db.examples import router as widgets_router
+  - Include: app.include_router(widgets_router)
+  - Endpoints: GET/POST /examples/widgets
+
+- Migrations quickstart using CLI
+  - python -m svc_infra.db init
+  - python -m svc_infra.db makemigrations -m "add widgets"
+  - python -m svc_infra.db upgrade head
