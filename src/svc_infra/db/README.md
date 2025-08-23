@@ -2,7 +2,7 @@ svc_infra.db quickstart
 
 - Env vars
   - DB_DATABASE_URL (preferred) or DATABASE_URL fallback
-  - Optional: DB_ECHO, DB_POOL_SIZE, DB_MAX_OVERFLOW
+  - Optional: DB_ECHO, DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_RECYCLE, DB_STATEMENT_CACHE_SIZE
 
 - FastAPI wiring
   - from svc_infra.db.integration import attach_db
@@ -11,6 +11,7 @@ svc_infra.db quickstart
 
 - Dependencies in routes
   - from svc_infra.db.deps import get_engine, get_session, get_uow
+  - Typed deps are also available: EngineDep, SessionDep, UoWDep
   - Use get_uow(request) to operate with repositories inside a transaction
 
 - Repository + UnitOfWork pattern
@@ -19,8 +20,8 @@ svc_infra.db quickstart
       repo = uow.repo(Model); await repo.create(...)
 
 - Alembic migrations (async engine friendly)
-  - Initialize: alembic init migrations
-  - Write env.py template: from svc_infra.db import write_async_env_template; write_async_env_template()
+  - Initialize: from svc_infra.db.alembic_helpers import init_migrations; init_migrations()
+  - Write env.py template: from svc_infra.db.alembic_helpers import write_async_env_template; write_async_env_template()
   - Autogenerate: alembic revision --autogenerate -m "init"
   - Upgrade: alembic upgrade head
 
@@ -30,7 +31,8 @@ svc_infra.db quickstart
 
 - Caching
   - DBEngine accepts an optional cache implementing BaseCache
-  - Default is NullCache (no-op). RedisCache provided in svc_infra.db.redis_cache
+  - Defaults to NullCache (no-op). InMemoryCache is available for tests/dev in svc_infra.db.cache
+  - RedisCache provided in svc_infra.db.redis_cache (or svc_infra.db.cache.redis)
   - Decorator svc_infra.db.redis_cache.cache(ttl=...) helps wrap cacheable calls
 
 - Testing tips
@@ -40,4 +42,3 @@ svc_infra.db quickstart
 - Troubleshooting
   - postgres:// URLs are normalized to postgresql+asyncpg://
   - For SQLite in-memory, StaticPool is used so multiple sessions share the same DB
-
