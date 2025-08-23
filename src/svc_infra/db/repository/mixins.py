@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import and_
 from typing import Any, Generic, Optional, TypeVar
 
 T = TypeVar("T")
@@ -25,3 +26,8 @@ class CRUDMixin(Generic[T]):
         cond = self.model.id == id  # type: ignore[attr-defined]
         res = await self.session.execute(self.model.__table__.delete().where(cond))  # type: ignore[attr-defined]
         return int(res.rowcount or 0)
+
+def apply_filters(stmt, model, where: dict[str, Any] | None):
+    if not where:
+        return stmt
+    return stmt.where(and_(*[(getattr(model, k) == v) for k, v in where.items()]))
