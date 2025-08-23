@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import AsyncIterator
-
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from .base import Base

@@ -3,9 +3,6 @@ from __future__ import annotations
 # Backward-compat shim for RedisCache and @cache decorator
 from .cache.redis import RedisCache as RedisCache  # noqa: F401
 
-import json
-from typing import Any
-
 
 def cache(ttl: int = 300):
     """Simple JSON cache decorator expecting `self.cache` to implement BaseCache."""
