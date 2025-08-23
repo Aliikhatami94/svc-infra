@@ -41,6 +41,9 @@ class DBSettings(BaseSettings):
         # normalize legacy postgres:// to SQLAlchemy async driver url
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        # ensure plain postgresql:// also uses async driver unless explicitly specified
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
 
 
