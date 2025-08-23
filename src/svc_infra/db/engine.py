@@ -24,14 +24,13 @@ class DBEngine:
             "echo": settings.echo,
             "future": True,
             "pool_pre_ping": True,
-            "pool_recycle": settings.pool_recycle or 1800,
-            "pool_timeout": 30,
         }
         if url.startswith("sqlite+aiosqlite://") and ":memory:" in url:
             engine_kwargs["poolclass"] = StaticPool
         else:
             engine_kwargs["pool_size"] = settings.pool_size
             engine_kwargs["max_overflow"] = settings.max_overflow
+            engine_kwargs["pool_recycle"] = settings.pool_recycle or 1800
 
         if url.startswith("postgresql+asyncpg://"):
             connect_args = engine_kwargs.setdefault("connect_args", {})

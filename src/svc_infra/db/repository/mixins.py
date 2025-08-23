@@ -23,6 +23,5 @@ class CRUDMixin(Generic[T]):
 
     async def delete(self, id: Any) -> int:  # type: ignore[override]
         cond = self.model.id == id  # type: ignore[attr-defined]
-        res = await self.session.execute(type(self).model.__table__.delete().where(cond))  # type: ignore[attr-defined]
+        res = await self.session.execute(self.model.__table__.delete().where(cond))  # type: ignore[attr-defined]
         return int(res.rowcount or 0)
-
