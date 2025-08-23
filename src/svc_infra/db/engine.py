@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional, Any
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -12,15 +12,16 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 
 from .settings import DBSettings
+from .cache import BaseCache, NullCache
 
 
 class DBEngine:
     """Holds the async SQLAlchemy engine and session factory."""
 
-    def __init__(self, settings: DBSettings):
+    def __init__(self, settings: DBSettings, cache: Optional[BaseCache] = None):
         url = settings.resolved_database_url
         # Special handling for SQLite in-memory so multiple sessions share the same DB
-        engine_kwargs = {
+        engine_kwargs: dict[str, Any] = {
             "echo": settings.echo,
             "future": True,
         }
@@ -35,6 +36,8 @@ class DBEngine:
         self._session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
             bind=self._engine, expire_on_commit=False
         )
+        # Pluggable cache; defaults to a no-op implementation
+        self.cache: BaseCache = cache or NullCache()
 
     @property
     def engine(self) -> AsyncEngine:
