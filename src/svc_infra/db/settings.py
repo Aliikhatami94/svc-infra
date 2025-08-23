@@ -22,6 +22,8 @@ class DBSettings(BaseSettings):
     echo: bool = Field(default=False)
     pool_size: int = Field(default=10)
     max_overflow: int = Field(default=20)
+    pool_recycle: Optional[int] = Field(default=None)  # seconds; None -> sensible default
+    statement_cache_size: int = Field(default=1000)
 
     model_config = SettingsConfigDict(
         env_prefix="DB_",        # DB_DATABASE_URL, DB_ECHO, ...
@@ -47,4 +49,3 @@ def get_db_settings(**kwargs) -> DBSettings:
     # Only include kwargs that are not None, so defaults in DBSettings are used
     filtered = {k: v for k, v in kwargs.items() if v is not None}
     return DBSettings(**filtered)
-

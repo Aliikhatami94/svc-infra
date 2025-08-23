@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Generic, Optional, Sequence, Type, TypeVar, cast
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -27,9 +27,8 @@ class Repository(Generic[T]):
     ) -> Sequence[T]:
         stmt = select(self.model)
         if where:
-            for k, v in where.items():
-                cond = cast(Any, getattr(self.model, k) == v)
-                stmt = stmt.where(cond)
+            # Basic equality filters; callers can pass richer expressions via a custom method
+            stmt = stmt.where(and_(*[(cast(Any, getattr(self.model, k)) == v) for k, v in where.items()]))
         if order_by is not None:
             stmt = stmt.order_by(order_by)
         if limit:
@@ -38,8 +37,28 @@ class Repository(Generic[T]):
             stmt = stmt.offset(offset)
         return (await self.session.execute(stmt)).scalars().all()
 
+    async def count(self, where: Optional[dict[str, Any]] = None) -> int:
+        stmt = select(func.count()).select_from(self.model)
+        if where:
+            stmt = stmt.where(and_(*[(cast(Any, getattr(self.model, k)) == v) for k, v in where.items()]))
+        return int((await self.session.execute(stmt)).scalar_one())
+
     async def create(self, **data) -> T:
         obj = self.model(**data)
+        self.session.add(obj)
+        await self.session.flush()
+        return obj
+
+    async def upsert(self, key_fields: dict[str, Any], **data) -> T:
+        # Try fetch existing by key_fields
+        stmt = select(self.model).filter_by(**key_fields)
+        obj = (await self.session.execute(stmt)).scalars().first()
+        if obj is not None:
+            for k, v in data.items():
+                setattr(obj, k, v)
+            await self.session.flush()
+            return obj
+        obj = self.model(**{**key_fields, **data})
         self.session.add(obj)
         await self.session.flush()
         return obj

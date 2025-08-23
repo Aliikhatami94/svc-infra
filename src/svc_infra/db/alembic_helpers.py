@@ -41,7 +41,7 @@ def write_async_env_template(cwd: str = ".") -> str:
     alembic_env_dir = os.path.join(cwd, "migrations")
     env_py = os.path.join(alembic_env_dir, "env.py")
     os.makedirs(alembic_env_dir, exist_ok=True)
-    content = """
+    content = '''
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import create_engine
@@ -99,7 +99,15 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-"""
+'''
     with open(env_py, "w", encoding="utf-8") as f:
         f.write(content.strip() + "\n")
     return env_py
+
+
+def ensure_initted(cwd: str = ".") -> None:
+    """Ensure Alembic is initialized and uses the async-friendly env template."""
+    ini_path = os.path.join(cwd, "alembic.ini")
+    if not os.path.exists(ini_path):
+        init_migrations(cwd)
+    write_async_env_template(cwd)

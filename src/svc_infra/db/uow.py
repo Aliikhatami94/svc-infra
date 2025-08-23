@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 from typing import Type, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,9 +40,17 @@ class UnitOfWork:
 
 def transactional(engine: DBEngine):
     def decorator(fn):
-        async def wrapper(*args, **kwargs):
-            async with UnitOfWork(engine) as uow:
-                return await fn(*args, uow=uow, **kwargs)
-        return wrapper
+        if inspect.iscoroutinefunction(fn):
+            async def aw(*args, **kwargs):
+                async with UnitOfWork(engine) as uow:
+                    return await fn(*args, uow=uow, **kwargs)
+            return aw
+        else:
+            def sw(*args, **kwargs):
+                async def run():
+                    async with UnitOfWork(engine) as uow:
+                        # fn is sync; run it in default loop executor if heavy
+                        return fn(*args, uow=uow, **kwargs)
+                return asyncio.run(run())
+            return sw
     return decorator
-

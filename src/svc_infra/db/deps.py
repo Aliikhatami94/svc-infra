@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import AsyncIterator
+from typing import AsyncIterator, Annotated
 
-from fastapi import Request
+from fastapi import Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .engine import DBEngine
@@ -23,3 +23,8 @@ async def get_uow(request: Request) -> AsyncIterator[UnitOfWork]:
     engine: DBEngine = get_engine(request)
     async with UnitOfWork(engine) as uow:
         yield uow
+
+
+EngineDep = Annotated[DBEngine, Depends(get_engine)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
+UoWDep = Annotated[UnitOfWork, Depends(get_uow)]

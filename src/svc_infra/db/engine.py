@@ -24,6 +24,8 @@ class DBEngine:
         engine_kwargs: dict[str, Any] = {
             "echo": settings.echo,
             "future": True,
+            "pool_pre_ping": True,
+            "pool_recycle": settings.pool_recycle or 1800,
         }
         if url.startswith("sqlite+aiosqlite://") and ":memory:" in url:
             engine_kwargs["poolclass"] = StaticPool
@@ -31,6 +33,11 @@ class DBEngine:
             # Pool args are ignored by some drivers (e.g., SQLite), safe to pass for others
             engine_kwargs["pool_size"] = settings.pool_size
             engine_kwargs["max_overflow"] = settings.max_overflow
+
+        # Asyncpg tuning
+        if url.startswith("postgresql+asyncpg://"):
+            connect_args = engine_kwargs.setdefault("connect_args", {})
+            connect_args["statement_cache_size"] = settings.statement_cache_size
 
         self._engine: AsyncEngine = create_async_engine(url, **engine_kwargs)
         self._session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
@@ -50,6 +57,13 @@ class DBEngine:
             yield sess
         finally:
             await sess.close()
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[AsyncSession]:
+        """Yield a session wrapped in a transaction block."""
+        async with self.session() as sess:
+            async with sess.begin():
+                yield sess
 
     async def dispose(self) -> None:
         await self._engine.dispose()
