@@ -13,7 +13,13 @@ python-dotenv = "^1.1.1"
 sqlalchemy = "^2.0.42"
 pydantic-settings = "^2.10.1"
 mcp = "^1.13.0"
+aiosqlite = "^0.20.0"
+alembic = "^1.13.2"
+greenlet = "^3"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+pytest-asyncio = "^0.23.8"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
