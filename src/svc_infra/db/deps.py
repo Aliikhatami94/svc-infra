@@ -1,30 +1,20 @@
 from __future__ import annotations
 
-from typing import AsyncIterator, Annotated
+# Backward-compat shim: forward FastAPI deps from new location
+from .integration.fastapi import (
+    get_engine,
+    get_session,
+    get_uow,
+    EngineDep,
+    SessionDep,
+    UoWDep,
+)
 
-from fastapi import Request, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from .engine import DBEngine
-from .uow import UnitOfWork
-
-
-def get_engine(request: Request) -> DBEngine:
-    return request.app.state.db_engine  # type: ignore[attr-defined]
-
-
-async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
-    engine: DBEngine = get_engine(request)
-    async with engine.session() as s:
-        yield s
-
-
-async def get_uow(request: Request) -> AsyncIterator[UnitOfWork]:
-    engine: DBEngine = get_engine(request)
-    async with UnitOfWork(engine) as uow:
-        yield uow
-
-
-EngineDep = Annotated[DBEngine, Depends(get_engine)]
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
-UoWDep = Annotated[UnitOfWork, Depends(get_uow)]
+__all__ = [
+    "get_engine",
+    "get_session",
+    "get_uow",
+    "EngineDep",
+    "SessionDep",
+    "UoWDep",
+]

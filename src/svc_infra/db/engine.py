@@ -20,21 +20,19 @@ class DBEngine:
 
     def __init__(self, settings: DBSettings, cache: Optional[BaseCache] = None):
         url = settings.resolved_database_url
-        # Special handling for SQLite in-memory so multiple sessions share the same DB
         engine_kwargs: dict[str, Any] = {
             "echo": settings.echo,
             "future": True,
             "pool_pre_ping": True,
             "pool_recycle": settings.pool_recycle or 1800,
+            "pool_timeout": 30,
         }
         if url.startswith("sqlite+aiosqlite://") and ":memory:" in url:
             engine_kwargs["poolclass"] = StaticPool
         else:
-            # Pool args are ignored by some drivers (e.g., SQLite), safe to pass for others
             engine_kwargs["pool_size"] = settings.pool_size
             engine_kwargs["max_overflow"] = settings.max_overflow
 
-        # Asyncpg tuning
         if url.startswith("postgresql+asyncpg://"):
             connect_args = engine_kwargs.setdefault("connect_args", {})
             connect_args["statement_cache_size"] = settings.statement_cache_size
@@ -43,12 +41,15 @@ class DBEngine:
         self._session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
             bind=self._engine, expire_on_commit=False
         )
-        # Pluggable cache; defaults to a no-op implementation
         self.cache: BaseCache = cache or NullCache()
 
     @property
     def engine(self) -> AsyncEngine:
         return self._engine
+
+    @property
+    def session_factory(self) -> async_sessionmaker[AsyncSession]:
+        return self._session_factory
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
@@ -60,7 +61,6 @@ class DBEngine:
 
     @asynccontextmanager
     async def transaction(self) -> AsyncIterator[AsyncSession]:
-        """Yield a session wrapped in a transaction block."""
         async with self.session() as sess:
             async with sess.begin():
                 yield sess
