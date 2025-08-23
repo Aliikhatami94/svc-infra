@@ -27,7 +27,7 @@ def _gen_operation_id_factory():
         base = _normalize(base)
 
         tag = _normalize(route.tags[0]) if route.tags else ""
-        method = next(iter(route.methods or ["GET"])).lower()
+        method = next(iter(route.methods or ["GET"])) .lower()
 
         # Prefer the base alone if unique
         candidate = base
@@ -81,6 +81,13 @@ def _build_child_api(
         child,
         base_package="svc_infra.api.fastapi.routers",
         prefix="",  # <-- key change
+    )
+
+    # Register DB integration routers (e.g., /_db/health)
+    register_all_routers(
+        child,
+        base_package="svc_infra.db.integration.routers",
+        prefix="",
     )
 
     # Optional custom routers
