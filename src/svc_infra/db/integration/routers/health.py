@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
-from ..health import db_healthcheck
+from svc_infra.db.health import db_healthcheck
 
 router = APIRouter(tags=["internal"])
 

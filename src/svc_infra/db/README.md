@@ -7,7 +7,7 @@ svc_infra.db quickstart
 - FastAPI wiring
   - from svc_infra.db.integration import attach_db
   - app = FastAPI(); db_engine = attach_db(app)
-  - Optional health router: include router from svc_infra.db.routers.health
+  - Optional health router: include router from svc_infra.db.integration.routers.health
 
 - Dependencies in routes
   - from svc_infra.db.deps import get_engine, get_session, get_uow
@@ -26,7 +26,7 @@ svc_infra.db quickstart
   - Upgrade: alembic upgrade head
 
 - Health check endpoint
-  - from svc_infra.db.routers.health import router as db_health_router
+  - from svc_infra.db.integration.routers.health import router as db_health_router
   - app.include_router(db_health_router)
 
 - Caching
