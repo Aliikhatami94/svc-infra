@@ -166,8 +166,8 @@ Wire it up:
 
 # -------- command: scaffold auth --------
 
-@app.command("scaffold-auth")
-def scaffold_auth(
+@app.command("auth")
+def auth(
         models_path: str = typer.Option(..., help="Where to put SQLAlchemy models file"),
         schemas_path: str = typer.Option(..., help="Where to put Pydantic schemas file"),
         routers_path: str = typer.Option(..., help="Where to put FastAPI router file"),
