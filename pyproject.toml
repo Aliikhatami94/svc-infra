@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "svc-infra"
-version = "0.0.5"
+version = "0.0.7"
 description = "Infrastructure for building and deploying prod-ready services"
 authors = ["Ali Khatami <aliikhatami94@gmail.com>"]
 readme = "README.md"
@@ -16,10 +16,14 @@ mcp = "^1.13.0"
 aiosqlite = "^0.20.0"
 alembic = "^1.13.2"
 greenlet = "^3"
+typer = "^0.16.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
 pytest-asyncio = "^0.23.8"
+
+[project.scripts]
+svc-infra-scaffold = "svc_infra.db.scaffold.cli:run"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
