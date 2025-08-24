@@ -9,7 +9,7 @@ from fastapi_users.authentication import AuthenticationBackend, BearerTransport,
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
-from $session_dep_import import SessionDep  # e.g. "from app.db.integration.fastapi import SessionDep"
+from svc_infra.api.fastapi.db.integration import SessionDep
 from .models import User
 from .schemas import UserRead, UserCreate, UserUpdate
 from .settings import get_auth_settings

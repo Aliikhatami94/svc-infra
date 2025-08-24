@@ -30,14 +30,12 @@ Generate only what you need, where you want it. Use `--overwrite` to replace exi
 - Users router
   - `poetry run svc-auth scaffold-auth-users-router \
       --dest-dir src/my_app/routers \
-      --session-dep-import my_app.db.integration_fastapi \
       --auth-prefix /auth`
   - Creates: `users.py`
 
 - OAuth router
   - `poetry run svc-auth scaffold-auth-oauth-router \
       --dest-dir src/my_app/auth \
-      --session-dep-import my_app.db.integration_fastapi \
       --oauth-prefix /oauth \
       --post-login-redirect /`
   - Creates: `oauth_router.py`
@@ -49,9 +47,6 @@ Generate only what you need, where you want it. Use `--overwrite` to replace exi
   - Creates: `include_routers.py`
 
 Notes
-- `session_dep_import` is a module path that contains a symbol named `SessionDep`.
-  - The generated files import it as: `from <module> import SessionDep`.
-  - Example: `my_app.db.integration_fastapi` should define `SessionDep` (see DB helpers below).
 - `--overwrite` is supported on every command.
 
 ## Batch scaffolding (all at once)
@@ -62,7 +57,6 @@ poetry run svc-auth scaffold-auth \
   --schemas-dir src/my_app/schemas \
   --routers-dir src/my_app/api/auth \
   --sqlalchemy-base-import "my_app.db.base import Base" \
-  --session-dep-import my_app.db.integration_fastapi \
   --auth-prefix "/auth" \
   --oauth-prefix "/oauth" \
   --post-login-redirect "/"
