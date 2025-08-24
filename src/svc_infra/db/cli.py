@@ -390,5 +390,80 @@ def stamp(
     command.stamp(cfg, revision)
 
 
+def _versions_dir(project_root: Path) -> Path:
+    return project_root / AL_EMBIC_DIR / "versions"
+
+def _latest_version_file(versions_dir: Path) -> Path | None:
+    if not versions_dir.exists():
+        return None
+    candidates = [p for p in versions_dir.iterdir() if p.is_file() and p.suffix == ".py"]
+    if not candidates:
+        return None
+    # newest by mtime
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+@app.command("drop-table")
+def drop_table(
+        table: str = typer.Argument(..., help="Table name to drop. Use schema.table for a specific schema."),
+        cascade: bool = typer.Option(False, help="Use CASCADE when dropping."),
+        if_exists: bool = typer.Option(True, help="Use IF EXISTS when dropping."),
+        message: Optional[str] = typer.Option(None, "-m", "--message", help="Custom migration message."),
+        apply: bool = typer.Option(False, help="Run upgrade head after creating the revision."),
+        project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
+        database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
+):
+    """
+    Create a migration that drops a specific table (optionally CASCADE) and
+    optionally apply it immediately.
+    """
+    cfg = _load_config(project_root.resolve(), database_url)
+
+    # 1) create an empty revision (no autogenerate)
+    msg = message or f"drop table {table}"
+    command.revision(cfg, message=msg, autogenerate=False)
+
+    # 2) locate the just-created file
+    versions_dir = _versions_dir(project_root.resolve())
+    rev_file = _latest_version_file(versions_dir)
+    if rev_file is None:
+        raise typer.Exit(code=1)
+
+    # 3) write upgrade/downgrade content
+    # Build fully-qualified identifier & SQL
+    fq_table = table.strip()  # allow "schema.table" or just "table"
+    sql = f'DROP TABLE {"IF EXISTS " if if_exists else ""}{fq_table}{" CASCADE" if cascade else ""};'
+
+    content = f'''""" {msg} """
+
+from __future__ import annotations
+
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic.
+revision = "{rev_file.stem.split("_", 1)[0]}"
+down_revision = None  # will be filled by Alembic scaffold
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    # Using raw SQL so we can support IF EXISTS and CASCADE
+    op.execute({sql!r})
+
+
+def downgrade() -> None:
+    # Irreversible without full original table definition
+    pass
+'''
+    rev_file.write_text(content, encoding="utf-8")
+    typer.echo(f"Wrote drop migration: {rev_file}")
+
+    # 4) optionally apply
+    if apply:
+        command.upgrade(cfg, "head")
+        typer.echo("Applied migration (upgrade head).")
+
+
 if __name__ == "__main__":
     app()
