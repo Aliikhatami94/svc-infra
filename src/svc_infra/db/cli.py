@@ -13,17 +13,14 @@ AL_EMBIC_DIR = "migrations"  # folder name for alembic scripts
 ALEMBIC_INI = "alembic.ini"
 
 
-def _load_config(
-        project_root: Path,
-        database_url: Optional[str],
-) -> Config:
+def _load_config(project_root: Path, database_url: Optional[str]) -> Config:
     cfg = Config(str(project_root / ALEMBIC_INI))
-    # Allow env to override sqlalchemy.url (alembic.ini)
     db_url = database_url or os.getenv("DATABASE_URL")
     if db_url:
         cfg.set_main_option("sqlalchemy.url", db_url)
-    # Ensure script_location is correct
     cfg.set_main_option("script_location", str(project_root / AL_EMBIC_DIR))
+    # IMPORTANT: let env.py decide logging (app logger vs fileConfig)
+    cfg.attributes["configure_logger"] = False
     return cfg
 
 
@@ -88,85 +85,99 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
     if not env_py.exists():
         run_cmd = "asyncio.run(run_migrations_online_async())" if async_db else "run_migrations_online_sync()"
         content = f"""\
-from __future__ import annotations
-import os
-import asyncio
-from logging.config import fileConfig
-
-from alembic import context
-from sqlalchemy import pool
-from sqlalchemy import engine_from_config
-from sqlalchemy.ext.asyncio import create_async_engine
-
-# Import your Base
-models_module = "{models_module}"
-module = __import__(models_module, fromlist=["Base"])
-target_metadata = getattr(module, "Base").metadata
-
-# this is the Alembic Config object
-# which provides access to the values within the .ini file in use.
-config = context.config
-
-# Interpret the config file for Python logging.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
-# Allow env var override
-database_url = os.getenv("DATABASE_URL")
-if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
-
-def run_migrations_offline():
-    '''Run migrations in "offline" mode.'''
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        compare_type=True,
-        compare_server_default=True,
-        render_as_batch=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-def do_run_migrations(connection):
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        compare_type=True,
-        compare_server_default=True,
-        render_as_batch=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-async def run_migrations_online_async():
-    connectable = create_async_engine(
-        config.get_main_option("sqlalchemy.url"),
-        poolclass=pool.NullPool,
-        future=True,
-    )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
-
-def run_migrations_online_sync():
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-        future=True,
-    )
-    with connectable.connect() as connection:
-        do_run_migrations(connection)
-    connectable.dispose()
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    {run_cmd}
-"""
+        from __future__ import annotations
+        import os
+        import asyncio
+        import logging
+        from importlib import import_module
+        from logging.config import fileConfig
+        
+        from alembic import context
+        from sqlalchemy import pool
+        from sqlalchemy import engine_from_config
+        from sqlalchemy.ext.asyncio import create_async_engine
+        
+        # --- App logging (optional) ---
+        USE_APP_LOGGING = os.getenv("ALEMBIC_USE_APP_LOGGING", "1") == "1"
+        if USE_APP_LOGGING:
+            try:
+                # Import your app's logging setup and configure it the same way
+                from svc_infra.app.logging import setup_logging  # <-- your module
+                # Allow overriding via env: LOG_LEVEL / LOG_FORMAT (json|plain)
+                setup_logging(level=os.getenv("LOG_LEVEL"), fmt=os.getenv("LOG_FORMAT"))
+                logging.getLogger(__name__).debug("Alembic using app logging setup.")
+            except Exception as e:
+                # If anything goes wrong, fallback to Alembic fileConfig
+                USE_APP_LOGGING = False
+                print(f"[alembic] App logging import failed: {{e}}. Falling back to fileConfig.")
+        
+        # --- Alembic config & logging ---
+        config = context.config
+        if not USE_APP_LOGGING and config.config_file_name is not None:
+            fileConfig(config.config_file_name)
+            logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
+        
+        # --- Database URL override via env ---
+        database_url = os.getenv("DATABASE_URL")
+        if database_url:
+            config.set_main_option("sqlalchemy.url", database_url)
+        
+        # --- Models/Base wiring ---
+        models_module = "{models_module}"
+        module = __import__(models_module, fromlist=["Base"])
+        target_metadata = getattr(module, "Base").metadata
+        
+        def run_migrations_offline():
+            \"\"\"Run migrations in 'offline' mode.\"\"\"
+            url = config.get_main_option("sqlalchemy.url")
+            context.configure(
+                url=url,
+                target_metadata=target_metadata,
+                literal_binds=True,
+                compare_type=True,
+                compare_server_default=True,
+                render_as_batch=True,
+            )
+            with context.begin_transaction():
+                context.run_migrations()
+        
+        def do_run_migrations(connection):
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                compare_type=True,
+                compare_server_default=True,
+                render_as_batch=True,
+            )
+            with context.begin_transaction():
+                context.run_migrations()
+        
+        async def run_migrations_online_async():
+            connectable = create_async_engine(
+                config.get_main_option("sqlalchemy.url"),
+                poolclass=pool.NullPool,
+                future=True,
+            )
+            async with connectable.connect() as connection:
+                await connection.run_sync(do_run_migrations)
+            await connectable.dispose()
+        
+        def run_migrations_online_sync():
+            connectable = engine_from_config(
+                config.get_section(config.config_ini_section),
+                prefix="sqlalchemy.",
+                poolclass=pool.NullPool,
+                future=True,
+            )
+            with connectable.connect() as connection:
+                do_run_migrations(connection)
+            connectable.dispose()
+        
+        if context.is_offline_mode():
+            run_migrations_offline()
+        else:
+            {run_cmd}
+        """
         env_py.write_text(content, encoding="utf-8")
         typer.echo(f"Wrote {env_py}")
     else:
