@@ -10,7 +10,6 @@ concurrency:
 
 jobs:
   release:
-    # avoid an infinite loop when the bot pushes the version bump commit
     if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     permissions:
@@ -28,29 +27,17 @@ jobs:
         with:
           python-version: "3.11"
 
-      # This ensures the requested Poetry version is actually installed & on PATH
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: "2.0.1"
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Show Poetry version
-        run: poetry --version
-
-      # Make sure the lock is good: Poetry 2 uses --check, Poetry 1 uses --no-update
-      - name: Verify lockfile matches pyproject
-        shell: bash
+      # Install Poetry 2.x deterministically
+      - name: Install Poetry 2.x
         run: |
-          set -euo pipefail
-          VER=$(poetry --version | awk '{print $3}')
-          MAJOR=${VER%%.*}
-          if [[ "$MAJOR" -ge 2 ]]; then
-            poetry lock --check
-          else
-            poetry lock --no-update
-          fi
+          python -m pip install --upgrade pip pipx
+          pipx install "poetry==2.0.1"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          poetry --version
+
+      # Keep the lockfile in sync with pyproject (no flags; works on Poetry 2)
+      - name: Refresh lockfile (no update)
+        run: poetry lock
 
       - name: Install deps (no dev)
         run: poetry install --no-root --only main --sync
@@ -80,7 +67,7 @@ jobs:
       - name: Build distributions
         run: poetry build
 
-      # OIDC/Trusted Publisher to PyPI (no API token)
+      # Publish to PyPI via Trusted Publisher / OIDC (no API token needed)
       - name: Publish to PyPI via OIDC
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
