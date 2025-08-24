@@ -493,7 +493,7 @@ def merge_heads(
         return
     # Create a merge revision that depends on all current heads
     from alembic import command
-    command.merge(cfg, heads=heads, message=message)
+    command.merge(cfg, revisions=heads, message=message)
     typer.echo(f"Created merge for heads: {', '.join(heads)}")
 
 if __name__ == "__main__":
