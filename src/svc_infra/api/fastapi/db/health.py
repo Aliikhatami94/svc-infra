@@ -5,7 +5,7 @@ from sqlalchemy import text
 from .integration import SessionDep
 
 
-def health_router(*, prefix: str = "/health", include_in_schema: bool = False) -> APIRouter:
+def health_router(*, prefix: str = "/_db/health", include_in_schema: bool = False) -> APIRouter:
     """Return a simple DB liveness router.
 
     - prefix: mount path for the health endpoints (default "/health").
