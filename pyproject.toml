@@ -23,7 +23,7 @@ pytest = "^8.3.2"
 pytest-asyncio = "^0.23.8"
 
 [tool.poetry.scripts]
-svc-infra-scaffold = "svc_infra.db.scaffold.cli:run"
+scaffold-user-db = "svc_infra.db.scaffold.user.cli:run"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

@@ -157,7 +157,7 @@ def scaffold_routers(
 
 # --- umbrella command: any subset -------------------------------------------
 
-@app.command("new")
+@app.command("combo")
 def scaffold_any(
         models_path: Optional[str] = typer.Option(None, "--models-path", help="Output path for models.py"),
         schemas_path: Optional[str] = typer.Option(None, "--schemas-path", help="Output path for schemas.py"),
@@ -174,8 +174,8 @@ def scaffold_any(
     if routers_path:
         _write_file(routers_path, USER_ROUTER_TEMPLATE, overwrite)
 
-def main():
+def run():
     app()
 
 if __name__ == "__main__":
-    main()
+    run()
