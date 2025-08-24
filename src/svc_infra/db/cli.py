@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 from pathlib import Path
+from textwrap import dedent
 from typing import Optional
 
 import typer
@@ -110,114 +111,114 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
     env_py = (project_root / AL_EMBIC_DIR / "env.py")
     if not env_py.exists():
         run_cmd = "asyncio.run(run_migrations_online_async())" if async_db else "run_migrations_online_sync()"
-        content = f"""\
-        from __future__ import annotations
-        import os
-        import sys
-        import asyncio
-        import logging
-        from pathlib import Path
-        from logging.config import fileConfig
-        
-        from alembic import context
-        from sqlalchemy import pool
-        from sqlalchemy import engine_from_config
-        from sqlalchemy.ext.asyncio import create_async_engine
-        from sqlalchemy.engine.url import make_url
-        
-        # --- Ensure project root and src/ on sys.path ---
-        ROOT = Path(__file__).resolve().parents[1]  # migrations/ -> project root
-        for p in (ROOT, ROOT / "src"):
-            s = str(p)
-            if p.exists() and s not in sys.path:
-                sys.path.insert(0, s)
-        
-        # --- App logging (optional) ---
-        USE_APP_LOGGING = os.getenv("ALEMBIC_USE_APP_LOGGING", "1") == "1"
-        if USE_APP_LOGGING:
-            try:
-                from svc_infra.app.logging import setup_logging
-                setup_logging(level=os.getenv("LOG_LEVEL"), fmt=os.getenv("LOG_FORMAT"))
-                logging.getLogger(__name__).debug("Alembic using app logging setup.")
-            except Exception as e:
-                USE_APP_LOGGING = False
-                print(f"[alembic] App logging import failed: {{e}}. Falling back to fileConfig.")
-        
-        # --- Alembic config & logging ---
-        config = context.config
-        if not USE_APP_LOGGING and config.config_file_name is not None:
-            fileConfig(config.config_file_name)
-            logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
-        
-        # --- Database URL override via env ---
-        database_url = os.getenv("DATABASE_URL")
-        if database_url:
-            config.set_main_option("sqlalchemy.url", database_url)
-        
-        # --- Models/Base wiring ---
-        models_module = "{normalized_models_module}"
-        module = __import__(models_module, fromlist=["Base"])
-        target_metadata = getattr(module, "Base").metadata
-        
-        # --- Choose async/sync path from URL automatically ---
-        url_str = config.get_main_option("sqlalchemy.url") or ""
-        driver = ""
-        try:
-            driver = make_url(url_str).get_dialect().driver  # 'asyncpg', 'psycopg2', etc.
-        except Exception:
-            pass
-        is_async = driver in {{"asyncpg", "aiosqlite"}}
-        
-        def run_migrations_offline():
-            url = config.get_main_option("sqlalchemy.url")
-            context.configure(
-                url=url,
-                target_metadata=target_metadata,
-                literal_binds=True,
-                compare_type=True,
-                compare_server_default=True,
-                render_as_batch=True,
-            )
-            with context.begin_transaction():
-                context.run_migrations()
-        
-        def do_run_migrations(connection):
-            context.configure(
-                connection=connection,
-                target_metadata=target_metadata,
-                compare_type=True,
-                compare_server_default=True,
-                render_as_batch=True,
-            )
-            with context.begin_transaction():
-                context.run_migrations()
-        
-        async def run_migrations_online_async():
-            connectable = create_async_engine(
-                config.get_main_option("sqlalchemy.url"),
-                poolclass=pool.NullPool,
-                future=True,
-            )
-            async with connectable.connect() as connection:
-                await connection.run_sync(do_run_migrations)
-            await connectable.dispose()
-        
-        def run_migrations_online_sync():
-            connectable = engine_from_config(
-                config.get_section(config.config_ini_section),
-                prefix="sqlalchemy.",
-                poolclass=pool.NullPool,
-                future=True,
-            )
-            with connectable.connect() as connection:
-                do_run_migrations(connection)
-            connectable.dispose()
-        
-        if context.is_offline_mode():
-            run_migrations_offline()
-        else:
-            {run_cmd}
-        """
+        content = dedent(f"""\
+from __future__ import annotations
+import os
+import sys
+import asyncio
+import logging
+from pathlib import Path
+from logging.config import fileConfig
+
+from alembic import context
+from sqlalchemy import pool
+from sqlalchemy import engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.engine.url import make_url
+
+# --- Ensure project root and src/ on sys.path ---
+ROOT = Path(__file__).resolve().parents[1]  # migrations/ -> project root
+for p in (ROOT, ROOT / "src"):
+    s = str(p)
+    if p.exists() and s not in sys.path:
+        sys.path.insert(0, s)
+
+# --- App logging (optional) ---
+USE_APP_LOGGING = os.getenv("ALEMBIC_USE_APP_LOGGING", "1") == "1"
+if USE_APP_LOGGING:
+    try:
+        from svc_infra.app.logging import setup_logging
+        setup_logging(level=os.getenv("LOG_LEVEL"), fmt=os.getenv("LOG_FORMAT"))
+        logging.getLogger(__name__).debug("Alembic using app logging setup.")
+    except Exception as e:
+        USE_APP_LOGGING = False
+        print(f"[alembic] App logging import failed: {{e}}. Falling back to fileConfig.")
+
+# --- Alembic config & logging ---
+config = context.config
+if not USE_APP_LOGGING and config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+    logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
+
+# --- Database URL override via env ---
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+
+# --- Models/Base wiring ---
+models_module = "{normalized_models_module}"
+module = __import__(models_module, fromlist=["Base"])
+target_metadata = getattr(module, "Base").metadata
+
+# --- Choose async/sync path from URL automatically ---
+url_str = config.get_main_option("sqlalchemy.url") or ""
+driver = ""
+try:
+    driver = make_url(url_str).get_dialect().driver  # 'asyncpg', 'psycopg2', etc.
+except Exception:
+    pass
+is_async = driver in {{"asyncpg", "aiosqlite"}}
+
+def run_migrations_offline():
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        compare_type=True,
+        compare_server_default=True,
+        render_as_batch=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+def do_run_migrations(connection):
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        compare_server_default=True,
+        render_as_batch=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+async def run_migrations_online_async():
+    connectable = create_async_engine(
+        config.get_main_option("sqlalchemy.url"),
+        poolclass=pool.NullPool,
+        future=True,
+    )
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+    await connectable.dispose()
+
+def run_migrations_online_sync():
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+        future=True,
+    )
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
+    connectable.dispose()
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    {run_cmd}
+""")
         env_py.write_text(content, encoding="utf-8")
         typer.echo(f"Wrote {env_py}")
     else:
