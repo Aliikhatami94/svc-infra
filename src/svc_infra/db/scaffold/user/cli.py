@@ -51,15 +51,17 @@ class UserUpdate(BaseModel):
 
 USER_ROUTER_TEMPLATE = """\
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, status
 from typing import Sequence
 from svc_infra.db.integration.fastapi import SessionDep  # provides AsyncSession via DI
-from svc_infra.db.repository.base import Repository, paginate, Page
+from svc_infra.db.repository.base import Repository, paginate
 from .schemas import UserCreate, UserRead, UserUpdate   # adjust import to your layout
 from .models import User                                # adjust import to your layout
 
-router = APIRouter(prefix="/users", tags=["users"])
+ROUTER_TAG = "users"
+ROUTER_PREFIX = "/_db/users"
+INCLUDE_ROUTER_IN_SCHEMA = False  # set to True to expose in OpenAPI docs
+router = APIRouter()
 
 @router.get("/", response_model=Sequence[UserRead])
 async def list_users(session: SessionDep, limit: int = 50, offset: int = 0):
@@ -108,14 +110,26 @@ async def delete_user(user_id: str, session: SessionDep):
 
 # --- helpers -----------------------------------------------------------------
 
+def _ensure_pkg_init(dir_path: Path) -> None:
+    """Ensure the directory is a Python package by creating __init__.py if missing."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    init_file = dir_path / "__init__.py"
+    if not init_file.exists():
+        init_file.write_text("", encoding="utf-8")
+        typer.echo(f"✔ Created {init_file}")
+
+
 def _write_file(path: str, content: str, overwrite: bool):
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
+    # Ensure the target directory is a package
+    _ensure_pkg_init(p.parent)
     if p.exists() and not overwrite:
         typer.echo(f"✖ File exists (use --overwrite to replace): {p}")
         raise typer.Exit(code=1)
     p.write_text(content, encoding="utf-8")
     typer.echo(f"✔ Wrote {p}")
+
 
 def _guess_import_note(path: str, kind: str):
     # Quick tip to show how to include the file after writing
@@ -135,6 +149,7 @@ def scaffold_models(
     if note:
         typer.echo(note)
 
+
 @app.command("schemas")
 def scaffold_schemas(
         path: str = typer.Option(..., "--path", help="Where to write the Pydantic schemas."),
@@ -144,6 +159,7 @@ def scaffold_schemas(
     note = _guess_import_note(path, "schemas")
     if note:
         typer.echo(note)
+
 
 @app.command("routers")
 def scaffold_routers(
@@ -174,8 +190,10 @@ def scaffold_any(
     if routers_path:
         _write_file(routers_path, USER_ROUTER_TEMPLATE, overwrite)
 
+
 def run():
     app()
+
 
 if __name__ == "__main__":
     run()
