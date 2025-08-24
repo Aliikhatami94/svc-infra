@@ -5,3 +5,4 @@ svc-infra.iml__pycache__/
 *.pyc
 .pytest_cache/
 *.iml
+*.pypl-token
