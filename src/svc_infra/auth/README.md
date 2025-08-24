@@ -23,6 +23,10 @@ Generate only what you need, where you want it. Use `--overwrite` to replace exi
   - `poetry run svc-auth scaffold-auth-schemas --dest-dir src/my_app/auth`
   - Creates: `schemas.py`
 
+- Settings
+  - `poetry run svc-auth scaffold-auth-settings --dest-dir src/my_app/auth`
+  - Creates: `settings.py`
+
 Notes
 - `--overwrite` is supported on every command.
 
@@ -31,11 +35,12 @@ Notes
 ```bash
 poetry run svc-auth scaffold-auth \
   --models-dir src/my_app/models \
-  --schemas-dir src/my_app/schemas
+  --schemas-dir src/my_app/schemas \
+  --settings-dir src/my_app/auth
 ```
 
 Creates
-- `models.py`, `schemas.py`
+- `models.py`, `schemas.py`, `settings.py`
 
 ## Wire it into your FastAPI app
 
@@ -43,8 +48,6 @@ Creates
   - `from svc_infra.api.fastapi.db import attach_to_app, health_router`
   - Attach DB on startup: `attach_to_app(app, dsn_env="DATABASE_URL")`
   - Optional health route: `app.include_router(health_router())  # default "/_db/health"`
-- Include auth routers you generated:
-  - `from my_app.api.auth.include_routers import include_auth`
   - `include_auth(app)`
 
 ## Requirements
