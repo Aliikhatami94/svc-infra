@@ -16,27 +16,27 @@ poetry run svc-auth --help
 Generate only what you need, where you want it. Use `--overwrite` to replace existing files.
 
 - Models
-  - `poetry run svc-auth scaffold-auth-models --dest-dir src/my_app/models`
+  - `poetry run svc-auth scaffold-auth-models --dest-dir src/my_app/auth`
   - Creates: `models.py`
 
 - Schemas
-  - `poetry run svc-auth scaffold-auth-schemas --dest-dir src/my_app/schemas`
+  - `poetry run svc-auth scaffold-auth-schemas --dest-dir src/my_app/auth`
   - Creates: `schemas.py`
 
 - Settings
-  - `poetry run svc-auth scaffold-auth-settings --dest-dir src/my_app/api/auth`
+  - `poetry run svc-auth scaffold-auth-settings --dest-dir src/my_app/auth`
   - Creates: `settings.py`
 
 - Users router
   - `poetry run svc-auth scaffold-auth-users-router \
-      --dest-dir src/my_app/api/auth \
+      --dest-dir src/my_app/routers \
       --session-dep-import my_app.db.integration_fastapi \
       --auth-prefix /auth`
   - Creates: `users.py`
 
 - OAuth router
   - `poetry run svc-auth scaffold-auth-oauth-router \
-      --dest-dir src/my_app/api/auth \
+      --dest-dir src/my_app/auth \
       --session-dep-import my_app.db.integration_fastapi \
       --oauth-prefix /oauth \
       --post-login-redirect /`
@@ -44,7 +44,7 @@ Generate only what you need, where you want it. Use `--overwrite` to replace exi
 
 - Include file
   - `poetry run svc-auth scaffold-auth-include \
-      --dest-dir src/my_app/api/auth \
+      --dest-dir src/my_app/auth \
       --auth-prefix /auth`
   - Creates: `include_routers.py`
 
