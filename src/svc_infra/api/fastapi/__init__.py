@@ -151,6 +151,9 @@ def create_and_register_api(
     # Apply CORS on parent only
     _setup_cors(parent, public_cors_origins)
 
+    parent.add_middleware(CatchAllExceptionMiddleware)
+    register_error_handlers(parent)
+
     for app_cfg, api_cfg in versions:
         child = _build_child_api(app_cfg, api_cfg)
         mount_path = f"/{api_cfg.version.strip('/')}"  # e.g. "/v0"
