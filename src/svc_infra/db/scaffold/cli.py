@@ -1,200 +1,181 @@
 from __future__ import annotations
-
 from pathlib import Path
+from typing import Optional
 import typer
 
-app = typer.Typer(no_args_is_help=True, add_completion=False)
+app = typer.Typer(help="Scaffold user-management boilerplate: models/schemas/routers.")
 
-def _write(path: Path, content: str, *, overwrite: bool = False) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() and not overwrite:
-        typer.echo(f"SKIP {path} (exists). Use --overwrite to replace.")
-        return
-    path.write_text(content.strip() + "\n", encoding="utf-8")
-    typer.echo(f"WRITE {path}")
+# --- Simple templates (minimal but useful) -----------------------------------
 
-def _slug(name: str) -> str:
-    return "".join(c if c.isalnum() or c in "-_" else "_" for c in name).lower()
-
-# -------- templates (minimal but solid) --------
-
-MODEL_USER = """\
+USER_MODEL_TEMPLATE = """\
 from __future__ import annotations
 import uuid
-import datetime as dt
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, DateTime, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Boolean
 from svc_infra.db.base import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
 
 class User(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "users"
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)  # nullable for oauth-only
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    provider: Mapped[str] = mapped_column(String(32), default="password", nullable=False)  # google, github, apple, password
+    provider_id: Mapped[str | None] = mapped_column(String(128), nullable=True)           # sub/id from the IdP
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)       # null for pure OAuth accounts
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    oauth_accounts: Mapped[list["OAuthAccount"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-
-class OAuthAccount(UUIDMixin, TimestampMixin, Base):
-    __tablename__ = "oauth_accounts"
-    provider: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
-    provider_account_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    access_token: Mapped[str | None] = mapped_column(String(4096))
-    refresh_token: Mapped[str | None] = mapped_column(String(4096))
-    expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
-    user: Mapped["User"] = relationship(back_populates="oauth_accounts")
-    __table_args__ = (UniqueConstraint("provider", "provider_account_id", name="uq_provider_account"),)
 """
 
-SCHEMAS_USER = """\
+USER_SCHEMAS_TEMPLATE = """\
 from __future__ import annotations
 import uuid
-import datetime as dt
 from pydantic import BaseModel, EmailStr, Field
 
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     email: EmailStr
-    password: str | None = None  # optional for oauth-only
+    name: str | None = None
 
-class UserRead(BaseModel):
+class UserCreate(UserBase):
+    password: str | None = Field(default=None, min_length=8)
+    provider: str = "password"
+    provider_id: str | None = None
+
+class UserRead(UserBase):
     id: uuid.UUID
-    email: EmailStr
     is_active: bool
-    class Config:
-        from_attributes = True
+    provider: str
+    provider_id: str | None = None
 
 class UserUpdate(BaseModel):
-    email: EmailStr | None = None
-    password: str | None = None
+    name: str | None = None
     is_active: bool | None = None
-
-class OAuthAccountRead(BaseModel):
-    id: uuid.UUID
-    provider: str
-    provider_account_id: str
-    expires_at: dt.datetime | None = None
-    class Config:
-        from_attributes = True
 """
 
-ROUTER_USER = """\
+USER_ROUTER_TEMPLATE = """\
 from __future__ import annotations
-import uuid
-from typing import Annotated, Sequence
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from svc_infra.db.integration.fastapi import SessionDep, UoWDep
-from svc_infra.db.repository.base import Repository
-from .schemas import UserCreate, UserRead, UserUpdate
-from .models import User, OAuthAccount
+from typing import Sequence
+from svc_infra.db.integration.fastapi import SessionDep  # provides AsyncSession via DI
+from svc_infra.db.repository.base import Repository, paginate, Page
+from .schemas import UserCreate, UserRead, UserUpdate   # adjust import to your layout
+from .models import User                                # adjust import to your layout
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-# NOTE: replace with your real hashing/JWT
-def _hash(pw: str) -> str: return "hashed:" + pw
+@router.get("/", response_model=Sequence[UserRead])
+async def list_users(session: SessionDep, limit: int = 50, offset: int = 0):
+    repo = Repository[User](session, User)
+    stmt = repo._base_select()  # includes soft-delete filtering if mixin present
+    page = await paginate(session, stmt, limit=limit, offset=offset)
+    return [UserRead.model_validate(x.__dict__) for x in page.items]
 
-@router.post("", response_model=UserRead, status_code=201)
-async def create_user(payload: UserCreate, uow: UoWDep):
-    repo = uow.repo(User)
-    # very basic uniqueness check
-    existing = await repo.list(where={"email": str(payload.email)}, limit=1)
-    if existing:
-        raise HTTPException(status_code=409, detail="Email already registered")
-    data = {"email": str(payload.email), "hashed_password": _hash(payload.password) if payload.password else None}
-    user = await repo.create(**data)
-    return user
-
-@router.get("", response_model=list[UserRead])
-async def list_users(limit: int = 50, offset: int = 0, uow: UoWDep = Depends()):
-    repo = uow.repo(User)
-    return await repo.list(limit=limit, offset=offset)
+@router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+async def create_user(payload: UserCreate, session: SessionDep):
+    repo = Repository[User](session, User)
+    # hashing omitted for brevity — plug your auth layer here
+    obj = await repo.create(
+        email=str(payload.email),
+        name=payload.name,
+        provider=payload.provider,
+        provider_id=payload.provider_id,
+        hashed_password=None if payload.password is None else payload.password,
+    )
+    return UserRead.model_validate(obj.__dict__)
 
 @router.get("/{user_id}", response_model=UserRead)
-async def get_user(user_id: uuid.UUID, uow: UoWDep = Depends()):
-    repo = uow.repo(User)
-    user = await repo.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404)
-    return user
+async def get_user(user_id: str, session: SessionDep):
+    repo = Repository[User](session, User)
+    obj = await repo.get(user_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserRead.model_validate(obj.__dict__)
 
 @router.patch("/{user_id}", response_model=UserRead)
-async def update_user(user_id: uuid.UUID, payload: UserUpdate, uow: UoWDep = Depends()):
-    repo = uow.repo(User)
-    data = payload.model_dump(exclude_unset=True)
-    if "password" in data:
-        data["hashed_password"] = _hash(data.pop("password")) if data["hashed_password"] is not None else None
-    user = await repo.update(user_id, **data)
-    if not user:
-        raise HTTPException(status_code=404)
-    return user
+async def update_user(user_id: str, payload: UserUpdate, session: SessionDep):
+    repo = Repository[User](session, User)
+    obj = await repo.update(user_id, **{k: v for k, v in payload.model_dump(exclude_unset=True).items()})
+    if not obj:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserRead.model_validate(obj.__dict__)
 
-@router.delete("/{user_id}", status_code=204)
-async def delete_user(user_id: uuid.UUID, uow: UoWDep = Depends()):
-    repo = uow.repo(User)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(user_id: str, session: SessionDep):
+    repo = Repository[User](session, User)
     deleted = await repo.delete(user_id)
-    if deleted == 0:
-        raise HTTPException(status_code=404)
-    return
-
-# --- OAuth (skeleton) ---
-@router.post("/oauth/{provider}/start", status_code=202)
-async def oauth_start(provider: str):
-    # return redirect URL for provider (plug your OAuth lib here)
-    return {"provider": provider, "message": "Implement start: return provider auth URL"}
-
-@router.get("/oauth/{provider}/callback", response_model=UserRead)
-async def oauth_callback(provider: str, code: str, uow: UoWDep = Depends()):
-    # exchange code, fetch profile -> provider_account_id, email
-    # create or link user + OAuthAccount; this is a stub
-    repo = uow.repo(User)
-    users = await repo.list(where={"email": "stub@example.com"}, limit=1)
-    user = users[0] if users else await repo.create(email="stub@example.com", hashed_password=None, is_active=True)
-    return user
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User not found")
+    return None
 """
 
-README_SNIPPET = """\
-Scaffolded auth boilerplate:
-- SQLAlchemy models: User, OAuthAccount
-- Pydantic schemas: UserCreate, UserRead, UserUpdate, OAuthAccountRead
-- FastAPI router with CRUD + OAuth stubs
-Wire it up:
-    from svc_infra.db.integration.fastapi import attach_db
-    from myapp.api.users.router import router as users_router
-    app = FastAPI()
-    attach_db(app)
-    app.include_router(users_router)
-"""
+# --- helpers -----------------------------------------------------------------
 
-# -------- command: scaffold auth --------
+def _write_file(path: str, content: str, overwrite: bool):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if p.exists() and not overwrite:
+        typer.echo(f"✖ File exists (use --overwrite to replace): {p}")
+        raise typer.Exit(code=1)
+    p.write_text(content, encoding="utf-8")
+    typer.echo(f"✔ Wrote {p}")
 
-@app.command("auth")
-def auth(
-        models_path: str = typer.Option(..., help="Where to put SQLAlchemy models file"),
-        schemas_path: str = typer.Option(..., help="Where to put Pydantic schemas file"),
-        routers_path: str = typer.Option(..., help="Where to put FastAPI router file"),
-        package_name: str = typer.Option("users", help="logical package name (used only in router import lines you may tweak)"),
-        overwrite: bool = typer.Option(False, help="Overwrite files if present"),
+def _guess_import_note(path: str, kind: str):
+    # Quick tip to show how to include the file after writing
+    if kind == "routers":
+        return "Remember to include the router in your FastAPI app: `app.include_router(router)`."
+    return None
+
+# --- subcommands: each independent ------------------------------------------
+
+@app.command("models")
+def scaffold_models(
+        path: str = typer.Option(..., "--path", help="Where to write the User model file."),
+        overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite if file exists"),
 ):
-    models_file = Path(models_path)
-    schemas_file = Path(schemas_path)
-    routers_file = Path(routers_path)
+    _write_file(path, USER_MODEL_TEMPLATE, overwrite)
+    note = _guess_import_note(path, "models")
+    if note:
+        typer.echo(note)
 
-    # write files
-    _write(models_file, MODEL_USER, overwrite=overwrite)
-    _write(schemas_file, SCHEMAS_USER, overwrite=overwrite)
+@app.command("schemas")
+def scaffold_schemas(
+        path: str = typer.Option(..., "--path", help="Where to write the Pydantic schemas."),
+        overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite if file exists"),
+):
+    _write_file(path, USER_SCHEMAS_TEMPLATE, overwrite)
+    note = _guess_import_note(path, "schemas")
+    if note:
+        typer.echo(note)
 
-    # router needs relative imports that match user’s layout.
-    # We keep them local ('.models', '.schemas') and rely on user placing them under same pkg.
-    # If they’re separate dirs, they can adjust the import lines quickly.
-    # To help, we emit the file as-is, and add a short README tip.
-    _write(routers_file, ROUTER_USER, overwrite=overwrite)
+@app.command("routers")
+def scaffold_routers(
+        path: str = typer.Option(..., "--path", help="Where to write the FastAPI router."),
+        overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite if file exists"),
+):
+    _write_file(path, USER_ROUTER_TEMPLATE, overwrite)
+    note = _guess_import_note(path, "routers")
+    if note:
+        typer.echo(note)
 
-    # readme next to router for quick wiring reminder
-    _write(routers_file.parent / "README_AUTH_SCAFFOLD.txt", README_SNIPPET, overwrite=overwrite)
+# --- umbrella command: any subset -------------------------------------------
 
-    typer.echo("Done. Review import lines if models/schemas live in different packages.")
+@app.command("new")
+def scaffold_any(
+        models_path: Optional[str] = typer.Option(None, "--models-path", help="Output path for models.py"),
+        schemas_path: Optional[str] = typer.Option(None, "--schemas-path", help="Output path for schemas.py"),
+        routers_path: Optional[str] = typer.Option(None, "--routers-path", help="Output path for routers.py"),
+        overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite if a target file exists"),
+):
+    if not any([models_path, schemas_path, routers_path]):
+        typer.echo("Nothing to do. Provide at least one of --models-path / --schemas-path / --routers-path.")
+        raise typer.Exit(code=1)
+    if models_path:
+        _write_file(models_path, USER_MODEL_TEMPLATE, overwrite)
+    if schemas_path:
+        _write_file(schemas_path, USER_SCHEMAS_TEMPLATE, overwrite)
+    if routers_path:
+        _write_file(routers_path, USER_ROUTER_TEMPLATE, overwrite)
 
-def run():
+def main():
     app()
 
 if __name__ == "__main__":
-    run()
+    main()
