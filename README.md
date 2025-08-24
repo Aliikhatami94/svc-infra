@@ -13,3 +13,4 @@ Infrastructure for building and deploying prod-ready applications:
 poetry add svc-infra
 # or
 pip install svc-infra
+```

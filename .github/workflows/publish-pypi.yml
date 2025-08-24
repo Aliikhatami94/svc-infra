@@ -1,0 +1,64 @@
+name: Auto publish to PyPI on main
+
+on:
+  push:
+    branches: [ main ]
+
+concurrency:
+  group: publish-pypi
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to push tags/commits
+      id-token: write   # not needed, but common for OIDC flows
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # we need tags/history to push a new tag
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install deps (no dev)
+        run: poetry install --no-root --only main
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Bump patch version in pyproject.toml on every push to main
+      - name: Bump patch version
+        id: bump
+        run: |
+          poetry version patch
+          NEW_VER=$(poetry version -s)
+          echo "new_version=$NEW_VER" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        run: |
+          NEW_VER="${{ steps.bump.outputs.new_version }}"
+          git add pyproject.toml
+          git commit -m "ci: release v${NEW_VER} [skip ci]" || echo "No changes to commit"
+          git tag "v${NEW_VER}" || echo "Tag exists; continuing"
+          git push || true
+          git push --tags || true
+
+      - name: Build
+        run: poetry build
+
+      - name: Publish to PyPI
+        env:
+          POETRY_HTTP_BASIC_PYPI_USERNAME: __token__
+          POETRY_HTTP_BASIC_PYPI_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: poetry publish
