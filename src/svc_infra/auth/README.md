@@ -56,7 +56,6 @@ poetry run svc-auth scaffold-auth \
   --models-dir src/my_app/models \
   --schemas-dir src/my_app/schemas \
   --routers-dir src/my_app/api/auth \
-  --sqlalchemy-base-import "my_app.db.base import Base" \
   --auth-prefix "/auth" \
   --oauth-prefix "/oauth" \
   --post-login-redirect "/"
@@ -78,20 +77,13 @@ Creates
 
 ## Requirements
 
-- You must provide a SQLAlchemy base and DB session dependency:
-  - Base example: `my_app/db/base.py` exports `Base`
-  - Session dependency example: `my_app/db/integration_fastapi.py` defines:
-    - `SessionDep` (FastAPI dependency that yields `AsyncSession`)
-    - Optionally `attach_to_app(app)` to initialize engine/pool
+- Register DB lifecycle once at startup: `attach_to_app(app, dsn_env="DATABASE_URL")`
 - Auth settings via env (examples):
   - `AUTH_JWT_SECRET`, `AUTH_JWT_LIFETIME_SECONDS`
   - Optional OAuth: `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET`, etc.
 
 ## Troubleshooting
 
-- ImportError: `SessionDep` not found
-  - Ensure your module path (e.g., `my_app.db.integration_fastapi`) defines `SessionDep`.
 - Async driver errors (psycopg2, pymysql, sqlite)
   - When using the packaged DB helpers, sync URLs are coerced to async (asyncpg/aiomysql/aiosqlite).
   - If writing your own integration, use async drivers: `postgresql+asyncpg://`, `mysql+aiomysql://`, `sqlite+aiosqlite://`.
-
