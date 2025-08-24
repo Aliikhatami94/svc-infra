@@ -23,10 +23,6 @@ Generate only what you need, where you want it. Use `--overwrite` to replace exi
   - `poetry run svc-auth scaffold-auth-schemas --dest-dir src/my_app/auth`
   - Creates: `schemas.py`
 
-- Settings
-  - `poetry run svc-auth scaffold-auth-settings --dest-dir src/my_app/auth`
-  - Creates: `settings.py`
-
 Notes
 - `--overwrite` is supported on every command.
 
@@ -35,12 +31,11 @@ Notes
 ```bash
 poetry run svc-auth scaffold-auth \
   --models-dir src/my_app/models \
-  --schemas-dir src/my_app/schemas \
-  --settings-dir src/my_app/auth
+  --schemas-dir src/my_app/schemas
 ```
 
 Creates
-- `models.py`, `schemas.py`, `settings.py`
+- `models.py`, `schemas.py`
 
 ## Wire it into your FastAPI app
 
