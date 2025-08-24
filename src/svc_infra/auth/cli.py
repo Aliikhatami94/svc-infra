@@ -18,8 +18,8 @@ def _write(dest: Path, content: str, overwrite: bool):
     dest.write_text(content, encoding="utf-8")
     typer.echo(f"Wrote {dest}")
 
-@app.command("auth")
-def scaffold_auth(
+@app.command("scaffold")
+def scaffold(
         models_dir: Path = typer.Option(..., help="Where to place models.py"),
         schemas_dir: Path = typer.Option(..., help="Where to place schemas.py"),
         routers_dir: Path = typer.Option(..., help="Where to place routers (users + oauth + include)"),
