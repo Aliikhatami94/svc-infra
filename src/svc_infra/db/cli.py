@@ -23,13 +23,31 @@ def _load_config(project_root: Path, database_url: Optional[str]) -> Config:
     cfg.attributes["configure_logger"] = False
     return cfg
 
-# NEW: helper to normalize the models module
-def _normalize_models_module(raw: str) -> str:
-    # strip any leading "src." and redundant dots/spaces
-    m = raw.strip().lstrip(".")
-    if m.startswith("src."):
-        m = m[4:]
-    return m
+def _normalize_models_module(raw: str, project_root: Path) -> str:
+    p = raw.strip().replace("\\", "/")
+
+    # If it looks like a file path, strip .py
+    if p.endswith(".py"):
+        p = p[:-3]
+
+    # If it's an absolute or project-relative path, drop the project root
+    pr = str(project_root.resolve()).replace("\\", "/").rstrip("/")
+    if p.startswith(pr + "/"):
+        p = p[len(pr) + 1 :]
+
+    # drop leading ./ or /
+    p = p.lstrip("./")
+
+    # drop leading src/
+    if p.startswith("src/"):
+        p = p[4:]
+
+    # convert slashes to dots
+    if "/" in p:
+        p = p.replace("/", ".")
+
+    # drop any leading dots
+    return p.lstrip(".")
 
 @app.command("init")
 def init(
@@ -41,7 +59,7 @@ def init(
     """Scaffold alembic (alembic.ini, migrations/, env.py) wired to your Base."""
     project_root = project_root.resolve()
     (project_root / AL_EMBIC_DIR).mkdir(parents=True, exist_ok=True)
-    normalized_models_module = _normalize_models_module(models_module)
+    normalized_models_module = _normalize_models_module(models_module, project_root)
 
     # 1) alembic.ini
     ini_path = project_root / ALEMBIC_INI
@@ -139,6 +157,18 @@ if database_url:
 
 # --- Models/Base wiring ---
 models_module = "{normalized_models_module}"
+
+# allow passing file paths accidentally
+_mm = models_module
+if _mm.endswith(".py") or ("/" in _mm) or ("\\" in _mm):
+    _mm = _mm.replace("\\", "/")
+    if _mm.endswith(".py"):
+        _mm = _mm[:-3]
+    if _mm.startswith("src/"):
+        _mm = _mm[4:]
+    _mm = _mm.lstrip("./").replace("/", ".").lstrip(".")
+    models_module = _mm
+
 module = __import__(models_module, fromlist=["Base"])
 target_metadata = getattr(module, "Base").metadata
 
