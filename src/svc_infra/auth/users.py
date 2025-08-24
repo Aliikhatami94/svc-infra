@@ -7,13 +7,15 @@ from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
+from .settings import get_auth_settings
+
+auth_settings = get_auth_settings()
 
 def get_fastapi_users(
     user_model: Any,
     user_schema_read: Any,
     user_schema_create: Any,
     user_schema_update: Any,
-    auth_settings: Any,
     auth_prefix: str = "/auth",
 ) -> tuple[FastAPIUsers, AuthenticationBackend, APIRouter, APIRouter, Callable]:
     """Factory that wires FastAPI Users with JWT backend and returns routers.

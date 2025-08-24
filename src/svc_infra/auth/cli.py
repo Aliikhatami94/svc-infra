@@ -35,7 +35,7 @@ def scaffold_auth(
 
     _write(Path(models_dir) / "models.py", _render("models.py.tmpl", ctx_common), overwrite)
     _write(Path(schemas_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
-    _write(Path(settings_dir) / "settings.py", _render("settings.py.tmpl", {}), overwrite)
+    _write(Path(settings_dir) / "settings.py", _render("settings.py", {}), overwrite)
 
 
 # One-by-one scaffolders for simplicity
@@ -61,7 +61,7 @@ def scaffold_auth_settings(
     dest_dir: Path = typer.Option(..., help="Directory to place auth settings.py"),
     overwrite: bool = typer.Option(False, help="Overwrite if exists"),
 ):
-    _write(Path(dest_dir) / "settings.py", _render("settings.py.tmpl", {}), overwrite)
+    _write(Path(dest_dir) / "settings.py", _render("settings.py", {}), overwrite)
 
 
 

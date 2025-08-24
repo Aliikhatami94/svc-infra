@@ -4,6 +4,10 @@ from .users import get_fastapi_users
 from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings
 
+from .settings import get_auth_settings
+
+auth_settings = get_auth_settings()
+
 def include_auth(
         app: FastAPI,
         *,
@@ -11,7 +15,6 @@ def include_auth(
         schema_read,
         schema_create,
         schema_update,
-        auth_settings,
         post_login_redirect: str = "/",
         auth_prefix: str = "/auth",
         oauth_prefix: str = "/auth/oauth",
@@ -21,7 +24,6 @@ def include_auth(
         user_schema_read=schema_read,
         user_schema_create=schema_create,
         user_schema_update=schema_update,
-        auth_settings=auth_settings,
         auth_prefix=auth_prefix,
     )
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict
+from typing import Dict, Any
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from authlib.integrations.starlette_client import OAuth
@@ -12,33 +12,36 @@ from svc_infra.api.fastapi.db.integration import SessionDep
 def oauth_router_with_backend(
         user_model: type,
         auth_backend: AuthenticationBackend,
-        providers: Dict[str, Dict[str, str]],
+        providers: Dict[str, Dict[str, Any]],
         post_login_redirect: str = "/",
         prefix: str = "/auth/oauth",
 ) -> APIRouter:
-    """OAuth router that reuses FastAPI Users' auth backend (single source of truth)."""
     oauth = OAuth()
 
-    if "google" in providers:
-        p = providers["google"]
-        oauth.register(
-            "google",
-            client_id=p["client_id"],
-            client_secret=p["client_secret"],
-            server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-            client_kwargs={"scope": "openid email profile"},
-        )
-    if "github" in providers:
-        p = providers["github"]
-        oauth.register(
-            "github",
-            client_id=p["client_id"],
-            client_secret=p["client_secret"],
-            authorize_url="https://github.com/login/oauth/authorize",
-            access_token_url="https://github.com/login/oauth/access_token",
-            api_base_url="https://api.github.com/",
-            client_kwargs={"scope": "user:email"},
-        )
+    # Register all providers
+    for name, cfg in providers.items():
+        kind = cfg.get("kind")
+        if kind == "oidc":
+            oauth.register(
+                name,
+                client_id=cfg["client_id"],
+                client_secret=cfg["client_secret"],
+                server_metadata_url=f"{cfg['issuer'].rstrip('/')}/.well-known/openid-configuration",
+                client_kwargs={"scope": cfg.get("scope", "openid email profile")},
+            )
+        elif kind in ("github", "linkedin"):
+            oauth.register(
+                name,
+                client_id=cfg["client_id"],
+                client_secret=cfg["client_secret"],
+                authorize_url=cfg["authorize_url"],
+                access_token_url=cfg["access_token_url"],
+                api_base_url=cfg["api_base_url"],
+                client_kwargs={"scope": cfg.get("scope", "")},
+            )
+        else:
+            # you can add more branches (facebook, apple*) as needed
+            pass
 
     r = APIRouter(prefix=prefix, tags=["auth:oauth"])
 
@@ -58,26 +61,48 @@ def oauth_router_with_backend(
 
         token = await client.authorize_access_token(request)
 
-        if provider == "google":
+        email = None
+        full_name = None
+
+        cfg = providers.get(provider, {})
+        kind = cfg.get("kind")
+
+        if kind == "oidc":
             userinfo = token.get("userinfo") or await client.parse_id_token(request, token)
             email = userinfo.get("email")
-            full_name = userinfo.get("name")
-        elif provider == "github":
+            full_name = userinfo.get("name") or userinfo.get("preferred_username")
+        elif kind == "github":
             resp = await client.get("user", token=token)
             data = resp.json()
-            email = data.get("email") or None
+            email = data.get("email")
             if not email:
                 emails = (await client.get("user/emails", token=token)).json()
                 primary = next((e for e in emails if e.get("primary")), emails[0] if emails else {})
                 email = primary.get("email")
-            full_name = data.get("name")
+            full_name = data.get("name") or data.get("login")
+        elif kind == "linkedin":
+            # profile
+            me = (await client.get("me", token=token)).json()
+            # email
+            em = (await client.get(
+                "emailAddress?q=members&projection=(elements*(handle~))",
+                token=token
+            )).json()
+            elements = em.get("elements") or []
+            if elements and "handle~" in elements[0]:
+                email = elements[0]["handle~"].get("emailAddress")
+            localizedFirst = (((me.get("firstName") or {}).get("localized")) or {}).values()
+            localizedLast = (((me.get("lastName") or {}).get("localized")) or {}).values()
+            first = next(iter(localizedFirst), None)
+            last = next(iter(localizedLast), None)
+            full_name = " ".join([x for x in [first, last] if x])
         else:
-            raise HTTPException(400, "Unsupported provider")
+            raise HTTPException(400, "Unsupported provider kind")
 
         if not email:
             raise HTTPException(400, "No email from provider")
 
-        # Find or create user
+        # Upsert user
         existing = (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
         if existing:
             user = existing
@@ -89,7 +114,6 @@ def oauth_router_with_backend(
             session.add(user)
             await session.flush()
 
-        # Reuse the backend's strategy
         jwt = (auth_backend.get_strategy)().write_token(user)
         return RedirectResponse(url=f"{post_login_redirect}?token={jwt}")
 
