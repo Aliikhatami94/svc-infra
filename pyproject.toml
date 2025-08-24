@@ -32,7 +32,7 @@ pytest-asyncio = "^0.23.8"
 
 [tool.poetry.scripts]
 svc-infra-auth = "svc_infra.auth.cli:app"
-svc-infra-db = "svc_infra.db.db_cli:app"
+svc-infra-db = "svc_infra.db.cli:app"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

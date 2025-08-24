@@ -1,4 +1,3 @@
-# svc_infra/db/db_cli.py
 from __future__ import annotations
 import os
 from pathlib import Path
