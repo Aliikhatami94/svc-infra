@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from textwrap import dedent
 from typing import Optional
+from alembic.script import ScriptDirectory
 
 import typer
 from alembic import command
@@ -402,36 +403,51 @@ def _latest_version_file(versions_dir: Path) -> Path | None:
     # newest by mtime
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
+def _script_dir(cfg: Config) -> ScriptDirectory:
+    return ScriptDirectory.from_config(cfg)
+
+def _single_head_or_none(script: ScriptDirectory) -> str | None:
+    heads = script.get_heads()
+    if len(heads) == 0:
+        return None
+    if len(heads) == 1:
+        return heads[0]
+    # Multiple heads: let caller decide or raise
+    raise RuntimeError(f"Multiple heads present: {', '.join(heads)}")
+
 @app.command("drop-table")
 def drop_table(
-        table: str = typer.Argument(..., help="Table name to drop. Use schema.table for a specific schema."),
-        cascade: bool = typer.Option(False, help="Use CASCADE when dropping."),
-        if_exists: bool = typer.Option(True, help="Use IF EXISTS when dropping."),
-        message: Optional[str] = typer.Option(None, "-m", "--message", help="Custom migration message."),
-        apply: bool = typer.Option(False, help="Run upgrade head after creating the revision."),
-        project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
+        table: str = typer.Argument(..., help="Table name (optionally schema.table)"),
+        cascade: bool = typer.Option(False, help="Use CASCADE"),
+        if_exists: bool = typer.Option(True, help="Use IF EXISTS"),
+        message: Optional[str] = typer.Option(None, "-m", "--message", help="Migration message"),
+        base: Optional[str] = typer.Option(None, help="Force down_revision to this revision id (use when multiple heads)"),
+        apply: bool = typer.Option(False, help="Run upgrade head after creating the revision"),
+        project_root: Path = typer.Option(Path.cwd(), help="Root with alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
-    """
-    Create a migration that drops a specific table (optionally CASCADE) and
-    optionally apply it immediately.
-    """
     cfg = _load_config(project_root.resolve(), database_url)
+    script = _script_dir(cfg)
 
-    # 1) create an empty revision (no autogenerate)
     msg = message or f"drop table {table}"
     command.revision(cfg, message=msg, autogenerate=False)
 
-    # 2) locate the just-created file
-    versions_dir = _versions_dir(project_root.resolve())
+    versions_dir = project_root.resolve() / AL_EMBIC_DIR / "versions"
     rev_file = _latest_version_file(versions_dir)
     if rev_file is None:
         raise typer.Exit(code=1)
 
-    # 3) write upgrade/downgrade content
-    # Build fully-qualified identifier & SQL
-    fq_table = table.strip()  # allow "schema.table" or just "table"
+    # Decide down_revision
+    try:
+        down_rev = base or _single_head_or_none(script)
+    except RuntimeError as e:
+        typer.echo(str(e))
+        typer.echo("Tip: re-run with --base <rev> or merge heads first.")
+        raise typer.Exit(code=2)
+
+    fq_table = table.strip()
     sql = f'DROP TABLE {"IF EXISTS " if if_exists else ""}{fq_table}{" CASCADE" if cascade else ""};'
+    rev_id = rev_file.stem.split("_", 1)[0]
 
     content = f'''""" {msg} """
 
@@ -441,29 +457,44 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = "{rev_file.stem.split("_", 1)[0]}"
-down_revision = None  # will be filled by Alembic scaffold
+revision = "{rev_id}"
+down_revision = {repr(down_rev) if down_rev else "None"}
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # Using raw SQL so we can support IF EXISTS and CASCADE
     op.execute({sql!r})
 
 
 def downgrade() -> None:
-    # Irreversible without full original table definition
+    # Irreversible without full table definition
     pass
 '''
     rev_file.write_text(content, encoding="utf-8")
     typer.echo(f"Wrote drop migration: {rev_file}")
 
-    # 4) optionally apply
     if apply:
         command.upgrade(cfg, "head")
         typer.echo("Applied migration (upgrade head).")
 
+
+@app.command("merge-heads")
+def merge_heads(
+        message: str = typer.Option("merge heads", "-m", "--message"),
+        project_root: Path = typer.Option(Path.cwd()),
+        database_url: Optional[str] = typer.Option(None),
+):
+    cfg = _load_config(project_root.resolve(), database_url)
+    script = ScriptDirectory.from_config(cfg)
+    heads = script.get_heads()
+    if len(heads) <= 1:
+        typer.echo("Nothing to merge (0 or 1 head).")
+        return
+    # Create a merge revision that depends on all current heads
+    from alembic import command
+    command.merge(cfg, heads=heads, message=message)
+    typer.echo(f"Created merge for heads: {', '.join(heads)}")
 
 if __name__ == "__main__":
     app()
