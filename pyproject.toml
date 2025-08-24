@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "svc-infra"
-version = "0.1.5"
+version = "0.1.6"
 description = "Infrastructure for building and deploying prod-ready services"
 authors = ["Ali Khatami <aliikhatami94@gmail.com>"]
 readme = "README.md"
