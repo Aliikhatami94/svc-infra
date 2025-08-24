@@ -28,13 +28,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install Poetry
-        run: pip install "poetry==1.8.3"
+        run: pip install "poetry==2.0.1"
 
-      - name: Regenerate lockfile
-        run: poetry lock --no-update
+      - name: Check lock is up-to-date
+        run: poetry lock --check
 
       - name: Install deps (no dev)
-        run: poetry install --no-root --only main
+        run: poetry install --no-root --only main --sync
 
       - name: Configure git identity
         run: |
