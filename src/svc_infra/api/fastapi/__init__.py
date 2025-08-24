@@ -72,10 +72,6 @@ def _build_child_api(
         allow_headers=["*"],
     )
 
-    # Error handling
-    child.add_middleware(CatchAllExceptionMiddleware)
-    register_error_handlers(child)
-
     # Register core routers (NO global version prefix here)
     register_all_routers(
         child,
