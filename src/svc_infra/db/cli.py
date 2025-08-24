@@ -25,44 +25,43 @@ def _load_config(project_root: Path, database_url: Optional[str]) -> Config:
     return cfg
 
 
-def _normalize_models_module(raw: str, project_root: Path) -> str:
-    p = raw.strip().replace("\\", "/")
-
-    # If it looks like a file path, strip .py
-    if p.endswith(".py"):
-        p = p[:-3]
-
-    # If it's an absolute or project-relative path, drop project root
-    pr = str(project_root.resolve()).replace("\\", "/").rstrip("/")
-    if p.startswith(pr + "/"):
-        p = p[len(pr) + 1 :]
-
-    # drop leading ./ or /
-    p = p.lstrip("./")
-
-    # drop leading src/
-    if p.startswith("src/"):
-        p = p[4:]
-
-    # convert slashes to dots
-    if "/" in p:
-        p = p.replace("/", ".")
-
-    # drop any leading dots
-    return p.lstrip(".")
+def _infer_default_roots(project_root: Path) -> list[str]:
+    """
+    Find top-level importable packages under project root and src/.
+    Returns a list of package names (directories with __init__.py).
+    """
+    roots: list[str] = []
+    for base in (project_root, project_root / "src"):
+        if not base.exists():
+            continue
+        for d in base.iterdir():
+            if d.is_dir() and (d / "__init__.py").exists():
+                roots.append(d.name)
+    # de-dupe but keep order
+    seen = set()
+    out = []
+    for r in roots:
+        if r not in seen:
+            seen.add(r)
+            out.append(r)
+    return out
 
 
 @app.command("init")
 def init(
         project_root: Path = typer.Option(Path.cwd(), help="Root of your app (where alembic.ini should live)"),
-        models_module: str = typer.Option(..., help="Import path to your models module exposing Base (e.g. 'app.models')"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL; defaults to env"),
         async_db: bool = typer.Option(True, help="Use async engine (postgresql+asyncpg)"),
+        discover_packages: Optional[str] = typer.Option(
+            None,
+            help="Comma-separated top-level packages to crawl for models (defaults to packages under project root and src/)",
+        ),
 ):
-    """Scaffold alembic (alembic.ini, migrations/, env.py, script.py.mako) wired to your Base."""
+    """
+    Scaffold alembic (alembic.ini, migrations/, env.py, script.py.mako) wired to *all* Declarative Bases discovered.
+    """
     project_root = project_root.resolve()
     (project_root / AL_EMBIC_DIR).mkdir(parents=True, exist_ok=True)
-    normalized_models_module = _normalize_models_module(models_module, project_root)
 
     # 1) alembic.ini
     ini_path = project_root / ALEMBIC_INI
@@ -112,7 +111,13 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
     else:
         typer.echo(f"SKIP {ini_path} (exists)")
 
-    # 2) env.py (async-aware, app-logging-aware)
+    # Figure out which packages to walk for model discovery
+    if discover_packages:
+        discover_root_csv = ",".join([p.strip() for p in discover_packages.split(",") if p.strip()])
+    else:
+        discover_root_csv = ",".join(_infer_default_roots(project_root))  # e.g. "apiframeworks_api,svc_infra"
+
+    # 2) env.py (async-aware, app-logging-aware, model auto-discovery)
     env_py = project_root / AL_EMBIC_DIR / "env.py"
     if not env_py.exists():
         run_cmd = "asyncio.run(run_migrations_online_async())" if async_db else "run_migrations_online_sync()"
@@ -123,14 +128,17 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
             import sys
             import asyncio
             import logging
+            import pkgutil
+            import importlib
             from pathlib import Path
             from logging.config import fileConfig
+            from typing import Iterable, List, Set
 
             from alembic import context
             from sqlalchemy import pool
             from sqlalchemy import engine_from_config
-            from sqlalchemy.ext.asyncio import create_async_engine
             from sqlalchemy.engine.url import make_url
+            from sqlalchemy.orm import DeclarativeBase
 
             # --- Ensure project root and src/ on sys.path ---
             ROOT = Path(__file__).resolve().parents[1]  # migrations/ -> project root
@@ -161,10 +169,54 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
             if database_url:
                 config.set_main_option("sqlalchemy.url", database_url)
 
-            # --- Models/Base wiring ---
-            models_module = "{normalized_models_module}"
-            module = __import__(models_module, fromlist=["Base"])
-            target_metadata = getattr(module, "Base").metadata
+            # --- Auto-discover model modules and collect all metadatas ---
+            # Comma-separated list of top-level packages to crawl. If empty, no-op.
+            DISCOVER_PKGS = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "{discover_root_csv}")
+
+            def _iter_pkg_modules(top_pkg_name: str) -> Iterable[str]:
+                try:
+                    top_pkg = importlib.import_module(top_pkg_name)
+                except Exception:
+                    return []
+                if not hasattr(top_pkg, "__path__"):
+                    # it's a module, not a package
+                    return [top_pkg_name]
+                names = []
+                for m in pkgutil.walk_packages(top_pkg.__path__, prefix=top_pkg.__name__ + "."):
+                    names.append(m.name)
+                return names
+
+            def import_all_under_packages(packages: Iterable[str]) -> None:
+                # Import everything under the listed packages so Declarative models register with their Bases.
+                for pkg_name in packages:
+                    if not pkg_name:
+                        continue
+                    for mod_name in _iter_pkg_modules(pkg_name):
+                        try:
+                            importlib.import_module(mod_name)
+                        except Exception as e:
+                            # Keep discovery resilient; noisy modules shouldn't break migrations
+                            logging.getLogger(__name__).debug(f"[alembic] Skipped import {{mod_name}}: {{e}}")
+
+            def collect_all_metadatas() -> List:
+                # After imports, gather every DeclarativeBase subclass metadata.
+                # This supports multiple Bases across packages.
+                metas: Set = set()
+                try:
+                    for cls in DeclarativeBase.__subclasses__():
+                        md = getattr(cls, "metadata", None)
+                        if md is not None:
+                            metas.add(md)
+                except Exception:
+                    pass
+                return list(metas)
+
+            pkgs = [p.strip() for p in (DISCOVER_PKGS or "").split(",") if p.strip()]
+            import_all_under_packages(pkgs)
+            metadatas = collect_all_metadatas()
+
+            # If nothing found, keep a harmless empty list; Alembic will no-op autogenerate.
+            target_metadata = metadatas
 
             # --- Choose async/sync path from URL automatically ---
             url_str = config.get_main_option("sqlalchemy.url") or ""
@@ -200,6 +252,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                     context.run_migrations()
 
             async def run_migrations_online_async():
+                from sqlalchemy.ext.asyncio import create_async_engine
                 connectable = create_async_engine(
                     config.get_main_option("sqlalchemy.url"),
                     poolclass=pool.NullPool,
@@ -232,6 +285,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         typer.echo(f"SKIP {env_py} (exists)")
 
     # 2.5) script.py.mako (needed for `revision --autogenerate`)
+    # Keep fastapi_users_db_sqlalchemy import so GUID() etc. resolve in generated scripts.
     script_tpl = dedent(
         """\
         \"\"\"${message}
@@ -245,7 +299,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
 
         from alembic import op
         import sqlalchemy as sa
-        import fastapi_users_db_sqlalchemy
+        import fastapi_users_db_sqlalchemy  # noqa: F401  (types used in models/migrations)
 
         # revision identifiers, used by Alembic.
         revision: str = ${repr(up_revision)}
