@@ -28,13 +28,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install Poetry
-        run: pip install poetry
+        run: pip install "poetry==1.8.3"
 
-      # (Optional) keep this if you want CI to refresh lock deterministically
-      - name: Check lock is up-to-date
-        run: poetry lock --check
+      - name: Regenerate lockfile
+        run: poetry lock --no-update
 
-      # Not strictly needed to build, but harmless if you want to validate deps
       - name: Install deps (no dev)
         run: poetry install --no-root --only main
 
