@@ -42,6 +42,7 @@ def include_auth(
             user_model=user_model,
             jwt_strategy=get_jwt_strategy(),
             post_login_redirect=post_login_redirect,
+            settings=auth_settings,
             prefix=oauth_prefix,
         )
     )
