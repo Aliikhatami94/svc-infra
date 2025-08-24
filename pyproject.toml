@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "svc-infra"
-version = "0.0.8"
+version = "0.0.9"
 description = "Infrastructure for building and deploying prod-ready services"
 authors = ["Ali Khatami <aliikhatami94@gmail.com>"]
 readme = "README.md"
@@ -10,20 +10,27 @@ packages = [{ include = "svc_infra", from = "src" }]
 python = ">=3.11,<4.0"
 fastapi = "^0.116.1"
 python-dotenv = "^1.1.1"
-sqlalchemy = "^2.0.42"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.43"}
 pydantic-settings = "^2.10.1"
 mcp = "^1.13.0"
 aiosqlite = "^0.20.0"
 alembic = "^1.13.2"
 greenlet = "^3"
 typer = "^0.16.1"
+fastapi-users = {extras = ["oauth", "sqlalchemy2"], version = "^14.0.1"}
+authlib = "^1.6.2"
+asyncpg = "^0.30.0"
+httpx = "^0.28.1"
+httpx-oauth = "^0.16.1"
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+email-validator = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
 pytest-asyncio = "^0.23.8"
 
 [tool.poetry.scripts]
-scaffold-user-db = "svc_infra.db.scaffold.user.cli:run"
+svc-auth = "svc_infra.auth.cli:app"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

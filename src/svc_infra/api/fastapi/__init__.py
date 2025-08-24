@@ -83,13 +83,6 @@ def _build_child_api(
         prefix="",  # <-- key change
     )
 
-    # Register DB integration routers (e.g., /_db/health)
-    register_all_routers(
-        child,
-        base_package="svc_infra.db.integration.routers",
-        prefix="",
-    )
-
     # Optional custom routers
     if api_config and api_config.routers_path:
         register_all_routers(

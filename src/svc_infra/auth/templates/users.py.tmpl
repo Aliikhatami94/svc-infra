@@ -1,0 +1,45 @@
+from __future__ import annotations
+from typing import AsyncIterator
+from uuid import UUID
+
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi_users import FastAPIUsers
+from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
+from fastapi_users.manager import BaseUserManager, UUIDIDMixin
+from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
+
+from $session_dep_import import SessionDep  # e.g. "from app.db.integration.fastapi import SessionDep"
+from .models import User
+from .schemas import UserRead, UserCreate, UserUpdate
+from .settings import get_auth_settings
+
+async def get_user_db(session: SessionDep) -> AsyncIterator[SQLAlchemyUserDatabase]:
+    yield SQLAlchemyUserDatabase(session, User)
+
+class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
+    reset_password_token_secret = "unused"
+    verification_token_secret = "unused"
+
+async def get_user_manager(user_db=Depends(get_user_db)):
+    yield UserManager(user_db)
+
+def get_jwt_strategy() -> JWTStrategy:
+    settings = get_auth_settings()
+    return JWTStrategy(secret=settings.jwt_secret.get_secret_value(), lifetime_seconds=settings.jwt_lifetime_seconds)
+
+bearer_transport = BearerTransport(tokenUrl="$auth_prefix/jwt/login")
+
+auth_backend = AuthenticationBackend(
+    name="jwt",
+    transport=bearer_transport,
+    get_strategy=get_jwt_strategy,
+)
+
+fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [auth_backend])
+
+def auth_routers():
+    """Return (auth_router, users_router) for inclusion."""
+    auth_router = fastapi_users.get_auth_router(auth_backend, requires_verification=False)
+    users_router = fastapi_users.get_users_router(UserRead, UserCreate, UserUpdate)
+    return auth_router, users_router

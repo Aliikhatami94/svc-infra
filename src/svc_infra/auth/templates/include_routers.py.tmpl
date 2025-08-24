@@ -1,0 +1,10 @@
+from __future__ import annotations
+from fastapi import FastAPI
+from .users import auth_routers
+from .oauth_router import oauth_router
+
+def include_auth(app: FastAPI):
+    auth_router, users_router = auth_routers()
+    app.include_router(auth_router, prefix="$auth_prefix", tags=["auth"])
+    app.include_router(users_router, prefix="$auth_prefix", tags=["users"])
+    app.include_router(oauth_router())

@@ -1,0 +1,24 @@
+from __future__ import annotations
+from typing import Optional
+from pydantic import BaseModel, EmailStr
+
+class UserRead(BaseModel):
+    id: str
+    email: EmailStr
+    full_name: Optional[str] = None
+    is_active: bool
+    is_superuser: bool
+    is_verified: bool
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    full_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
+    is_verified: Optional[bool] = None
