@@ -16,11 +16,11 @@ poetry run svc-auth --help
 Generate only what you need, where you want it. Use `--overwrite` to replace existing files.
 
 - Models
-  - `poetry run svc-auth scaffold-auth-models --dest-dir src/my_app/auth`
+  - `poetry run svc-infra-auth scaffold-auth-models --dest-dir src/my_app/auth`
   - Creates: `models.py`
 
 - Schemas
-  - `poetry run svc-auth scaffold-auth-schemas --dest-dir src/my_app/auth`
+  - `poetry run svc-infra-auth scaffold-auth-schemas --dest-dir src/my_app/auth`
   - Creates: `schemas.py`
 
 Notes
@@ -29,7 +29,7 @@ Notes
 ## Batch scaffolding (all at once)
 
 ```bash
-poetry run svc-auth scaffold-auth \
+poetry run svc-infra-auth scaffold-auth \
   --models-dir src/my_app/models \
   --schemas-dir src/my_app/schemas
 ```

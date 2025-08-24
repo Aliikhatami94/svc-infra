@@ -6,11 +6,11 @@ import typer
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
+TEMPLATES_PKG = "svc_infra.auth.templates"  # must be a package with the .tmpl files
 
 def _render(name: str, ctx: dict[str, str]) -> str:
-    txt = pkg.files("svc_infra.auth.templates").joinpath(name).read_text(encoding="utf-8")
+    txt = pkg.files(TEMPLATES_PKG).joinpath(name).read_text(encoding="utf-8")
     return Template(txt).substitute(**ctx)
-
 
 def _write(dest: Path, content: str, overwrite: bool):
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -20,50 +20,29 @@ def _write(dest: Path, content: str, overwrite: bool):
     dest.write_text(content, encoding="utf-8")
     typer.echo(f"Wrote {dest}")
 
-
 @app.command("scaffold-auth")
 def scaffold_auth(
-    models_dir: Path = typer.Option(..., help="Where to place models.py"),
-    schemas_dir: Path = typer.Option(..., help="Where to place schemas.py"),
-    settings_dir: Path = typer.Option(..., help="Where to place settings.py"),
-    table_name: str = typer.Option("users", help="SQL table name"),
-    overwrite: bool = typer.Option(False, help="Overwrite files if they exist"),
+        models_dir: Path = typer.Option(..., help="Where to place models.py"),
+        schemas_dir: Path = typer.Option(..., help="Where to place schemas.py"),
+        overwrite: bool = typer.Option(False, help="Overwrite files if they exist"),
 ):
-    ctx_common = dict(
-        table_name=table_name,
-    )
-
-    _write(Path(models_dir) / "models.py", _render("models.py.tmpl", ctx_common), overwrite)
+    # no table_name anymore; template should hardcode __tablename__ = "users"
+    _write(Path(models_dir) / "models.py", _render("models.py.tmpl", {}), overwrite)
     _write(Path(schemas_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
-    _write(Path(settings_dir) / "settings.py", _render("settings.py", {}), overwrite)
 
-
-# One-by-one scaffolders for simplicity
 @app.command("scaffold-auth-models")
 def scaffold_auth_models(
-    dest_dir: Path = typer.Option(..., help="Directory to place models.py"),
-    table_name: str = typer.Option("users", help="SQL table name"),
-    overwrite: bool = typer.Option(False, help="Overwrite if exists"),
+        dest_dir: Path = typer.Option(..., help="Directory to place models.py"),
+        overwrite: bool = typer.Option(False, help="Overwrite if exists"),
 ):
-    _write(Path(dest_dir) / "models.py", _render("models.py.tmpl", {"table_name": table_name}), overwrite)
-
+    _write(Path(dest_dir) / "models.py", _render("models.py.tmpl", {}), overwrite)
 
 @app.command("scaffold-auth-schemas")
 def scaffold_auth_schemas(
-    dest_dir: Path = typer.Option(..., help="Directory to place schemas.py"),
-    overwrite: bool = typer.Option(False, help="Overwrite if exists"),
+        dest_dir: Path = typer.Option(..., help="Directory to place schemas.py"),
+        overwrite: bool = typer.Option(False, help="Overwrite if exists"),
 ):
     _write(Path(dest_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
-
-
-@app.command("scaffold-auth-settings")
-def scaffold_auth_settings(
-    dest_dir: Path = typer.Option(..., help="Directory to place auth settings.py"),
-    overwrite: bool = typer.Option(False, help="Overwrite if exists"),
-):
-    _write(Path(dest_dir) / "settings.py", _render("settings.py", {}), overwrite)
-
-
 
 if __name__ == "__main__":
     app()

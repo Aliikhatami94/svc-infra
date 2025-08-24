@@ -5,8 +5,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, Boolean
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 
-class Base(DeclarativeBase):
-    pass
+from svc_infra.db.base import Base
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
     # FastAPI Users base table includes:
