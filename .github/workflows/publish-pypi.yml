@@ -31,8 +31,8 @@ jobs:
         run: pip install poetry
 
       # (Optional) keep this if you want CI to refresh lock deterministically
-      - name: Regenerate lockfile
-        run: poetry lock --no-update
+      - name: Check lock is up-to-date
+        run: poetry lock --check
 
       # Not strictly needed to build, but harmless if you want to validate deps
       - name: Install deps (no dev)
