@@ -57,7 +57,13 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     if _SessionLocal is None:
         raise RuntimeError("Database not initialized. Call attach_db_to_api(app) first.")
     async with _SessionLocal() as session:
-        yield session
+        try:
+            yield session
+            # if the request handler made changes, this persists them
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
