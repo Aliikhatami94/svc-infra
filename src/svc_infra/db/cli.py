@@ -87,7 +87,8 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
     # 2) env.py (async-aware)
     env_py = (project_root / AL_EMBIC_DIR / "env.py")
     if not env_py.exists():
-        env_py.write_text(f"""\
+        run_cmd = "asyncio.run(run_migrations_online_async())" if async_db else "run_migrations_online_sync()"
+        content = f"""\
 from __future__ import annotations
 import os
 import asyncio
@@ -117,7 +118,7 @@ if database_url:
     config.set_main_option("sqlalchemy.url", database_url)
 
 def run_migrations_offline():
-    """Run migrations in 'offline' mode."""
+    '''Run migrations in "offline" mode.'''
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -165,8 +166,9 @@ def run_migrations_online_sync():
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    {"asyncio.run(run_migrations_online_async())" if async_db else "run_migrations_online_sync()"}
-""", encoding="utf-8")
+    {run_cmd}
+"""
+        env_py.write_text(content, encoding="utf-8")
         typer.echo(f"Wrote {env_py}")
     else:
         typer.echo(f"SKIP {env_py} (exists)")
