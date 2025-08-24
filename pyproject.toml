@@ -7,7 +7,6 @@ license = "MIT"
 readme = "README.md"
 packages = [{ include = "svc_infra", from = "src" }]
 keywords = ["fastapi", "sqlalchemy", "alembic", "auth", "infra", "async", "pydantic"]
-
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -18,7 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Framework :: FastAPI",
-    "Typing :: Typed",
+    "Typing :: Typed"
 ]
 
 [tool.poetry.urls]
