@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Any, Type
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select

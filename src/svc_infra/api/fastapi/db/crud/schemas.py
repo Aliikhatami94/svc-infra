@@ -58,5 +58,6 @@ def make_crud_schemas(
     # allow ORM objects
     for M in (Read, Create, Update):
         M.model_config = ConfigDict(from_attributes=True)
+        M.model_rebuild()
 
     return Read, Create, Update
