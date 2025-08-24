@@ -1,4 +1,6 @@
 .idea/
 .env
 .env.local
-svc-infra.iml
+svc-infra.iml__pycache__/
+*.pyc
+.pytest_cache/
