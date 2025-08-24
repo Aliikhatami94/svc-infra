@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import logging
 from typing import Annotated, AsyncIterator
 
 from fastapi import Depends, FastAPI
@@ -10,12 +11,44 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+logger = logging.getLogger(__name__)
+
 _engine: AsyncEngine | None = None
 _SessionLocal: async_sessionmaker[AsyncSession] | None = None
 
 
+def _coerce_to_async_url(url: str) -> str:
+    """Coerce common sync driver URLs to async-capable URLs.
+
+    - postgresql:// or postgres://        -> postgresql+asyncpg://
+    - postgresql+psycopg2:// or +psycopg  -> postgresql+asyncpg://
+    - mysql:// or mysql+pymysql://        -> mysql+aiomysql://
+    - sqlite://                           -> sqlite+aiosqlite://
+    If already async (contains +asyncpg/+aiomysql/+aiosqlite), leave unchanged.
+    """
+    low = url.lower()
+    if "+asyncpg" in low or "+aiomysql" in low or "+aiosqlite" in low:
+        return url
+    if low.startswith("postgresql+psycopg2://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("postgresql+psycopg://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("postgres://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("mysql+pymysql://") or low.startswith("mysql://"):
+        return "mysql+aiomysql://" + url.split("://", 1)[1]
+    if low.startswith("sqlite://") and not low.startswith("sqlite+aiosqlite://"):
+        return "sqlite+aiosqlite://" + url.split("://", 1)[1]
+    return url
+
+
 def _init_engine_and_session(url: str) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(url)
+    async_url = _coerce_to_async_url(url)
+    if async_url != url:
+        logger.info("Coerced DB URL driver to async: %s -> %s", url.split("://",1)[0], async_url.split("://",1)[0])
+    engine = create_async_engine(async_url)
     session_local = async_sessionmaker(engine, expire_on_commit=False)
     return engine, session_local
 
@@ -35,7 +68,7 @@ def attach_to_app(app: FastAPI, *, dsn_env: str = "DATABASE_URL") -> None:
 
     Args:
         app: FastAPI application instance.
-        dsn_env: Environment variable that contains the async DB URL.
+        dsn_env: Environment variable that contains the async DB URL (sync URLs will be coerced).
     """
 
     @app.on_event("startup")
@@ -57,7 +90,7 @@ def attach_to_app(app: FastAPI, *, dsn_env: str = "DATABASE_URL") -> None:
 
 
 def attach_to_app_with_url(app: FastAPI, *, url: str) -> None:
-    """Same as attach_to_app but pass URL directly instead of env var."""
+    """Same as attach_to_app but pass URL directly instead of env var (sync URLs will be coerced)."""
 
     @app.on_event("startup")
     async def _startup() -> None:  # noqa: ANN202
@@ -75,4 +108,3 @@ def attach_to_app_with_url(app: FastAPI, *, url: str) -> None:
 
 
 __all__ = ["SessionDep", "attach_to_app", "attach_to_app_with_url"]
-
