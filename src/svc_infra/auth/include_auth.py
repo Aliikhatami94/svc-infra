@@ -24,7 +24,7 @@ def include_auth(
         user_schema_read=schema_read,
         user_schema_create=schema_create,
         user_schema_update=schema_update,
-        auth_prefix=auth_prefix,
+        auth_prefix="/_db" + auth_prefix,
     )
 
     app.include_router(auth_router, prefix=auth_prefix, tags=["auth"])
@@ -38,6 +38,6 @@ def include_auth(
                 auth_backend=auth_backend,
                 providers=providers,
                 post_login_redirect=post_login_redirect,
-                prefix=oauth_prefix,
+                prefix="/_db" + oauth_prefix,
             )
         )

@@ -15,7 +15,8 @@ def make_crud_router(
         tags: list[str] | None = None,
         id_attr: str = "id",
 ) -> APIRouter:
-    r = APIRouter(prefix=prefix, tags=tags or [prefix.strip("/")])
+    router_prefix = "/_db" + prefix
+    r = APIRouter(prefix=router_prefix, tags=tags or [prefix.strip("/")])
 
     @r.get("/", response_model=list[read_schema])
     async def list_items(session: SessionDep):
