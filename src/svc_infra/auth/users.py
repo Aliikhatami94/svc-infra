@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import AsyncIterator, Any
+from typing import AsyncIterator, Any, Callable
 from uuid import UUID
 
 from fastapi import Depends, APIRouter
@@ -7,16 +7,15 @@ from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
-from .settings import get_auth_settings
-
 
 def get_fastapi_users(
-    user_model: type,
-    user_schema_read: type,
-    user_schema_create: type,
-    user_schema_update: type,
+    user_model: Any,
+    user_schema_read: Any,
+    user_schema_create: Any,
+    user_schema_update: Any,
+    auth_settings: Any,
     auth_prefix: str = "/auth",
-) -> tuple[FastAPIUsers, AuthenticationBackend, APIRouter, APIRouter]:
+) -> tuple[FastAPIUsers, AuthenticationBackend, APIRouter, APIRouter, Callable]:
     """Factory that wires FastAPI Users with JWT backend and returns routers.
 
     Returns: (fastapi_users, auth_backend, auth_router, users_router)
@@ -35,10 +34,9 @@ def get_fastapi_users(
         yield UserManager(user_db)
 
     def get_jwt_strategy() -> JWTStrategy:
-        settings = get_auth_settings()
         return JWTStrategy(
-            secret=settings.jwt_secret.get_secret_value(),
-            lifetime_seconds=settings.jwt_lifetime_seconds,
+            secret=auth_settings.jwt_secret.get_secret_value(),
+            lifetime_seconds=auth_settings.jwt_lifetime_seconds,
         )
 
     bearer_transport = BearerTransport(tokenUrl=f"{auth_prefix}/jwt/login")
@@ -52,4 +50,4 @@ def get_fastapi_users(
     auth_router = fastapi_users.get_auth_router(auth_backend, requires_verification=False)
     users_router = fastapi_users.get_users_router(user_schema_read, user_schema_create, user_schema_update)
 
-    return fastapi_users, auth_backend, auth_router, users_router
+    return fastapi_users, auth_backend, auth_router, users_router, get_jwt_strategy

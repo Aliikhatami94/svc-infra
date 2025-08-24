@@ -1,6 +1,5 @@
 from __future__ import annotations
 from fastapi import FastAPI
-from fastapi_users.authentication import JWTStrategy
 
 from .users import get_fastapi_users
 from .oauth_router import oauth_router
@@ -13,7 +12,7 @@ def include_auth(
     schema_read,
     schema_create,
     schema_update,
-    jwt_strategy: JWTStrategy,
+    auth_settings,
     post_login_redirect: str = "/",
     auth_prefix: str = "/auth",
     oauth_prefix: str = "/auth/oauth",
@@ -26,11 +25,12 @@ def include_auth(
     - OAuth routes under oauth_prefix (if providers are configured via env)
     """
 
-    fastapi_users, auth_backend, auth_router, users_router = get_fastapi_users(
+    fastapi_users, auth_backend, auth_router, users_router, get_jwt_strategy = get_fastapi_users(
         user_model=user_model,
         user_schema_read=schema_read,
         user_schema_create=schema_create,
         user_schema_update=schema_update,
+        auth_settings=auth_settings,
         auth_prefix=auth_prefix,
     )
 
@@ -40,9 +40,8 @@ def include_auth(
     app.include_router(
         oauth_router(
             user_model=user_model,
-            jwt_strategy=jwt_strategy,
+            jwt_strategy=get_jwt_strategy(),
             post_login_redirect=post_login_redirect,
             prefix=oauth_prefix,
         )
     )
-

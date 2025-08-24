@@ -5,14 +5,14 @@ from authlib.integrations.starlette_client import OAuth
 from sqlalchemy import select
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
+from typing import Any
 
 from svc_infra.api.fastapi.db.integration import SessionDep
-from .settings import get_auth_settings
-
 
 def oauth_router(
     user_model: type,
     jwt_strategy: JWTStrategy,
+    settings: Any,
     post_login_redirect: str = "/",
     prefix: str = "/auth/oauth",
 ) -> APIRouter:
@@ -21,10 +21,11 @@ def oauth_router(
     Args:
         user_model: SQLAlchemy model class for your User table.
         jwt_strategy: A configured JWTStrategy instance.
+        settings: An object with google_client_id, google_client_secret,
+            github_client_id, github_client_secret attributes.
         post_login_redirect: Where to redirect after successful OAuth login (?token=...).
         prefix: Router prefix.
     """
-    settings = get_auth_settings()
     oauth = OAuth()
 
     if settings.google_client_id and settings.google_client_secret:
