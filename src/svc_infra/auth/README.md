@@ -40,14 +40,14 @@ Creates
 ## Wire it into your FastAPI app
 
 - DB helper (packaged, no scaffolding needed):
-  - `from svc_infra.api.fastapi.db import attach_to_app, health_router`
-  - Attach DB on startup: `attach_to_app(app, dsn_env="DATABASE_URL")`
-  - Optional health route: `app.include_router(health_router())  # default "/_db/health"`
+  - `from svc_infra.api.fastapi.db import attach_db_to_api, db_health_router`
+  - Attach DB on startup: `attach_db_to_api(app, dsn_env="DATABASE_URL")`
+  - Optional health route: `app.include_router(db_health_router())  # default "/_db/health"`
   - `include_auth(app)`
 
 ## Requirements
 
-- Register DB lifecycle once at startup: `attach_to_app(app, dsn_env="DATABASE_URL")`
+- Register DB lifecycle once at startup: `attach_db_to_api(app, dsn_env="DATABASE_URL")`
 - Auth settings via env (examples):
   - `AUTH_JWT_SECRET`, `AUTH_JWT_LIFETIME_SECONDS`
   - Optional OAuth: `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET`, etc.

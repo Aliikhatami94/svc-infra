@@ -55,7 +55,7 @@ def _init_engine_and_session(url: str) -> tuple[AsyncEngine, async_sessionmaker[
 
 async def get_session() -> AsyncIterator[AsyncSession]:
     if _SessionLocal is None:
-        raise RuntimeError("Database not initialized. Call attach_to_app(app) first.")
+        raise RuntimeError("Database not initialized. Call attach_db_to_api(app) first.")
     async with _SessionLocal() as session:
         yield session
 
@@ -63,7 +63,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def attach_to_app(app: FastAPI, *, dsn_env: str = "DATABASE_URL") -> None:
+def attach_db_to_api(app: FastAPI, *, dsn_env: str = "DATABASE_URL") -> None:
     """Register startup/shutdown hooks to manage an async SQLAlchemy engine.
 
     Args:
@@ -89,8 +89,8 @@ def attach_to_app(app: FastAPI, *, dsn_env: str = "DATABASE_URL") -> None:
             _SessionLocal = None
 
 
-def attach_to_app_with_url(app: FastAPI, *, url: str) -> None:
-    """Same as attach_to_app but pass URL directly instead of env var (sync URLs will be coerced)."""
+def attach_db_to_api_with_url(app: FastAPI, *, url: str) -> None:
+    """Same as attach_db_to_api but pass URL directly instead of env var (sync URLs will be coerced)."""
 
     @app.on_event("startup")
     async def _startup() -> None:  # noqa: ANN202
@@ -107,4 +107,4 @@ def attach_to_app_with_url(app: FastAPI, *, url: str) -> None:
             _SessionLocal = None
 
 
-__all__ = ["SessionDep", "attach_to_app", "attach_to_app_with_url"]
+__all__ = ["SessionDep", "attach_db_to_api", "attach_db_to_api_with_url"]
