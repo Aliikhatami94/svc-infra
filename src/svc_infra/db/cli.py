@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 import os
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional, Any, Dict, List
+from typing import Optional
 
-from ai_infra import Providers, Models
-from ai_infra.llm import CoreAgent
-from ai_infra.llm.tools.custom.terminal import run_command
 from alembic.script import ScriptDirectory
 
 import typer
 from alembic import command
 from alembic.config import Config
+from .ai import ai as _ai
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -400,6 +397,7 @@ def stamp(
 def _versions_dir(project_root: Path) -> Path:
     return project_root / AL_EMBIC_DIR / "versions"
 
+
 def _latest_version_file(versions_dir: Path) -> Path | None:
     if not versions_dir.exists():
         return None
@@ -409,8 +407,10 @@ def _latest_version_file(versions_dir: Path) -> Path | None:
     # newest by mtime
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
+
 def _script_dir(cfg: Config) -> ScriptDirectory:
     return ScriptDirectory.from_config(cfg)
+
 
 def _single_head_or_none(script: ScriptDirectory) -> str | None:
     heads = script.get_heads()
@@ -420,6 +420,7 @@ def _single_head_or_none(script: ScriptDirectory) -> str | None:
         return heads[0]
     # Multiple heads: let caller decide or raise
     raise RuntimeError(f"Multiple heads present: {', '.join(heads)}")
+
 
 @app.command("drop-table")
 def drop_table(
@@ -455,28 +456,9 @@ def drop_table(
     sql = f'DROP TABLE {"IF EXISTS " if if_exists else ""}{fq_table}{" CASCADE" if cascade else ""};'
     rev_id = rev_file.stem.split("_", 1)[0]
 
-    content = f'''""" {msg} """
-
-from __future__ import annotations
-
-from alembic import op
-import sqlalchemy as sa
-
-# revision identifiers, used by Alembic.
-revision = "{rev_id}"
-down_revision = {repr(down_rev) if down_rev else "None"}
-branch_labels = None
-depends_on = None
-
-
-def upgrade() -> None:
-    op.execute({sql!r})
-
-
-def downgrade() -> None:
-    # Irreversible without full table definition
-    pass
-'''
+    content = f'''""" {msg} """\n\nfrom __future__ import annotations\n\nfrom alembic import op\nimport sqlalchemy as sa\n\n# revision identifiers, used by Alembic.\nrevision = "{rev_id}"\ndown_revision = {repr(down_rev) if down_rev else "None"}\nbranch_labels = None\ndepends_on = None\n\n\n
+def upgrade() -> None:\n    op.execute({sql!r})\n\n\n
+def downgrade() -> None:\n    # Irreversible without full table definition\n    pass\n'''
     rev_file.write_text(content, encoding="utf-8")
     typer.echo(f"Wrote drop migration: {rev_file}")
 
@@ -503,102 +485,8 @@ def merge_heads(
     typer.echo(f"Created merge for heads: {', '.join(heads)}")
 
 
-def _read_readme() -> str:
-    p = Path(__file__).parent / "README.md"
-    return p.read_text(encoding="utf-8") if p.exists() else ""
-
-SYSTEM_POLICY = """\
-You operate the `svc-infra-db` CLI.
-1) Print a short, numbered PLAN of exact shell commands you will run.
-2) Then execute them with the terminal tool.
-   - Before each: print `RUN: <command>`
-   - After each: print `OK` or `FAIL: <reason>`
-Be concise. Prefer DATABASE_URL from env; never print secrets.
-"""
-
-def _label(t: str) -> str:
-    t = (t or "").lower()
-    if t in ("human", "user"): return "You"
-    if t in ("ai", "assistant"): return "AI"
-    if t in ("tool", "function"): return "TOOL"
-    return t.upper() or "MSG"
-
-def _truncate(text: str, max_lines: int) -> str:
-    if max_lines <= 0:
-        return text.rstrip()
-    lines = text.rstrip().splitlines()
-    return "\n".join(lines[:max_lines] + (["... [truncated]"] if len(lines) > max_lines else []))
-
-def _print_msg(msg, max_lines: int):
-    # Your objects have .type and .content
-    t = getattr(msg, "type", None)
-    c = getattr(msg, "content", None)
-    if c is None:
-        return
-    if not isinstance(c, str):
-        try:
-            c = str(c)
-        except Exception:
-            c = repr(c)
-    print(f"{_label(t)}: {_truncate(c, max_lines)}")
-
-async def _run_stream(
-        agent: CoreAgent,
-        messages: List[Dict[str, str]],
-        provider: str,
-        model_name: str,
-        tools,
-        temperature: float,
-        interactive: bool,
-        max_lines: int,
-):
-    # HITL gate you already rely on
-    agent.set_hitl(on_tool_call=agent.make_sys_gate(interactive))
-
-    # Stream both messages and final values.
-    async for mode, chunk in agent.arun_agent_stream(
-            messages=messages,
-            provider=provider,
-            model_name=model_name,
-            tools=tools,
-            model_kwargs={"temperature": temperature},
-            stream_mode=("messages", "values"),
-    ):
-        if mode == "messages":
-            # Each `chunk` is a single message object with .type /.content
-            _print_msg(chunk, max_lines)
-        elif mode == "values":
-            # If you want to inspect the final object, do it here.
-            # Typically not necessary because we already printed all turns.
-            pass
-
-@app.command("db-agent")
-def db_agent(
-        query: str = typer.Argument(..., help="e.g. 'init alembic and create migrations'"),
-        interactive: bool = typer.Option(True, help="Require approval before each tool call"),
-        temperature: float = typer.Option(0.0, help="LLM creativity"),
-        max_lines: int = typer.Option(120, help="Max lines per printed block (0 = unlimited)"),
-):
-    """
-    Stream the full agent conversation (AI / TOOL / You) using .type and .content.
-    """
-    agent = CoreAgent()
-    messages: List[Dict[str, str]] = [
-        {"role": "system", "content": _read_readme() + "\n\n" + SYSTEM_POLICY},
-        {"role": "user", "content": query},
-    ]
-    asyncio.run(
-        _run_stream(
-            agent=agent,
-            messages=messages,
-            provider=Providers.openai,
-            model_name=Models.openai.default.value,  # your ai_infra defaults
-            tools=[run_command],
-            temperature=temperature,
-            interactive=interactive,
-            max_lines=max_lines,
-        )
-    )
+# Register AI subcommand from ai.py
+app.command("ai")(_ai)
 
 
 if __name__ == "__main__":

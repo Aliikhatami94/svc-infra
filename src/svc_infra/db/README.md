@@ -38,6 +38,21 @@ poetry run svc-infra-db drop-table public.users --cascade --if-exists --apply
 poetry run svc-infra-db merge-heads -m "merge branches"
 ```
 
+AI assistant
+- Use the ai to plan and execute DB CLI workflows interactively:
+```bash
+# Plan and execute with confirmation
+poetry run svc-infra-db ai "init alembic and create migrations"
+
+# Auto-confirm execution
+poetry run svc-infra-db ai "upgrade head" -y
+```
+- Options
+  - --yes, -y: auto-confirm execution
+  - --interactive / --no-interactive: human-in-the-loop before each tool call (default: interactive)
+  - --temperature: LLM creativity (default 0.0)
+  - --show-tool-output / --no-show-tool-output: print terminal output (default: on)
+
 How init works
 - Writes alembic.ini and a migrations/ folder with:
   - env.py that:
