@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+import asyncio
 import os
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional
+from typing import Optional, Any, Dict, List
 
 from ai_infra import Providers, Models
 from ai_infra.llm import CoreAgent
@@ -501,46 +503,102 @@ def merge_heads(
     typer.echo(f"Created merge for heads: {', '.join(heads)}")
 
 
+def _read_readme() -> str:
+    p = Path(__file__).parent / "README.md"
+    return p.read_text(encoding="utf-8") if p.exists() else ""
+
+SYSTEM_POLICY = """\
+You operate the `svc-infra-db` CLI.
+1) Print a short, numbered PLAN of exact shell commands you will run.
+2) Then execute them with the terminal tool.
+   - Before each: print `RUN: <command>`
+   - After each: print `OK` or `FAIL: <reason>`
+Be concise. Prefer DATABASE_URL from env; never print secrets.
+"""
+
+def _label(t: str) -> str:
+    t = (t or "").lower()
+    if t in ("human", "user"): return "You"
+    if t in ("ai", "assistant"): return "AI"
+    if t in ("tool", "function"): return "TOOL"
+    return t.upper() or "MSG"
+
+def _truncate(text: str, max_lines: int) -> str:
+    if max_lines <= 0:
+        return text.rstrip()
+    lines = text.rstrip().splitlines()
+    return "\n".join(lines[:max_lines] + (["... [truncated]"] if len(lines) > max_lines else []))
+
+def _print_msg(msg, max_lines: int):
+    # Your objects have .type and .content
+    t = getattr(msg, "type", None)
+    c = getattr(msg, "content", None)
+    if c is None:
+        return
+    if not isinstance(c, str):
+        try:
+            c = str(c)
+        except Exception:
+            c = repr(c)
+    print(f"{_label(t)}: {_truncate(c, max_lines)}")
+
+async def _run_stream(
+        agent: CoreAgent,
+        messages: List[Dict[str, str]],
+        provider: str,
+        model_name: str,
+        tools,
+        temperature: float,
+        interactive: bool,
+        max_lines: int,
+):
+    # HITL gate you already rely on
+    agent.set_hitl(on_tool_call=agent.make_sys_gate(interactive))
+
+    # Stream both messages and final values.
+    async for mode, chunk in agent.arun_agent_stream(
+            messages=messages,
+            provider=provider,
+            model_name=model_name,
+            tools=tools,
+            model_kwargs={"temperature": temperature},
+            stream_mode=("messages", "values"),
+    ):
+        if mode == "messages":
+            # Each `chunk` is a single message object with .type /.content
+            _print_msg(chunk, max_lines)
+        elif mode == "values":
+            # If you want to inspect the final object, do it here.
+            # Typically not necessary because we already printed all turns.
+            pass
+
 @app.command("db-agent")
 def db_agent(
-        query: str = typer.Argument(..., help="Ask your database question in natural language"),
-        project_root: Path = typer.Option(Path.cwd(), help="Root of your app (where alembic.ini should live)"),
-        dry_run: bool = typer.Option(False, help="Plan only; do not execute commands"),
-        temperature: float = typer.Option(0.0, help="LLM creativity (default: 0)"),
-        verbose: bool = typer.Option(False, help="Print raw model output"),
+        query: str = typer.Argument(..., help="e.g. 'init alembic and create migrations'"),
+        interactive: bool = typer.Option(True, help="Require approval before each tool call"),
+        temperature: float = typer.Option(0.0, help="LLM creativity"),
+        max_lines: int = typer.Option(120, help="Max lines per printed block (0 = unlimited)"),
 ):
     """
-    AI-powered database CLI assistant.
-    Uses the README.md as context to decide which svc-infra-db command to run.
+    Stream the full agent conversation (AI / TOOL / You) using .type and .content.
     """
-
     agent = CoreAgent()
-
-    # Always pass README context so the model knows which commands exist
-    readme_path = Path(__file__).parent / "README.md"
-    readme_context = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
-
-    messages = [
-        {"role": "system", "content": readme_context},
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": _read_readme() + "\n\n" + SYSTEM_POLICY},
         {"role": "user", "content": query},
     ]
-
-    resp = agent.run_agent(
-        messages=messages,
-        provider=Providers.openai,  # ai-infra already provides defaults
-        model_name=Models.openai.gpt_5_mini.value,
-        tools=[] if dry_run else [run_command],
-        model_kwargs={"temperature": temperature},
+    asyncio.run(
+        _run_stream(
+            agent=agent,
+            messages=messages,
+            provider=Providers.openai,
+            model_name=Models.openai.default.value,  # your ai_infra defaults
+            tools=[run_command],
+            temperature=temperature,
+            interactive=interactive,
+            max_lines=max_lines,
+        )
     )
-
-    if verbose:
-        typer.echo("--- RAW ---")
-        typer.echo(str(resp))
-        typer.echo("-----------")
-
-    # Handle both dict and object-like responses
-    content = getattr(resp, "content", None) or getattr(resp, "messages", None) or resp
-    typer.echo(content)
 
 
 if __name__ == "__main__":
