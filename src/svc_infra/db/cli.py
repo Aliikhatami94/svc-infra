@@ -3,6 +3,10 @@ import os
 from pathlib import Path
 from textwrap import dedent
 from typing import Optional
+
+from ai_infra import Providers, Models
+from ai_infra.llm import CoreAgent
+from ai_infra.llm.tools.custom.terminal import run_command
 from alembic.script import ScriptDirectory
 
 import typer
@@ -495,6 +499,49 @@ def merge_heads(
     from alembic import command
     command.merge(cfg, revisions=heads, message=message)
     typer.echo(f"Created merge for heads: {', '.join(heads)}")
+
+
+@app.command("db-agent")
+def db_agent(
+        query: str = typer.Argument(..., help="Ask your database question in natural language"),
+        project_root: Path = typer.Option(Path.cwd(), help="Root of your app (where alembic.ini should live)"),
+        dry_run: bool = typer.Option(False, help="Plan only; do not execute commands"),
+        temperature: float = typer.Option(0.0, help="LLM creativity (default: 0)"),
+        verbose: bool = typer.Option(False, help="Print raw model output"),
+):
+    """
+    AI-powered database CLI assistant.
+    Uses the README.md as context to decide which svc-infra-db command to run.
+    """
+
+    agent = CoreAgent()
+
+    # Always pass README context so the model knows which commands exist
+    readme_path = Path(__file__).parent / "README.md"
+    readme_context = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
+
+    messages = [
+        {"role": "system", "content": readme_context},
+        {"role": "user", "content": query},
+    ]
+
+    resp = agent.run_agent(
+        messages=messages,
+        provider=Providers.openai,  # ai-infra already provides defaults
+        model_name=Models.openai.gpt_5_mini.value,
+        tools=[] if dry_run else [run_command],
+        model_kwargs={"temperature": temperature},
+    )
+
+    if verbose:
+        typer.echo("--- RAW ---")
+        typer.echo(str(resp))
+        typer.echo("-----------")
+
+    # Handle both dict and object-like responses
+    content = getattr(resp, "content", None) or getattr(resp, "messages", None) or resp
+    typer.echo(content)
+
 
 if __name__ == "__main__":
     app()
