@@ -39,19 +39,31 @@ poetry run svc-infra-db merge-heads -m "merge branches"
 ```
 
 AI assistant
-- Use the ai to plan and execute DB CLI workflows interactively:
+- Use the ai command to plan and execute DB CLI workflows interactively:
 ```bash
 # Plan and execute with confirmation
 poetry run svc-infra-db ai "init alembic and create migrations"
 
-# Auto-confirm execution
+# Auto-confirm plan + run
 poetry run svc-infra-db ai "upgrade head" -y
+
+# Fully autonomous (auto-approve plan and tools)
+poetry run svc-infra-db ai "upgrade head" --auto
+
+# Specify provider/model
+poetry run svc-infra-db ai "show current" --provider openai --model gpt_5_mini
 ```
-- Options
-  - --yes, -y: auto-confirm execution
-  - --interactive / --no-interactive: human-in-the-loop before each tool call (default: interactive)
-  - --temperature: LLM creativity (default 0.0)
-  - --show-tool-output / --no-show-tool-output: print terminal output (default: on)
+- Options (from `svc-infra-db ai --help`)
+  - --yes, -y: Auto-confirm plan execution
+  - --autoapprove: Auto-approve all tool calls
+  - --auto: Fully autonomous (approve plan + tool calls)
+  - --db-url TEXT: Set $DATABASE_URL for tools (never printed)
+  - --max-lines INTEGER: Max lines when printing tool output (default: 60)
+  - --quiet-tools: Hide tool output; show only AI summaries
+  - --verbose-tools/--no-verbose-tools: Show detailed tool logs including args (redacted) (default: enabled)
+  - --show-error-context/--no-show-error-context: Print partial tool output when a step fails (default: enabled)
+  - --provider TEXT: LLM provider (e.g. openai, anthropic, google) (default: openai)
+  - --model TEXT: Model name key (e.g. gpt_5_mini, sonnet, gemini_1_5_pro) (default: default)
 
 How init works
 - Writes alembic.ini and a migrations/ folder with:
