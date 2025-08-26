@@ -214,7 +214,7 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
                 print("\n🔍 Context:")
                 print(_trunc(_redact(text), 20))
             if summary and "Postgres system user" in summary:
-                print("   ➡️ TIP: Run this on Linux, or use `--docker` to generate a docker-based workflow.")
+                print("* TIP: Run this on Linux, or use `--docker` to generate a docker-based workflow.")
             print()
             return
         # Non-error: print raw output only (no header)
@@ -308,10 +308,10 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
         elif step.get("fail_msg"):
             _print_error(f"Step {i} failed: {step['fail_msg']}\n")
             if "Postgres system user" in step["fail_msg"]:
-                print("   ➡️ TIP: Run this on Linux, or use `--docker` to generate a docker-based workflow.")
+                print("* TIP: Run this on Linux, or use `--docker` to generate a docker-based workflow.")
         # NEXT and bullets
         if step.get("next_header"):
-            print("\n➡️ " + step["next_header"])
+            print("\n* " + step["next_header"])
         for b in step.get("bullets", []):
             print(" " + b)
 

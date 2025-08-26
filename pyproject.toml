@@ -60,6 +60,7 @@ mypy = "^1.11.2"
 types-requests = "^2.32.0.20241016"
 
 [tool.poetry.scripts]
+svc-infra = "svc_infra.cli.ai:app"
 svc-infra-auth = "svc_infra.auth.cli:app"
 svc-infra-db = "svc_infra.db.cli:app"
 

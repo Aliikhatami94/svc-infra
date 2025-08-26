@@ -1,59 +1,40 @@
-# svc_infra.auth CLI
+## svc_infra.auth CLI
 
-Scaffold FastAPI Users essentials into your app. You can generate files one-by-one or all at once.
+Scaffold FastAPI Users models and schemas.
 
-## Install / Run
+### Usage
 
-- Installed with this package. The CLI entrypoint is `svc-auth`.
-- Typical usage with Poetry:
+- Script: `svc-infra-auth`
+- Poetry: `poetry run svc-infra-auth --help`
 
-```bash
-poetry run svc-auth --help
-```
+### Quick start
 
-## One-by-one scaffolding (recommended)
+- Models:
 
-Generate only what you need, where you want it. Use `--overwrite` to replace existing files.
+  ```bash
+  poetry run svc-infra-auth scaffold-auth-models --dest-dir src/my_app/auth
+  ```
 
-- Models
-  - `poetry run svc-infra-auth scaffold-auth-models --dest-dir src/my_app/auth`
-  - Creates: `models.py`
+- Schemas:
 
-- Schemas
-  - `poetry run svc-infra-auth scaffold-auth-schemas --dest-dir src/my_app/auth`
-  - Creates: `schemas.py`
+  ```bash
+  poetry run svc-infra-auth scaffold-auth-schemas --dest-dir src/my_app/auth
+  ```
 
-Notes
-- `--overwrite` is supported on every command.
+- All at once:
 
-## Batch scaffolding (all at once)
+  ```bash
+  poetry run svc-infra-auth scaffold-auth --models-dir src/my_app/auth --schemas-dir src/my_app/auth
+  ```
 
-```bash
-poetry run svc-infra-auth scaffold-auth \
-  --models-dir src/my_app/models \
-  --schemas-dir src/my_app/schemas
-```
+### Commands
 
-Creates
-- `models.py`, `schemas.py`
+- `scaffold-auth --models-dir PATH --schemas-dir PATH [--overwrite]`
+- `scaffold-auth-models --dest-dir PATH [--overwrite]`
+- `scaffold-auth-schemas --dest-dir PATH [--overwrite]`
 
-## Wire it into your FastAPI app
+### Notes
 
-- DB helper (packaged, no scaffolding needed):
-  - `from svc_infra.api.fastapi.db import attach_db_to_api, db_health_router`
-  - Attach DB on startup: `attach_db_to_api(app, dsn_env="DATABASE_URL")`
-  - Optional health route: `app.include_router(db_health_router())  # default "/_db/health"`
-  - `include_auth(app)`
-
-## Requirements
-
-- Register DB lifecycle once at startup: `attach_db_to_api(app, dsn_env="DATABASE_URL")`
-- Auth settings via env (examples):
-  - `AUTH_JWT_SECRET`, `AUTH_JWT_LIFETIME_SECONDS`
-  - Optional OAuth: `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET`, etc.
-
-## Troubleshooting
-
-- Async driver errors (psycopg2, pymysql, sqlite)
-  - When using the packaged DB helpers, sync URLs are coerced to async (asyncpg/aiomysql/aiosqlite).
-  - If writing your own integration, use async drivers: `postgresql+asyncpg://`, `mysql+aiomysql://`, `sqlite+aiosqlite://`.
+- Writes `models.py` and `schemas.py` at the target paths.
+- Creates directories if missing.
+- Shows `SKIP` when a file exists (use `--overwrite`), otherwise `Wrote`.
