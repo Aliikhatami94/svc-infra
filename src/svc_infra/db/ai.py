@@ -65,8 +65,8 @@ _SECRET_RE = re.compile(
     r'(?:(?P<user>[^:/\s@]+)(?::(?P<pw>[^@\s]+))?@)?'
 )
 # Additional redaction patterns
-_SQL_PASSWORD_QUOTED_RE = re.compile(r"(?i)(password\s*)(['\"])(?:[^'\"]*)(\2)")
-_EQ_PASSWORD_QUOTED_RE = re.compile(r"(?i)(password\s*=\s*)(['\"])(?:[^'\"]*)(\2)")
+_SQL_PASSWORD_QUOTED_RE = re.compile(r"(?i)(password\s*)(['\"])[^'\"]*(\2)")
+_EQ_PASSWORD_QUOTED_RE = re.compile(r"(?i)(password\s*=\s*)(['\"])[^'\"]*(\2)")
 _CLI_PASSWORD_EQ_RE = re.compile(r"(?i)(--password\s*=\s*)([^\s]+)")
 _CLI_PASSWORD_SPACE_RE = re.compile(r"(?i)(--password)(\s+)([^\s]+)")
 _ENV_PGPASSWORD_RE = re.compile(r"(?i)(pgpassword\s*=\s*)([^\s]+)")
@@ -196,26 +196,20 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
     }
 
     def _print_tool_output_block(name: str, text: str, *, last_fail: bool) -> None:
-        """Print tool output with spacing, summary/context, and trivial filtering."""
+        """Print tool output with spacing and summaries; hide header for non-errors."""
         if text is None:
             return
         stripped = (text or "").strip()
-        # Noise
-        if _is_noise(stripped):
-            return
-        # Trivial single-line outputs
-        if stripped in _TRIVIAL_TOOL_LINES:
-            print()  # keep a small spacing line
+        if not stripped or _is_noise(stripped):
             return
         # Error summaries
         if stripped.startswith("Error:"):
             summary = _summarize_tool_error(text)
-            print()  # spacing before tool output
-            # Print summary in red if associated with a failed step
+            print()
             if last_fail:
-                typer.secho(f"TOOL{f'({name})' if name else ''}: " + summary, fg=typer.colors.RED, bold=True, color=True)
+                typer.secho((f"TOOL({name}): " if name else "TOOL: ") + summary, fg=typer.colors.RED, bold=True, color=True)
             else:
-                print(f"TOOL{f'({name})' if name else ''}: " + summary)
+                print((f"TOOL({name}): " if name else "TOOL: ") + summary)
             if summary and show_error_context and last_fail:
                 print("\n🔍 Context:")
                 print(_trunc(_redact(text), 20))
@@ -223,16 +217,15 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
                 print("   ➡️ TIP: Run this on Linux, or use `--docker` to generate a docker-based workflow.")
             print()
             return
-        # Regular output
-        print()  # spacing before tool output
-        print(f"TOOL{f'({name})' if name else ''}:")
+        # Non-error: print raw output only (no header)
         print(_trunc(_redact(text), max_lines))
-        print()
 
     # -------- Collect steps first (RUN -> status -> optional NEXT lines -> tool outputs) --------
     steps: list[dict] = []
     last_cmd_raw: str | None = None
     current_step: dict | None = None
+    pending_tool_outputs: list[dict] = []  # tool outputs seen before first RUN
+    next_tool_step_idx = 0  # pointer to the next step expecting tool output
 
     for m in _messages_from(resp):
         role = _get_role(m)
@@ -246,7 +239,6 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
                     continue
                 if s.startswith("RUN:"):
                     raw_cmd = s[4:].strip()
-                    # Skip echo if identical to last seen RUN command
                     if last_cmd_raw is not None and raw_cmd == last_cmd_raw:
                         continue
                     last_cmd_raw = raw_cmd
@@ -257,8 +249,11 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
                         "fail_msg": None,
                         "next_header": None,
                         "bullets": [],
-                        "tool_outputs": [],  # list of {name, text}
+                        "tool_outputs": [],
                     }
+                    # Attach at most one pending tool output to this step (preserve order)
+                    if pending_tool_outputs:
+                        current_step["tool_outputs"].append(pending_tool_outputs.pop(0))
                     steps.append(current_step)
                 elif s == "OK":
                     if current_step is not None:
@@ -272,54 +267,53 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
                 elif s.startswith("- "):
                     if steps:
                         steps[-1].setdefault("bullets", []).append(s)
+                else:
+                    # Ignore any other AI chatter like summaries/echoes
+                    continue
             continue
 
         if role == "tool" and show_tool_output and not quiet_tools:
-            # Attach tool output to the most recent step
             name = (
                 (m.get("name") if isinstance(m, dict) else getattr(m, "name", ""))
                 or (m.get("tool_name") if isinstance(m, dict) else getattr(m, "tool_name", ""))
             )
             text = _get_content(m) or ""
             if steps:
-                steps[-1]["tool_outputs"].append({"name": name, "text": text})
+                # Find next step without anassigned output
+                while next_tool_step_idx < len(steps) and steps[next_tool_step_idx]["tool_outputs"]:
+                    next_tool_step_idx += 1
+                target_idx = min(next_tool_step_idx, len(steps) - 1)
+                steps[target_idx]["tool_outputs"].append({"name": name, "text": text})
+                # Advance pointer if we just filled a step
+                if target_idx == next_tool_step_idx and steps[target_idx]["tool_outputs"]:
+                    next_tool_step_idx += 1
             else:
-                # No RUN seen yet; queue as an unassigned prelude step
-                steps.append({
-                    "cmd_raw": "",
-                    "cmd": "",
-                    "ok": False,
-                    "fail_msg": None,
-                    "next_header": None,
-                    "bullets": [],
-                    "tool_outputs": [{"name": name, "text": text}],
-                })
+                # Buffer outputs until a RUN step arrives
+                pending_tool_outputs.append({"name": name, "text": text})
 
-    # -------- Print steps (no progress bars) --------
+    # -------- Print steps (Step -> output -> status) --------
     for i, step in enumerate(steps, start=1):
         if not step.get("cmd") and not step.get("tool_outputs"):
             continue
         if step.get("cmd"):
             typer.secho(f"Step {i}: {step['cmd']}", fg=typer.colors.YELLOW, bold=True, color=True)
-        # Status lines
-        last_fail = False
+        # Tool outputs first (immediately under the step)
+        if show_tool_output and not quiet_tools:
+            for idx, out in enumerate(step.get("tool_outputs", [])):
+                # Pass whether this step failed so context prints when appropriate
+                _print_tool_output_block(out.get("name"), out.get("text"), last_fail=bool(step.get("fail_msg")))
+        # Then status
         if step.get("ok"):
             _print_success("OK\n")
         elif step.get("fail_msg"):
             _print_error(f"Step {i} failed: {step['fail_msg']}\n")
             if "Postgres system user" in step["fail_msg"]:
                 print("   ➡️ TIP: Run this on Linux, or use `--docker` to generate a docker-based workflow.")
-            last_fail = True
-        # Tool outputs for this step (immediately after status)
-        if show_tool_output and not quiet_tools:
-            for idx, out in enumerate(step.get("tool_outputs", [])):
-                _print_tool_output_block(out.get("name"), out.get("text"), last_fail=last_fail and idx == 0)
         # NEXT and bullets
         if step.get("next_header"):
             print("\n➡️ " + step["next_header"])
         for b in step.get("bullets", []):
             print(" " + b)
-        # Reset line break between steps is handled by blocks themselves
 
 
 # ------------- plan printing helper -------------
@@ -330,13 +324,18 @@ def _print_numbered_plan(plan_text: str) -> None:
         raw = (line or "").strip()
         if not raw:
             continue
-        m = re.match(r"^(\d+)\)\s*(.*)$", raw)
+        m = re.match(r"^\s*(\d+)[)\.\]]\s*(.*)$", raw)
         if m:
             cmds.append(m.group(2).strip())
-        else:
-            cmds.append(raw)
+            continue
+        m2 = re.match(r"^\s*[-*]\s+(.*)$", raw)
+        if m2:
+            cmds.append(m2.group(1).strip())
+            continue
+        cmds.append(raw)
+    typer.secho("Plan:", fg=typer.colors.BLUE, bold=True, color=True)
     for i, cmd in enumerate(cmds, start=1):
-        typer.secho(f"Plan {i}: {cmd}", fg=typer.colors.CYAN, bold=True, color=True)
+        typer.secho(f"{i}. {cmd}", fg=typer.colors.BLUE, color=True)
 
 
 # -------------------- helpers for provider/model resolution --------------------
@@ -439,10 +438,19 @@ def ai(
         # Print consistently formatted plan
         _print_numbered_plan(plan_text)
     else:
-        # Build an OS-aware planning prompt
+        # Build cross-platform hints
         os_hint = ""
-        if sys.platform.lower().startswith("darwin"):
-            os_hint = "You're on macOS; 'sudo -u postgres' may not exist. Prefer user-mode or docker-based commands.\n"
+
+        if sys.platform.startswith("darwin"):
+            os_hint = (
+                "You're on macOS. Use standard Unix tools. Prefer user-mode tools. Avoid sudo where possible.\n"
+            )
+        elif sys.platform.startswith("win"):
+            os_hint = (
+                "You're on Windows. Prefer PowerShell-compatible commands. Avoid Unix-only tools like grep, dirname, or bash syntax like $PWD.\n"
+            )
+        elif sys.platform.startswith("linux"):
+            os_hint = "You're on Linux. Standard bash tools and user-space postgres are available.\n"
         plan_prompt = f"{_read_readme()}\n\n{os_hint}{PLAN_POLICY}"
         plan_text = llm.chat(
             user_msg=query,
@@ -477,17 +485,11 @@ def ai(
         cmd = _redact(str((args or {}).get("command", "")))
         if autoapprove:
             if not quiet_tools:
-                if verbose_tools:
-                    print(f"\nExecuting plan: {cmd}")
-                else:
-                    print(f"\nExecuting plan: {cmd}")
+                print(f"Executing -> {cmd}")
             return {"action": "call"}
 
         if not quiet_tools:
-            if verbose_tools:
-                print(f"\nExecuting plan: {cmd}")
-            else:
-                print(f"\nExecuting plan: {cmd}")
+            print(f"Executing -> {cmd}")
         ok = input("Approve? [y]es / [b]lock: ").strip().lower()
         if ok in ("y", "yes"):
             return {"action": "call"}
@@ -501,6 +503,9 @@ def ai(
         {"role": "system", "content": "If a DB connection is needed, prefer: `--database-url \"$DATABASE_URL\"`."},
         {"role": "human", "content": f"Execute this plan now:\n{plan_text}"},
     ]
+
+    # Visual spacer between the Plan and the upcoming "Executing ->" lines
+    print()
 
     exec_resp = agent.run_agent(
         messages=exec_messages,
