@@ -296,6 +296,13 @@ def _print_numbered_plan(plan_text: str) -> None:
     for i, cmd in enumerate(cmds, start=1):
         typer.secho(f"{i}. {cmd}", fg=typer.colors.BLUE, color=True)
 
+def clip(s: str, max_chars: int) -> str:
+    s = (s or "").strip()
+    if len(s) <= max_chars:
+        return s
+    cut = s[:max_chars]
+    cut = cut[: cut.rfind(" ")] if " " in cut else cut
+    return cut.rstrip() + "..."
 
 # ----- Provider/model resolution helpers ---- #
 

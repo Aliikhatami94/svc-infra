@@ -14,7 +14,7 @@ app = typer.Typer(
 )
 app.add_typer(_db_app, name="db", help="Database related commands")
 app.add_typer(_auth_app, name="auth", help="Auth db setup related commands")
-app.command("agent")(_agent)
+app.command("agent", hidden=True)(_agent)
 
 
 if __name__ == "__main__":

@@ -26,7 +26,9 @@ def scaffold_auth(
         schemas_dir: Path = typer.Option(..., help="Where to place schemas.py"),
         overwrite: bool = typer.Option(False, help="Overwrite files if they exist"),
 ):
-    # no table_name anymore; template should hardcode __tablename__ = "users"
+    """
+    Scaffold auth models and schemas files from templates.
+    """
     _write(Path(models_dir) / "models.py", _render("models.py.tmpl", {}), overwrite)
     _write(Path(schemas_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
 
@@ -35,6 +37,9 @@ def scaffold_auth_models(
         dest_dir: Path = typer.Option(..., help="Directory to place models.py"),
         overwrite: bool = typer.Option(False, help="Overwrite if exists"),
 ):
+    """
+    Scaffold auth models.py from template.
+    """
     _write(Path(dest_dir) / "models.py", _render("models.py.tmpl", {}), overwrite)
 
 @app.command("scaffold-auth-schemas")
@@ -42,4 +47,7 @@ def scaffold_auth_schemas(
         dest_dir: Path = typer.Option(..., help="Directory to place schemas.py"),
         overwrite: bool = typer.Option(False, help="Overwrite if exists"),
 ):
+    """
+    Scaffold auth schemas.py from template.
+    """
     _write(Path(dest_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)

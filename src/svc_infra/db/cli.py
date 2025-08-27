@@ -11,7 +11,10 @@ import typer
 from alembic import command
 from alembic.config import Config
 
-app = typer.Typer(no_args_is_help=True, add_completion=False)
+app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False
+)
 
 AL_EMBIC_DIR = "migrations"
 ALEMBIC_INI = "alembic.ini"
@@ -61,8 +64,10 @@ def init(
         ),
 ):
     """
-    Scaffold alembic (alembic.ini, migrations/, env.py, script.py.mako) wired to *all* Declarative Bases discovered.
+    Initialize Alembic setup in the project root.
+    Creates alembic.ini and migrations/env.py with async support and model auto-discovery.
     """
+
     project_root = project_root.resolve()
     (project_root / AL_EMBIC_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -339,6 +344,10 @@ def revision(
         project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
+    """
+    Create a new revision file. By default, attempts to autogenerate from model diffs.
+    If multiple heads exist, you may need to merge them first or specify --base.
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     command.revision(cfg, message=message, autogenerate=autogenerate)
 
@@ -349,6 +358,11 @@ def upgrade(
         project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
+    """
+    Upgrade to a later version. Default is 'head'.
+    You can specify a specific revision or relative steps (e.g. +1, -2
+    from the current).
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     command.upgrade(cfg, revision)
 
@@ -359,6 +373,12 @@ def downgrade(
         project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
+    """
+    Downgrade to an earlier version. Default is -1 (one step down).
+    You can specify a specific revision or relative steps (e.g. +1, -2
+    from the current).
+    Note: downgrades may not always be possible if not implemented in the migration.
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     command.downgrade(cfg, revision)
 
@@ -369,6 +389,10 @@ def current(
         project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
+    """
+    Display the current revision(s) for the database.
+    If multiple heads exist, all will be shown.
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     command.current(cfg, verbose=verbose)
 
@@ -379,6 +403,9 @@ def history(
         project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
+    """
+    List changeset scripts in chronological order.
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     command.history(cfg, verbose=verbose)
 
@@ -389,6 +416,10 @@ def stamp(
         project_root: Path = typer.Option(Path.cwd(), help="Root containing alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
+    """
+    'Stamp' the database with a specific revision without running migrations.
+    Useful for marking the DB as up-to-date when you know it is, but Alemb ic doesn't.
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     command.stamp(cfg, revision)
 
@@ -432,6 +463,11 @@ def drop_table(
         project_root: Path = typer.Option(Path.cwd(), help="Root with alembic.ini"),
         database_url: Optional[str] = typer.Option(None, help="Override DATABASE_URL"),
 ):
+    """
+    Create and optionally apply a migration that drops the specified table.
+    The generated migration's downgrade is a no-op since the full table definition is not known.
+    If multiple heads exist, you may need to specify --base or merge them first.
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     script = _script_dir(cfg)
 
@@ -472,6 +508,12 @@ def merge_heads(
         project_root: Path = typer.Option(Path.cwd()),
         database_url: Optional[str] = typer.Option(None),
 ):
+    """
+    If multiple heads exist, create a merge revision that depends on all of them.
+    This is useful to unify divergent branches before continuing with new revisions.
+    Note: the merge revision will have an empty upgrade/downgrade by default.
+    You may want to edit it to add any necessary migration steps.
+    """
     cfg = _load_config(project_root.resolve(), database_url)
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()

@@ -3,7 +3,7 @@ import typer
 from pathlib import Path
 
 from .utils import _print_warning, _resolve_provider, _resolve_model, _print_exec_transcript, _redact, _print_numbered_plan
-from .context import _compose_plan_system_prompt
+from .context import cli_agent_sys_msg
 
 from ai_infra.llm import CoreLLM, CoreAgent
 from ai_infra.llm.tools.custom.terminal import run_command
@@ -37,14 +37,6 @@ def agent(
         model: str = typer.Option("default", "--model", help="Model name key (e.g. gpt_5_mini, sonnet, gemini_1_5_pro)"),
         show_error_context: bool = typer.Option(True, "--show-error-context", help="Print partial tool output when a step fails"),
 ):
-    """
-    AI-powered DB assistant (stateless, one-shot).
-
-    Modes:
-      - default: PLAN → confirm → EXECUTE (manual HITL per tool)
-      - --autoapprove: PLAN → confirm → EXECUTE (autoapprove tools)
-      - --auto: PLAN → autoapprove → EXECUTE (autoapprove tools)
-    """
     if auto:
         autoapprove = True
         yes = True
@@ -84,7 +76,7 @@ def agent(
     else:
         plan_text = llm.chat(
             user_msg=query,
-            system=_compose_plan_system_prompt(),
+            system=cli_agent_sys_msg(),
             provider=prov,
             model_name=model_name,
         ).content or ""

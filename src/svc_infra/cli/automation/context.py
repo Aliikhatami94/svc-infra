@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from svc_infra.cli.automation.utils import _redact
+from svc_infra.cli.automation.helper import svc_infra_help_snippets
 
 # Directories we usually don't want to expand
 _IGNORED_DIRS = {
@@ -113,37 +114,21 @@ def _scan_project_signals(root: Path) -> dict[str, list[str]]:
             found[key] = hits
     return found
 
-def _capabilities_text(root: Path, signals: dict[str, list[str]]) -> str:
-    caps: list[str] = []
-
-    if "python" in signals:
-        if (root / "pyproject.toml").exists():
-            caps.append("- Python/Poetry project detected (pyproject.toml). Prefer `poetry run ...` for local CLIs.")
-        elif (root / "requirements.txt").exists():
-            caps.append("- Python/pip project detected (requirements.txt).")
-    if "node" in signals:
-        if (root / "package.json").exists():
-            pkg = "npm"
-            if (root / "pnpm-lock.yaml").exists(): pkg = "pnpm"
-            elif (root / "yarn.lock").exists():    pkg = "yarn"
-            caps.append(f"- Node project detected (package.json). Prefer `{pkg} <script>`.")
-    if "java" in signals:
-        if (root / "pom.xml").exists():
-            caps.append("- Java/Maven detected. Prefer `mvn clean package` etc.")
-        elif any((root / f).exists() for f in ["build.gradle", "build.gradle.kts"]):
-            caps.append("- Java/Gradle detected. Prefer `./gradlew build` if wrapper exists, else `gradle build`.")
-    if "docker" in signals:
-        caps.append("- Docker detected. Prefer `docker compose`/`docker build` when relevant.")
-    if "make" in signals:
-        caps.append("- Makefile present. Prefer `make <target>` for common workflows.")
-    if "just" in signals:
-        caps.append("- Justfile present. Prefer `just <recipe>`.")
-    if "task" in signals:
-        caps.append("- Taskfile present. Prefer `task <task>`.")
-    # svc-infra umbrella
-    caps.append("- Project CLIs: `svc-infra db ...`, `svc-infra auth ...` (see READMEs); also plain shell commands.")
-
-    return "## Capabilities (detected)\n" + "\n".join(caps) + "\n"
+def _capabilities_text(root: Path) -> str:
+    hits = []
+    if (root / "pyproject.toml").exists(): hits.append("Python/Poetry")
+    elif (root / "requirements.txt").exists(): hits.append("Python/pip")
+    if (root / "package.json").exists(): hits.append("Node (npm/yarn/pnpm)")
+    if (root / "pom.xml").exists(): hits.append("Java/Maven")
+    if any((root / f).exists() for f in ("build.gradle","build.gradle.kts")): hits.append("Java/Gradle")
+    if any((root / f).exists() for f in ("Dockerfile","docker-compose.yml","compose.yml")): hits.append("Docker")
+    if (root / "Makefile").exists(): hits.append("Make")
+    if (root / "Justfile").exists(): hits.append("Just")
+    if any((root / f).exists() for f in ("Taskfile.yml","Taskfile.yaml")): hits.append("Taskfile")
+    # tools on PATH:
+    for tool in ("poetry","npm","yarn","pnpm","mvn","gradle","docker","make","just","task","svc-infra"):
+        if shutil.which(tool): hits.append(f"{tool} (on PATH)")
+    return "## Capabilities\n- " + "\n- ".join(sorted(set(hits))) + "\n" if hits else ""
 
 def render_repo_tree(
         root: Path,
@@ -203,13 +188,13 @@ def render_repo_tree(
     )
 
 def _find_repo_root(start: Path) -> Path:
-    """Walk up from start to locate the repository root (presence of pyproject.toml)."""
     cur = start.resolve()
+    signals = ("pyproject.toml","package.json","pom.xml","build.gradle",
+               ".git","Makefile","Justfile","Taskfile.yml","Taskfile.yaml","Dockerfile","docker-compose.yml","compose.yml")
     while True:
-        if (cur / "pyproject.toml").exists():
+        if any((cur / s).exists() for s in signals):
             return cur
         if cur.parent == cur:
-            # Reached filesystem root; fallback to original start
             return start.resolve()
         cur = cur.parent
 
@@ -274,13 +259,19 @@ def _run_quiet(args: list[str], cwd: Path | None = None) -> str:
     except Exception:
         return ""
 
+def _git_ahead_behind(root: Path, upstream: str) -> str:
+    out = _run_quiet(["git","rev-list","--left-right","--count",f"{upstream}...HEAD"], cwd=root)
+    if not out: return ""
+    left,right = (out.split() + ["0","0"])[:2]
+    return f"{right} ahead / {left} behind"
+
 def _git_context(root: Path) -> str:
     top = _run_quiet(["git", "rev-parse", "--show-toplevel"], cwd=root)
     if not top:
         return ""
     branch = _run_quiet(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=root)
     upstream = _run_quiet(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=root)
-    ahead_behind = _run_quiet(["git", "rev-list", "--left-right", "--count", f"{upstream}...HEAD"], cwd=root) if upstream else ""
+    ahead_behind = _git_ahead_behind(root, upstream)
     log = _run_quiet(["git", "--no-pager", "log", "--oneline", "-n", "3"], cwd=root)
     remotes = _redact(_run_quiet(["git", "remote", "-v"], cwd=root))
     return (
@@ -293,68 +284,31 @@ def _git_context(root: Path) -> str:
               f"{remotes}\n\nRecent commits:\n{log}\n```\n"
     )
 
-def _clip(s: str, max_chars: int) -> str:
-    s = s.strip()
-    return s if len(s) <= max_chars else (s[:max_chars].rstrip() + "... [truncated]")
+PLAN_POLICY = (
+    "ROLE=repo-orchestrator\n"
+    "TASK=PLAN\n"
+    "Assume working directory is the repo root: ${REPO_ROOT}.\n"
+    "Output ONLY a short, numbered list of exact shell commands (one per line). "
+    "No prose, no comments, no code fences.\n"
+    "Prefer local tools inferred from project signals (svc-infra, poetry, npm/yarn/pnpm, mvn/gradle, make, docker compose). "
+    "If a command isn’t on PATH and pyproject.toml exists, try `poetry run <cmd>` first.\n"
+    "Avoid destructive operations (rm -rf, sudo) unless explicitly requested."
+)
 
-def _svc_infra_help_snippets() -> str:
-    """Render help for our Typer apps without spawning processes."""
-    try:
-        from click import Context
-        from svc_infra.cli.main import app as root_app  # your umbrella app
-        blocks = []
-
-        # root help
-        try:
-            blocks.append("### svc-infra --help\n```text\n" + root_app.get_help(Context(root_app)).strip() + "\n```")
-        except Exception:
-            pass
-
-        # subcommands if present
-        for name in ("db", "auth"):
-            try:
-                cmd = root_app.commands.get(name)  # Typer exposes Click grp
-                if cmd:
-                    blocks.append(f"### svc-infra {name} --help\n```text\n{cmd.get_help(Context(cmd)).strip()}\n```")
-            except Exception:
-                continue
-
-        return "\n\n".join(blocks)
-    except Exception:
-        return ""  # if import fails, skip silently
-
-def _compose_plan_system_prompt() -> str:
+def cli_agent_sys_msg() -> str:
     ctx = _discover_package_context()
     root = Path(ctx["root"])
 
     tree_txt = render_repo_tree(root, depth_default=3, depth_focus=6, focus_subpaths=("src/svc_infra", "tests"))
     git_txt  = _git_context(root)
 
-    # ADD: capabilities
-    signals  = _scan_project_signals(root)
-    caps_txt = _capabilities_text(root, signals)
-
-    readme_snippets = "\n\n".join(
-        f"# {pkg['package']} readme\n\n{_clip(pkg['readme'], 1000)}\n---"
-        for pkg in ctx["packages"]
-    )
-
+    caps_txt = _capabilities_text(root)
     os_hint = _os_hint()
-    generic_plan_policy = (
-        "ROLE=repo-orchestrator\n"
-        "TASK=PLAN\n"
-        "Output ONLY a short, numbered list of exact shell commands. Do not execute. No notes.\n"
-        "Prefer local tools inferred from project signals (svc-infra, poetry, npm/yarn/pnpm, mvn/gradle, make, docker compose).\n"
-        "If an executable is not found, prefer `poetry run <cmd>` (when pyproject.toml exists) before falling back.\n"
-        "Avoid destructive operations (rm -rf, sudo) unless the user explicitly requests them."
-    )
 
     return (
             "## Project tree\n```text\n" + tree_txt + "\n```\n\n" +
-            (git_txt or "") +
             caps_txt + "\n" +
-            readme_snippets + "\n\n" +
-            os_hint + generic_plan_policy
+            (git_txt or "") +
+            svc_infra_help_snippets() + "\n\n" +
+            os_hint + PLAN_POLICY
     )
-
-print(_compose_plan_system_prompt())
