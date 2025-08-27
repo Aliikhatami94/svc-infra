@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import typer
 
-from svc_infra.cli.db import app as _db_app
-from svc_infra.cli.auth import app as _auth_app
+from svc_infra.db.cli import app as _db_app
+from svc_infra.auth.cli import app as _auth_app
 from .automation.agent import agent as _agent
 
 app = typer.Typer(

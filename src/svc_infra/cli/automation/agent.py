@@ -1,9 +1,9 @@
 import os
-import sys
 import typer
 from pathlib import Path
 
-from .utils import _print_warning, _resolve_provider, _resolve_model, _print_exec_transcript, _redact, _print_numbered_plan, _cli_context
+from .utils import _print_warning, _resolve_provider, _resolve_model, _print_exec_transcript, _redact, _print_numbered_plan
+from .context import _compose_plan_system_prompt
 
 from ai_infra.llm import CoreLLM, CoreAgent
 from ai_infra.llm.tools.custom.terminal import run_command
@@ -86,23 +86,9 @@ def agent(
         # Print consistently formatted plan
         _print_numbered_plan(plan_text)
     else:
-        # Build cross-platform hints
-        os_hint = ""
-
-        if sys.platform.startswith("darwin"):
-            os_hint = (
-                "You're on macOS. Use standard Unix tools. Prefer user-mode tools. Avoid sudo where possible.\n"
-            )
-        elif sys.platform.startswith("win"):
-            os_hint = (
-                "You're on Windows. Prefer PowerShell-compatible commands. Avoid Unix-only tools like grep, dirname, or bash syntax like $PWD.\n"
-            )
-        elif sys.platform.startswith("linux"):
-            os_hint = "You're on Linux. Standard bash tools and user-space postgres are available.\n"
-        plan_prompt = f"{_cli_context()}\n\n{os_hint}{PLAN_POLICY}"
         plan_text = llm.chat(
             user_msg=query,
-            system=plan_prompt,
+            system=_compose_plan_system_prompt(),
             provider=prov,
             model_name=model_name,
         ).content or ""
