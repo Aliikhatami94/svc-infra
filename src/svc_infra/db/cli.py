@@ -487,7 +487,3 @@ def merge_heads(
 
 # Register AI subcommand from ai.py
 app.command("ai")(_ai)
-
-
-if __name__ == "__main__":
-    app()

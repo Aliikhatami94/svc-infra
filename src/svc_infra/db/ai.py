@@ -41,7 +41,7 @@ PLAN_POLICY = (
     "ROLE=db-cli\n"
     "TASK=PLAN\n"
     "Output ONLY a short, numbered list of exact shell commands. Do not execute. No notes.\n"
-    "Prefer 'svc-infra-db init --database-url \"$DATABASE_URL\"' without --discover-packages."
+    "Prefer 'svc-infra db init --database-url \"$DATABASE_URL\"' without --discover-packages."
 )
 
 EXEC_POLICY = (
@@ -385,7 +385,6 @@ def ai(
         db_url: str = typer.Option("", "--db-url", help="Set $DATABASE_URL for tools (never printed)"),
         max_lines: int = typer.Option(60, "--max-lines", help="Max lines when printing tool output"),
         quiet_tools: bool = typer.Option(False, "--quiet-tools", help="Hide tool output; show only AI summaries"),
-        verbose_tools: bool = typer.Option(True, "--verbose-tools", help="Show detailed tool logs including args (redacted)"),
         plan_only: bool = typer.Option(False, "--plan-only", help="Only generate a plan; don't execute"),
         exec_only: bool = typer.Option(False, "--exec-only", help="Only execute a plan from --plan-file"),
         plan_file: str = typer.Option("", "--plan-file", help="Path to save/load the plan when using plan-only/exec-only"),

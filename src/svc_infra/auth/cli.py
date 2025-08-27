@@ -43,6 +43,3 @@ def scaffold_auth_schemas(
         overwrite: bool = typer.Option(False, help="Overwrite if exists"),
 ):
     _write(Path(dest_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
-
-if __name__ == "__main__":
-    app()

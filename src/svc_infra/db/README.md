@@ -3,16 +3,16 @@
 Alembic helper CLI for init and migrations.
 
 Usage
-- Script: svc-infra-db
-- Poetry: poetry run svc-infra-db --help
+- Script: svc-infra db
+- Poetry: poetry run svc-infra db --help
 
 Quick start
 - init:
-  poetry run svc-infra-db init --database-url postgresql+asyncpg://user:pass@localhost/db --discover-packages my_app --async-db
+  poetry run svc-infra db init --database-url postgresql+asyncpg://user:pass@localhost/db --discover-packages my_app --async-db
 - revision:
-  poetry run svc-infra-db revision -m "init" --autogenerate
+  poetry run svc-infra db revision -m "init" --autogenerate
 - upgrade:
-  poetry run svc-infra-db upgrade head
+  poetry run svc-infra db upgrade head
 
 Commands
 - init [--project-root PATH] [--database-url URL] [--async-db|--no-async-db] [--discover-packages pkgs]
