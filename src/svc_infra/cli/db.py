@@ -10,7 +10,6 @@ from alembic.script import ScriptDirectory
 import typer
 from alembic import command
 from alembic.config import Config
-from .ai import ai as _ai
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -483,7 +482,3 @@ def merge_heads(
     from alembic import command
     command.merge(cfg, revisions=heads, message=message)
     typer.echo(f"Created merge for heads: {', '.join(heads)}")
-
-
-# Register AI subcommand from ai.py
-app.command("ai")(_ai)

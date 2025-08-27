@@ -61,8 +61,6 @@ types-requests = "^2.32.0.20241016"
 
 [tool.poetry.scripts]
 svc-infra = "svc_infra.cli.main:app"
-#svc-infra auth = "svc_infra.auth.cli:app"
-#svc-infra db = "svc_infra.db.cli:app"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

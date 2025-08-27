@@ -1,37 +1,88 @@
-from __future__ import annotations
-
-from pathlib import Path
-import os
 import re
-import sys
+from pathlib import Path
+from typing import Any
 import typer
-from ai_infra import Providers, Models
-from ai_infra.llm import CoreAgent, CoreLLM
-from ai_infra.llm.tools.custom.terminal import run_command
+from ai_infra.llm.providers import Providers, Models
 
 
-# -------------------- context --------------------
+# ---- Package discovery ---- #
 
-def _read_readme() -> str:
-    p = Path(__file__).parent / "README.md"
-    return p.read_text(encoding="utf-8") if p.exists() else ""
+def _find_repo_root(start: Path) -> Path:
+    """Walk up from start to locate the repository root (presence of pyproject.toml)."""
+    cur = start.resolve()
+    while True:
+        if (cur / "pyproject.toml").exists():
+            return cur
+        if cur.parent == cur:
+            # Reached filesystem root; fallback to original start
+            return start.resolve()
+        cur = cur.parent
 
-# Styled printing helpers
+def _discover_package_context() -> dict[str, Any]:
+    """
+    Discover any packages that expose a CLI entry under src/svc_infra/**/auth.py.
+
+    Returns a dictionary with keys:
+      - root: repository root path
+      - packages: list of { package, module, path, readme }
+        where:
+          package = conventional name like 'svc-infra-<module>'
+          module  = folder name under src/svc_infra (e.g., db, auth)
+          path    = absolute path to the package folder
+          readme  = README.md contents if present, else ''
+    """
+    cwd = Path.cwd()
+    root = _find_repo_root(cwd)
+
+    cli_files = list((root / "src" / "svc_infra").glob("**/cli.py"))
+
+    packages: list[dict[str, str]] = []
+    for cli_file in cli_files:
+        pkg_dir = cli_file.parent
+        module = pkg_dir.name
+        # Build conventional package name
+        pkg_name = f"svc-infra-{module}"
+        readme_path = pkg_dir / "README.md"
+        readme = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
+        packages.append({
+            "package": pkg_name,
+            "module": module,
+            "path": str(pkg_dir.resolve()),
+            "readme": readme,
+        })
+
+    return {
+        "root": str(root),
+        "packages": packages,
+    }
+
+def _cli_context() -> str:
+    """
+    Builds a compact section describing available subcommands with
+    their README snippets to bias the model toward your CLIs.
+    """
+    ctx = _discover_package_context()
+    readme_snippets = "\n\n".join(
+        f"# {pkg['package']} readme\n\n{pkg['readme'][:2000]}\n---"
+        for pkg in ctx["packages"]
+    )
+    return readme_snippets
+
+
+# ---- Console output helpers ---- #
 
 def _print_success(msg: str) -> None:
     # Force color even when not a TTY (e.g., piped or captured)
     typer.secho(msg, fg=typer.colors.GREEN, bold=True, color=True)
 
-
 def _print_warning(msg: str) -> None:
     typer.secho(msg, fg=typer.colors.YELLOW, bold=True, color=True)
-
 
 def _print_error(msg: str) -> None:
     typer.secho(msg, fg=typer.colors.RED, bold=True, color=True)
 
 
-# -------------------- transcript helpers --------------------
+# ---- Redaction helpers ---- #
 
 _SECRET_RE = re.compile(
     r'(?P<scheme>\b[a-zA-Z][a-zA-Z0-9+\-.]*://)'
@@ -44,14 +95,12 @@ _CLI_PASSWORD_EQ_RE = re.compile(r"(?i)(--password\s*=\s*)([^\s]+)")
 _CLI_PASSWORD_SPACE_RE = re.compile(r"(?i)(--password)(\s+)([^\s]+)")
 _ENV_PGPASSWORD_RE = re.compile(r"(?i)(pgpassword\s*=\s*)([^\s]+)")
 
-
 def _redact_secrets(text: str) -> str:
     def _sub(m):
         scheme = m.group("scheme") or ""
         user = m.group("user")
         return f"{scheme}***:***@" if user else scheme
     return _SECRET_RE.sub(_sub, text or "")
-
 
 def _redact(text: str) -> str:
     """Redact secrets in URLs and common CLI/SQL password patterns."""
@@ -64,6 +113,8 @@ def _redact(text: str) -> str:
     t = _ENV_PGPASSWORD_RE.sub(r"\1***", t)
     return t
 
+
+# ---- AI message helpers ---- #
 
 def _norm_role(role: str) -> str:
     r = (role or "").lower()
@@ -89,7 +140,7 @@ def _get_role(m) -> str:
     return _norm_role(getattr(m, "role", None) or getattr(m, "type", None) or "")
 
 
-# ---------- compact error summarization for tool output ----------
+# ---- Error parsing helpers ---- #
 
 _ERR_CODE_RE = re.compile(r"Command failed with code (\d+)")
 _LAST_LINE_RE = re.compile(r"(?:\n|^)([A-Za-z0-9_:. -]*Error[:] ?.+)$")
@@ -101,7 +152,6 @@ _BREW_NOT_FOUND_RE = re.compile(r"brew: command not found", re.I)
 _BREW_SERVICE_ERROR_RE = re.compile(r"Error: .*brew services.*", re.I)
 _BREW_SERVICES_UNKNOWN_CMD_RE = re.compile(r"Unknown command: services\b", re.I)
 _BREW_SERVICE_HINT_RE = re.compile(r"Did you mean:.*\bservice\b", re.I)
-
 
 def _summarize_tool_error(text: str) -> str:
     t = text or ""
@@ -135,6 +185,8 @@ def _summarize_tool_error(text: str) -> str:
         return f"code {code}"
     return tail or "command failed"
 
+
+# ---- Transcript printing ---- #
 
 def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60, quiet_tools: bool = False, show_error_context: bool = True):
     def _is_noise(s: str) -> bool:
@@ -247,8 +299,8 @@ def _print_exec_transcript(resp, *, show_tool_output: bool, max_lines: int = 60,
 
         if role == "tool" and show_tool_output and not quiet_tools:
             name = (
-                (m.get("name") if isinstance(m, dict) else getattr(m, "name", ""))
-                or (m.get("tool_name") if isinstance(m, dict) else getattr(m, "tool_name", ""))
+                    (m.get("name") if isinstance(m, dict) else getattr(m, "name", ""))
+                    or (m.get("tool_name") if isinstance(m, dict) else getattr(m, "tool_name", ""))
             )
             text = _get_content(m) or ""
             if steps:
@@ -311,11 +363,10 @@ def _print_numbered_plan(plan_text: str) -> None:
         typer.secho(f"{i}. {cmd}", fg=typer.colors.BLUE, color=True)
 
 
-# -------------------- helpers for provider/model resolution --------------------
+# ----- Provider/model resolution helpers ---- #
 
 def _norm_key(s: str) -> str:
     return (s or "").strip().lower().replace("-", "_")
-
 
 def _resolve_provider(provider_key: str):
     key = _norm_key(provider_key)
@@ -325,7 +376,6 @@ def _resolve_provider(provider_key: str):
         known = [k for k in dir(Providers) if not k.startswith("_")]
         raise typer.BadParameter(f"Unknown provider '{provider_key}'. Known: {', '.join(sorted(known))}")
     return prov, key  # also return normalized key for Models lookup
-
 
 def _resolve_model(models_key: str, model_key: str) -> str:
     ns = getattr(Models, models_key, None)
