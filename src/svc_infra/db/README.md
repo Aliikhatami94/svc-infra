@@ -1,4 +1,4 @@
-## svc_infra.db CLI
+## svc_infra db CLI
 
 Alembic helper CLI for init and migrations.
 

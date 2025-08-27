@@ -1,4 +1,4 @@
-## svc_infra.auth CLI
+## svc_infra auth CLI
 
 Scaffold FastAPI Users models and schemas.
 

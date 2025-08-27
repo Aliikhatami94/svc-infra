@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from svc_infra.cli.automation.utils import _redact
+
 # Directories we usually don't want to expand
 _IGNORED_DIRS = {
     ".git", ".hg", ".svn", ".idea", ".vscode",
@@ -90,6 +92,58 @@ def _py_tree(
     lines.append(root.name + "/")
     walk(root, "", max_depth)
     return "\n".join(lines)
+
+_PROJECT_SIGNALS = {
+    # Build / package managers
+    "python": ["pyproject.toml", "poetry.lock", "requirements.txt", "setup.py"],
+    "node":   ["package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"],
+    "java":   ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"],
+    "docker": ["Dockerfile", "docker-compose.yml", "compose.yml"],
+    "make":   ["Makefile"],
+    "just":   ["Justfile"],
+    "task":   ["Taskfile.yml", "Taskfile.yaml"],
+    "pytest": ["pytest.ini", "pyproject.toml"],
+}
+
+def _scan_project_signals(root: Path) -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    for key, files in _PROJECT_SIGNALS.items():
+        hits = [f for f in files if (root / f).exists()]
+        if hits:
+            found[key] = hits
+    return found
+
+def _capabilities_text(root: Path, signals: dict[str, list[str]]) -> str:
+    caps: list[str] = []
+
+    if "python" in signals:
+        if (root / "pyproject.toml").exists():
+            caps.append("- Python/Poetry project detected (pyproject.toml). Prefer `poetry run ...` for local CLIs.")
+        elif (root / "requirements.txt").exists():
+            caps.append("- Python/pip project detected (requirements.txt).")
+    if "node" in signals:
+        if (root / "package.json").exists():
+            pkg = "npm"
+            if (root / "pnpm-lock.yaml").exists(): pkg = "pnpm"
+            elif (root / "yarn.lock").exists():    pkg = "yarn"
+            caps.append(f"- Node project detected (package.json). Prefer `{pkg} <script>`.")
+    if "java" in signals:
+        if (root / "pom.xml").exists():
+            caps.append("- Java/Maven detected. Prefer `mvn clean package` etc.")
+        elif any((root / f).exists() for f in ["build.gradle", "build.gradle.kts"]):
+            caps.append("- Java/Gradle detected. Prefer `./gradlew build` if wrapper exists, else `gradle build`.")
+    if "docker" in signals:
+        caps.append("- Docker detected. Prefer `docker compose`/`docker build` when relevant.")
+    if "make" in signals:
+        caps.append("- Makefile present. Prefer `make <target>` for common workflows.")
+    if "just" in signals:
+        caps.append("- Justfile present. Prefer `just <recipe>`.")
+    if "task" in signals:
+        caps.append("- Taskfile present. Prefer `task <task>`.")
+    # svc-infra umbrella
+    caps.append("- Project CLIs: `svc-infra db ...`, `svc-infra auth ...` (see READMEs); also plain shell commands.")
+
+    return "## Capabilities (detected)\n" + "\n".join(caps) + "\n"
 
 def render_repo_tree(
         root: Path,
@@ -182,7 +236,7 @@ def _discover_package_context() -> dict[str, Any]:
         pkg_dir = cli_file.parent
         module = pkg_dir.name
         # Build conventional package name
-        pkg_name = f"svc-infra-{module}"
+        pkg_name = f"svc-infra {module}"
         readme_path = pkg_dir / "README.md"
         readme = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
         packages.append({
@@ -213,36 +267,94 @@ def _os_hint() -> str:
 
     return os_hint
 
+def _run_quiet(args: list[str], cwd: Path | None = None) -> str:
+    try:
+        out = subprocess.check_output(args, cwd=str(cwd) if cwd else None, text=True, stderr=subprocess.STDOUT)
+        return out.strip()
+    except Exception:
+        return ""
+
+def _git_context(root: Path) -> str:
+    top = _run_quiet(["git", "rev-parse", "--show-toplevel"], cwd=root)
+    if not top:
+        return ""
+    branch = _run_quiet(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=root)
+    upstream = _run_quiet(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=root)
+    ahead_behind = _run_quiet(["git", "rev-list", "--left-right", "--count", f"{upstream}...HEAD"], cwd=root) if upstream else ""
+    log = _run_quiet(["git", "--no-pager", "log", "--oneline", "-n", "3"], cwd=root)
+    remotes = _redact(_run_quiet(["git", "remote", "-v"], cwd=root))
+    return (
+            "## Git\n"
+            f"Repo root: {top}\n"
+            f"Branch: {branch or 'unknown'}"
+            + (f" | Upstream: {upstream}" if upstream else "")
+            + (f" | Ahead/Behind: {ahead_behind}" if ahead_behind else "")
+            + "\n\n```text\n"
+              f"{remotes}\n\nRecent commits:\n{log}\n```\n"
+    )
+
+def _clip(s: str, max_chars: int) -> str:
+    s = s.strip()
+    return s if len(s) <= max_chars else (s[:max_chars].rstrip() + "... [truncated]")
+
+def _svc_infra_help_snippets() -> str:
+    """Render help for our Typer apps without spawning processes."""
+    try:
+        from click import Context
+        from svc_infra.cli.main import app as root_app  # your umbrella app
+        blocks = []
+
+        # root help
+        try:
+            blocks.append("### svc-infra --help\n```text\n" + root_app.get_help(Context(root_app)).strip() + "\n```")
+        except Exception:
+            pass
+
+        # subcommands if present
+        for name in ("db", "auth"):
+            try:
+                cmd = root_app.commands.get(name)  # Typer exposes Click grp
+                if cmd:
+                    blocks.append(f"### svc-infra {name} --help\n```text\n{cmd.get_help(Context(cmd)).strip()}\n```")
+            except Exception:
+                continue
+
+        return "\n\n".join(blocks)
+    except Exception:
+        return ""  # if import fails, skip silently
+
 def _compose_plan_system_prompt() -> str:
     ctx = _discover_package_context()
     root = Path(ctx["root"])
 
-    # Render deep tree (uses `tree` if present, else Python fallback)
-    tree_txt = render_repo_tree(
-        root,
-        depth_default=3,       # general depth
-        depth_focus=6,         # deep dive under focus paths
-        focus_subpaths=("src/svc_infra", "tests"),
-    )
+    tree_txt = render_repo_tree(root, depth_default=3, depth_focus=6, focus_subpaths=("src/svc_infra", "tests"))
+    git_txt  = _git_context(root)
 
-    # Package READMEs (your current logic)
+    # ADD: capabilities
+    signals  = _scan_project_signals(root)
+    caps_txt = _capabilities_text(root, signals)
+
     readme_snippets = "\n\n".join(
-        f"# {pkg['package']} readme\n\n{pkg['readme'][:2000]}\n---"
+        f"# {pkg['package']} readme\n\n{_clip(pkg['readme'], 1000)}\n---"
         for pkg in ctx["packages"]
     )
 
-    # OS hint + generic plan policy (make this non-DB specific)
-    os_hint = _os_hint()  # your existing darwin/win/linux helper
+    os_hint = _os_hint()
     generic_plan_policy = (
-        "ROLE=repo-cli\n"
+        "ROLE=repo-orchestrator\n"
         "TASK=PLAN\n"
         "Output ONLY a short, numbered list of exact shell commands. Do not execute. No notes.\n"
-        "Prefer invoking available local tools (e.g., svc-infra db ..., svc-infra auth ..., npm, poetry, make, etc.)."
+        "Prefer local tools inferred from project signals (svc-infra, poetry, npm/yarn/pnpm, mvn/gradle, make, docker compose).\n"
+        "If an executable is not found, prefer `poetry run <cmd>` (when pyproject.toml exists) before falling back.\n"
+        "Avoid destructive operations (rm -rf, sudo) unless the user explicitly requests them."
     )
 
-    # Final system prompt section
     return (
             "## Project tree\n```text\n" + tree_txt + "\n```\n\n" +
+            (git_txt or "") +
+            caps_txt + "\n" +
             readme_snippets + "\n\n" +
             os_hint + generic_plan_policy
     )
+
+print(_compose_plan_system_prompt())

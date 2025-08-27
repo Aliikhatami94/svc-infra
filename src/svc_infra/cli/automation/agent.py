@@ -11,20 +11,16 @@ from ai_infra.llm.tools.custom.terminal import run_command
 
 # --- Super-compact, low-token policies --- #
 
-PLAN_POLICY = (
-    "ROLE=db-cli\n"
-    "TASK=PLAN\n"
-    "Output ONLY a short, numbered list of exact shell commands. Do not execute. No notes.\n"
-    "Prefer 'svc-infra db init --database-url \"$DATABASE_URL\"' without --discover-packages."
-)
-
 EXEC_POLICY = (
-    "ROLE=db-cli\n"
+    "ROLE=repo-orchestrator\n"
     "TASK=EXEC\n"
+    "Assume the working directory is the repository root unless the plan includes 'cd'. "
     "Loop: print 'RUN: <command>'; call terminal tool with RAW command; then print 'OK' or 'FAIL: <reason>'. "
     "Never echo secrets. One-shot. Optional final 'NEXT:' with 1–3 bullets. "
     "You may SKIP unsafe commands (e.g., unresolved placeholders or exposed credentials) and MUST explain why."
 )
+
+DANGEROUS = (" rm -rf /", " mkfs", " shutdown", " reboot", ":(){:|:&};:", " dd if=", " > /dev/sda", " > /dev/nvme", " > /dev/vda")
 
 def agent(
         query: str = typer.Argument(..., help="e.g. 'init alembic and create migrations'"),
@@ -114,9 +110,10 @@ def agent(
 
     # -------- EXECUTE --------
 
-    def hitl_gate(tool_name: str, args: dict):
-        # Prefer showing the actual command being executed (redacted)
+    def hitl_gate(args: dict):
         cmd = _redact(str((args or {}).get("command", "")))
+        if any(d in cmd for d in DANGEROUS):
+            return {"action": "block", "replacement": "[blocked: potentially destructive]"}
         if autoapprove:
             if not quiet_tools:
                 print(f"Executing -> {cmd}")
