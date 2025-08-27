@@ -1,9 +1,13 @@
+import asyncio
 import os
+
 import typer
 from pathlib import Path
 
-from .utils import _print_warning, _resolve_provider, _resolve_model, _print_exec_transcript, _redact, _print_numbered_plan
-from .context import cli_agent_sys_msg
+from ai_infra.mcp.client.core import CoreMCPClient
+
+from svc_infra.cli.automation.utils import _print_warning, _resolve_provider, _resolve_model, _print_exec_transcript, _redact, _print_numbered_plan
+from svc_infra.cli.automation.context import cli_agent_sys_msg
 
 from ai_infra.llm import CoreLLM, CoreAgent
 from ai_infra.llm.tools.custom.terminal import run_command
@@ -21,6 +25,21 @@ EXEC_POLICY = (
 )
 
 DANGEROUS = (" rm -rf /", " mkfs", " shutdown", " reboot", ":(){:|:&};:", " dd if=", " > /dev/sda", " > /dev/nvme", " > /dev/vda")
+
+client = CoreMCPClient([
+    {
+        "command": "cli",
+        "transport": "stdio",
+    },
+    {
+        "command": "project-management-mcp",
+        "transport": "stdio",
+    },
+])
+
+async def get_tools():
+    tools = await client.list_tools()
+    return tools
 
 def agent(
         query: str = typer.Argument(..., help="e.g. 'init alembic and create migrations'"),
@@ -122,7 +141,7 @@ def agent(
 
     exec_messages = [
         {"role": "system", "content": EXEC_POLICY},
-        {"role": "system", "content": "You are executing shell commands on a developer's local machine. Each command must run as-is. Output results using RUN/OK/FAIL markers. Be concise."},
+        {"role": "system", "content": "You can manage the project as well as executing shell commands on a developer's local machine. Each command must run as-is. Output results using RUN/OK/FAIL markers. Be concise."},
         {"role": "system", "content": "If a DB connection is needed, prefer: `--database-url \"$DATABASE_URL\"`."},
         {"role": "human", "content": f"Execute this plan now:\n{plan_text}"},
     ]
@@ -134,7 +153,7 @@ def agent(
         messages=exec_messages,
         provider=prov,
         model_name=model_name,
-        tools=[run_command],
+        tools=asyncio.run(get_tools()),
     )
 
     print("\n=== EXECUTION ===")
