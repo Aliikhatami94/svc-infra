@@ -1,10 +1,10 @@
 from __future__ import annotations
-
 import typer
 
 from svc_infra.db.cli import app as _db_app
 from svc_infra.auth.cli import app as _auth_app
 from .automation.agent import agent as _agent
+from .utils import _async_cmd
 
 app = typer.Typer(
     name="svc-infra",
@@ -14,7 +14,7 @@ app = typer.Typer(
 )
 app.add_typer(_db_app, name="db", help="Database related commands")
 app.add_typer(_auth_app, name="auth", help="Auth db setup related commands")
-app.command("agent", hidden=True)(_agent)
+app.command("agent", hidden=True)(_async_cmd(_agent))
 
 
 if __name__ == "__main__":
