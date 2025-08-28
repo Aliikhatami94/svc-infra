@@ -5,7 +5,7 @@ from functools import lru_cache
 import click
 from typer.main import get_command
 
-from svc_infra.cli.automation.utils import clip
+from svc_infra.cli.ai.utils import clip
 
 _ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 _WS_RE = re.compile(r"[ \t]+")

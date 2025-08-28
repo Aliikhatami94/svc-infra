@@ -3,8 +3,8 @@ import typer
 
 from svc_infra.db.cli import app as _db_app
 from svc_infra.auth.cli import app as _auth_app
-from .automation.agent import agent as _agent
-from .utils import _async_cmd
+from svc_infra.cli.ai.agent import agent as _agent
+from svc_infra.cli.utils import _async_cmd
 
 app = typer.Typer(
     name="svc-infra",

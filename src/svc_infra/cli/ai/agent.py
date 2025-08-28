@@ -1,50 +1,21 @@
 import asyncio
 import os
+import json
 
 import typer
 from pathlib import Path
 
 from ai_infra.mcp.client.core import CoreMCPClient
 
-from svc_infra.cli.automation.utils import _print_warning, _resolve_provider, _resolve_model, _print_exec_transcript, _redact, _print_numbered_plan
-from svc_infra.cli.automation.context import cli_agent_sys_msg
+from svc_infra.cli.ai.utils import _print_warning, _resolve_provider, _resolve_model, _print_exec_transcript, _print_numbered_plan
+from svc_infra.cli.ai.context import cli_agent_sys_msg
 
 from ai_infra.llm import CoreLLM, CoreAgent
-
-
-# --- Super-compact, low-token policies --- #
-
-AGENT_POLICY = (
-    "ROLE=repo-orchestrator\n"
-    "You have tools to: list/scan the repo, read/write files, run shell, query git, and show CLI help.\n"
-    "Never assume facts about the project; if you need info, call a tool to fetch it.\n"
-    "\n"
-    "When to call the Planner tool:\n"
-    "- The task is multi-step, risky, or stateful (e.g., migrations, deploys, refactors, destructive ops).\n"
-    "- The request is ambiguous and needs information-gathering + decision-making before execution.\n"
-    "- You expect >2 tool calls or cross-cutting changes.\n"
-    "Otherwise, directly use the minimal set of tools to answer or execute.\n"
-    "\n"
-    "Safety:\n"
-    "- Refuse or ask for confirmation before destructive actions (e.g., 'rm -rf', dropping tables).\n"
-    "- Prefer project-local tools (make/npm/poetry/svc-infra) when present.\n"
-    "- For DB actions prefer flags that accept env variables (e.g., --database-url \"$DATABASE_URL\").\n"
-    "\n"
-    "Output policy during EXEC:\n"
-    "- For shell runs: print 'RUN: <command>', then 'OK' or 'FAIL: <reason>'. Be concise.\n"
-    "- Do not echo secrets. Redact env values in logs.\n"
+from .constants import (
+    DANGEROUS,
+    EXEC_POLICY,
 )
 
-EXEC_POLICY = (
-    "ROLE=repo-orchestrator\n"
-    "TASK=EXEC\n"
-    "Assume the working directory is the repository root unless the plan includes 'cd'. "
-    "Loop: print 'RUN: <command>'; call terminal tool with RAW command; then print 'OK' or 'FAIL: <reason>'. "
-    "Never echo secrets. One-shot. Optional final 'NEXT:' with 1–3 bullets. "
-    "You may SKIP unsafe commands (e.g., unresolved placeholders or exposed credentials) and MUST explain why."
-)
-
-DANGEROUS = (" rm -rf /", " mkfs", " shutdown", " reboot", ":(){:|:&};:", " dd if=", " > /dev/sda", " > /dev/nvme", " > /dev/vda")
 
 client = CoreMCPClient([
     {
@@ -57,9 +28,7 @@ client = CoreMCPClient([
     },
 ])
 
-async def _mcp_tools():
-    tools = await client.list_tools()
-    return tools
+# --- Super-compact, low-token policies --- #
 
 async def agent(
         query: str = typer.Argument(..., help="e.g. 'init alembic and create migrations'"),
@@ -142,16 +111,31 @@ async def agent(
     # -------- EXECUTE --------
 
     async def hitl_gate(name: str, args: dict):
-        cmd = _redact(str(args.get("command", "")))
-        if any(d in cmd for d in DANGEROUS):
-            return {"action": "block", "replacement": "[blocked: potentially destructive]"}
-        if autoapprove:
-            if not quiet_tools:
-                print(f"Executing -> {cmd}")
-            return {"action": "pass"}
+        # try common keys first
+        cmd = (
+            args.get("command") or
+            " && ".join(args.get("commands", []) or []) or
+            args.get("cmd") or
+            args.get("shell") or
+            ""
+        )
+
+        # redact here if you have a _redact() util
+        preview = cmd.strip() or f"{name}({json.dumps(args, separators=(',', ':'), ensure_ascii=False)})"
+
         if not quiet_tools:
-            print(f"Executing -> {cmd}")
-        # non-interactive default:
+            print(f"Executing -> {preview}")
+
+        # dangerous-check should consider the final preview string
+        if any(d in preview for d in DANGEROUS):
+            return {"action": "block", "replacement": "[blocked: potentially destructive]"}
+
+        if autoapprove:
+            return {"action": "pass"}
+
+        ans = (await asyncio.to_thread(input, "Approve? [y]es / [b]lock: ")).strip().lower()
+        if ans in ("b", "block"):
+            return {"action": "block", "replacement": "[blocked by user]"}
         return {"action": "pass"}
 
     agent.set_hitl(on_tool_call_async=hitl_gate)
@@ -160,13 +144,13 @@ async def agent(
         {"role": "system", "content": EXEC_POLICY},
         {"role": "system", "content": "You can manage the project as well as executing shell commands on a developer's local machine. Each command must run as-is. Output results using RUN/OK/FAIL markers. Be concise."},
         {"role": "system", "content": "If a DB connection is needed, prefer: `--database-url \"$DATABASE_URL\"`."},
-        {"role": "human", "content": f"Execute this plan now:\n{plan_text}"},
+        {"role": "human", "content": f"Execute this plan now:\n{query}"},
     ]
 
     # Visual spacer between the Plan and the upcoming "Executing ->" lines
     print()
 
-    tools = await _mcp_tools()
+    tools = await client.list_tools()
     exec_resp = await agent.arun_agent(
         messages=exec_messages,
         provider=prov,

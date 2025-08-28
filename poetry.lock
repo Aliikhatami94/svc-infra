@@ -2,14 +2,14 @@
 
 [[package]]
 name = "ai-infra"
-version = "0.1.25"
+version = "0.1.27"
 description = "Infrastructure for efficient and scalable AI applications."
 optional = false
 python-versions = "<4.0,>=3.11"
 groups = ["main"]
 files = [
-    {file = "ai_infra-0.1.25-py3-none-any.whl", hash = "sha256:7dc66c22e4a4972ef6273600a5b432ecdf92a7613bc4c47594f7d9dad46dfd87"},
-    {file = "ai_infra-0.1.25.tar.gz", hash = "sha256:4240659d8ce0559ec259e275d41d1cfe7a2a52fb357763d9d5e6a559a85e62a8"},
+    {file = "ai_infra-0.1.27-py3-none-any.whl", hash = "sha256:9537b030b7dee1f1d53ef532b3d56151331545906d4c5dc56ce9f02c7853c8a2"},
+    {file = "ai_infra-0.1.27.tar.gz", hash = "sha256:059c068dec53fca476d6384a43455d8a8db5cc9c126e03bf59042b07ef9bf1ef"},
 ]
 
 [package.dependencies]
