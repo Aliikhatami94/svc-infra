@@ -130,63 +130,6 @@ def _capabilities_text(root: Path) -> str:
         if shutil.which(tool): hits.append(f"{tool} (on PATH)")
     return "## Capabilities\n- " + "\n- ".join(sorted(set(hits))) + "\n" if hits else ""
 
-def render_repo_tree(
-        root: Path,
-        *,
-        prefer_external: bool = True,
-        depth_default: int = 3,
-        depth_focus: int = 6,
-        max_total: int = 3000,
-        max_entries_per_dir: int = 80,
-        focus_subpaths: Sequence[str] = ("src/svc_infra", "tests"),
-) -> str:
-    """
-    Render a deep repo tree. If `tree` is available and prefer_external=True, use it;
-    otherwise fall back to a Python renderer with selective deepening for focus paths.
-
-    - depth_default: max depth for general dirs
-    - depth_focus:   max depth for focus dirs (applies recursively under those roots)
-    """
-    root = root.resolve()
-    focus_paths = [root / sp for sp in focus_subpaths]
-
-    # Try using the external `tree` command if available
-    if prefer_external and shutil.which("tree"):
-        # Build ignore pattern for external tree (-I uses | as alternation)
-        ignore_globs = [
-            ".git", ".hg", ".svn", ".idea", ".vscode", "node_modules", ".venv", "venv",
-            ".tox", "dist", "build", "__pycache__", ".pytest_cache", ".mypy_cache",
-            ".next", ".turbo", ".cache", ".gradle",
-        ]
-        ignore_pattern = "|".join(ignore_globs)
-
-        # We can't express "focus deeper than default" with plain `tree`,
-        # so pick the larger of the two depths to not miss structure.
-        depth = max(depth_default, depth_focus)
-
-        try:
-            out = subprocess.check_output(
-                ["tree", "-a", "-I", ignore_pattern, "-L", str(depth), str(root)],
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
-            return out.strip()
-        except Exception:
-            # fall back to Python if tree invocation fails
-            pass
-
-    # Python fallback with selective deepening for focus paths
-    # Strategy:
-    #  - First level under root uses depth_default
-    #  - Any path under a focus path expands up to depth_focus
-    return _py_tree(
-        root=root,
-        max_depth=depth_default,
-        max_total=max_total,
-        max_entries_per_dir=max_entries_per_dir,
-        focus_paths=focus_paths,
-    )
-
 def _find_repo_root(start: Path) -> Path:
     cur = start.resolve()
     signals = ("pyproject.toml","package.json","pom.xml","build.gradle",
@@ -295,20 +238,12 @@ PLAN_POLICY = (
     "Avoid destructive operations (rm -rf, sudo) unless explicitly requested."
 )
 
-def cli_agent_sys_msg() -> str:
+def cli_planner_sys_msg() -> str:
     ctx = _discover_package_context()
     root = Path(ctx["root"])
 
-    tree_txt = render_repo_tree(root, depth_default=3, depth_focus=6, focus_subpaths=("src/svc_infra", "tests"))
     git_txt  = _git_context(root)
-
     caps_txt = _capabilities_text(root)
     os_hint = _os_hint()
 
-    return (
-            "## Project tree\n```text\n" + tree_txt + "\n```\n\n" +
-            caps_txt + "\n" +
-            (git_txt or "") +
-            svc_infra_help_snippets() + "\n\n" +
-            os_hint + PLAN_POLICY
-    )
+    return git_txt + caps_txt + os_hint + PLAN_POLICY
