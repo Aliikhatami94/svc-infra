@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from svc_infra.cli.ai.utils import _redact
-from svc_infra.cli.ai.helper import svc_infra_help_snippets
+
 
 # Directories we usually don't want to expand
 _IGNORED_DIRS = {

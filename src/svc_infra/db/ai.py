@@ -7,7 +7,6 @@ import sys
 import typer
 from ai_infra import Providers, Models
 from ai_infra.llm import CoreAgent, CoreLLM
-from ai_infra.llm.tools.custom.terminal import run_command
 
 
 # -------------------- context --------------------

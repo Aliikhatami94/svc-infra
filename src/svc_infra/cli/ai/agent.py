@@ -16,6 +16,7 @@ from .constants import (
     EXEC_POLICY,
 )
 from ai_infra.llm.agents.custom.tool_planner.main import tool_planner
+from .tools import svc_infra_helper_md
 
 
 client = CoreMCPClient([
@@ -40,7 +41,6 @@ async def cli_agent(
     # -- autonomy flags
     if auto:
         autoapprove = True
-        yes = True
 
     # -- env prep
     def _is_db_action(q: str) -> bool:

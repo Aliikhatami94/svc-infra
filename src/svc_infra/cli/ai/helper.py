@@ -1,6 +1,7 @@
-import re
+import re, json
 from pathlib import Path
 from functools import lru_cache
+from typing import Any, Dict, List
 
 import click
 from typer.main import get_command
@@ -84,70 +85,67 @@ def _prune_inv(inv: dict, max_depth: int = 3) -> dict:
     ]
     return inv
 
-@lru_cache(maxsize=1)
-def _svc_infra_inventory_json() -> str:
+def _safe_bool(v: Any) -> bool:
     try:
-        from svc_infra.cli.main import app as root_typer_app
-        root_click: click.Command = get_command(root_typer_app)
-
-        def cmd_to_dict(cmd: click.Command, name: str) -> dict:
-            d = {
-                "name": name,
-                "hidden": bool(getattr(cmd, "hidden", False)),
-                "help": (_short_help(cmd) or ""),
-                "usage": _squash_ws(cmd.get_usage(click.Context(cmd))) if hasattr(cmd, "get_usage") else "",
-                "options": [],
-                "subcommands": [],
-            }
-            if hasattr(cmd, "params"):
-                for p in cmd.params:
-                    if isinstance(p, click.Option):
-                        d["options"].append({
-                            "opts": p.opts + p.secondary_opts,
-                            "metavar": p.metavar,
-                            "required": bool(p.required),
-                            "is_flag": bool(p.is_flag),
-                            "nargs": p.nargs,
-                        })
-            if isinstance(cmd, click.Group):
-                for child_name, child_cmd in _cmds_sorted(cmd):
-                    if child_name in _SKIP or getattr(child_cmd, "hidden", False):
-                        continue
-                    d["subcommands"].append(cmd_to_dict(child_cmd, child_name))
-            return d
-
-        inv = cmd_to_dict(root_click, "svc-infra")
-        inv = _prune_inv(inv, max_depth=3)
-
-        import json
-        return "```json\n" + json.dumps(inv, ensure_ascii=False, separators=(",", ":")) + "\n```"
+        return bool(v)
     except Exception:
-        return ""
+        return False
 
-@lru_cache(maxsize=1)
-def svc_infra_help_snippets() -> str:
-    """
-    Compact, human-readable help:
-    - Root usage line
-    - Commands list (name — short help)
-    - For each subcommand: usage line + its commands list
-    """
+def _build_inventory(max_depth: int = 3) -> Dict[str, Any]:
+    """Walk the Typer/Click app and return a pruned command tree dict."""
+    from svc_infra.cli.main import app as root_typer_app  # local import to avoid import-cycles
+    root_click: click.Command = get_command(root_typer_app)
+
+    def cmd_to_dict(cmd: click.Command, name: str) -> dict:
+        d = {
+            "name": name,
+            "hidden": _safe_bool(getattr(cmd, "hidden", False)),
+            "help": (_short_help(cmd) or ""),
+            "usage": _squash_ws(cmd.get_usage(click.Context(cmd))) if hasattr(cmd, "get_usage") else "",
+            "options": [],
+            "subcommands": [],
+        }
+        if hasattr(cmd, "params"):
+            for p in cmd.params:
+                if isinstance(p, click.Option):
+                    d["options"].append({
+                        "opts": p.opts + p.secondary_opts,
+                        "metavar": p.metavar,
+                        "required": _safe_bool(p.required),
+                        "is_flag": _safe_bool(p.is_flag),
+                        "nargs": getattr(p, "nargs", None),
+                    })
+        if isinstance(cmd, click.Group):
+            for child_name, child_cmd in _cmds_sorted(cmd):
+                if child_name in _SKIP or getattr(child_cmd, "hidden", False):
+                    continue
+                d["subcommands"].append(cmd_to_dict(child_cmd, child_name))
+        return d
+
+    inv = cmd_to_dict(root_click, "svc-infra")
+    inv = _prune_inv(inv, max_depth=max_depth)
+    return inv
+
+def _render_json(inv: Dict[str, Any]) -> str:
+    return "```json\n" + json.dumps(inv, ensure_ascii=False, separators=(",", ":")) + "\n```"
+
+def _render_md(inv: Dict[str, Any]) -> str:
+    """Compact, human-readable markdown summary (like your current helper)."""
+    blocks: List[str] = []
     try:
         from svc_infra.cli.main import app as root_typer_app
         root_click: click.Command = get_command(root_typer_app)
 
-        blocks: list[str] = []
-
-        # Root header
+        # Root usage
         try:
             usage = _squash_ws(root_click.get_usage(click.Context(root_click)))
             blocks.append("### svc-infra — usage\n```text\n" + clip(usage, 400) + "\n```")
         except Exception:
             pass
 
-        # Root commands table (compact)
+        # Root commands list
         if isinstance(root_click, click.Group):
-            lines = []
+            lines: List[str] = []
             for name, cmd in _cmds_sorted(root_click):
                 if name in _SKIP or getattr(cmd, "hidden", False):
                     continue
@@ -155,7 +153,7 @@ def svc_infra_help_snippets() -> str:
             if lines:
                 blocks.append("### svc-infra — commands\n```text\n" + clip("\n".join(lines), 800) + "\n```")
 
-            # Per-subcommand summaries (1 level deep)
+            # Subcommand summaries (1 level)
             for name, cmd in _cmds_sorted(root_click):
                 if name in _SKIP or getattr(cmd, "hidden", False):
                     continue
@@ -163,7 +161,7 @@ def svc_infra_help_snippets() -> str:
                     usage = _squash_ws(cmd.get_usage(click.Context(cmd)))
                     sect = [f"### svc-infra {name} — usage\n```text\n{clip(usage, 280)}\n```"]
                     if isinstance(cmd, click.Group) and (cmd.commands or {}):
-                        sub_lines = []
+                        sub_lines: List[str] = []
                         for cname, ccmd in _cmds_sorted(cmd):
                             if getattr(ccmd, "hidden", False):
                                 continue
@@ -177,7 +175,7 @@ def svc_infra_help_snippets() -> str:
                     blocks.append("\n".join(sect))
                 except Exception:
                     continue
-
-        return "\n\n".join(blocks)
     except Exception:
-        return ""
+        # fall back to a very small block if anything fails
+        blocks.append("### svc-infra — help\n(Help could not be rendered.)")
+    return "\n\n".join(blocks)
