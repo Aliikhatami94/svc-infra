@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 from contextlib import redirect_stdout
 
-from svc_infra.cli.ai.prints import _print_exec_transcript
+from svc_infra.cli.agent.prints import _print_exec_transcript
 
 
 def test_duplicate_run_lines_are_suppressed_within_same_message():

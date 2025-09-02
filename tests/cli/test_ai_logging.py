@@ -3,8 +3,8 @@ from __future__ import annotations
 import io
 from contextlib import redirect_stdout
 
-from svc_infra.cli.ai.prints import _print_exec_transcript
-from svc_infra.cli.ai.redaction import _redact
+from svc_infra.cli.agent.prints import _print_exec_transcript
+from svc_infra.cli.agent.redaction import _redact
 
 
 def test_redact_common_patterns():

@@ -5,7 +5,7 @@ from ai_infra.graph import ConditionalEdge, Edge
 from ai_infra.mcp.client.core import CoreMCPClient
 from ai_infra.llm import PROVIDER, MODEL
 
-from svc_infra.cli.ai.prints import _print_exec_transcript
+from svc_infra.cli.agent.prints import _print_exec_transcript
 from .nodes import plan_with_action_planner, execute_plan, recover_from_error
 from .states import CLIAgentState
 from .utils import (_on_exit, _on_enter)

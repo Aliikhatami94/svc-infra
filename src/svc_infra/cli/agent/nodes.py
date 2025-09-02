@@ -4,10 +4,10 @@ from ai_infra.llm import CoreAgent
 from ai_infra.llm.agents.custom.action_planner.main import run_action_planner
 
 from .states import CLIAgentState
-from svc_infra.cli.ai.constants import EXEC_POLICY
-from svc_infra.cli.ai.context import cli_planner_sys_msg
+from svc_infra.cli.agent.constants import EXEC_POLICY
+from svc_infra.cli.agent.context import cli_planner_sys_msg
 from .utils import _print_plan_presentation
-from svc_infra.cli.ai.error_parser import extract_last_fail
+from svc_infra.cli.agent.error_parser import extract_last_fail
 
 
 async def plan_with_action_planner(state: CLIAgentState) -> CLIAgentState:

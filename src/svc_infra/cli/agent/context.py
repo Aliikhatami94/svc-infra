@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Iterable
 
-from svc_infra.cli.ai.prints import _redact
+from svc_infra.cli.agent.prints import _redact
 from .constants import (PLAN_POLICY, _PROJECT_SIGNALS)
 
 
