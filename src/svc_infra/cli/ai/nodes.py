@@ -89,7 +89,7 @@ async def execute_plan(state: CLIAgentState) -> CLIAgentState:
                 print(f"Probing help for: {cmd.split()[0:3]}")
             print(f"Executing -> {cmd or f'{name}({args})'}")
 
-        from ..constants import DANGEROUS
+        from .constants import DANGEROUS
         preview = cmd or f"{name}({json.dumps(args, separators=(',', ':'), ensure_ascii=False)})"
         if any(d in preview for d in DANGEROUS):
             return {"action": "block", "replacement": "[blocked: potentially destructive]"}
