@@ -1,27 +1,19 @@
+from ai_infra.llm import tools_from_functions
+
 from .helper import (
     _build_inventory,
     _render_json,
-    _render_md,
 )
 
 async def svc_infra_helper_json(max_depth: int = 3) -> str:
-    """Render a JSON inventory of the svc-infra CLI commands and options, up to max_depth levels deep."""
+    """
+    Returns a JSON representation of the current service infrastructure inventory. This includes services, their configurations, dependencies, and statuses. The depth of the inventory can be controlled with the `max_depth` parameter.
+    """
     try:
         inv = _build_inventory(max_depth=max_depth)
         return _render_json(inv)
     except Exception:
         return ""
 
-async def svc_infra_helper_md(max_depth: int = 3) -> str:
-    """Render a markdown inventory of the svc-infra CLI commands and options, up to max_depth levels deep."""
-    try:
-        # _render_md renders from live click tree; we still build/prune to bound work,
-        # but we don't need inv to render; keeping symmetry with json.
-        _ = _build_inventory(max_depth=max_depth)
-        return _render_md(_)
-    except Exception:
-        return ""
 
-from langchain_core.tools import StructuredTool
-
-svc_infra_helper = StructuredTool.from_function(func=svc_infra_helper_json)
+svc_infra_tools = tools_from_functions(tools=[svc_infra_helper_json])
