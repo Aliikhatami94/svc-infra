@@ -8,7 +8,7 @@ def _print_plan_presentation(md: str) -> None:
         typer.secho(line, fg=typer.colors.BLUE, color=True)
 
 def _on_enter(node_name: str, state: dict):
-    if node_name == "plan_with_tool_planner":
+    if node_name == "plan_with_action_planner":
         print("\n→ Planning...")
     elif node_name == "execute_plan":
         rc = int(state.get("retry_count") or 0)
@@ -23,7 +23,7 @@ def _on_enter(node_name: str, state: dict):
         print("\n→ Diagnosing failure and preparing fix...")
 
 def _on_exit(node_name: str, state: dict):
-    if node_name == "plan_with_tool_planner":
+    if node_name == "plan_with_action_planner":
         if state.get("presentation_md"):
             print("\n(plan ready)")
         if state.get("aborted"):

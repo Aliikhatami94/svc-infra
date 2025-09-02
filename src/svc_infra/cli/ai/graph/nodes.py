@@ -1,7 +1,7 @@
-import json, re
+import json, re, sys
 from typing import Dict
 from ai_infra.llm import CoreAgent
-from ai_infra.llm.agents.custom.tool_planner.main import tool_planner
+from ai_infra.llm.agents.custom.action_planner.main import run_action_planner
 
 from .states import CLIAgentState
 from ..constants import EXEC_POLICY
@@ -9,11 +9,9 @@ from ..context import cli_planner_sys_msg
 from .utils import _print_plan_presentation
 from .error_parser import extract_last_fail
 from .recover import build_recovery_hint
-from ..utils import _print_error
 
 
-
-async def plan_with_tool_planner(state: CLIAgentState) -> CLIAgentState:
+async def plan_with_action_planner(state: CLIAgentState) -> CLIAgentState:
     # exec-only: load from file and skip planner (see Step 2 below if you adopt that path here)
     if state.get("exec_only") and state.get("plan_file"):
         import json
@@ -25,7 +23,7 @@ async def plan_with_tool_planner(state: CLIAgentState) -> CLIAgentState:
             {"role": "system", "content": cli_planner_sys_msg()},
             {"role": "user", "content": state["query"]},
         ]
-        res = await tool_planner(
+        res = await run_action_planner(
             messages=messages,
             tools=state["tools"],
             io_mode="terminal",
@@ -126,9 +124,45 @@ async def execute_plan(state: CLIAgentState) -> CLIAgentState:
     plan_steps = state.get("plan") or []
     questions  = state.get("questions") or []
 
-    if plan_steps:
-        exec_payload = json.dumps(plan_steps, ensure_ascii=False, indent=2)
-        exec_instruction = f"Execute this structured plan now:\n{exec_payload}"
+    # --- NEW: split plan into tool vs. non-tool and print contextual steps
+    tool_steps = [s for s in plan_steps if isinstance(s, dict) and s.get("kind") == "tool"]
+    context_steps = [s for s in plan_steps if isinstance(s, dict) and s.get("kind") != "tool"]
+
+    if context_steps:
+        print("\nContext:")
+        for s in context_steps:
+            k = (s.get("kind") or "").lower()
+            if k == "reason" and s.get("text"):
+                print(" -", s["text"])
+            elif k == "assert" and s.get("condition"):
+                line = f"Assert: {s['condition']}"
+                if s.get("on_fail_hint"):
+                    line += f" (if false: {s['on_fail_hint']})"
+                print(" -", line)
+            elif k == "ask" and s.get("question"):
+                print(" - Ask:", s["question"])
+
+    # --- NEW: if no tool steps, synthesize a single best-effort command for trivial goals
+    synthesized_steps = []
+    if not tool_steps:
+        q = (state.get("query") or "").lower().strip()
+        if "path" in q and ("get" in q or "print" in q or "show" in q or "$path" in q):
+            if sys.platform.startswith("win"):
+                cmd = r'powershell -NoProfile -Command "$env:PATH"'
+            else:
+                cmd = r'''bash -lc 'printf "%s\n" "$PATH"' '''
+            synthesized_steps = [{
+                "kind": "tool",
+                "tool": "run_command",
+                "args": {"command": cmd.strip()},
+                "rationale": "Print PATH (single-step, non-interactive)."
+            }]
+
+    effective_tool_steps = tool_steps or synthesized_steps
+
+    if effective_tool_steps:
+        exec_payload = json.dumps(effective_tool_steps, ensure_ascii=False, indent=2)
+        exec_instruction = f"Execute this structured plan now (tool steps only):\n{exec_payload}"
     else:
         exec_instruction = f"Goal (no plan needed): {state['query']}\nExecute directly."
 

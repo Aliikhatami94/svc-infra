@@ -1,13 +1,9 @@
-from langchain_core.tools import tool
-
 from .helper import (
     _build_inventory,
     _render_json,
     _render_md,
 )
 
-
-@tool
 async def svc_infra_helper_json(max_depth: int = 3) -> str:
     """Render a JSON inventory of the svc-infra CLI commands and options, up to max_depth levels deep."""
     try:
@@ -16,7 +12,6 @@ async def svc_infra_helper_json(max_depth: int = 3) -> str:
     except Exception:
         return ""
 
-@tool
 async def svc_infra_helper_md(max_depth: int = 3) -> str:
     """Render a markdown inventory of the svc-infra CLI commands and options, up to max_depth levels deep."""
     try:
@@ -26,3 +21,7 @@ async def svc_infra_helper_md(max_depth: int = 3) -> str:
         return _render_md(_)
     except Exception:
         return ""
+
+from langchain_core.tools import StructuredTool
+
+svc_infra_helper = StructuredTool.from_function(func=svc_infra_helper_json)

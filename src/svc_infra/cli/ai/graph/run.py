@@ -5,8 +5,8 @@ from ai_infra.graph import ConditionalEdge, Edge
 from ai_infra.mcp.client.core import CoreMCPClient
 from ai_infra.llm import PROVIDER, MODEL
 
-from svc_infra.db.ai import _print_exec_transcript
-from .nodes import plan_with_tool_planner, execute_plan, recover_from_error
+from svc_infra.cli.ai.utils import _print_exec_transcript
+from .nodes import plan_with_action_planner, execute_plan, recover_from_error
 from .states import CLIAgentState
 from ..utils import (
     _resolve_provider,
@@ -20,14 +20,14 @@ MAX_RETRIES = 2
 CLIAgentGraph = CoreGraph(
     state_type=CLIAgentState,
     node_definitions=[
-        plan_with_tool_planner,
+        plan_with_action_planner,
         execute_plan,
         recover_from_error
     ],
     edges=[
-        Edge(start=START, end="plan_with_tool_planner"),
+        Edge(start=START, end="plan_with_action_planner"),
         ConditionalEdge(
-            start="plan_with_tool_planner",
+            start="plan_with_action_planner",
             router_fn=lambda s: (
                 END
                 if (bool(s.get("aborted"))
