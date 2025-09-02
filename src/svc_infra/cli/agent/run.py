@@ -1,9 +1,10 @@
+import typer
 from langgraph.graph import END, START
 
 from ai_infra import CoreGraph
 from ai_infra.graph import ConditionalEdge, Edge
 from ai_infra.mcp.client.core import CoreMCPClient
-from ai_infra.llm import PROVIDER, MODEL
+from ai_infra.llm import PROVIDER
 
 from svc_infra.cli.agent.prints import _print_exec_transcript
 from .nodes import plan_with_action_planner, execute_plan, recover_from_error
@@ -45,18 +46,49 @@ CLIAgentGraph = CoreGraph(
     ],
 )
 
-async def run_cli(
-        *,
-        query: str,
-        provider: str = PROVIDER,
-        model: str = MODEL,
-        autoapprove_tools: bool = False,
-        quiet_tools: bool = False,
-        max_lines: int = 60,
-        show_error_context: bool = True,
-        max_tool_calls: int = 5
+async def agent_cmd(
+        query: str = typer.Argument(..., help="Natural-language request for the agent to execute."),
+        provider: str = typer.Option(
+            PROVIDER,
+            "--provider", "-p",
+            help="LLM provider key (e.g., openai, anthropic, azure_openai)."
+        ),
+        model: str | None = typer.Option(
+            None,
+            "--model", "-m",
+            help="Model name for the provider. Omit, if you want to set to the default model for the provider."
+        ),
+        autoapprove_tools: bool = typer.Option(
+            False,
+            "--autoapprove/--no-autoapprove",
+            help="Auto-approve tool calls without interactive prompts."
+        ),
+        quiet_tools: bool = typer.Option(
+            False,
+            "--quiet-tools/--no-quiet-tools",
+            help="Hide tool stdout/stderr in the transcript."
+        ),
+        max_lines: int = typer.Option(
+            60,
+            "--max-lines",
+            help="Max lines of tool output to show per step."
+        ),
+        show_error_context: bool = typer.Option(
+            True,
+            "--show-error-context/--no-show-error-context",
+            help="Show a short context excerpt when a tool fails."
+        ),
+        max_tool_calls: int = typer.Option(
+            5,
+            "--max-tool-calls",
+            help="Budget for tool calls; the agent stops when exhausted."
+        ),
 ):
-    # shared MCP tools
+    """
+    Run the CLI agent with the given parameters. This function initializes the agent's state, sets up the necessary tools,
+    and executes the agent's planning and execution graph. It handles user interruptions and prints the execution transcript if applicable.
+    This agent has access to cli commands, project management functionalities, db management functionalities, and scaffolding auth related management for existing db setups and applications.
+    """
     client = CoreMCPClient([
         {"command": "cli-mcp", "transport": "stdio"},
         {"command": "project-management-mcp", "transport": "stdio"},

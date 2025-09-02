@@ -6,7 +6,7 @@ class CLIAgentState(TypedDict, total=False):
     # ---- Inputs (from CLI flags) ----
     query: str
     provider: str
-    model_name: str
+    model_name: str | None
 
     # Execution gating
     autoapprove_tools: bool          # --autoapprove or implied by --auto
