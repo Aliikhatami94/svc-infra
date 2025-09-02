@@ -8,7 +8,6 @@ from ai_infra.llm import PROVIDER, MODEL
 from svc_infra.cli.ai.utils import _print_exec_transcript
 from .nodes import plan_with_action_planner, execute_plan, recover_from_error
 from .states import CLIAgentState
-from ..tools import svc_infra_tools
 from ..utils import (
     _resolve_provider,
     _resolve_model,
@@ -70,6 +69,7 @@ async def run_cli(
         {"command": "cli-mcp", "transport": "stdio"},
         {"command": "project-management-mcp", "transport": "stdio"},
         {"command": "db-management-mcp", "transport": "stdio"},
+        {"command": "auth-infra-mcp", "transport": "stdio"},
     ])
     tools = await client.list_tools()
 
