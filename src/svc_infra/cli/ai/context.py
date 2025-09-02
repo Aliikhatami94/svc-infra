@@ -4,23 +4,11 @@ from typing import Any
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable
 
-from svc_infra.cli.ai.utils import _redact
+from svc_infra.cli.ai.prints import _redact
+from .constants import (PLAN_POLICY, _PROJECT_SIGNALS)
 
-
-# Directories we usually don't want to expand
-_IGNORED_DIRS = {
-    ".git", ".hg", ".svn", ".idea", ".vscode",
-    "node_modules", ".venv", "venv", ".tox",
-    "dist", "build", "__pycache__", ".pytest_cache", ".mypy_cache",
-    ".next", ".turbo", ".cache", ".gradle",
-}
-
-# Files we usually don't care to list (big or noisy)
-_IGNORED_FILES = {
-    ".DS_Store",
-}
 
 def _iter_dir(path: Path) -> Iterable[Path]:
     try:
@@ -30,81 +18,6 @@ def _iter_dir(path: Path) -> Iterable[Path]:
 
 def _shorten(s: str, n: int) -> str:
     return s if len(s) <= n else s[: n - 3] + "..."
-
-def _py_tree(
-        root: Path,
-        max_depth: int,
-        max_total: int,
-        max_entries_per_dir: int,
-        focus_paths: Sequence[Path],
-) -> str:
-    """
-    Python fallback: deep tree with selective focus expansion.
-    Always expands items under any path that is a prefix of a focus path.
-    """
-    lines: list[str] = []
-    total = 0
-
-    root = root.resolve()
-    focus_paths = [fp.resolve() for fp in focus_paths if isinstance(fp, Path)]
-
-    def is_under_focus(p: Path) -> bool:
-        rp = p.resolve()
-        return any(str(rp).startswith(str(f)) for f in focus_paths)
-
-    def walk(dir_path: Path, prefix: str, depth: int) -> None:
-        nonlocal total
-        if total >= max_total:
-            return
-
-        try:
-            entries = [p for p in _iter_dir(dir_path)
-                       if p.name not in _IGNORED_FILES
-                       and (p.name not in _IGNORED_DIRS or is_under_focus(p))]
-        except Exception:
-            return
-
-        if not entries:
-            return
-
-        shown = 0
-        n = len(entries)
-        for i, p in enumerate(entries, start=1):
-            if total >= max_total:
-                break
-            if shown >= max_entries_per_dir and not is_under_focus(p):
-                remaining = n - (i - 1)
-                lines.append(f"{prefix}└── … ({remaining} more)")
-                break
-
-            connector = "└──" if i == n else "├──"
-            label = p.name + ("/" if p.is_dir() else "")
-            lines.append(f"{prefix}{connector} {_shorten(label, 120)}")
-            total += 1
-            shown += 1
-
-            # Decide the recursive depth: full if in focus; else use remaining depth
-            next_depth = max_depth if is_under_focus(p) else depth - 1
-
-            if p.is_dir() and next_depth > 0:
-                child_prefix = f"{prefix}{'    ' if i == n else '│   '}"
-                walk(p, child_prefix, next_depth)
-
-    lines.append(root.name + "/")
-    walk(root, "", max_depth)
-    return "\n".join(lines)
-
-_PROJECT_SIGNALS = {
-    # Build / package managers
-    "python": ["pyproject.toml", "poetry.lock", "requirements.txt", "setup.py"],
-    "node":   ["package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"],
-    "java":   ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"],
-    "docker": ["Dockerfile", "docker-compose.yml", "compose.yml"],
-    "make":   ["Makefile"],
-    "just":   ["Justfile"],
-    "task":   ["Taskfile.yml", "Taskfile.yaml"],
-    "pytest": ["pytest.ini", "pyproject.toml"],
-}
 
 def _scan_project_signals(root: Path) -> dict[str, list[str]]:
     found: dict[str, list[str]] = {}
@@ -226,17 +139,6 @@ def _git_context(root: Path) -> str:
             + "\n\n```text\n"
               f"{remotes}\n\nRecent commits:\n{log}\n```\n"
     )
-
-PLAN_POLICY = (
-    "ROLE=repo-orchestrator\n"
-    "TASK=PLAN\n"
-    "Assume working directory is the repo root: ${REPO_ROOT}.\n"
-    "Output ONLY a short, numbered list of exact shell commands (one per line). "
-    "No prose, no comments, no code fences.\n"
-    "Prefer local tools inferred from project signals (svc-infra, poetry, npm/yarn/pnpm, mvn/gradle, make, docker compose). "
-    "If a command isn’t on PATH and pyproject.toml exists, try `poetry run <cmd>` first.\n"
-    "Avoid destructive operations (rm -rf, sudo) unless explicitly requested."
-)
 
 def cli_planner_sys_msg() -> str:
     ctx = _discover_package_context()

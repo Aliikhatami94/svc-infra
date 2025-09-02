@@ -43,7 +43,6 @@ class CLIAgentState(TypedDict, total=False):
     last_cmd: str                   # last RUN command that failed
     last_error_text: str            # terse error summary
     retry_count: int                # bounded retries
-    recovery_hint: str              # extra instruction to guide the executor
 
     hard_stop: bool              # set to True to abort the run immediately
     max_tool_calls: int          # optional budget; when exhausted, we stop

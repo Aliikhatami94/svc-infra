@@ -5,13 +5,9 @@ from ai_infra.graph import ConditionalEdge, Edge
 from ai_infra.mcp.client.core import CoreMCPClient
 from ai_infra.llm import PROVIDER, MODEL
 
-from svc_infra.cli.ai.utils import _print_exec_transcript
+from svc_infra.cli.ai.prints import _print_exec_transcript
 from .nodes import plan_with_action_planner, execute_plan, recover_from_error
 from .states import CLIAgentState
-from ..utils import (
-    _resolve_provider,
-    _resolve_model,
-)
 from .utils import (_on_exit, _on_enter)
 
 
@@ -52,18 +48,14 @@ CLIAgentGraph = CoreGraph(
 async def run_cli(
         *,
         query: str,
-        provider_key: str = PROVIDER,
-        model_key: str = MODEL,
+        provider: str = PROVIDER,
+        model: str = MODEL,
         autoapprove_tools: bool = False,
         quiet_tools: bool = False,
         max_lines: int = 60,
         show_error_context: bool = True,
         max_tool_calls: int = 5
 ):
-    # resolve provider/model
-    prov, models_key = _resolve_provider(provider_key)
-    model_name = _resolve_model(models_key, model_key)
-
     # shared MCP tools
     client = CoreMCPClient([
         {"command": "cli-mcp", "transport": "stdio"},
@@ -75,8 +67,8 @@ async def run_cli(
 
     initial: CLIAgentState = {
         "query": query,
-        "provider": prov,
-        "model_name": model_name,
+        "provider": provider,
+        "model_name": model,
         "tools": tools,
         "autoapprove_tools": autoapprove_tools,
         "quiet_tools": quiet_tools,

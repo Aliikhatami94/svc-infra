@@ -1,14 +1,13 @@
-import json, re, sys
+import json, sys
 from typing import Dict
 from ai_infra.llm import CoreAgent
 from ai_infra.llm.agents.custom.action_planner.main import run_action_planner
 
 from .states import CLIAgentState
-from ..constants import EXEC_POLICY
-from ..context import cli_planner_sys_msg
+from svc_infra.cli.ai.constants import EXEC_POLICY
+from svc_infra.cli.ai.context import cli_planner_sys_msg
 from .utils import _print_plan_presentation
-from .error_parser import extract_last_fail
-from .recover import build_recovery_hint
+from svc_infra.cli.ai.error_parser import extract_last_fail
 
 
 async def plan_with_action_planner(state: CLIAgentState) -> CLIAgentState:
@@ -169,11 +168,6 @@ async def execute_plan(state: CLIAgentState) -> CLIAgentState:
     if questions:
         exec_instruction += "\n\nOpen questions (answer if needed before execution):\n- " + "\n- ".join(questions)
 
-    hint = (state.get("recovery_hint") or "").strip()
-    if hint:
-        print("\nApplying recovery hint:")
-        print("  " + hint)
-
     exec_messages = [
         {"role": "system", "content": EXEC_POLICY},
         {"role": "system", "content": "You can manage the project as well as executing shell commands on a developer's local machine. Each command must run as-is. Output results using RUN/OK/FAIL markers. Be concise."},
@@ -196,12 +190,6 @@ async def execute_plan(state: CLIAgentState) -> CLIAgentState:
     msgs = getattr(resp, "messages", None) or (resp.get("messages") if isinstance(resp, dict) else None)
     cmd, fail = extract_last_fail(msgs or [])
     state["had_error"] = bool(fail)
-    if fail and re.search(r"\b(y/n|\[y/N\]|\(yes/no\))", fail, re.I):
-        state["recovery_hint"] = (
-            "The command appears to require interactive confirmation. "
-            "Re-run with a non-interactive flag (e.g. --yes / --no-interaction) after checking '<cmd> --help'."
-        )
-
     return state
 
 
@@ -219,7 +207,6 @@ async def recover_from_error(state: CLIAgentState) -> CLIAgentState:
     cmd, fail = extract_last_fail(msgs or [])
     state["last_cmd"] = cmd or ""
     state["last_error_text"] = fail or "command failed"
-    state["recovery_hint"] = build_recovery_hint(cmd, fail)
     state["retry_count"] = int(state.get("retry_count") or 0) + 1
     # clear error flag so execute_plan can set it again if needed
     state["had_error"] = False

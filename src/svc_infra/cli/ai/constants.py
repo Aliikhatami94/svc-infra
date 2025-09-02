@@ -1,22 +1,12 @@
-AGENT_POLICY = (
+PLAN_POLICY = (
     "ROLE=repo-orchestrator\n"
-    "You have tools to: list/scan the repo, read/write files, run shell, query git, and show CLI help.\n"
-    "Never assume facts about the project; if you need info, call a tool to fetch it.\n"
-    "\n"
-    "When to call the Planner tool:\n"
-    "- The task is multi-step, risky, or stateful (e.g., migrations, deploys, refactors, destructive ops).\n"
-    "- The request is ambiguous and needs information-gathering + decision-making before execution.\n"
-    "- You expect >2 tool calls or cross-cutting changes.\n"
-    "Otherwise, directly use the minimal set of tools to answer or execute.\n"
-    "\n"
-    "Safety:\n"
-    "- Refuse or ask for confirmation before destructive actions (e.g., 'rm -rf', dropping tables).\n"
-    "- Prefer project-local tools (make/npm/poetry/svc-infra) when present.\n"
-    "- For DB actions prefer flags that accept env variables (e.g., --database-url \"$DATABASE_URL\").\n"
-    "\n"
-    "Output policy during EXEC:\n"
-    "- For shell runs: print 'RUN: <command>', then 'OK' or 'FAIL: <reason>'. Be concise.\n"
-    "- Do not echo secrets. Redact env values in logs.\n"
+    "TASK=PLAN\n"
+    "Assume working directory is the repo root: ${REPO_ROOT}.\n"
+    "Output ONLY a short, numbered list of exact shell commands (one per line). "
+    "No prose, no comments, no code fences.\n"
+    "Prefer local tools inferred from project signals (svc-infra, poetry, npm/yarn/pnpm, mvn/gradle, make, docker compose). "
+    "If a command isn’t on PATH and pyproject.toml exists, try `poetry run <cmd>` first.\n"
+    "Avoid destructive operations (rm -rf, sudo) unless explicitly requested."
 )
 
 EXEC_POLICY = (
@@ -31,3 +21,28 @@ EXEC_POLICY = (
 )
 
 DANGEROUS = (" rm -rf /", " mkfs", " shutdown", " reboot", ":(){:|:&};:", " dd if=", " > /dev/sda", " > /dev/nvme", " > /dev/vda")
+
+# Directories we usually don't want to expand
+_IGNORED_DIRS = {
+    ".git", ".hg", ".svn", ".idea", ".vscode",
+    "node_modules", ".venv", "venv", ".tox",
+    "dist", "build", "__pycache__", ".pytest_cache", ".mypy_cache",
+    ".next", ".turbo", ".cache", ".gradle",
+}
+
+# Files we usually don't care to list (big or noisy)
+_IGNORED_FILES = {
+    ".DS_Store",
+}
+
+_PROJECT_SIGNALS = {
+    # Build / package managers
+    "python": ["pyproject.toml", "poetry.lock", "requirements.txt", "setup.py"],
+    "node":   ["package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"],
+    "java":   ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"],
+    "docker": ["Dockerfile", "docker-compose.yml", "compose.yml"],
+    "make":   ["Makefile"],
+    "just":   ["Justfile"],
+    "task":   ["Taskfile.yml", "Taskfile.yaml"],
+    "pytest": ["pytest.ini", "pyproject.toml"],
+}
