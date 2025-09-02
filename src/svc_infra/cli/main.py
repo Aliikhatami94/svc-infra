@@ -1,7 +1,7 @@
 from __future__ import annotations
 import typer
 
-from svc_infra.db.cli import app as _db_app
+from svc_infra.db.core import app as _db_app
 from svc_infra.auth.cli import app as _auth_app
 from svc_infra.cli.ai.graph.run import run_cli as _agent
 from svc_infra.cli.utils import _async_cmd

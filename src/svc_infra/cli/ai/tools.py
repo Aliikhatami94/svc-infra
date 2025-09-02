@@ -16,4 +16,4 @@ async def svc_infra_helper_json(max_depth: int = 3) -> str:
         return ""
 
 
-svc_infra_tools = tools_from_functions(tools=[svc_infra_helper_json])
+svc_infra_tools = tools_from_functions(functions=[svc_infra_helper_json])

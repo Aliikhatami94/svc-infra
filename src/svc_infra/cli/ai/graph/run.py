@@ -69,9 +69,9 @@ async def run_cli(
     client = CoreMCPClient([
         {"command": "cli-mcp", "transport": "stdio"},
         {"command": "project-management-mcp", "transport": "stdio"},
+        {"command": "db-management-mcp", "transport": "stdio"},
     ])
     tools = await client.list_tools()
-    tools = tools + svc_infra_tools
 
     initial: CLIAgentState = {
         "query": query,

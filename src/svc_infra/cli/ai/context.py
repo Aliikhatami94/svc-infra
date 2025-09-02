@@ -143,7 +143,7 @@ def _find_repo_root(start: Path) -> Path:
 
 def _discover_package_context() -> dict[str, Any]:
     """
-    Discover any packages that expose a CLI entry under src/svc_infra/**/cli.py.
+    Discover any packages that expose a CLI entry under src/svc_infra/**/core.py.
 
     Returns a dictionary with keys:
       - root: repository root path
@@ -157,7 +157,7 @@ def _discover_package_context() -> dict[str, Any]:
     cwd = Path.cwd()
     root = _find_repo_root(cwd)
 
-    cli_files = list((root / "src" / "svc_infra").glob("**/cli.py"))
+    cli_files = list((root / "src" / "svc_infra").glob("**/core.py"))
 
     packages: list[dict[str, str]] = []
     for cli_file in cli_files:
