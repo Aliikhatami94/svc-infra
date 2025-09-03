@@ -14,6 +14,9 @@ from alembic.config import Config
 from .utils import (
     _resolve_ini_url_value,
     _normalize_discover_arg,
+    _load_dotenv_if_present,
+    _get_env_value_from_name,
+    _normalize_db_url_for_alembic,
 )
 
 app = typer.Typer(
@@ -26,10 +29,21 @@ ALEMBIC_INI = "alembic.ini"
 
 
 def _load_config(project_root: Path, database_url: Optional[str]) -> Config:
+    # Ensure env is loaded for this process (so env.py override works too)
+    _load_dotenv_if_present(project_root)
+
     cfg = Config(str(project_root / ALEMBIC_INI))
-    db_url = database_url or os.getenv("DATABASE_URL")
-    if db_url:
-        cfg.set_main_option("sqlalchemy.url", db_url)
+
+    # Resolve database_url: support passing "$DATABASE_URL" or "DATABASE_URL"
+    # If a literal url is provided, use it; else fallback to os.getenv("DATABASE_URL")
+    effective = _get_env_value_from_name(database_url) if database_url else os.getenv("DATABASE_URL")
+
+    # Normalize for Alembic callers (env.py will still do final mapping)
+    effective = _normalize_db_url_for_alembic(effective) if effective else effective
+
+    if effective:
+        cfg.set_main_option("sqlalchemy.url", effective)
+
     cfg.set_main_option("script_location", str(project_root / AL_EMBIC_DIR))
     cfg.attributes["configure_logger"] = False
     return cfg
@@ -42,8 +56,7 @@ def _infer_default_roots(project_root: Path) -> list[str]:
         for d in base.iterdir():
             if d.is_dir() and (d / "__init__.py").exists():
                 roots.append(d.name)
-    seen = set()
-    out = []
+    seen, out = set(), []
     for r in roots:
         if r not in seen:
             seen.add(r)
@@ -72,7 +85,6 @@ def _single_head_or_none(script: ScriptDirectory) -> str | None:
         return heads[0]
     raise RuntimeError(f"Multiple heads present: {', '.join(heads)}")
 
-
 # ---------------- Core (tool-callable) APIs ---------------- #
 
 def db_init_core(
@@ -81,8 +93,13 @@ def db_init_core(
         database_url: Optional[str],
         discover_packages: Optional[str | bool | list[str]],
 ) -> Dict[str, Any]:
-    """Initialize Alembic environment in the given project root (sync-only env.py)."""
+    """
+    Initialize Alembic environment in the given project root.
+    Generates sync-only env.py; env.py maps async drivers to sync for migrations.
+    """
     project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)  # make DATABASE_URL visible to ini/env generation
+
     (project_root / AL_EMBIC_DIR).mkdir(parents=True, exist_ok=True)
 
     ini_path = project_root / ALEMBIC_INI
@@ -98,10 +115,9 @@ def db_init_core(
 
     ini_url_value = _resolve_ini_url_value(database_url)
 
-    # 1) alembic.ini (leave URL blank if coming from env)
+    # 1) alembic.ini
     if not ini_path.exists():
-        ini_path.write_text(
-            f"""\
+        ini_text = f"""\
 [alembic]
 script_location = {AL_EMBIC_DIR}
 sqlalchemy.url = {ini_url_value}
@@ -138,13 +154,12 @@ formatter = generic
 
 [formatter_generic]
 format = %(levelname)-5.5s [%(name)s] %(message)s
-""",
-            encoding="utf-8",
-        )
+"""
+        ini_path.write_text(ini_text, encoding="utf-8")
         created["alembic_ini"] = True
         notes.append(f"Wrote {ini_path}")
 
-    # 2) env.py — **no asyncio anywhere**; map async URLs to sync driver for migrations
+    # 2) env.py — sync only, async→sync mapping is handled at runtime
     env_py = project_root / AL_EMBIC_DIR / "env.py"
     if not env_py.exists():
         content = dedent(
@@ -157,7 +172,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
             import importlib
             from pathlib import Path
             from logging.config import fileConfig
-            from typing import Iterable, List, Set
+            from typing import Iterable, List
 
             from alembic import context
             from sqlalchemy import pool, create_engine
@@ -188,7 +203,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 fileConfig(config.config_file_name)
                 logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
 
-            # --- Database URL override via env ---
+            # --- Database URL override via env (if ini is blank) ---
             env_url = os.getenv("DATABASE_URL")
             if env_url:
                 config.set_main_option("sqlalchemy.url", env_url)
@@ -233,7 +248,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
             import_all_under_packages(pkgs)
             target_metadata = collect_all_metadatas()  # may be empty (autogen no-op)
 
-            # --- URL normalization: map async drivers to sync for migrations ---
+            # --- URL normalization: map async drivers to sync + ensure sslmode=require ---
             def _sync_url_for_migrations(url_str: str) -> str:
                 if not url_str:
                     return url_str
@@ -242,22 +257,30 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 except Exception:
                     return url_str
 
-                drivername = u.drivername or ""
-                # Postgres
-                if drivername.endswith("+asyncpg"):
-                    return str(u.set(drivername="postgresql+psycopg2"))
-                # SQLite
-                if drivername.endswith("+aiosqlite"):
-                    return str(u.set(drivername="sqlite"))
-                # MySQL
-                if drivername.endswith("+asyncmy"):
-                    return str(u.set(drivername="mysql+pymysql"))
-                # Fallback: unchanged
-                return url_str
+                drv = (u.drivername or "")
+                # map async → sync driver
+                if drv.endswith("+asyncpg"):
+                    u = u.set(drivername="postgresql+psycopg2")
+                elif drv.endswith("+aiosqlite"):
+                    u = u.set(drivername="sqlite")
+                elif drv.endswith("+asyncmy"):
+                    u = u.set(drivername="mysql+pymysql")
+
+                # ensure sslmode=require for postgres if missing
+                try:
+                    from urllib.parse import urlencode
+                    if u.drivername.startswith("postgresql"):
+                        q = dict(u.query)
+                        if "sslmode" not in q:
+                            q["sslmode"] = "require"
+                        u = u.set(query=q)
+                except Exception:
+                    pass
+
+                return str(u)
 
             def run_migrations_offline():
-                url = config.get_main_option("sqlalchemy.url")
-                url = _sync_url_for_migrations(url)
+                url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
                 context.configure(
                     url=url,
                     target_metadata=target_metadata,
@@ -281,8 +304,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                     context.run_migrations()
 
             def run_migrations_online_sync():
-                url = config.get_main_option("sqlalchemy.url")
-                url = _sync_url_for_migrations(url)
+                url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
                 engine = create_engine(url, poolclass=pool.NullPool, future=True)
                 try:
                     with engine.connect() as connection:
@@ -360,7 +382,9 @@ def db_revision_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Create a new Alembic revision."""
-    cfg = _load_config(project_root.resolve(), database_url)
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     command.revision(cfg, message=message, autogenerate=autogenerate)
     return {"status": "ok", "message": message, "autogenerate": autogenerate}
 
@@ -371,7 +395,9 @@ def db_upgrade_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Upgrade to a later Alembic revision."""
-    cfg = _load_config(project_root.resolve(), database_url)
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     command.upgrade(cfg, revision)
     return {"status": "ok", "to": revision}
 
@@ -382,7 +408,9 @@ def db_downgrade_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Downgrade to an earlier Alembic revision."""
-    cfg = _load_config(project_root.resolve(), database_url)
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     command.downgrade(cfg, revision)
     return {"status": "ok", "to": revision}
 
@@ -393,8 +421,9 @@ def db_current_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Show the current Alembic revision."""
-    cfg = _load_config(project_root.resolve(), database_url)
-    # Alembic prints to stdout; for tools we return a marker
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     command.current(cfg, verbose=verbose)
     return {"status": "ok", "verbose": verbose}
 
@@ -405,7 +434,9 @@ def db_history_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Show the history of Alembic revisions."""
-    cfg = _load_config(project_root.resolve(), database_url)
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     command.history(cfg, verbose=verbose)
     return {"status": "ok", "verbose": verbose}
 
@@ -416,7 +447,9 @@ def db_stamp_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Stamp the database with a given Alembic revision without running migrations."""
-    cfg = _load_config(project_root.resolve(), database_url)
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     command.stamp(cfg, revision)
     return {"status": "ok", "revision": revision}
 
@@ -432,13 +465,15 @@ def db_drop_table_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Create and optionally apply a migration that drops a specified table."""
-    cfg = _load_config(project_root.resolve(), database_url)
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     script = _script_dir(cfg)
 
     msg = message or f"drop table {table}"
     command.revision(cfg, message=msg, autogenerate=False)
 
-    versions_dir = project_root.resolve() / AL_EMBIC_DIR / "versions"
+    versions_dir = project_root / AL_EMBIC_DIR / "versions"
     rev_file = _latest_version_file(versions_dir)
     if rev_file is None:
         raise RuntimeError("Could not locate newly created revision file.")
@@ -474,7 +509,9 @@ def db_merge_heads_core(
         database_url: Optional[str],
 ) -> Dict[str, Any]:
     """Merge multiple Alembic heads into a single revision."""
-    cfg = _load_config(project_root.resolve(), database_url)
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    cfg = _load_config(project_root, database_url)
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     if len(heads) <= 1:
