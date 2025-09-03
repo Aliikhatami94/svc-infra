@@ -9,7 +9,7 @@ class Timestamped(BaseModel):
     updated_at: datetime
 
 class UserBase(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     email: EmailStr
     full_name: Optional[str] = None
     is_active: bool = True
@@ -18,7 +18,7 @@ class UserBase(BaseModel):
     tenant_id: Optional[str] = None
     roles: List[str] = Field(default_factory=list)
     mfa_enabled: bool = False
-    metadata: Optional[Dict[str, Any]] = None  # maps to 'extra' column
+    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")  # <-- matches model.extra
 
 class UserRead(UserBase, Timestamped):
     id: str
@@ -27,7 +27,7 @@ class UserRead(UserBase, Timestamped):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)  # align w/ server policy
+    password: str = Field(min_length=8)
     full_name: Optional[str] = None
     tenant_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
@@ -45,5 +45,5 @@ class UserUpdate(BaseModel):
     disabled_reason: Optional[str] = None
 
 class UserPasswordUpdate(BaseModel):
-    current_password: Optional[str] = None  # require if user-initiated
+    current_password: Optional[str] = None
     new_password: str = Field(min_length=8)
