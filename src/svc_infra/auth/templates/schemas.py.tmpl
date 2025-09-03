@@ -1,14 +1,15 @@
 from __future__ import annotations
 from typing import Optional, Any, Dict, List
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
-# --- Base mixins ---
 class Timestamped(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     created_at: datetime
     updated_at: datetime
 
 class UserBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     email: EmailStr
     full_name: Optional[str] = None
     is_active: bool = True
@@ -17,18 +18,16 @@ class UserBase(BaseModel):
     tenant_id: Optional[str] = None
     roles: List[str] = Field(default_factory=list)
     mfa_enabled: bool = False
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None  # maps to 'extra' column
 
-# --- Read models (what you return to clients) ---
 class UserRead(UserBase, Timestamped):
     id: str
     last_login: Optional[datetime] = None
     disabled_reason: Optional[str] = None
 
-# --- Write models (what clients send to you) ---
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)  # tune in server policy
+    password: str = Field(min_length=8)  # align w/ server policy
     full_name: Optional[str] = None
     tenant_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
@@ -45,7 +44,6 @@ class UserUpdate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     disabled_reason: Optional[str] = None
 
-# Optional: separate endpoint for password changes
 class UserPasswordUpdate(BaseModel):
     current_password: Optional[str] = None  # require if user-initiated
     new_password: str = Field(min_length=8)
