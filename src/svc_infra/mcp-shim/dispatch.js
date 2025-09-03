@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 const path = require("path");
 const script = process.argv[2];
 if (script === "auth-infra-mcp" || script === "db-management-mcp") {

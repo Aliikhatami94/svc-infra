@@ -60,12 +60,7 @@ mypy = "^1.11.2"
 types-requests = "^2.32.0.20241016"
 
 [tool.poetry.scripts]
-# CLI entry point
 svc-infra = "svc_infra.cli.main:app"
-
-# MCP entry points
-db-management-mcp = "svc_infra.db.mcp:main"
-auth-infra-mcp = "svc_infra.auth.mcp:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
