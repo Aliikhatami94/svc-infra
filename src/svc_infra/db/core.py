@@ -11,6 +11,11 @@ import typer
 from alembic import command
 from alembic.config import Config
 
+from .utils import (
+    _resolve_ini_url_value,
+    _normalize_discover_arg,
+)
+
 app = typer.Typer(
     no_args_is_help=True,
     add_completion=False
@@ -75,7 +80,7 @@ def db_init_core(
         project_root: Path,
         database_url: Optional[str],
         async_db: bool,
-        discover_packages: Optional[str],
+        discover_packages: Optional[str | bool | list[str]],
 ) -> Dict[str, Any]:
     """Initialize Alembic environment in the given project root."""
     project_root = project_root.resolve()
@@ -85,12 +90,24 @@ def db_init_core(
     created = {"alembic_ini": False, "env_py": False, "script_tpl": False, "versions_dir": False}
     notes: list[str] = []
 
+    # --- Normalize inputs ---
+    normalized_discover = _normalize_discover_arg(discover_packages)
+    if normalized_discover is None:
+        # infer default roots under project root and src/
+        discover_root_csv = ",".join(_infer_default_roots(project_root))
+    else:
+        discover_root_csv = normalized_discover
+
+    # For ini, avoid writing an env var NAME as the URL; leave empty and let env.py override
+    ini_url_value = _resolve_ini_url_value(database_url)
+
+    # 1) alembic.ini
     if not ini_path.exists():
         ini_path.write_text(
             f"""\
 [alembic]
 script_location = {AL_EMBIC_DIR}
-sqlalchemy.url = {database_url or os.getenv('DATABASE_URL', '')}
+sqlalchemy.url = {ini_url_value}
 
 [loggers]
 keys = root,sqlalchemy,alembic
@@ -130,14 +147,10 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         created["alembic_ini"] = True
         notes.append(f"Wrote {ini_path}")
 
-    discover_root_csv = (
-        ",".join([p.strip() for p in discover_packages.split(",") if p.strip()])
-        if discover_packages
-        else ",".join(_infer_default_roots(project_root))
-    )
-
+    # 2) env.py (SYNC-ONLY, chooses async engine internally but no top-level coroutine)
     env_py = project_root / AL_EMBIC_DIR / "env.py"
     if not env_py.exists():
+        # DEFAULT_IS_ASYNC is baked in (fallback when driver can't be parsed)
         content = dedent(
             f"""\
             from __future__ import annotations
@@ -150,20 +163,20 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
             from pathlib import Path
             from logging.config import fileConfig
             from typing import Iterable, List, Set
-        
+
             from alembic import context
             from sqlalchemy import pool
             from sqlalchemy import engine_from_config
             from sqlalchemy.engine.url import make_url
             from sqlalchemy.orm import DeclarativeBase
-        
+
             # --- Ensure project root and src/ on sys.path ---
-            ROOT = Path(__file__).resolve().parents[1]  # migrations/ -> project root
+            ROOT = Path(__file__).resolve().parents[1]
             for p in (ROOT, ROOT / "src"):
                 s = str(p)
                 if p.exists() and s not in sys.path:
                     sys.path.insert(0, s)
-        
+
             # --- App logging (optional) ---
             USE_APP_LOGGING = os.getenv("ALEMBIC_USE_APP_LOGGING", "1") == "1"
             if USE_APP_LOGGING:
@@ -174,36 +187,35 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 except Exception as e:
                     USE_APP_LOGGING = False
                     print(f"[alembic] App logging import failed: {{e}}. Falling back to fileConfig.")
-        
+
             # --- Alembic config & logging ---
             config = context.config
             if not USE_APP_LOGGING and config.config_file_name is not None:
                 fileConfig(config.config_file_name)
                 logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
-        
+
             # --- Database URL override via env ---
-            database_url = os.getenv("DATABASE_URL")
-            if database_url:
-                config.set_main_option("sqlalchemy.url", database_url)
-        
+            # If alembic.ini 'sqlalchemy.url' is empty or placeholder, override from env.
+            env_url = os.getenv("DATABASE_URL")
+            if env_url:
+                config.set_main_option("sqlalchemy.url", env_url)
+
             # --- Auto-discover model modules and collect all metadatas ---
             DISCOVER_PKGS = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "{discover_root_csv}")
-        
+
             def _iter_pkg_modules(top_pkg_name: str) -> Iterable[str]:
                 try:
                     top_pkg = importlib.import_module(top_pkg_name)
                 except Exception:
                     return []
                 if not hasattr(top_pkg, "__path__"):
-                    # it's a module, not a package
                     return [top_pkg_name]
                 names = []
                 for m in pkgutil.walk_packages(top_pkg.__path__, prefix=top_pkg.__name__ + "."):
                     names.append(m.name)
                 return names
-        
+
             def import_all_under_packages(packages: Iterable[str]) -> None:
-                # Import everything under the listed packages so Declarative models register with their Bases.
                 for pkg_name in packages:
                     if not pkg_name:
                         continue
@@ -212,10 +224,8 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                             importlib.import_module(mod_name)
                         except Exception as e:
                             logging.getLogger(__name__).debug(f"[alembic] Skipped import {{mod_name}}: {{e}}")
-        
+
             def collect_all_metadatas() -> List:
-                # After imports, gather every DeclarativeBase subclass metadata.
-                # This supports multiple Bases across packages.
                 metas: set = set()
                 try:
                     for cls in DeclarativeBase.__subclasses__():
@@ -225,14 +235,12 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 except Exception:
                     pass
                 return list(metas)
-        
+
             pkgs = [p.strip() for p in (DISCOVER_PKGS or "").split(",") if p.strip()]
             import_all_under_packages(pkgs)
             metadatas = collect_all_metadatas()
-        
-            # If nothing found, keep a harmless empty list; Alembic will no-op autogenerate.
-            target_metadata = metadatas
-        
+            target_metadata = metadatas  # may be empty (no-op autogenerate)
+
             # --- Decide async vs sync at runtime ---
             DEFAULT_IS_ASYNC = {str(async_db)}
             url_str = config.get_main_option("sqlalchemy.url") or ""
@@ -243,9 +251,8 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 pass
             is_async = driver in {{"asyncpg", "aiosqlite"}}
             if not driver:
-                # If we couldn't parse a driver (e.g., empty URL), fall back to the init flag
                 is_async = DEFAULT_IS_ASYNC
-        
+
             def run_migrations_offline():
                 url = config.get_main_option("sqlalchemy.url")
                 context.configure(
@@ -258,7 +265,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 )
                 with context.begin_transaction():
                     context.run_migrations()
-        
+
             def do_run_migrations(connection):
                 context.configure(
                     connection=connection,
@@ -269,18 +276,34 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 )
                 with context.begin_transaction():
                     context.run_migrations()
-        
-            async def run_migrations_online_async():
+
+            # NOTE: we avoid top-level 'async def' to prevent "coroutine was never awaited" warnings
+            def run_migrations_online_async_wrapper():
                 from sqlalchemy.ext.asyncio import create_async_engine
-                connectable = create_async_engine(
-                    config.get_main_option("sqlalchemy.url"),
-                    poolclass=pool.NullPool,
-                    future=True,
-                )
-                async with connectable.connect() as connection:
-                    await connection.run_sync(do_run_migrations)
-                await connectable.dispose()
-        
+                async def _inner():
+                    connectable = create_async_engine(
+                        config.get_main_option("sqlalchemy.url"),
+                        poolclass=pool.NullPool,
+                        future=True,
+                    )
+                    async with connectable.connect() as connection:
+                        await connection.run_sync(do_run_migrations)
+                    await connectable.dispose()
+                # Run even if we're inside another framework; handle nested loops if needed.
+                try:
+                    asyncio.run(_inner())
+                except RuntimeError as e:
+                    # If an event loop is already running (rare in alembic CLI),
+                    # fall back to creating a new loop policy/loop.
+                    if "asyncio.run()" in str(e):
+                        loop = asyncio.new_event_loop()
+                        try:
+                            loop.run_until_complete(_inner())
+                        finally:
+                            loop.close()
+                    else:
+                        raise
+
             def run_migrations_online_sync():
                 connectable = engine_from_config(
                     config.get_section(config.config_ini_section),
@@ -291,12 +314,12 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 with connectable.connect() as connection:
                     do_run_migrations(connection)
                 connectable.dispose()
-        
+
             if context.is_offline_mode():
                 run_migrations_offline()
             else:
                 if is_async:
-                    asyncio.run(run_migrations_online_async())
+                    run_migrations_online_async_wrapper()
                 else:
                     run_migrations_online_sync()
             """
@@ -305,6 +328,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         created["env_py"] = True
         notes.append(f"Wrote {env_py}")
 
+    # 2.5) script.py.mako (unchanged except your comment)
     script_tpl = dedent(
         """\
         \"\"\"${message}
@@ -338,6 +362,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         created["script_tpl"] = True
         notes.append(f"Wrote {script_path}")
 
+    # 3) versions dir
     versions = _versions_dir(project_root)
     versions.mkdir(exist_ok=True)
     created["versions_dir"] = True
