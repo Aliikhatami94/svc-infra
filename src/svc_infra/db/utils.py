@@ -2,6 +2,7 @@ import os
 import re
 from typing import Optional, Any
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+from sqlalchemy.engine.url import make_url, URL
 
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
@@ -90,22 +91,31 @@ def _ensure_sslmode_required(url: str) -> str:
     new_query = urlencode(q, doseq=True)
     return urlunparse(parsed._replace(query=new_query))
 
-def _normalize_db_url_for_alembic(url: Optional[str]) -> Optional[str]:
-    """
-    If a URL is async (e.g., postgresql+asyncpg), normalize to sync driver
-    for Alembic CLI so autogenerate/upgrade works with psycopg2/pymysql/sqlite.
-    Leave None/empty untouched.
-    """
-    if not url:
-        return url
-    # Do a light-weight, string-oriented normalization here; env.py also maps again.
-    if url.startswith("postgresql+asyncpg"):
-        return url.replace("postgresql+asyncpg", "postgresql+psycopg2", 1)
-    if url.startswith("sqlite+aiosqlite"):
-        return url.replace("sqlite+aiosqlite", "sqlite", 1)
-    if url.startswith("mysql+asyncmy"):
-        return url.replace("mysql+asyncmy", "mysql+pymysql", 1)
-    return url
+def _normalize_db_url_for_alembic(url_str: str | None) -> str | None:
+    if not url_str:
+        return url_str
+    try:
+        u: URL = make_url(url_str)
+    except Exception:
+        return url_str
+
+    drv = (u.drivername or "")
+    # Map common async drivers to sync for Alembic/psycopg2 flow
+    if drv.endswith("+asyncpg"):
+        u = u.set(drivername="postgresql+psycopg2")
+    elif drv.endswith("+aiosqlite"):
+        u = u.set(drivername="sqlite")
+    elif drv.endswith("+asyncmy"):
+        u = u.set(drivername="mysql+pymysql")
+
+    # Railway & many managed PGs require SSL
+    if u.drivername.startswith("postgresql"):
+        q = dict(u.query)
+        if "sslmode" not in q:
+            q["sslmode"] = "require"
+        u = u.set(query=q)
+
+    return str(u)
 
 def _load_dotenv_if_present(project_root) -> None:
     """

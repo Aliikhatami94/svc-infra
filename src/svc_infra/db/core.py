@@ -416,10 +416,12 @@ def db_revision_core(*, message: str, autogenerate: bool, project_root: Path, da
     _load_dotenv_if_present(project_root)
     cfg = _load_config(project_root, database_url)
 
-    eff = cfg.get_main_option("sqlalchemy.url")
-    if eff:
+    # Build the exact URL we'd use for migrations (mapped + ssl)
+    eff_env = _get_env_value_from_name(database_url) or os.getenv("DATABASE_URL")
+    eff_url = _normalize_db_url_for_alembic(eff_env) if eff_env else None
+    if eff_url:
         try:
-            engine = create_engine(eff, future=True)
+            engine = create_engine(eff_url, future=True)
             with closing(engine.connect()) as conn:
                 conn.exec_driver_sql("SELECT 1")
             engine.dispose()
