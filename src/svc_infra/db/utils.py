@@ -2,6 +2,11 @@ import os
 import re
 from typing import Optional
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+from sqlalchemy import create_engine, inspect
+from pathlib import Path
+
+from svc_infra.db.constants import ALEMBIC_INI, AL_EMBIC_DIR
+from svc_infra.db.core import db_init_core
 
 _ENV_NAME_RE = re.compile(r"^\$?[A-Z_][A-Z0-9_]*$")
 
@@ -104,3 +109,62 @@ def _load_dotenv_if_present(project_root) -> None:
         if candidate.exists():
             load_dotenv(candidate, override=False)
             break
+
+def _project_paths(project_root: Path) -> dict[str, Path]:
+    pr = project_root.resolve()
+    return {
+        "root": pr,
+        "alembic_ini": pr / ALEMBIC_INI,
+        "env_py": pr / AL_EMBIC_DIR / "env.py",
+        "versions_dir": pr / AL_EMBIC_DIR / "versions",
+    }
+
+def _ensure_alembic_bootstrap(*, project_root: Path, database_url: Optional[str]) -> None:
+    """Idempotently ensure alembic.ini and migrations/env.py exist."""
+    paths = _project_paths(project_root)
+    if paths["alembic_ini"].exists() and paths["env_py"].exists():
+        return
+    # minimal, fast bootstrap: no discovery unless you pass it explicitly later
+    db_init_core(
+        project_root=project_root,
+        database_url=database_url or "DATABASE_URL",
+        discover_packages=False,
+    )
+
+def _effective_migration_url(project_root: Path, database_url: Optional[str]) -> str:
+    """Load .env, resolve env var names, normalize for Alembic (sync driver, sslmode)."""
+    _load_dotenv_if_present(project_root)
+    eff = _get_env_value_from_name(database_url) if database_url else os.getenv("DATABASE_URL")
+    eff = _normalize_db_url_for_alembic(eff) if eff else eff
+    if not eff:
+        raise RuntimeError("DATABASE_URL is empty or not set.")
+    return eff
+
+def _quote_ident(ident: str) -> str:
+    # naive but safe enough: double up internal quotes
+    return '"' + ident.replace('"', '""') + '"'
+
+def _parse_table_identifier(raw: str) -> tuple[Optional[str], str]:
+    """
+    Accepts: 'users' or 'public.users' or '"Weird.Schema"."Weird.Table"'.
+    Returns (schema|None, table).
+    """
+    raw = raw.strip()
+    if "." not in raw:
+        return (None, raw)
+    # do not try to fully parse SQL identifiers here; split once
+    schema, table = raw.split(".", 1)
+    return (schema.strip(), table.strip())
+
+def _table_exists(engine, schema: Optional[str], table: str) -> bool:
+    insp = inspect(engine)
+    try:
+        names = insp.get_table_names(schema=schema)
+    except Exception:
+        names = insp.get_table_names()
+    return table in names
+
+def _connect_engine(url: str):
+    # url here is already normalized for sync driver
+    eng = create_engine(url, future=True)
+    return eng

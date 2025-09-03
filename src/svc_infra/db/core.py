@@ -9,26 +9,31 @@ from alembic.script import ScriptDirectory
 from sqlalchemy.engine.url import make_url
 from sqlalchemy import create_engine
 from contextlib import closing
+from sqlalchemy import text
 
 import typer
 from alembic import command
 from alembic.config import Config
 
+from .constants import ALEMBIC_INI, AL_EMBIC_DIR
 from .utils import (
     _resolve_ini_url_value,
     _normalize_discover_arg,
     _load_dotenv_if_present,
     _get_env_value_from_name,
     _normalize_db_url_for_alembic,
+    _ensure_alembic_bootstrap,
+    _effective_migration_url,
+    _quote_ident,
+    _parse_table_identifier,
+    _table_exists,
+    _connect_engine,
 )
 
 app = typer.Typer(
     no_args_is_help=True,
     add_completion=False
 )
-
-AL_EMBIC_DIR = "migrations"
-ALEMBIC_INI = "alembic.ini"
 
 
 def _load_config(project_root: Path, database_url: Optional[str]) -> Config:
@@ -495,9 +500,36 @@ def db_drop_table_core(
         project_root: Path,
         database_url: Optional[str],
 ) -> Dict[str, Any]:
-    """Create and optionally apply a migration that drops a specified table."""
+    """
+    Create and optionally apply a migration that drops a specified table.
+    - Ensures Alembic is bootstrapped
+    - Pings DB first
+    - Writes revision with op.execute(DROP TABLE ...)
+    - Applies upgrade if requested
+    - Verifies table removal using Inspector
+    """
     project_root = project_root.resolve()
-    _load_dotenv_if_present(project_root)
+
+    # 0) Make sure Alembic exists (idempotent)
+    _ensure_alembic_bootstrap(project_root=project_root, database_url=database_url)
+
+    # 1) Effective DB url (normalized for Alembic/psycopg2)
+    eff_url = _effective_migration_url(project_root, database_url)
+
+    # 2) Quick ping & note pre-state
+    engine = _connect_engine(eff_url)
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as e:
+        engine.dispose()
+        raise RuntimeError(f"DB ping failed: {e}") from e
+
+    # Determine schema/table & existence BEFORE
+    schema, tbl = _parse_table_identifier(table)
+    existed_before = _table_exists(engine, schema, tbl)
+
+    # 3) Create revision file
     cfg = _load_config(project_root, database_url)
     script = _script_dir(cfg)
 
@@ -507,30 +539,62 @@ def db_drop_table_core(
     versions_dir = project_root / AL_EMBIC_DIR / "versions"
     rev_file = _latest_version_file(versions_dir)
     if rev_file is None:
+        engine.dispose()
         raise RuntimeError("Could not locate newly created revision file.")
 
     try:
         down_rev = base or _single_head_or_none(script)
     except RuntimeError as e:
+        engine.dispose()
         raise RuntimeError(str(e) + " Tip: re-run with base=<rev> or merge heads first.") from e
 
-    fq_table = table.strip()
-    sql = f'DROP TABLE {"IF EXISTS " if if_exists else ""}{fq_table}{" CASCADE" if cascade else ""};'
-    rev_id = rev_file.stem.split("_", 1)[0]
+    # 4) Generate safe SQL
+    qschema = _quote_ident(schema) + "." if schema else ""
+    qtable = _quote_ident(tbl)
+    sql = f'DROP TABLE {"IF EXISTS " if if_exists else ""}{qschema}{qtable}{" CASCADE" if cascade else ""};'
 
-    content = f'''""" {msg} """\n\nfrom __future__ import annotations\n\nfrom alembic import op\nimport sqlalchemy as sa\n\nrevision = "{rev_id}"\ndown_revision = {repr(down_rev) if down_rev else "None"}\nbranch_labels = None\ndepends_on = None\n\n\ndef upgrade() -> None:\n    op.execute({sql!r})\n\n\ndef downgrade() -> None:\n    # Irreversible without full table definition\n    pass\n'''
+    rev_id = rev_file.stem.split("_", 1)[0]
+    content = (
+        f'''""" {msg} """\n\n'''
+        f'''from __future__ import annotations\n\n'''
+        f'''from alembic import op\nimport sqlalchemy as sa\n\n'''
+        f'''revision = "{rev_id}"\n'''
+        f'''down_revision = {repr(down_rev) if down_rev else "None"}\n'''
+        f'''branch_labels = None\n'''
+        f'''depends_on = None\n\n'''
+        f'''def upgrade() -> None:\n'''
+        f'''    op.execute({sql!r})\n\n'''
+        f'''def downgrade() -> None:\n'''
+        f'''    # Irreversible without full table definition\n'''
+        f'''    pass\n'''
+    )
     rev_file.write_text(content, encoding="utf-8")
 
+    # 5) Apply if requested
+    applied = False
     if apply:
-        command.upgrade(cfg, "head")
+        try:
+            command.upgrade(cfg, "head")
+            applied = True
+        except Exception:
+            # surface alembic error (don’t swallow)
+            engine.dispose()
+            raise
+
+    # 6) Verify AFTER
+    exists_after = _table_exists(engine, schema, tbl)
+    engine.dispose()
 
     return {
         "status": "ok",
         "wrote": str(rev_file),
-        "applied": bool(apply),
-        "table": table,
+        "applied": bool(applied),
+        "table": {"raw": table, "schema": schema, "name": tbl},
         "cascade": cascade,
         "if_exists": if_exists,
+        "existed_before": bool(existed_before),
+        "exists_after": bool(exists_after),
+        "note": "If exists_after is True, your DB user may lack privileges or the table is in a different schema.",
     }
 
 def db_merge_heads_core(
