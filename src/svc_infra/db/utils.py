@@ -219,3 +219,41 @@ def _repair_self_loop_if_present(project_root: Path) -> dict[str, Any]:
             p.write_text(fixed, encoding="utf-8")
             return {"repaired": True, "file": str(p), "rev": rev}
     return {"repaired": False}
+
+def _resolve_down_revision(script: ScriptDirectory, base: Optional[str]) -> str | None:
+    """
+    Resolve the intended down_revision BEFORE creating a new revision:
+    - None / "" / False  -> use single current head (or None if no heads)
+    - "head"             -> same as above (current single head)
+    - "<rev_id>"         -> validate and return that explicit revision id
+    Raises with a helpful message if multiple heads exist and no explicit base is given.
+    """
+    def _single_head_or_none_local() -> str | None:
+        heads = script.get_heads()
+        if len(heads) == 0:
+            return None
+        if len(heads) == 1:
+            return heads[0]
+        raise RuntimeError(
+            "Multiple heads present: "
+            + ", ".join(heads)
+            + ". Provide base=<rev_id> to branch from, or merge heads first."
+        )
+
+    if base in (None, "", False):
+        return _single_head_or_none_local()
+    b = str(base).strip().lower()
+    if b == "head":
+        return _single_head_or_none_local()
+
+    # explicit revision id
+    if b in {h.lower() for h in script.get_revisions(script.get_heads())}:
+        # (extra safety, but ScriptDirectory will validate below anyway)
+        pass
+
+    try:
+        rev = script.get_revision(base)  # validates it exists
+        return rev.revision
+    except Exception:
+        # allow passing raw rev id; error message should be clear if it's wrong
+        return base
