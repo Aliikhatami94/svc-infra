@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 import importlib.resources as pkg
 
-TEMPLATES_PKG = "svc_infra.auth.templates"  # package containing .tmpl files
+TEMPLATES_PKG = "svc_infra.auth.templates"
 
 
 def _render(name: str, ctx: dict[str, str]) -> str:
@@ -14,8 +14,17 @@ def _render(name: str, ctx: dict[str, str]) -> str:
     return Template(txt).substitute(**ctx)
 
 
+def _normalize_dir(p: Path | str) -> Path:
+    """Ensure a path works with both absolute and project-root relative."""
+    p = Path(p)
+    if p.is_absolute():
+        return p
+    # Treat as relative to CWD (repo root)
+    return (Path.cwd() / p).resolve()
+
+
 def _write(dest: Path, content: str, overwrite: bool) -> Dict[str, Any]:
-    dest = Path(dest)
+    dest = dest.resolve()
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists() and not overwrite:
         return {"path": str(dest), "action": "skipped", "reason": "exists"}
@@ -27,13 +36,16 @@ def _write(dest: Path, content: str, overwrite: bool) -> Dict[str, Any]:
 
 def scaffold_auth_core(
         *,
-        models_dir: Path,
-        schemas_dir: Path,
+        models_dir: Path | str,
+        schemas_dir: Path | str,
         overwrite: bool,
 ) -> Dict[str, Any]:
     """Create models.py and schemas.py for auth from templates."""
-    models_res = _write(Path(models_dir) / "models.py", _render("models.py.tmpl", {}), overwrite)
-    schemas_res = _write(Path(schemas_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
+    models_dir = _normalize_dir(models_dir)
+    schemas_dir = _normalize_dir(schemas_dir)
+
+    models_res = _write(models_dir / "models.py", _render("models.py.tmpl", {}), overwrite)
+    schemas_res = _write(schemas_dir / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
     return {
         "status": "ok",
         "results": {
@@ -45,19 +57,21 @@ def scaffold_auth_core(
 
 def scaffold_auth_models_core(
         *,
-        dest_dir: Path,
+        dest_dir: Path | str,
         overwrite: bool,
 ) -> Dict[str, Any]:
     """Create models.py for auth from template."""
-    res = _write(Path(dest_dir) / "models.py", _render("models.py.tmpl", {}), overwrite)
+    dest_dir = _normalize_dir(dest_dir)
+    res = _write(dest_dir / "models.py", _render("models.py.tmpl", {}), overwrite)
     return {"status": "ok", "result": res}
 
 
 def scaffold_auth_schemas_core(
         *,
-        dest_dir: Path,
+        dest_dir: Path | str,
         overwrite: bool,
 ) -> Dict[str, Any]:
     """Create schemas.py for auth from template."""
-    res = _write(Path(dest_dir) / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
+    dest_dir = _normalize_dir(dest_dir)
+    res = _write(dest_dir / "schemas.py", _render("schemas.py.tmpl", {}), overwrite)
     return {"status": "ok", "result": res}
