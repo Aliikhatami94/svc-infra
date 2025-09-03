@@ -1,16 +1,39 @@
 from __future__ import annotations
-import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Boolean
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID
+from sqlalchemy import String, Boolean, DateTime, JSON, Text
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
+import uuid
 
-from svc_infra.db.base import Base
+class Base(DeclarativeBase): pass
 
-class User(SQLAlchemyBaseUserTableUUID, Base):
-    # FastAPI Users base table includes:
-    # id, email, hashed_password, is_active, is_superuser, is_verified
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+class User(Base):
     __tablename__ = "users"
-    full_name: Mapped[Optional[str]] = mapped_column(String(length=256), nullable=True)
 
-# Example: You can add more domain tables here.
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    full_name: Mapped[Optional[str]] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # auth state
+    password_hash: Mapped[str] = mapped_column(String(255))       # do NOT expose
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    disabled_reason: Mapped[Optional[str]] = mapped_column(Text)
+
+    # org / roles / mfa
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    roles: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # misc
+    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    # auditing
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False)
