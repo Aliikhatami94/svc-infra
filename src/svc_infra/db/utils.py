@@ -6,7 +6,6 @@ from sqlalchemy import create_engine, inspect
 from pathlib import Path
 
 from svc_infra.db.constants import ALEMBIC_INI, AL_EMBIC_DIR
-from svc_infra.db.core import db_init_core
 
 _ENV_NAME_RE = re.compile(r"^\$?[A-Z_][A-Z0-9_]*$")
 
@@ -124,8 +123,10 @@ def _ensure_alembic_bootstrap(*, project_root: Path, database_url: Optional[str]
     paths = _project_paths(project_root)
     if paths["alembic_ini"].exists() and paths["env_py"].exists():
         return
-    # minimal, fast bootstrap: no discovery unless you pass it explicitly later
-    db_init_core(
+    # Lazy import to avoid circular dependency with core.py
+    from importlib import import_module
+    db_core = import_module("svc_infra.db.core")
+    db_core.db_init_core(
         project_root=project_root,
         database_url=database_url or "DATABASE_URL",
         discover_packages=False,
