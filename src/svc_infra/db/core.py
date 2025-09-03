@@ -79,10 +79,9 @@ def db_init_core(
         *,
         project_root: Path,
         database_url: Optional[str],
-        async_db: bool,
         discover_packages: Optional[str | bool | list[str]],
 ) -> Dict[str, Any]:
-    """Initialize Alembic environment in the given project root."""
+    """Initialize Alembic environment in the given project root (sync-only env.py)."""
     project_root = project_root.resolve()
     (project_root / AL_EMBIC_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -93,15 +92,13 @@ def db_init_core(
     # --- Normalize inputs ---
     normalized_discover = _normalize_discover_arg(discover_packages)
     if normalized_discover is None:
-        # infer default roots under project root and src/
         discover_root_csv = ",".join(_infer_default_roots(project_root))
     else:
         discover_root_csv = normalized_discover
 
-    # For ini, avoid writing an env var NAME as the URL; leave empty and let env.py override
     ini_url_value = _resolve_ini_url_value(database_url)
 
-    # 1) alembic.ini
+    # 1) alembic.ini (leave URL blank if coming from env)
     if not ini_path.exists():
         ini_path.write_text(
             f"""\
@@ -147,16 +144,14 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         created["alembic_ini"] = True
         notes.append(f"Wrote {ini_path}")
 
-    # 2) env.py (SYNC-ONLY, chooses async engine internally but no top-level coroutine)
+    # 2) env.py — **no asyncio anywhere**; map async URLs to sync driver for migrations
     env_py = project_root / AL_EMBIC_DIR / "env.py"
     if not env_py.exists():
-        # DEFAULT_IS_ASYNC is baked in (fallback when driver can't be parsed)
         content = dedent(
             f"""\
             from __future__ import annotations
             import os
             import sys
-            import asyncio
             import logging
             import pkgutil
             import importlib
@@ -165,9 +160,8 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
             from typing import Iterable, List, Set
 
             from alembic import context
-            from sqlalchemy import pool
-            from sqlalchemy import engine_from_config
-            from sqlalchemy.engine.url import make_url
+            from sqlalchemy import pool, create_engine
+            from sqlalchemy.engine.url import make_url, URL
             from sqlalchemy.orm import DeclarativeBase
 
             # --- Ensure project root and src/ on sys.path ---
@@ -195,7 +189,6 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
 
             # --- Database URL override via env ---
-            # If alembic.ini 'sqlalchemy.url' is empty or placeholder, override from env.
             env_url = os.getenv("DATABASE_URL")
             if env_url:
                 config.set_main_option("sqlalchemy.url", env_url)
@@ -238,23 +231,33 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
 
             pkgs = [p.strip() for p in (DISCOVER_PKGS or "").split(",") if p.strip()]
             import_all_under_packages(pkgs)
-            metadatas = collect_all_metadatas()
-            target_metadata = metadatas  # may be empty (no-op autogenerate)
+            target_metadata = collect_all_metadatas()  # may be empty (autogen no-op)
 
-            # --- Decide async vs sync at runtime ---
-            DEFAULT_IS_ASYNC = {str(async_db)}
-            url_str = config.get_main_option("sqlalchemy.url") or ""
-            driver = ""
-            try:
-                driver = make_url(url_str).get_dialect().driver  # 'asyncpg', 'psycopg2', etc.
-            except Exception:
-                pass
-            is_async = driver in {{"asyncpg", "aiosqlite"}}
-            if not driver:
-                is_async = DEFAULT_IS_ASYNC
+            # --- URL normalization: map async drivers to sync for migrations ---
+            def _sync_url_for_migrations(url_str: str) -> str:
+                if not url_str:
+                    return url_str
+                try:
+                    u: URL = make_url(url_str)
+                except Exception:
+                    return url_str
+
+                drivername = u.drivername or ""
+                # Postgres
+                if drivername.endswith("+asyncpg"):
+                    return str(u.set(drivername="postgresql+psycopg2"))
+                # SQLite
+                if drivername.endswith("+aiosqlite"):
+                    return str(u.set(drivername="sqlite"))
+                # MySQL
+                if drivername.endswith("+asyncmy"):
+                    return str(u.set(drivername="mysql+pymysql"))
+                # Fallback: unchanged
+                return url_str
 
             def run_migrations_offline():
                 url = config.get_main_option("sqlalchemy.url")
+                url = _sync_url_for_migrations(url)
                 context.configure(
                     url=url,
                     target_metadata=target_metadata,
@@ -277,58 +280,27 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 with context.begin_transaction():
                     context.run_migrations()
 
-            # NOTE: we avoid top-level 'async def' to prevent "coroutine was never awaited" warnings
-            def run_migrations_online_async_wrapper():
-                from sqlalchemy.ext.asyncio import create_async_engine
-                async def _inner():
-                    connectable = create_async_engine(
-                        config.get_main_option("sqlalchemy.url"),
-                        poolclass=pool.NullPool,
-                        future=True,
-                    )
-                    async with connectable.connect() as connection:
-                        await connection.run_sync(do_run_migrations)
-                    await connectable.dispose()
-                # Run even if we're inside another framework; handle nested loops if needed.
-                try:
-                    asyncio.run(_inner())
-                except RuntimeError as e:
-                    # If an event loop is already running (rare in alembic CLI),
-                    # fall back to creating a new loop policy/loop.
-                    if "asyncio.run()" in str(e):
-                        loop = asyncio.new_event_loop()
-                        try:
-                            loop.run_until_complete(_inner())
-                        finally:
-                            loop.close()
-                    else:
-                        raise
-
             def run_migrations_online_sync():
-                connectable = engine_from_config(
-                    config.get_section(config.config_ini_section),
-                    prefix="sqlalchemy.",
-                    poolclass=pool.NullPool,
-                    future=True,
-                )
-                with connectable.connect() as connection:
-                    do_run_migrations(connection)
-                connectable.dispose()
+                url = config.get_main_option("sqlalchemy.url")
+                url = _sync_url_for_migrations(url)
+                engine = create_engine(url, poolclass=pool.NullPool, future=True)
+                try:
+                    with engine.connect() as connection:
+                        do_run_migrations(connection)
+                finally:
+                    engine.dispose()
 
             if context.is_offline_mode():
                 run_migrations_offline()
             else:
-                if is_async:
-                    run_migrations_online_async_wrapper()
-                else:
-                    run_migrations_online_sync()
+                run_migrations_online_sync()
             """
         )
         env_py.write_text(content, encoding="utf-8")
         created["env_py"] = True
         notes.append(f"Wrote {env_py}")
 
-    # 2.5) script.py.mako (unchanged except your comment)
+    # 2.5) script.py.mako (unchanged)
     script_tpl = dedent(
         """\
         \"\"\"${message}
@@ -362,7 +334,6 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         created["script_tpl"] = True
         notes.append(f"Wrote {script_path}")
 
-    # 3) versions dir
     versions = _versions_dir(project_root)
     versions.mkdir(exist_ok=True)
     created["versions_dir"] = True
