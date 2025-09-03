@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const { spawn } = require("child_process");
 
 const UVX  = process.env.UVX_PATH || "uvx";
