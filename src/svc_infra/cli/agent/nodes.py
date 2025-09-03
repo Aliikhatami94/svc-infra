@@ -171,7 +171,7 @@ async def execute_plan(state: CLIAgentState) -> CLIAgentState:
     exec_messages = [
         {"role": "system", "content": EXEC_POLICY},
         {"role": "system", "content": "You can manage the project as well as executing shell commands on a developer's local machine. Each command must run as-is. Output results using RUN/OK/FAIL markers. Be concise."},
-        {"role": "system", "content": "If a DB connection is needed, prefer: `--database-url \"$DATABASE_URL\"`."},
+        {"role": "system", "content": "If a DB connection is needed, user on default will set the DATABASE_URL in environment variables and you don't need to pass to functions."},
         {"role": "human", "content": exec_instruction},
     ]
 
