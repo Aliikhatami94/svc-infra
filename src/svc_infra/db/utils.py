@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Optional
+from typing import Optional, Any
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 from alembic.script import ScriptDirectory
