@@ -41,7 +41,7 @@ httpx = "^0.28.1"
 sqlalchemy = {extras = ["asyncio"], version = "^2.0.43"}
 alembic = "^1.13.2"
 greenlet = "^3"
-fastapi-users = {extras = ["oauth", "sqlalchemy2"], version = "^14.0.1"}
+fastapi-users = { extras = ["oauth"], version = "^14.0.1" }
 fastapi-users-db-sqlalchemy = "^7.0.0"
 authlib = "^1.6.2"
 httpx-oauth = "^0.16.1"

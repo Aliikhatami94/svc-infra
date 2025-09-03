@@ -7,6 +7,7 @@ const REF  = process.env.SVC_INFRA_REF  || "main";
 const SPEC = `git+${REPO}@${REF}`;
 
 const args = [
+    "--quiet",
     ...(process.env.UVX_REFRESH ? ["--refresh"] : []),
     "--from", SPEC,
     "python", "-m", "svc_infra.auth.mcp",
