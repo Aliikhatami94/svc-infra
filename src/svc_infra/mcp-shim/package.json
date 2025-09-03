@@ -1,0 +1,10 @@
+{
+  "name": "svc-infra-mcp-shims",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "auth-infra-mcp": "bin/auth-infra-mcp.js",
+    "db-management-mcp": "bin/db-management-mcp.js"
+  },
+  "license": "MIT"
+}
