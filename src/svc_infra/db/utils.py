@@ -2,6 +2,8 @@ import os
 import re
 from typing import Optional
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
 from pathlib import Path
 
@@ -169,3 +171,39 @@ def _connect_engine(url: str):
     # url here is already normalized for sync driver
     eng = create_engine(url, future=True)
     return eng
+
+def _get_heads(script: ScriptDirectory) -> list[str]:
+    try:
+        return list(script.get_heads())
+    except Exception:
+        return []
+
+def _repair_self_loop_if_present(project_root: Path) -> dict[str, Any]:
+    """
+    Scan migrations/versions for a file whose revision == down_revision.
+    If found, reset its down_revision to None and return repair info.
+    Safe no-op if nothing is broken.
+    """
+    versions_dir = project_root.resolve() / AL_EMBIC_DIR / "versions"
+    if not versions_dir.exists():
+        return {"repaired": False, "reason": "no versions dir"}
+
+    pat_rev   = re.compile(r'^\s*revision\s*=\s*[\'"]([0-9a-f]+)[\'"]\s*$', re.M)
+    pat_down  = re.compile(r'^\s*down_revision\s*=\s*([^\n]+)$', re.M)
+
+    for p in sorted(versions_dir.glob("*.py")):
+        txt = p.read_text(encoding="utf-8")
+        m_rev  = pat_rev.search(txt)
+        m_down = pat_down.search(txt)
+        if not (m_rev and m_down):
+            continue
+        rev = m_rev.group(1)
+        down_line = m_down.group(1).strip()
+        # extract literal down_revision value if present
+        m_lit = re.match(r'[\'"]([0-9a-f]+)[\'"]', down_line)
+        if m_lit and m_lit.group(1) == rev:
+            # self-loop — fix to None
+            fixed = pat_down.sub('down_revision = None', txt, count=1)
+            p.write_text(fixed, encoding="utf-8")
+            return {"repaired": True, "file": str(p), "rev": rev}
+    return {"repaired": False}
