@@ -10,6 +10,7 @@ from sqlalchemy.engine.url import make_url
 from sqlalchemy import create_engine
 from contextlib import closing
 from sqlalchemy import text
+import py_compile
 
 import typer
 from alembic import command
