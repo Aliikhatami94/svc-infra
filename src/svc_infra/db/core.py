@@ -95,7 +95,7 @@ def _single_head_or_none(script: ScriptDirectory) -> str | None:
 
 # ---------------- Core (tool-callable) APIs ---------------- #
 
-def db_ping_core(*, project_root: Path, database_url: Optional[str]) -> Dict[str, Any]:
+def db_ping_core(*, project_root: Path, database_url: Optional[str] = None) -> Dict[str, Any]:
     project_root = project_root.resolve()
     _load_dotenv_if_present(project_root)
 
@@ -120,7 +120,7 @@ def db_ping_core(*, project_root: Path, database_url: Optional[str]) -> Dict[str
     try:
         engine = create_engine(eff, future=True)
         with closing(engine.connect()) as conn:
-            conn.execute("SELECT 1;")
+            conn.exec_driver_sql("SELECT 1")
         engine.dispose()
         return {"status": "ok", "url": redacted}
     except Exception as e:
@@ -129,7 +129,7 @@ def db_ping_core(*, project_root: Path, database_url: Optional[str]) -> Dict[str
 def db_init_core(
         *,
         project_root: Path,
-        database_url: Optional[str],
+        database_url: Optional[str] = None,
         discover_packages: Optional[str | bool | list[str]],
 ) -> Dict[str, Any]:
     """
@@ -418,7 +418,7 @@ def db_revision_core(
         message: str,
         autogenerate: bool,
         project_root: Path,
-        database_url: Optional[str],
+        database_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a new Alembic revision."""
     project_root = project_root.resolve()
@@ -431,7 +431,7 @@ def db_upgrade_core(
         *,
         revision: str,
         project_root: Path,
-        database_url: Optional[str],
+        database_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Upgrade to a later Alembic revision."""
     project_root = project_root.resolve()
@@ -444,7 +444,7 @@ def db_downgrade_core(
         *,
         revision: str,
         project_root: Path,
-        database_url: Optional[str],
+        database_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Downgrade to an earlier Alembic revision."""
     project_root = project_root.resolve()
@@ -457,7 +457,7 @@ def db_current_core(
         *,
         verbose: bool,
         project_root: Path,
-        database_url: Optional[str],
+        database_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Show the current Alembic revision."""
     project_root = project_root.resolve()
@@ -466,7 +466,7 @@ def db_current_core(
     command.current(cfg, verbose=verbose)
     return {"status": "ok", "verbose": verbose}
 
-def db_history_core(*, verbose: bool, project_root: Path, database_url: Optional[str]) -> Dict[str, Any]:
+def db_history_core(*, verbose: bool, project_root: Path, database_url: Optional[str] = None) -> Dict[str, Any]:
     """Show the full Alembic revision history."""
     project_root = project_root.resolve()
     _load_dotenv_if_present(project_root)
@@ -479,7 +479,7 @@ def db_stamp_core(
         *,
         revision: str,
         project_root: Path,
-        database_url: Optional[str],
+        database_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Stamp the database with a given Alembic revision without running migrations."""
     project_root = project_root.resolve()
@@ -497,7 +497,7 @@ def db_drop_table_core(
         base: Optional[str],
         apply: bool,
         project_root: Path,
-        database_url: Optional[str],
+        database_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create and optionally apply a migration that drops a specified table.
@@ -630,7 +630,7 @@ def db_drop_table_core(
         "exists_after": bool(exists_after),
     }
 
-def db_merge_heads_core(*, message: str, project_root: Path, database_url: Optional[str]) -> Dict[str, Any]:
+def db_merge_heads_core(*, message: str, project_root: Path, database_url: Optional[str] = None) -> Dict[str, Any]:
     """Merge all current heads into one new head."""
     project_root = project_root.resolve()
     _load_dotenv_if_present(project_root)
