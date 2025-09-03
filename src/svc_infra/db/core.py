@@ -202,177 +202,160 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
     # 2) env.py — sync only, async→sync mapping is handled at runtime
     env_py = project_root / AL_EMBIC_DIR / "env.py"
     if not env_py.exists():
-        env_template = dedent("""
-        from __future__ import annotations
-        import os
-        import sys
-        import logging
-        import pkgutil
-        import importlib
-        import fnmatch
-        from pathlib import Path
-        from logging.config import fileConfig
-        from typing import Iterable, List
-        
-        from alembic import context
-        from sqlalchemy import pool, create_engine
-        from sqlalchemy.engine.url import make_url, URL
-        from sqlalchemy.orm import DeclarativeBase
-        
-        # --- Ensure project root and src/ on sys.path ---
-        ROOT = Path(__file__).resolve().parents[1]
-        for p in (ROOT, ROOT / "src"):
-            s = str(p)
-            if p.exists() and s not in sys.path:
-                sys.path.insert(0, s)
-        
-        # --- Alembic config & logging ---
-        config = context.config
-        USE_APP_LOGGING = os.getenv("ALEMBIC_USE_APP_LOGGING", "1") == "1"
-        if USE_APP_LOGGING:
-            try:
-                from svc_infra.app.logging import setup_logging
-                setup_logging(level=os.getenv("LOG_LEVEL"), fmt=os.getenv("LOG_FORMAT"))
-                logging.getLogger(__name__).debug("Alembic using app logging setup.")
-            except Exception as e:
-                USE_APP_LOGGING = False
-                print(f"[alembic] App logging import failed: {e}. Falling back to fileConfig.")
-        
-        if not USE_APP_LOGGING and config.config_file_name is not None:
-            fileConfig(config.config_file_name)
-            logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
-        
-        # --- Database URL override via env (if ini is blank) ---
-        env_url = os.getenv("DATABASE_URL")
-        if env_url:
-            config.set_main_option("sqlalchemy.url", env_url)
-        
-        # --- Auto-discover model modules (SAFE) and collect all metadatas ---
-        # Inputs:
-        #   ALEMBIC_DISCOVER_PACKAGES: CSV of top-level packages to scan
-        #   ALEMBIC_IMPORT_ALLOW: CSV of glob patterns to import
-        #   ALEMBIC_IMPORT_DENY:  CSV of glob patterns to exclude
-        DISCOVER_PKGS = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "__DISCOVER__")
-        ALLOW_PATTERNS = [p.strip() for p in (os.getenv("ALEMBIC_IMPORT_ALLOW", "*.models,*.db,*.db.models") or "").split(",") if p.strip()]
-        DENY_PATTERNS  = [p.strip() for p in (os.getenv("ALEMBIC_IMPORT_DENY",  "*.api.*,*.routers.*,*.server.*,*.cli.*") or "").split(",") if p.strip()]
-        
-        def _should_import(mod_name: str) -> bool:
-            for pat in DENY_PATTERNS:
-                if fnmatch.fnmatch(mod_name, pat):
-                    return False
-            for pat in ALLOW_PATTERNS:
-                if fnmatch.fnmatch(mod_name, pat):
-                    return True
-            return False
-        
-        def _iter_pkg_modules(top_pkg_name: str) -> Iterable[str]:
-            try:
-                top_pkg = importlib.import_module(top_pkg_name)
-            except Exception:
-                return []
-            if not hasattr(top_pkg, "__path__"):
-                return [top_pkg_name] if _should_import(top_pkg_name) else []
-            names = []
-            for m in pkgutil.walk_packages(top_pkg.__path__, prefix=top_pkg.__name__ + "."):
-                if _should_import(m.name):
-                    names.append(m.name)
-            return names
-        
-        def import_model_modules(packages: Iterable[str]) -> None:
-            for pkg_name in packages:
-                pkg_name = (pkg_name or "").strip()
-                if not pkg_name:
-                    continue
-                for mod_name in _iter_pkg_modules(pkg_name):
-                    try:
-                        importlib.import_module(mod_name)
-                    except Exception as e:
-                        logging.getLogger(__name__).debug(f"[alembic] Skipped import {mod_name}: {e}")
-        
-        def collect_all_metadatas() -> List:
-            metas: set = set()
-            try:
-                for cls in DeclarativeBase.__subclasses__():
-                    md = getattr(cls, "metadata", None)
-                    if md is not None:
-                        metas.add(md)
-            except Exception:
-                pass
-            return list(metas)
-        
-        pkgs = [p.strip() for p in (DISCOVER_PKGS or "").split(",") if p.strip()]
-        import_model_modules(pkgs)
-        target_metadata = collect_all_metadatas()  # may be empty (autogen no-op)
-        
-        # --- URL normalization: map async drivers to sync + ensure sslmode=require for pg ---
-        def _sync_url_for_migrations(url_str: str) -> str:
-            if not url_str:
-                return url_str
-            try:
-                u: URL = make_url(url_str)
-            except Exception:
-                return url_str
-        
-            drv = (u.drivername or "")
-            if drv.endswith("+asyncpg"):
-                u = u.set(drivername="postgresql+psycopg2")
-            elif drv.endswith("+aiosqlite"):
-                u = u.set(drivername="sqlite")
-            elif drv.endswith("+asyncmy"):
-                u = u.set(drivername="mysql+pymysql")
-        
-            if u.drivername.startswith("postgresql"):
-                q = dict(u.query)
-                if "sslmode" not in q:
-                    q["sslmode"] = "require"
-                u = u.set(query=q)
-        
-            return str(u)
-        
-        def run_migrations_offline():
-            url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
-            context.configure(
-                url=url,
-                target_metadata=target_metadata,
-                literal_binds=True,
-                compare_type=True,
-                compare_server_default=True,
-                render_as_batch=True,
-            )
-            with context.begin_transaction():
-                context.run_migrations()
-        
-        def do_run_migrations(connection):
-            context.configure(
-                connection=connection,
-                target_metadata=target_metadata,
-                compare_type=True,
-                compare_server_default=True,
-                render_as_batch=True,
-            )
-            with context.begin_transaction():
-                context.run_migrations()
-        
-        def run_migrations_online_sync():
-            url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
-            engine = create_engine(url, poolclass=pool.NullPool, future=True)
-            try:
-                with engine.connect() as connection:
-                    do_run_migrations(connection)
-            finally:
-                engine.dispose()
-        
-        if context.is_offline_mode():
-            run_migrations_offline()
-        else:
-            run_migrations_online_sync()
-        """).replace("__DISCOVER__", discover_root_csv)
-        env_py.write_text(env_template, encoding="utf-8")
+        env_tpl = """
+    from __future__ import annotations
+    import os
+    import sys
+    import logging
+    import importlib
+    from pathlib import Path
+    from logging.config import fileConfig
+    from typing import Iterable, List
+    
+    from alembic import context
+    from sqlalchemy import pool, create_engine
+    from sqlalchemy.engine.url import make_url, URL
+    from sqlalchemy.orm import DeclarativeBase
+    
+    # --- Ensure project root and src/ on sys.path ---
+    ROOT = Path(__file__).resolve().parents[1]
+    for p in (ROOT, ROOT / "src"):
+        s = str(p)
+        if p.exists() and s not in sys.path:
+            sys.path.insert(0, s)
+    
+    # --- Optional: load .env for Alembic runtime (noop if missing) ---
+    try:
+        from dotenv import load_dotenv  # type: ignore
+        load_dotenv(dotenv_path=ROOT / ".env")
+    except Exception:
+        pass
+    
+    # --- Alembic config & logging ---
+    config = context.config
+    USE_APP_LOGGING = os.getenv("ALEMBIC_USE_APP_LOGGING", "1") == "1"
+    if USE_APP_LOGGING:
+        try:
+            from svc_infra.app.logging import setup_logging
+            setup_logging(level=os.getenv("LOG_LEVEL"), fmt=os.getenv("LOG_FORMAT"))
+            logging.getLogger(__name__).debug("Alembic using app logging setup.")
+        except Exception as e:
+            USE_APP_LOGGING = False
+            print(f"[alembic] App logging import failed: {e}. Falling back to fileConfig.")
+    
+    if not USE_APP_LOGGING and config.config_file_name is not None:
+        fileConfig(config.config_file_name)
+        logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
+    
+    # --- DATABASE_URL override via env (if ini is blank/placeholder) ---
+    env_url = os.getenv("DATABASE_URL")
+    if env_url:
+        config.set_main_option("sqlalchemy.url", env_url)
+    
+    # --- Import ONLY model modules to avoid app startup side-effects ---
+    # Provide packages via ALEMBIC_DISCOVER_PACKAGES: "pkg1,pkg2"
+    DISCOVER_PKGS = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "__DISCOVER__")
+    
+    def import_model_modules(packages: Iterable[str]) -> None:
+        # Only try <pkg>.models and <pkg>.db.models
+        candidates = ("models", "db.models")
+        for pkg in packages:
+            pkg = (pkg or "").strip()
+            if not pkg:
+                continue
+            for leaf in candidates:
+                mod = f"{pkg}.{leaf}"
+                try:
+                    importlib.import_module(mod)
+                except Exception as e:
+                    logging.getLogger(__name__).debug(f"[alembic] Skipped import {mod}: {e}")
+    
+    def collect_all_metadatas() -> List:
+        metas: set = set()
+        try:
+            for cls in DeclarativeBase.__subclasses__():
+                md = getattr(cls, "metadata", None)
+                if md is not None:
+                    metas.add(md)
+        except Exception:
+            pass
+        return list(metas)
+    
+    pkgs = [p.strip() for p in (DISCOVER_PKGS or "").split(",") if p.strip()]
+    import_model_modules(pkgs)
+    target_metadata = collect_all_metadatas()  # may be empty (autogen no-op)
+    
+    # --- URL normalization: map async → sync; require SSL for Postgres ---
+    def _sync_url_for_migrations(url_str: str) -> str:
+        if not url_str:
+            return url_str
+        try:
+            u: URL = make_url(url_str)
+        except Exception:
+            return url_str
+    
+        drv = (u.drivername or "")
+        if drv.endswith("+asyncpg"):
+            u = u.set(drivername="postgresql+psycopg2")
+        elif drv.endswith("+aiosqlite"):
+            u = u.set(drivername="sqlite")
+        elif drv.endswith("+asyncmy"):
+            u = u.set(drivername="mysql+pymysql")
+    
+        if u.drivername.startswith("postgresql"):
+            q = dict(u.query)
+            if "sslmode" not in q:
+                q["sslmode"] = "require"
+            u = u.set(query=q)
+    
+        return str(u)
+    
+    def run_migrations_offline():
+        url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
+        context.configure(
+            url=url,
+            target_metadata=target_metadata,
+            literal_binds=True,
+            compare_type=True,
+            compare_server_default=True,
+            render_as_batch=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+    
+    def do_run_migrations(connection):
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+            render_as_batch=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+    
+    def run_migrations_online_sync():
+        url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
+        engine = create_engine(url, poolclass=pool.NullPool, future=True)
+        try:
+            with engine.connect() as connection:
+                do_run_migrations(connection)
+        finally:
+            engine.dispose()
+    
+    if context.is_offline_mode():
+        run_migrations_offline()
+    else:
+        run_migrations_online_sync()
+    """
+        # replace the sentinel with the computed CSV
+        env_text = env_tpl.replace("__DISCOVER__", discover_root_csv)
+        env_py.write_text(env_text, encoding="utf-8")
         created["env_py"] = True
         notes.append(f"Wrote {env_py}")
     script_path = project_root / AL_EMBIC_DIR / "script.py.mako"
     if not script_path.exists():
-        script_tpl = dedent("""
+        script_tpl = """
         \"\"\"${message}
         
         Revision ID: ${up_revision}
@@ -396,7 +379,8 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         
         def downgrade() -> None:
             ${downgrades if downgrades else "pass"}
-        """)
+        """
+        script_path = project_root / AL_EMBIC_DIR / "script.py.mako"
         if not script_path.exists():
             script_path.write_text(script_tpl, encoding="utf-8")
             created["script_tpl"] = True
@@ -431,6 +415,17 @@ def db_revision_core(
     project_root = project_root.resolve()
     _load_dotenv_if_present(project_root)
     cfg = _load_config(project_root, database_url)
+
+    eff = cfg.get_main_option("sqlalchemy.url")  # already normalized by your loader
+    try:
+        engine = create_engine(eff, future=True)
+        with closing(engine.connect()) as conn:
+            conn.exec_driver_sql("SELECT 1")
+        engine.dispose()
+    except Exception as e:
+        raise RuntimeError(f"DB connection check failed before autogenerate: {e}") from e
+
+    # Good to go
     command.revision(cfg, message=message, autogenerate=autogenerate)
     return {"status": "ok", "message": message, "autogenerate": autogenerate}
 
