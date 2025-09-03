@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "auth-infra-mcp": "src/svc_infra/mcp-shim/bin/auth-infra-mcp.js",
-    "db-management-mcp": "src/svc_infra/mcp-shim/bin/db-management-mcp.js"
+    "auth-infra-mcp": "mcp-shim/bin/auth-infra-mcp.js",
+    "db-management-mcp": "mcp-shim/bin/db-management-mcp.js"
+  },
+  "scripts": {
+    "auth-mcp": "node mcp-shim/bin/auth-infra-mcp.js",
+    "db-mcp": "node mcp-shim/bin/db-management-mcp.js"
   }
 }
