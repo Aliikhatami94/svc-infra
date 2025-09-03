@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "auth-infra-mcp": "bin/auth-infra-mcp.js",
-    "db-management-mcp": "bin/db-management-mcp.js"
+    "auth-infra-mcp": "src/svc_infra/mcp-shim/bin/auth-infra-mcp.js",
+    "db-management-mcp": "src/svc_infra/mcp-shim/bin/db-management-mcp.js"
   },
   "license": "MIT"
 }
