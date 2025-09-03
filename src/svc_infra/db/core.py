@@ -6,6 +6,9 @@ from textwrap import dedent
 from typing import Optional, Dict, Any
 
 from alembic.script import ScriptDirectory
+from sqlalchemy.engine.url import make_url
+from sqlalchemy import create_engine
+from contextlib import closing
 
 import typer
 from alembic import command
@@ -86,6 +89,34 @@ def _single_head_or_none(script: ScriptDirectory) -> str | None:
     raise RuntimeError(f"Multiple heads present: {', '.join(heads)}")
 
 # ---------------- Core (tool-callable) APIs ---------------- #
+
+def db_ping_core(*, project_root: Path, database_url: Optional[str]) -> Dict[str, Any]:
+    project_root = project_root.resolve()
+    _load_dotenv_if_present(project_root)
+    eff = _get_env_value_from_name(database_url) if database_url else os.getenv("DATABASE_URL")
+    eff = _normalize_db_url_for_alembic(eff) if eff else eff
+
+    if not eff:
+        return {"status": "error", "message": "DATABASE_URL is empty or not set."}
+
+    def _redact(u: str) -> str:
+        try:
+            m = make_url(u)
+            if m.password:
+                m = m.set(password="***")
+            return str(m)
+        except Exception:
+            return "<unparseable>"
+
+    redacted = _redact(eff)
+    try:
+        engine = create_engine(eff, future=True)
+        with closing(engine.connect()) as conn:
+            conn.execute("SELECT 1;")
+        engine.dispose()
+        return {"status": "ok", "url": redacted}
+    except Exception as e:
+        return {"status": "error", "url": redacted, "error": str(e)}
 
 def db_init_core(
         *,

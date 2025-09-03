@@ -1,6 +1,7 @@
 from ai_infra import mcp_from_functions
 
 from .core import (
+    db_ping_core,
     db_init_core,
     db_revision_core,
     db_upgrade_core,
@@ -15,6 +16,7 @@ from .core import (
 mcp = mcp_from_functions(
     name="db-management",
     functions=[
+        db_ping_core,
         db_init_core,
         db_revision_core,
         db_upgrade_core,
