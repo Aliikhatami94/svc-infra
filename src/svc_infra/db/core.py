@@ -201,8 +201,11 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
 
     # 2) env.py — sync only, async→sync mapping is handled at runtime
     env_py = project_root / AL_EMBIC_DIR / "env.py"
-    if not env_py.exists():
-        env_tpl = """
+    # Always (re)write env.py to ensure it's correct; if you prefer idempotency,
+    # change to "if not env_py.exists():" again after you’re confident.
+    # For now, be robust for the agent:
+    # if not env_py.exists():
+    env_tpl = """
     from __future__ import annotations
     import os
     import sys
@@ -348,11 +351,14 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
     else:
         run_migrations_online_sync()
     """
-        # replace the sentinel with the computed CSV
-        env_text = env_tpl.replace("__DISCOVER__", discover_root_csv)
-        env_py.write_text(env_text, encoding="utf-8")
-        created["env_py"] = True
-        notes.append(f"Wrote {env_py}")
+    # Fill in the discover CSV, then dedent and strip leading blank lines
+    env_text = dedent(env_tpl.replace("__DISCOVER__", discover_root_csv)).lstrip()
+    env_py.write_text(env_text + "\n", encoding="utf-8")
+
+    # Fail fast if we somehow wrote a bad file
+    py_compile.compile(str(env_py), doraise=True)
+    created["env_py"] = True
+    notes.append(f"Wrote {env_py}")
     script_path = project_root / AL_EMBIC_DIR / "script.py.mako"
     if not script_path.exists():
         script_tpl = """
@@ -404,28 +410,21 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
         "notes": notes,
     }
 
-def db_revision_core(
-        *,
-        message: str,
-        autogenerate: bool,
-        project_root: Path,
-        database_url: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Create a new Alembic revision."""
+def db_revision_core(*, message: str, autogenerate: bool, project_root: Path, database_url: Optional[str] = None) -> Dict[str, Any]:
     project_root = project_root.resolve()
     _load_dotenv_if_present(project_root)
     cfg = _load_config(project_root, database_url)
 
-    eff = cfg.get_main_option("sqlalchemy.url")  # already normalized by your loader
-    try:
-        engine = create_engine(eff, future=True)
-        with closing(engine.connect()) as conn:
-            conn.exec_driver_sql("SELECT 1")
-        engine.dispose()
-    except Exception as e:
-        raise RuntimeError(f"DB connection check failed before autogenerate: {e}") from e
+    eff = cfg.get_main_option("sqlalchemy.url")
+    if eff:
+        try:
+            engine = create_engine(eff, future=True)
+            with closing(engine.connect()) as conn:
+                conn.exec_driver_sql("SELECT 1")
+            engine.dispose()
+        except Exception as e:
+            raise RuntimeError(f"DB connection check failed before autogenerate: {e}") from e
 
-    # Good to go
     command.revision(cfg, message=message, autogenerate=autogenerate)
     return {"status": "ok", "message": message, "autogenerate": autogenerate}
 
