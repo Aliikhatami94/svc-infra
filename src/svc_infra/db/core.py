@@ -203,29 +203,30 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
     env_py = project_root / AL_EMBIC_DIR / "env.py"
     if not env_py.exists():
         content = dedent(
-            f"""\
+            f'''\
             from __future__ import annotations
             import os
             import sys
             import logging
             import pkgutil
             import importlib
+            import fnmatch
             from pathlib import Path
             from logging.config import fileConfig
             from typing import Iterable, List
-
+        
             from alembic import context
             from sqlalchemy import pool, create_engine
             from sqlalchemy.engine.url import make_url, URL
             from sqlalchemy.orm import DeclarativeBase
-
+        
             # --- Ensure project root and src/ on sys.path ---
             ROOT = Path(__file__).resolve().parents[1]
             for p in (ROOT, ROOT / "src"):
                 s = str(p)
                 if p.exists() and s not in sys.path:
                     sys.path.insert(0, s)
-
+        
             # --- App logging (optional) ---
             USE_APP_LOGGING = os.getenv("ALEMBIC_USE_APP_LOGGING", "1") == "1"
             if USE_APP_LOGGING:
@@ -236,35 +237,60 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 except Exception as e:
                     USE_APP_LOGGING = False
                     print(f"[alembic] App logging import failed: {{e}}. Falling back to fileConfig.")
-
+        
             # --- Alembic config & logging ---
             config = context.config
             if not USE_APP_LOGGING and config.config_file_name is not None:
                 fileConfig(config.config_file_name)
                 logging.getLogger(__name__).debug("Alembic using fileConfig logging.")
-
+        
             # --- Database URL override via env (if ini is blank) ---
             env_url = os.getenv("DATABASE_URL")
             if env_url:
                 config.set_main_option("sqlalchemy.url", env_url)
-
-            # --- Auto-discover model modules and collect all metadatas ---
+        
+            # --- Auto-discover model modules (SAFE) and collect all metadatas ---
+            # Inputs:
+            #   ALEMBIC_DISCOVER_PACKAGES: comma CSV of top-level packages to scan (defaults to discovered roots)
+            #   ALEMBIC_IMPORT_ALLOW: CSV of glob patterns to import (default: "*.models,*.db,*.db.models")
+            #   ALEMBIC_IMPORT_DENY:  CSV of glob patterns to exclude (default: "*.api.*,*.routers.*,*.server.*,*.cli.*")
             DISCOVER_PKGS = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "{discover_root_csv}")
-
+            ALLOW_PATTERNS = [p.strip() for p in (os.getenv("ALEMBIC_IMPORT_ALLOW", "*.models,*.db,*.db.models") or "").split(",") if p.strip()]
+            DENY_PATTERNS  = [p.strip() for p in (os.getenv("ALEMBIC_IMPORT_DENY",  "*.api.*,*.routers.*,*.server.*,*.cli.*") or "").split(",") if p.strip()]
+        
+            def _should_import(mod_name: str) -> bool:
+                # deny has priority
+                for pat in DENY_PATTERNS:
+                    if fnmatch.fnmatch(mod_name, pat):
+                        return False
+                for pat in ALLOW_PATTERNS:
+                    if fnmatch.fnmatch(mod_name, pat):
+                        return True
+                return False
+        
             def _iter_pkg_modules(top_pkg_name: str) -> Iterable[str]:
-                try:
-                    top_pkg = importlib.import_module(top_pkg_name)
-                except Exception:
-                    return []
-                if not hasattr(top_pkg, "__path__"):
-                    return [top_pkg_name]
-                names = []
-                for m in pkgutil.walk_packages(top_pkg.__path__, prefix=top_pkg.__name__ + "."):
-                    names.append(m.name)
-                return names
-
-            def import_all_under_packages(packages: Iterable[str]) -> None:
+                """
+        Yield module names under 'top_pkg_name' that match ALLOW/DENY patterns.
+        We walk package metadata but only import a small, safe subset of modules.
+        """
+        try:
+            top_pkg = importlib.import_module(top_pkg_name)
+        except Exception:
+            return []
+        if not hasattr(top_pkg, "__path__"):
+            # plain module: import it only if allowed
+            return [top_pkg_name] if _should_import(top_pkg_name) else []
+        names = []
+        for m in pkgutil.walk_packages(top_pkg.__path__, prefix=top_pkg.__name__ + "."):
+            # Only enqueue names that match the allow/deny filters
+            if _should_import(m.name):
+                names.append(m.name)
+        return names
+        
+        def import_model_modules(packages: Iterable[str]) -> None:
+        """Import *only* model-ish modules to register DeclarativeBase subclasses."""
                 for pkg_name in packages:
+                    pkg_name = (pkg_name or "").strip()
                     if not pkg_name:
                         continue
                     for mod_name in _iter_pkg_modules(pkg_name):
@@ -272,7 +298,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                             importlib.import_module(mod_name)
                         except Exception as e:
                             logging.getLogger(__name__).debug(f"[alembic] Skipped import {{mod_name}}: {{e}}")
-
+        
             def collect_all_metadatas() -> List:
                 metas: set = set()
                 try:
@@ -283,12 +309,12 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 except Exception:
                     pass
                 return list(metas)
-
+        
             pkgs = [p.strip() for p in (DISCOVER_PKGS or "").split(",") if p.strip()]
-            import_all_under_packages(pkgs)
+            import_model_modules(pkgs)
             target_metadata = collect_all_metadatas()  # may be empty (autogen no-op)
-
-            # --- URL normalization: map async drivers to sync + ensure sslmode=require ---
+        
+            # --- URL normalization: map async drivers to sync + ensure sslmode=require for pg ---
             def _sync_url_for_migrations(url_str: str) -> str:
                 if not url_str:
                     return url_str
@@ -296,29 +322,23 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                     u: URL = make_url(url_str)
                 except Exception:
                     return url_str
-
+        
                 drv = (u.drivername or "")
-                # map async → sync driver
                 if drv.endswith("+asyncpg"):
                     u = u.set(drivername="postgresql+psycopg2")
                 elif drv.endswith("+aiosqlite"):
                     u = u.set(drivername="sqlite")
                 elif drv.endswith("+asyncmy"):
                     u = u.set(drivername="mysql+pymysql")
-
-                # ensure sslmode=require for postgres if missing
-                try:
-                    from urllib.parse import urlencode
-                    if u.drivername.startswith("postgresql"):
-                        q = dict(u.query)
-                        if "sslmode" not in q:
-                            q["sslmode"] = "require"
-                        u = u.set(query=q)
-                except Exception:
-                    pass
-
+        
+                if u.drivername.startswith("postgresql"):
+                    q = dict(u.query)
+                    if "sslmode" not in q:
+                        q["sslmode"] = "require"
+                    u = u.set(query=q)
+        
                 return str(u)
-
+        
             def run_migrations_offline():
                 url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
                 context.configure(
@@ -331,7 +351,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 )
                 with context.begin_transaction():
                     context.run_migrations()
-
+        
             def do_run_migrations(connection):
                 context.configure(
                     connection=connection,
@@ -342,7 +362,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                 )
                 with context.begin_transaction():
                     context.run_migrations()
-
+        
             def run_migrations_online_sync():
                 url = _sync_url_for_migrations(config.get_main_option("sqlalchemy.url"))
                 engine = create_engine(url, poolclass=pool.NullPool, future=True)
@@ -351,7 +371,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
                         do_run_migrations(connection)
                 finally:
                     engine.dispose()
-
+        
             if context.is_offline_mode():
                 run_migrations_offline()
             else:
@@ -388,7 +408,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
 
         def downgrade() -> None:
             ${downgrades if downgrades else "pass"}
-        """
+        '''
     )
     script_path = project_root / AL_EMBIC_DIR / "script.py.mako"
     if not script_path.exists():
