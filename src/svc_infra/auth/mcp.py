@@ -7,7 +7,7 @@ from .core import (
 )
 
 mcp = mcp_from_functions(
-    name="auth-infra",
+    name="auth-infra-mcp",
     functions=[
         scaffold_auth_core,
         scaffold_auth_models_core,
