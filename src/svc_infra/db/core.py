@@ -39,18 +39,16 @@ app = typer.Typer(
 
 
 def _load_config(project_root: Path, database_url: Optional[str]) -> Config:
-    # Ensure env is loaded for this process (so env.py override works too)
-    _load_dotenv_if_present(project_root)
+    _load_dotenv_if_present(project_root)  # ensure .env is loaded
 
     cfg = Config(str(project_root / ALEMBIC_INI))
 
-    # Resolve database_url: support passing "$DATABASE_URL" or "DATABASE_URL"
-    # If a literal url is provided, use it; else fallback to os.getenv("DATABASE_URL")
-    effective = _get_env_value_from_name(database_url) if database_url else os.getenv("DATABASE_URL")
+    # Accept placeholders like "${database_url}" and fall back to env
+    effective = _get_env_value_from_name(database_url)
+    if not effective:
+        effective = os.getenv("DATABASE_URL")
 
-    # Normalize for Alembic callers (env.py will still do final mapping)
     effective = _normalize_db_url_for_alembic(effective) if effective else effective
-
     if effective:
         cfg.set_main_option("sqlalchemy.url", effective)
 
@@ -100,7 +98,10 @@ def _single_head_or_none(script: ScriptDirectory) -> str | None:
 def db_ping_core(*, project_root: Path, database_url: Optional[str]) -> Dict[str, Any]:
     project_root = project_root.resolve()
     _load_dotenv_if_present(project_root)
-    eff = _get_env_value_from_name(database_url) if database_url else os.getenv("DATABASE_URL")
+
+    eff = _get_env_value_from_name(database_url)
+    if not eff:
+        eff = os.getenv("DATABASE_URL")
     eff = _normalize_db_url_for_alembic(eff) if eff else eff
 
     if not eff:

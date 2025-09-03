@@ -9,7 +9,8 @@ from pathlib import Path
 
 from svc_infra.db.constants import ALEMBIC_INI, AL_EMBIC_DIR
 
-_ENV_NAME_RE = re.compile(r"^\$?[A-Z_][A-Z0-9_]*$")
+_ENV_NAME_RE = re.compile(r'^\$?[A-Z_][A-Z0-9_]*$')
+_ENV_NAME_BRACED_RE = re.compile(r'^\$\{[A-Za-z_][A-Za-z0-9_]*\}$')
 
 def _normalize_discover_arg(discover_packages) -> str | None:
     """
@@ -40,26 +41,37 @@ def _resolve_ini_url_value(database_url: Optional[str]) -> str:
     """
     For alembic.ini:
     - If a literal URL is passed -> write it.
-    - If an ENV name like 'DATABASE_URL' or '$DATABASE_URL' or None -> write empty string,
+    - If an ENV name like 'DATABASE_URL', '$DATABASE_URL', or '${DATABASE_URL}' (any case) or None -> write empty string,
       and let env.py override from os.getenv at runtime.
     """
     if not database_url:
         return ""
-    if _ENV_NAME_RE.fullmatch(database_url):
+    s = str(database_url).strip()
+    if _ENV_NAME_RE.fullmatch(s) or _ENV_NAME_BRACED_RE.fullmatch(s):
         return ""
-    return database_url
+    # Also treat lowercase ${database_url} as an env placeholder
+    if _ENV_PLACEHOLDER_RE.fullmatch(s):
+        return ""
+    return s
 
-def _get_env_value_from_name(name: str) -> Optional[str]:
+def _get_env_value_from_name(v: Optional[str]) -> Optional[str]:
     """
-    If name looks like an env var (DATABASE_URL or $DATABASE_URL), return its os.getenv value.
-    Otherwise return the name itself (assume literal URL).
+    If v looks like an environment variable name or placeholder
+    (e.g., DATABASE_URL, $DATABASE_URL, ${DATABASE_URL}, ${database_url}),
+    return its value from os.environ (case-sensitive first, then UPPER).
+    Otherwise return v (treat as a literal URL).
     """
-    if not name:
+    if v is None:
         return None
-    if _ENV_NAME_RE.fullmatch(name):
-        key = name[1:] if name.startswith("$") else name
-        return os.getenv(key)
-    return name  # literal URL
+    s = str(v).strip()
+    m = _ENV_PLACEHOLDER_RE.match(s)
+    if not m:
+        # Not an env placeholder -> treat as literal URL string
+        return s if s else None
+
+    name = m.group(1)
+    # Try exact case first, then UPPER for agent-provided ${database_url}
+    return os.getenv(name) or os.getenv(name.upper())
 
 def _ensure_sslmode_required(url: str) -> str:
     """
@@ -83,17 +95,20 @@ def _ensure_sslmode_required(url: str) -> str:
 
 def _normalize_db_url_for_alembic(url: Optional[str]) -> Optional[str]:
     """
-    Normalize DB url for Alembic tooling (not env.py mapping).
-    - Keep as-is for most cases.
-    - If postgres async driver is present, we still let env.py downshift to psycopg2.
-    - Ensure sslmode=require for Postgres if missing.
+    If a URL is async (e.g., postgresql+asyncpg), normalize to sync driver
+    for Alembic CLI so autogenerate/upgrade works with psycopg2/pymysql/sqlite.
+    Leave None/empty untouched.
     """
     if not url:
         return url
-    # normalize postgres:// -> postgresql:// (some clients output postgres://)
-    if url.startswith("postgres://"):
-        url = "postgresql://" + url[len("postgres://"):]
-    return _ensure_sslmode_required(url)
+    # Do a light-weight, string-oriented normalization here; env.py also maps again.
+    if url.startswith("postgresql+asyncpg"):
+        return url.replace("postgresql+asyncpg", "postgresql+psycopg2", 1)
+    if url.startswith("sqlite+aiosqlite"):
+        return url.replace("sqlite+aiosqlite", "sqlite", 1)
+    if url.startswith("mysql+asyncmy"):
+        return url.replace("mysql+asyncmy", "mysql+pymysql", 1)
+    return url
 
 def _load_dotenv_if_present(project_root) -> None:
     """
