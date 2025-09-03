@@ -7,10 +7,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
 from pathlib import Path
 
-from svc_infra.db.constants import ALEMBIC_INI, AL_EMBIC_DIR
-
-_ENV_NAME_RE = re.compile(r'^\$?[A-Z_][A-Z0-9_]*$')
-_ENV_NAME_BRACED_RE = re.compile(r'^\$\{[A-Za-z_][A-Za-z0-9_]*\}$')
+from svc_infra.db.constants import ALEMBIC_INI, AL_EMBIC_DIR, _ENV_NAME_RE, _ENV_NAME_BRACED_RE, _ENV_PLACEHOLDER_RE
 
 def _normalize_discover_arg(discover_packages) -> str | None:
     """
