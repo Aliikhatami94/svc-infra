@@ -30,6 +30,7 @@ from .utils import (
     _connect_engine,
     _get_heads,
     _repair_self_loop_if_present,
+    _resolve_down_revision,
 )
 
 app = typer.Typer(
