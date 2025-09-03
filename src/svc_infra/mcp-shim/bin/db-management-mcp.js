@@ -2,7 +2,7 @@
 const { spawn } = require("child_process");
 
 const UVX = process.env.UVX_PATH || "uvx";
-const REPO = process.env.SVC_INFRA_REPO || "https://github.com/<your-org>/svc-infra.git";
+const REPO = process.env.SVC_INFRA_REPO || "https://github.com/aliikhatami94/svc-infra.git";
 const REF  = process.env.SVC_INFRA_REF  || "main";
 const SPEC = `git+${REPO}@${REF}`;
 
