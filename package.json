@@ -3,7 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "svc-infra-mcp-shims": "bin/dispatch.js",
     "auth-infra-mcp": "src/svc_infra/mcp-shim/bin/auth-infra-mcp.js",
     "db-management-mcp": "src/svc_infra/mcp-shim/bin/db-management-mcp.js"
   }
