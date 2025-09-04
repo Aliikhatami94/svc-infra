@@ -28,6 +28,7 @@ def _render_env_py(packages: Sequence[str]) -> str:
 from __future__ import annotations
 import os
 import logging
+from typing import List
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
@@ -52,7 +53,7 @@ if prepend:
             sys.path.insert(0, s)
 
 # Discover metadata from packages, but prefer the central ModelBase first
-DISCOVER_PACKAGES: list[str] = [__PACKAGES_LIST__]
+DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
@@ -185,6 +186,7 @@ def _render_env_py_async(packages: Sequence[str]) -> str:
 from __future__ import annotations
 import os
 import logging
+from typing import List
 
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -208,7 +210,7 @@ if prepend:
         if s not in sys.path:
             sys.path.insert(0, s)
 
-DISCOVER_PACKAGES: list[str] = [__PACKAGES_LIST__]
+DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
