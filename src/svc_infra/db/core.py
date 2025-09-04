@@ -51,28 +51,47 @@ if ENV_DISCOVER:
 def _collect_metadata() -> list[object]:
     import importlib
     import pkgutil
+    from pathlib import Path
+
     found: list[object] = []
-    
+
     def _maybe_add(obj: object) -> None:
-        # Accept MetaData directly, or declarative Base with .metadata
         md = getattr(obj, "metadata", None) or obj
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
-    
+
+    if not DISCOVER_PACKAGES:
+        try:
+            script_location = Path(config.get_main_option("script_location")).resolve()
+            project_root = script_location.parent
+            candidates: list[Path] = [project_root]
+            if (project_root / "src").exists():
+                candidates.append(project_root / "src")
+
+            seen_names: set[str] = set()
+            for base in candidates:
+                for p in base.iterdir():
+                    # only top-level python packages
+                    if p.is_dir() and (p / "__init__.py").exists():
+                        seen_names.add(p.name)
+            DISCOVER_PACKAGES.extend(sorted(seen_names))
+        except Exception:
+            pass
+
     for pkg_name in DISCOVER_PACKAGES:
         try:
             pkg = importlib.import_module(pkg_name)
         except Exception as e:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
-    
-        # 1) Try the package root (works if they export Base/metadata at __init__.py)
+
+        # 1) Package root
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
-    
-        # 2) Also try a common 'models' submodule explicitly
+
+        # 2) Common submodule
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -82,13 +101,12 @@ def _collect_metadata() -> list[object]:
                         _maybe_add(obj)
             except Exception:
                 pass
-    
-        # 3) Walk the whole package tree and look in every module
+
+        # 3) Walk likely modules
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
-            continue  # not a package (single module), nothing to walk
-    
-        for finder, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
+            continue
+        for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
             if ispkg:
                 continue
             if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
@@ -101,8 +119,8 @@ def _collect_metadata() -> list[object]:
                 obj = getattr(mod, attr, None)
                 if obj is not None:
                     _maybe_add(obj)
-    
-    # Deduplicate by object id to avoid repeats
+
+    # Deduplicate
     uniq: list[object] = []
     seen = set()
     for md in found:
@@ -185,12 +203,32 @@ if ENV_DISCOVER:
 def _collect_metadata() -> list[object]:
     import importlib
     import pkgutil
+    from pathlib import Path
+
     found: list[object] = []
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
+
+    if not DISCOVER_PACKAGES:
+        try:
+            script_location = Path(config.get_main_option("script_location")).resolve()
+            project_root = script_location.parent
+            candidates: list[Path] = [project_root]
+            if (project_root / "src").exists():
+                candidates.append(project_root / "src")
+
+            seen_names: set[str] = set()
+            for base in candidates:
+                for p in base.iterdir():
+                    # only top-level python packages
+                    if p.is_dir() and (p / "__init__.py").exists():
+                        seen_names.add(p.name)
+            DISCOVER_PACKAGES.extend(sorted(seen_names))
+        except Exception:
+            pass
 
     for pkg_name in DISCOVER_PACKAGES:
         try:
@@ -199,13 +237,13 @@ def _collect_metadata() -> list[object]:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
-        # 1) Try package root
+        # 1) Package root
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        # 2) Try common submodules
+        # 2) Common submodule
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -218,20 +256,21 @@ def _collect_metadata() -> list[object]:
 
         # 3) Walk likely modules
         mod_path = getattr(pkg, "__path__", None)
-        if mod_path:
-            for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
-                if ispkg:
-                    continue
-                if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
-                    continue
-                try:
-                    mod = importlib.import_module(name)
-                except Exception:
-                    continue
-                for attr in ("metadata", "MetaData", "Base", "base"):
-                    obj = getattr(mod, attr, None)
-                    if obj is not None:
-                        _maybe_add(obj)
+        if not mod_path:
+            continue
+        for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
+            if ispkg:
+                continue
+            if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
+                continue
+            try:
+                mod = importlib.import_module(name)
+            except Exception:
+                continue
+            for attr in ("metadata", "MetaData", "Base", "base"):
+                obj = getattr(mod, attr, None)
+                if obj is not None:
+                    _maybe_add(obj)
 
     # Deduplicate
     uniq: list[object] = []
