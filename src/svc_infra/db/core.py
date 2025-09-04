@@ -89,11 +89,9 @@ def _collect_metadata() -> list[object]:
             continue  # not a package (single module), nothing to walk
     
         for finder, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
-            # Only peek into modules that are likely to contain models
             if ispkg:
                 continue
             if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
-                # keep it cheap; adjust heuristics if needed
                 continue
             try:
                 mod = importlib.import_module(name)
@@ -118,34 +116,16 @@ target_metadata = _collect_metadata()
 # Determine URL: prefer env var DATABASE_URL else alembic.ini sqlalchemy.url
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
-config.set_main_option("sqlalchemy.url", env_db_url)
+    config.set_main_option("sqlalchemy.url", env_db_url)
 
 
 def run_migrations_offline() -> None:
-url = config.get_main_option("sqlalchemy.url")
-context.configure(
-    url=url,
-    target_metadata=target_metadata,
-    literal_binds=True,
-    dialect_opts={"paramstyle": "named"},
-    compare_type=True,
-    compare_server_default=True,
-    include_schemas=True,
-)
-with context.begin_transaction():
-    context.run_migrations()
-
-
-def run_migrations_online() -> None:
-connectable = engine_from_config(
-    config.get_section(config.config_ini_section, {}),
-    prefix="sqlalchemy.",
-    poolclass=pool.NullPool,
-)
-with connectable.connect() as connection:
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        connection=connection,
+        url=url,
         target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
         include_schemas=True,
@@ -153,10 +133,28 @@ with connectable.connect() as connection:
     with context.begin_transaction():
         context.run_migrations()
 
+
+def run_migrations_online() -> None:
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+            include_schemas=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+
 if context.is_offline_mode():
-run_migrations_offline()
+    run_migrations_offline()
 else:
-run_migrations_online()
+    run_migrations_online()
 """
     return tpl.replace("__PACKAGES_LIST__", packages_list)
 
@@ -167,54 +165,91 @@ def _render_env_py_async(packages: Sequence[str]) -> str:
 from __future__ import annotations
 import os
 import logging
-from importlib import import_module
-from typing import List
 
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+# Load logging configuration from alembic.ini
 config = context.config
 if config.config_file_name is not None:
     import logging.config
     logging.config.fileConfig(config.config_file_name)
 logger = logging.getLogger(__name__)
 
-DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
+# Discover metadata from packages
+DISCOVER_PACKAGES: list[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
-def _collect_metadata() -> List[object]:
-    from importlib import import_module
-    metadata = []
-    for pkg in DISCOVER_PACKAGES:
+def _collect_metadata() -> list[object]:
+    import importlib
+    import pkgutil
+    found: list[object] = []
+
+    def _maybe_add(obj: object) -> None:
+        md = getattr(obj, "metadata", None) or obj
+        if hasattr(md, "tables") and hasattr(md, "schema"):
+            found.append(md)
+
+    for pkg_name in DISCOVER_PACKAGES:
         try:
-            mod = import_module(pkg)
+            pkg = importlib.import_module(pkg_name)
         except Exception as e:
-            logger.debug("Failed to import %s: %s", pkg, e)
+            logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
+
+        # 1) Try package root
         for attr in ("metadata", "MetaData", "Base", "base"):
-            obj = getattr(mod, attr, None)
-            if obj is None:
-                try:
-                    sub = import_module(f"{pkg}.models")
+            obj = getattr(pkg, attr, None)
+            if obj is not None:
+                _maybe_add(obj)
+
+        # 2) Try common submodules
+        for subname in ("models",):
+            try:
+                sub = importlib.import_module(f"{pkg_name}.{subname}")
+                for attr in ("metadata", "MetaData", "Base", "base"):
                     obj = getattr(sub, attr, None)
+                    if obj is not None:
+                        _maybe_add(obj)
+            except Exception:
+                pass
+
+        # 3) Walk likely modules
+        mod_path = getattr(pkg, "__path__", None)
+        if mod_path:
+            for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
+                if ispkg:
+                    continue
+                if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
+                    continue
+                try:
+                    mod = importlib.import_module(name)
                 except Exception:
-                    obj = None
-            if obj is None:
-                continue
-            md = getattr(obj, "metadata", None) or obj
-            if hasattr(md, "tables") and hasattr(md, "schema"):
-                metadata.append(md)
-    return metadata
+                    continue
+                for attr in ("metadata", "MetaData", "Base", "base"):
+                    obj = getattr(mod, attr, None)
+                    if obj is not None:
+                        _maybe_add(obj)
+
+    # Deduplicate
+    uniq: list[object] = []
+    seen = set()
+    for md in found:
+        if id(md) not in seen:
+            seen.add(id(md))
+            uniq.append(md)
+    return uniq
 
 target_metadata = _collect_metadata()
 
+# Prefer env var DATABASE_URL if present
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
     config.set_main_option("sqlalchemy.url", env_db_url)
 
-def do_run_migrations(connection):
+def _do_run_migrations(connection):
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -226,12 +261,14 @@ def do_run_migrations(connection):
         context.run_migrations()
 
 async def run_migrations_online() -> None:
-    connectable = create_async_engine(config.get_main_option("sqlalchemy.url"))
+    url = config.get_main_option("sqlalchemy.url")
+    connectable = create_async_engine(url)
     async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+        await connection.run_sync(_do_run_migrations)
     await connectable.dispose()
 
 if context.is_offline_mode():
+    # Async template only supports online mode.
     raise SystemExit("Run offline migrations with a sync env.py or set offline to False.")
 else:
     import asyncio as _asyncio
