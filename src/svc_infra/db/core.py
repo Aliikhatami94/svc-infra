@@ -49,10 +49,7 @@ if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    import importlib
-    import pkgutil
-    from pathlib import Path
-
+    import importlib, pkgutil, sys, os, pathlib
     found: list[object] = []
 
     def _maybe_add(obj: object) -> None:
@@ -60,38 +57,30 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    if not DISCOVER_PACKAGES:
-        try:
-            script_location = Path(config.get_main_option("script_location")).resolve()
-            project_root = script_location.parent
-            candidates: list[Path] = [project_root]
-            if (project_root / "src").exists():
-                candidates.append(project_root / "src")
+    pkgs = list(DISCOVER_PACKAGES)
 
-            seen_names: set[str] = set()
-            for base in candidates:
-                for p in base.iterdir():
-                    # only top-level python packages
-                    if p.is_dir() and (p / "__init__.py").exists():
-                        seen_names.add(p.name)
-            DISCOVER_PACKAGES.extend(sorted(seen_names))
-        except Exception:
-            pass
+    # Fallback: if no packages provided, scan <prepend_sys_path>/src for top-level pkgs
+    prepend = config.get_main_option("prepend_sys_path") or ""
+    src = pathlib.Path(prepend) / "src"
+    if not pkgs and src.exists():
+        for p in src.iterdir():
+            if p.is_dir() and (p / "__init__.py").exists():
+                pkgs.append(p.name)
 
-    for pkg_name in DISCOVER_PACKAGES:
+    for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
         except Exception as e:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
-        # 1) Package root
+        # package root (supports __init__.py exposing metadata/Base)
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        # 2) Common submodule
+        # common submodules
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -102,14 +91,12 @@ def _collect_metadata() -> list[object]:
             except Exception:
                 pass
 
-        # 3) Walk likely modules
+        # walk likely modules
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
         for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
-            if ispkg:
-                continue
-            if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
+            if ispkg or not any(x in name for x in (".models", ".db", ".orm", ".entities")):
                 continue
             try:
                 mod = importlib.import_module(name)
@@ -120,9 +107,8 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # Deduplicate
-    uniq: list[object] = []
-    seen = set()
+    # dedupe by identity
+    uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
             seen.add(id(md))
@@ -201,10 +187,7 @@ if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    import importlib
-    import pkgutil
-    from pathlib import Path
-
+    import importlib, pkgutil, sys, os, pathlib
     found: list[object] = []
 
     def _maybe_add(obj: object) -> None:
@@ -212,38 +195,30 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    if not DISCOVER_PACKAGES:
-        try:
-            script_location = Path(config.get_main_option("script_location")).resolve()
-            project_root = script_location.parent
-            candidates: list[Path] = [project_root]
-            if (project_root / "src").exists():
-                candidates.append(project_root / "src")
+    pkgs = list(DISCOVER_PACKAGES)
 
-            seen_names: set[str] = set()
-            for base in candidates:
-                for p in base.iterdir():
-                    # only top-level python packages
-                    if p.is_dir() and (p / "__init__.py").exists():
-                        seen_names.add(p.name)
-            DISCOVER_PACKAGES.extend(sorted(seen_names))
-        except Exception:
-            pass
+    # Fallback: if no packages provided, scan <prepend_sys_path>/src for top-level pkgs
+    prepend = config.get_main_option("prepend_sys_path") or ""
+    src = pathlib.Path(prepend) / "src"
+    if not pkgs and src.exists():
+        for p in src.iterdir():
+            if p.is_dir() and (p / "__init__.py").exists():
+                pkgs.append(p.name)
 
-    for pkg_name in DISCOVER_PACKAGES:
+    for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
         except Exception as e:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
-        # 1) Package root
+        # package root (supports __init__.py exposing metadata/Base)
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        # 2) Common submodule
+        # common submodules
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -254,14 +229,12 @@ def _collect_metadata() -> list[object]:
             except Exception:
                 pass
 
-        # 3) Walk likely modules
+        # walk likely modules
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
         for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
-            if ispkg:
-                continue
-            if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
+            if ispkg or not any(x in name for x in (".models", ".db", ".orm", ".entities")):
                 continue
             try:
                 mod = importlib.import_module(name)
@@ -272,9 +245,8 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # Deduplicate
-    uniq: list[object] = []
-    seen = set()
+    # dedupe by identity
+    uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
             seen.add(id(md))

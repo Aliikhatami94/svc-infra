@@ -6,7 +6,7 @@ from __future__ import annotations
 
 def __getattr__(name: str):
     if name == "include_auth":
-        from .include_auth import include_auth as _f
+        from .main import include_auth as _f
 
         return _f
     if name == "get_fastapi_users":
