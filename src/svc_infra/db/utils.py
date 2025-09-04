@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import os
-import asyncio
+import os, asyncio
+from sqlalchemy import inspect
 from pathlib import Path
 from typing import Any, Optional, Sequence, Union, TYPE_CHECKING
+from alembic.config import Config
 
 from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
@@ -29,6 +30,33 @@ try:
 except Exception:  # pragma: no cover - optional env
     _create_engine = None  # type: ignore
 
+
+def prepare_process_env(
+        project_root: Path | str,
+        discover_packages: Optional[Sequence[str]] = None,
+        database_url: Optional[str] = None,
+) -> None:
+    """Make Alembic runs self-contained (no shell exports needed)."""
+    root = Path(project_root).resolve()
+
+    # Prevent app startup side-effects while env.py imports your package
+    os.environ.setdefault("SKIP_APP_INIT", "1")
+
+    # Make sure Alembic can import your code without PYTHONPATH hacks
+    # (env.py also inserts <project>/src, but this helps external callers too)
+    src_dir = root / "src"
+    if src_dir.exists():
+        sys_path = os.environ.get("PYTHONPATH", "")
+        parts = [str(src_dir)] + ([sys_path] if sys_path else [])
+        os.environ["PYTHONPATH"] = os.pathsep.join(parts)
+
+    # Bake discovery for this process
+    if discover_packages:
+        os.environ["ALEMBIC_DISCOVER_PACKAGES"] = ",".join(discover_packages)
+
+    # Provide DB URL if the caller passed it
+    if database_url and not os.getenv("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = database_url
 
 def _read_secret_from_file(path: str) -> Optional[str]:
     """Return file contents if path exists, else None."""
@@ -483,6 +511,46 @@ def ensure_database_exists(url: URL | str) -> None:
     except OperationalError as exc:  # pragma: no cover (depends on env)
         raise RuntimeError(f"Failed to connect to database: {exc}") from exc
 
+def repair_alembic_state_if_needed(cfg: Config) -> None:
+    """If DB points to a non-existent local revision, reset to base."""
+    db_url = cfg.get_main_option("sqlalchemy.url") or os.getenv("DATABASE_URL")
+    if not db_url:
+        return
+
+    # Collect local revision IDs
+    script_location = Path(cfg.get_main_option("script_location"))
+    versions_dir = script_location / "versions"
+    local_ids = set()
+    if versions_dir.exists():
+        for p in versions_dir.glob("*.py"):
+            try:
+                txt = p.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            for line in txt.splitlines():
+                line = line.strip()
+                if line.startswith("revision ="):
+                    rid = line.split("=", 1)[1].strip().strip("'\"")
+                    local_ids.add(rid)
+                    break
+
+    eng = build_engine(db_url)
+    try:
+        with eng.begin() as c:
+            insp = inspect(c)
+            has_version_tbl = insp.has_table("alembic_version")
+
+            rows = []
+            if has_version_tbl:
+                rows = c.execute(text("SELECT version_num FROM alembic_version")).fetchall()
+
+            missing = any((ver not in local_ids) for (ver,) in rows)
+
+            if missing:
+                # safest reset: drop version table, caller will autogen + upgrade
+                c.execute(text("DROP TABLE IF EXISTS alembic_version"))
+    finally:
+        eng.dispose()
 
 __all__ = [
     # env helpers
