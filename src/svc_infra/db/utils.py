@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import OperationalError
 
-from .constants import DEFAULT_DB_ENV_VARS, ASYNC_DRIVER_HINT
+from .constants import ASYNC_DRIVER_HINT
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine as SyncEngine
@@ -30,21 +30,124 @@ except Exception:  # pragma: no cover - optional env
     _create_engine = None  # type: ignore
 
 
+def _read_secret_from_file(path: str) -> Optional[str]:
+    """Return file contents if path exists, else None."""
+    try:
+        p = Path(path)
+        if p.exists():
+            return p.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+    return None
+
+def _compose_url_from_parts() -> Optional[str]:
+    """
+    Compose a SQLAlchemy URL from component env vars.
+    Supports private DNS hostnames and Unix sockets.
+
+    Recognized envs:
+      DB_DIALECT (default: postgresql), DB_DRIVER (optional, e.g. asyncpg, psycopg),
+      DB_HOST (hostname or Unix socket dir), DB_PORT,
+      DB_NAME, DB_USER, DB_PASSWORD,
+      DB_PARAMS (raw query string like 'sslmode=require&connect_timeout=5')
+    """
+    dialect = os.getenv("DB_DIALECT", "").strip() or "postgresql"
+    driver  = os.getenv("DB_DRIVER", "").strip()      # e.g. asyncpg, psycopg, pymysql, aiosqlite
+    host    = os.getenv("DB_HOST", "").strip() or None
+    port    = os.getenv("DB_PORT", "").strip() or None
+    db      = os.getenv("DB_NAME", "").strip() or None
+    user    = os.getenv("DB_USER", "").strip() or None
+    pwd     = os.getenv("DB_PASSWORD", "").strip() or None
+    params  = os.getenv("DB_PARAMS", "").strip() or ""
+
+    if not (host and db):
+        return None
+
+    # Build SQLAlchemy URL safely
+    drivername = f"{dialect}+{driver}" if driver else dialect
+    query = dict(q.split("=", 1) for q in params.split("&") if q) if params else {}
+
+    # URL.create handles unix socket paths when host begins with a slash
+    try:
+        url = URL.create(
+            drivername=drivername,
+            username=user or None,
+            password=pwd or None,
+            host=host if (host and not host.startswith("/")) else None,
+            port=int(port) if (port and port.isdigit()) else None,
+            database=db,
+            query=query,
+        )
+        # If host is a unix socket dir, place it in query as host param many drivers understand
+        if host and host.startswith("/"):
+            # e.g. for psycopg/psycopg2: host=/cloudsql/instance; for MySQL: unix_socket=/path
+            if "postgresql" in drivername:
+                url = url.set(query={**url.query, "host": host})
+            elif "mysql" in drivername:
+                url = url.set(query={**url.query, "unix_socket": host})
+        return str(url)
+    except Exception:
+        return None
+
+
 # ---------- Environment helpers ----------
 
-def get_database_url_from_env(required: bool = True, env_vars: Sequence[str] = DEFAULT_DB_ENV_VARS) -> str | None:
-    """Return the first non-empty database URL from environment.
-
-    Env precedence: DATABASE_URL, DB_URL (by default).
-    If required and none found, raises RuntimeError.
+def get_database_url_from_env(
+        required: bool = True,
+        env_vars: Sequence[str] = ("DATABASE_URL", "PRIVATE_DATABASE_URL", "DB_URL")
+) -> Optional[str]:
     """
+    Resolve the database connection string, with support for:
+      - Primary env vars: DATABASE_URL, PRIVATE_DATABASE_URL, DB_URL (in that order).
+      - Secret file pointers: <NAME>_FILE (reads file contents).
+      - Well-known locations: DATABASE_URL_FILE, /run/secrets/database_url.
+      - Composed from parts: DB_* (host, port, name, user, password, params).
+    This works for public or private networks—private DNS/socket addresses are just host strings.
+    """
+    # 1) Direct envs
     for key in env_vars:
         val = os.getenv(key)
         if val and val.strip():
-            return val.strip()
+            s = val.strip()
+            # Some platforms inject "file:" or path-like values—read them
+            if s.startswith("file:"):
+                s = s[5:]
+            if os.path.isabs(s) and Path(s).exists():
+                file_val = _read_secret_from_file(s)
+                if file_val:
+                    return file_val
+            return s
+
+        # Companion NAME_FILE secret path
+        file_key = f"{key}_FILE"
+        file_path = os.getenv(file_key)
+        if file_path:
+            file_val = _read_secret_from_file(file_path)
+            if file_val:
+                return file_val
+
+    # 2) Conventional secret envs
+    for file_key in ("DATABASE_URL_FILE",):
+        file_path = os.getenv(file_key)
+        if file_path:
+            file_val = _read_secret_from_file(file_path)
+            if file_val:
+                return file_val
+
+    # 3) Docker/K8s default secret mount
+    file_val = _read_secret_from_file("/run/secrets/database_url")
+    if file_val:
+        return file_val
+
+    # 4) Compose from parts (supports private DNS / unix sockets)
+    composed = _compose_url_from_parts()
+    if composed:
+        return composed
+
     if required:
         raise RuntimeError(
-            f"Database URL not set. Expect one of {', '.join(env_vars)} to be defined in environment."
+            "Database URL not set. Set DATABASE_URL (or PRIVATE_DATABASE_URL / DB_URL), "
+            "or provide DB_* parts (DB_HOST, DB_NAME, etc.), or a *_FILE secret."
         )
     return None
 
@@ -69,12 +172,18 @@ def with_database(url: URL | str, database: Optional[str]) -> URL:
 # ---------- Engine creation ----------
 
 def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
+    """Create a SQLAlchemy Engine or AsyncEngine based on the URL.
+
+    - If the URL uses an async driver, returns an AsyncEngine (requires async extras installed).
+    - Otherwise returns a sync Engine.
+    - Pass `echo=True` to enable SQL echoing.
+    """
     u = make_url(url) if isinstance(url, str) else url
     if is_async_url(u):
-        if _create_async_engine is None:
+        create_async = _create_async_engine
+        if create_async is None:
             raise RuntimeError("Async driver URL provided but SQLAlchemy async extras are not available.")
-        assert _create_async_engine is not None  # for type-checkers
-        return _create_async_engine(u, echo=echo, pool_pre_ping=True)
+        return create_async(u, echo=echo, pool_pre_ping=True)
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
     assert _create_engine is not None  # for type-checkers
