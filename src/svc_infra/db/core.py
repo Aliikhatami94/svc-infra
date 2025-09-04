@@ -16,7 +16,8 @@ from .utils import (
     is_async_url,
     build_engine,
     ensure_database_exists,
-    prepare_process_env, repair_alembic_state_if_needed
+    prepare_process_env,
+    repair_alembic_state_if_needed
 )
 
 # ---------- Alembic env.py renderers ----------
@@ -50,13 +51,23 @@ if prepend:
         if s not in sys.path:
             sys.path.insert(0, s)
 
-# Discover metadata from packages
+# Discover metadata from packages, but prefer the central ModelBase first
 DISCOVER_PACKAGES: list[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
+    # 0) Prefer svc_infra.db.base.ModelBase.metadata if available
+    try:
+        from svc_infra.db.base import ModelBase  # type: ignore
+        md = getattr(ModelBase, "metadata", None)
+        if md is not None and hasattr(md, "tables") and md.tables:
+            return [md]
+    except Exception as e:
+        logger.debug("ModelBase not available or empty: %s", e)
+
+    # 1) Fallback: discover across packages (your existing logic)
     import importlib, pkgutil, pathlib
     found: list[object] = []
 
@@ -65,10 +76,8 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    # Base package list
     pkgs = list(DISCOVER_PACKAGES)
 
-    # Fallback discovery if none specified: scan <project_root> and <project_root>/src
     if not pkgs:
         roots = []
         if prepend:
@@ -81,7 +90,6 @@ def _collect_metadata() -> list[object]:
                 if p.is_dir() and (p / "__init__.py").exists():
                     pkgs.append(p.name)
 
-    # Import packages and harvest metadata
     for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
@@ -89,13 +97,11 @@ def _collect_metadata() -> list[object]:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
-        # 1) Package root (supports __init__.py exposing Base/metadata)
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        # 2) Common submodules
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -106,7 +112,6 @@ def _collect_metadata() -> list[object]:
             except Exception:
                 pass
 
-        # 3) Walk likely modules under the package
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
@@ -122,7 +127,6 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # Deduplicate by identity
     uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
@@ -132,7 +136,6 @@ def _collect_metadata() -> list[object]:
 
 target_metadata = _collect_metadata()
 
-# Prefer env var DATABASE_URL; alembic.ini is only for offline fallback
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
     config.set_main_option("sqlalchemy.url", env_db_url)
@@ -205,13 +208,22 @@ if prepend:
         if s not in sys.path:
             sys.path.insert(0, s)
 
-# Discover metadata from packages
 DISCOVER_PACKAGES: list[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
+    # 0) Prefer ModelBase.metadata
+    try:
+        from svc_infra.db.base import ModelBase  # type: ignore
+        md = getattr(ModelBase, "metadata", None)
+        if md is not None and hasattr(md, "tables") and md.tables:
+            return [md]
+    except Exception as e:
+        logger.debug("ModelBase not available or empty: %s", e)
+
+    # 1) Fallback discovery (same as sync)
     import importlib, pkgutil, pathlib
     found: list[object] = []
 
@@ -220,10 +232,7 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    # Base package list
     pkgs = list(DISCOVER_PACKAGES)
-
-    # Fallback discovery if none specified: scan <project_root> and <project_root>/src
     if not pkgs:
         roots = []
         if prepend:
@@ -236,7 +245,6 @@ def _collect_metadata() -> list[object]:
                 if p.is_dir() and (p / "__init__.py").exists():
                     pkgs.append(p.name)
 
-    # Import packages and harvest metadata
     for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
@@ -244,13 +252,11 @@ def _collect_metadata() -> list[object]:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
-        # 1) Package root
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        # 2) Common submodules
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -261,7 +267,6 @@ def _collect_metadata() -> list[object]:
             except Exception:
                 pass
 
-        # 3) Walk likely modules
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
@@ -277,7 +282,6 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # Deduplicate by identity
     uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
@@ -287,7 +291,6 @@ def _collect_metadata() -> list[object]:
 
 target_metadata = _collect_metadata()
 
-# Prefer env var DATABASE_URL if present
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
     config.set_main_option("sqlalchemy.url", env_db_url)
@@ -311,7 +314,6 @@ async def run_migrations_online() -> None:
     await connectable.dispose()
 
 if context.is_offline_mode():
-    # Async template only supports online mode.
     raise SystemExit("Run offline migrations with a sync env.py or set offline to False.")
 else:
     import asyncio as _asyncio

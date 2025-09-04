@@ -7,13 +7,12 @@ from sqlalchemy import (
     String, Boolean, DateTime, JSON, Text, func, UniqueConstraint, Index
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict, MutableList  # <-- add
 
-class Base(DeclarativeBase):
-    pass
+from svc_infra.db.base import ModelBase
 
-class User(Base):
+class User(ModelBase):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
