@@ -57,7 +57,6 @@ formatter = generic
 format = %(levelname)-5.5s [%(name)s] %(message)s
 """
 
-# Default Mako template for new revisions, if alembic doesn't provide one locally
 ALEMBIC_SCRIPT_TEMPLATE = '''"""${message}
 
 Revision ID: ${up_revision}
@@ -67,6 +66,7 @@ Create Date: ${create_date}
 
 from alembic import op
 import sqlalchemy as sa
+${imports if imports else ""}
 
 # revision identifiers, used by Alembic.
 revision = ${repr(up_revision)}
@@ -75,10 +75,10 @@ branch_labels = ${repr(branch_labels)}
 depends_on = ${repr(depends_on)}
 
 def upgrade() -> None:
-    pass
+    ${upgrades if upgrades else "pass"}
 
 def downgrade() -> None:
-    pass
+    ${downgrades if downgrades else "pass"}
 '''
 
 __all__ = [

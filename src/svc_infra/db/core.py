@@ -323,21 +323,23 @@ else:
 # ---------- Alembic init ----------
 
 def init_alembic(
-    project_root: Path | str,
-    *,
-    script_location: str = "migrations",
-    async_db: bool = False,
-    discover_packages: Optional[Sequence[str]] = None,
-    overwrite: bool = False,
+        project_root: Path | str,
+        *,
+        script_location: str = "migrations",
+        async_db: bool = False,
+        discover_packages: Optional[Sequence[str]] = None,
+        overwrite: bool = False,
 ) -> Path:
     """Initialize Alembic in the target project directory.
 
     - Creates alembic.ini (or overwrites if requested).
     - Creates migrations/ with env.py and versions/.
-    - env.py will read DATABASE_URL from environment at runtime, and
-      discover model metadata from the provided packages or ALEMBIC_DISCOVER_PACKAGES.
+    - Ensures a correct script.py.mako (auto-fixes legacy 'pass'-only templates).
+    - env.py will read DATABASE_URL at runtime and discover metadata from
+      provided packages or ALEMBIC_DISCOVER_PACKAGES.
 
-    Returns the Path to the created migrations directory.
+    Returns:
+        Path to the created migrations directory.
     """
     root = Path(project_root).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -345,7 +347,6 @@ def init_alembic(
     migrations_dir = root / script_location
     versions_dir = migrations_dir / "versions"
 
-    # Create alembic.ini
     alembic_ini = root / "alembic.ini"
     sqlalchemy_url = os.getenv("DATABASE_URL", "")
     dialect_name = (make_url(sqlalchemy_url).get_backend_name() if sqlalchemy_url else "")
@@ -359,28 +360,38 @@ def init_alembic(
     else:
         alembic_ini.write_text(ini_contents, encoding="utf-8")
 
-    # Create migrations structure
     migrations_dir.mkdir(parents=True, exist_ok=True)
     versions_dir.mkdir(parents=True, exist_ok=True)
 
-    # Ensure a local Alembic revision template exists for mako
     script_template = migrations_dir / "script.py.mako"
-    if overwrite or not script_template.exists():
+    need_template_write = overwrite or not script_template.exists()
+    if not need_template_write and script_template.exists():
+        try:
+            current = script_template.read_text(encoding="utf-8")
+            # If the template doesn't have the standard Mako slots, rewrite it.
+            if ("${upgrades" not in current) or ("${downgrades" not in current):
+                need_template_write = True
+        except Exception:
+            need_template_write = True
+
+    if need_template_write:
         script_template.write_text(ALEMBIC_SCRIPT_TEMPLATE, encoding="utf-8")
 
-    # Render env.py
     pkgs = list(discover_packages or [])
     if not pkgs:
-        # Common default; user can override via ALEMBIC_DISCOVER_PACKAGES
-        # Keep empty to avoid import errors by default
         pkgs = []
 
-    env_py = _render_env_py_async(pkgs) if async_db else _render_env_py(pkgs)
+    env_py_text = _render_env_py_async(pkgs) if async_db else _render_env_py(pkgs)
     env_path = migrations_dir / "env.py"
     if env_path.exists() and not overwrite:
-        pass
+        try:
+            existing = env_path.read_text(encoding="utf-8")
+            if "DISCOVER_PACKAGES:" not in existing:
+                env_path.write_text(env_py_text, encoding="utf-8")
+        except Exception:
+            env_path.write_text(env_py_text, encoding="utf-8")
     else:
-        env_path.write_text(env_py, encoding="utf-8")
+        env_path.write_text(env_py_text, encoding="utf-8")
 
     return migrations_dir
 
