@@ -4,10 +4,10 @@
   "private": true,
   "bin": {
     "auth-infra-mcp": "mcp-shim/bin/auth-infra-mcp.js",
-    "db-management-mcp": "mcp-shim/bin/db-management-mcp.js"
+    "db-infra-mcp": "mcp-shim/bin/db-infra-mcp.js"
   },
   "scripts": {
     "auth-mcp": "node mcp-shim/bin/auth-infra-mcp.js",
-    "db-mcp": "node mcp-shim/bin/db-management-mcp.js"
+    "db-mcp": "node mcp-shim/bin/db-infra-mcp.js"
   }
 }

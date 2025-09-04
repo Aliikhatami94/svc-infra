@@ -27,7 +27,7 @@ Prerequisites:
 
 Run locally from this repo:
 - ./mcp-shim/bin/auth-infra-mcp.js
-- ./mcp-shim/bin/db-management-mcp.js
+- ./mcp-shim/bin/db-infra-mcp.js
 
 Notes:
 - The shims default to repo https://github.com/Aliikhatami94/svc-infra.git at ref "main". Override with env vars:
