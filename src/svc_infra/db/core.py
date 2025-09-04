@@ -293,6 +293,22 @@ def revision(
     version_path: str | None = None,
     sql: bool = False,
 ) -> None:
+    """Create a new Alembic revision.
+
+    Uses alembic.ini under project_root (created by init_alembic). Respects the
+    DATABASE_URL environment variable if set, which overrides sqlalchemy.url.
+    When autogenerate=True, Alembic compares discovered model metadata to the
+    current database to produce a migration script.
+
+    Args:
+        project_root: Directory containing alembic.ini and the migrations/ folder.
+        message: Human-readable message for the revision.
+        autogenerate: If True, autogenerate operations based on model diffs.
+        head: Base revision to branch from (default "head").
+        branch_label: Optional branch label for the new revision.
+        version_path: Optional versions subfolder to place the revision in.
+        sql: If True, don't write files; emit SQL to stdout instead.
+    """
     cfg = _build_alembic_config(project_root)
     command.revision(
         cfg,
@@ -306,31 +322,69 @@ def revision(
 
 
 def upgrade(project_root: Path | str, revision_target: str = "head") -> None:
+    """Apply migrations forward to the specified revision.
+
+    Args:
+        project_root: Directory containing alembic.ini and migrations/.
+        revision_target: Target revision identifier (e.g. "head", "ae1027a7acf").
+    """
     cfg = _build_alembic_config(project_root)
     command.upgrade(cfg, revision_target)
 
 
 def downgrade(project_root: Path | str, revision_target: str = "-1") -> None:
+    """Revert migrations down to the specified revision or relative step.
+
+    Args:
+        project_root: Directory containing alembic.ini and migrations/.
+        revision_target: Target revision identifier or relative step (e.g. "-1").
+    """
     cfg = _build_alembic_config(project_root)
     command.downgrade(cfg, revision_target)
 
 
 def current(project_root: Path | str, verbose: bool = False) -> None:
+    """Print the current database revision(s).
+
+    Args:
+        project_root: Directory containing alembic.ini and migrations/.
+        verbose: If True, include detailed revision information.
+    """
     cfg = _build_alembic_config(project_root)
     command.current(cfg, verbose=verbose)
 
 
 def history(project_root: Path | str, verbose: bool = False) -> None:
+    """Show the migration history for this project.
+
+    Args:
+        project_root: Directory containing alembic.ini and migrations/.
+        verbose: If True, include down revisions, timestamps, and messages.
+    """
     cfg = _build_alembic_config(project_root)
     command.history(cfg, verbose=verbose)
 
 
 def stamp(project_root: Path | str, revision_target: str = "head") -> None:
+    """Set the current database revision without running migrations.
+
+    Useful for marking an existing database as up-to-date.
+
+    Args:
+        project_root: Directory containing alembic.ini and migrations/.
+        revision_target: Target revision identifier (e.g. "head").
+    """
     cfg = _build_alembic_config(project_root)
     command.stamp(cfg, revision_target)
 
 
 def merge_heads(project_root: Path | str, message: Optional[str] = None) -> None:
+    """Create a merge revision that joins multiple migration heads.
+
+    Args:
+        project_root: Directory containing alembic.ini and migrations/.
+        message: Optional message to use for the merge revision.
+    """
     cfg = _build_alembic_config(project_root)
     command.merge(cfg, "heads", message=message)
 
