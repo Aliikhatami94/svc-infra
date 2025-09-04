@@ -9,6 +9,7 @@ from .core import (
     history,
     stamp,
     merge_heads,
+    setup_and_migrate,
 )
 
 mcp = mcp_from_functions(
@@ -22,6 +23,7 @@ mcp = mcp_from_functions(
         history,
         stamp,
         merge_heads,
+        setup_and_migrate
     ])
 
 def main():
