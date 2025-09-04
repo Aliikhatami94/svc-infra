@@ -27,13 +27,9 @@ def _render_env_py(packages: Sequence[str]) -> str:
 from __future__ import annotations
 import os
 import logging
-from importlib import import_module
-from typing import Iterable, List
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Connection
 
 # Load logging configuration from alembic.ini
 config = context.config
@@ -42,14 +38,26 @@ if config.config_file_name is not None:
     logging.config.fileConfig(config.config_file_name)
 logger = logging.getLogger(__name__)
 
+# --- sys.path bootstrap for src-layout projects ---
+import sys, pathlib
+prepend = config.get_main_option("prepend_sys_path") or ""
+if prepend:
+    if prepend not in sys.path:
+        sys.path.insert(0, prepend)
+    src_path = pathlib.Path(prepend) / "src"
+    if src_path.exists():
+        s = str(src_path)
+        if s not in sys.path:
+            sys.path.insert(0, s)
+
 # Discover metadata from packages
-DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
+DISCOVER_PACKAGES: list[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    import importlib, pkgutil, sys, os, pathlib
+    import importlib, pkgutil, pathlib
     found: list[object] = []
 
     def _maybe_add(obj: object) -> None:
@@ -57,16 +65,23 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
+    # Base package list
     pkgs = list(DISCOVER_PACKAGES)
 
-    # Fallback: if no packages provided, scan <prepend_sys_path>/src for top-level pkgs
-    prepend = config.get_main_option("prepend_sys_path") or ""
-    src = pathlib.Path(prepend) / "src"
-    if not pkgs and src.exists():
-        for p in src.iterdir():
-            if p.is_dir() and (p / "__init__.py").exists():
-                pkgs.append(p.name)
+    # Fallback discovery if none specified: scan <project_root> and <project_root>/src
+    if not pkgs:
+        roots = []
+        if prepend:
+            roots.append(pathlib.Path(prepend))
+            roots.append(pathlib.Path(prepend) / "src")
+        for root in roots:
+            if not root or not root.exists():
+                continue
+            for p in root.iterdir():
+                if p.is_dir() and (p / "__init__.py").exists():
+                    pkgs.append(p.name)
 
+    # Import packages and harvest metadata
     for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
@@ -74,13 +89,13 @@ def _collect_metadata() -> list[object]:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
-        # package root (supports __init__.py exposing metadata/Base)
+        # 1) Package root (supports __init__.py exposing Base/metadata)
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        # common submodules
+        # 2) Common submodules
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -91,7 +106,7 @@ def _collect_metadata() -> list[object]:
             except Exception:
                 pass
 
-        # walk likely modules
+        # 3) Walk likely modules under the package
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
@@ -107,21 +122,20 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # dedupe by identity
+    # Deduplicate by identity
     uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
             seen.add(id(md))
             uniq.append(md)
     return uniq
-    
+
 target_metadata = _collect_metadata()
 
-# Determine URL: prefer env var DATABASE_URL else alembic.ini sqlalchemy.url
+# Prefer env var DATABASE_URL; alembic.ini is only for offline fallback
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
     config.set_main_option("sqlalchemy.url", env_db_url)
-
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -136,7 +150,6 @@ def run_migrations_offline() -> None:
     )
     with context.begin_transaction():
         context.run_migrations()
-
 
 def run_migrations_online() -> None:
     connectable = engine_from_config(
@@ -180,6 +193,18 @@ if config.config_file_name is not None:
     logging.config.fileConfig(config.config_file_name)
 logger = logging.getLogger(__name__)
 
+# --- sys.path bootstrap for src-layout projects ---
+import sys, pathlib
+prepend = config.get_main_option("prepend_sys_path") or ""
+if prepend:
+    if prepend not in sys.path:
+        sys.path.insert(0, prepend)
+    src_path = pathlib.Path(prepend) / "src"
+    if src_path.exists():
+        s = str(src_path)
+        if s not in sys.path:
+            sys.path.insert(0, s)
+
 # Discover metadata from packages
 DISCOVER_PACKAGES: list[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
@@ -187,7 +212,7 @@ if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    import importlib, pkgutil, sys, os, pathlib
+    import importlib, pkgutil, pathlib
     found: list[object] = []
 
     def _maybe_add(obj: object) -> None:
@@ -195,16 +220,23 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
+    # Base package list
     pkgs = list(DISCOVER_PACKAGES)
 
-    # Fallback: if no packages provided, scan <prepend_sys_path>/src for top-level pkgs
-    prepend = config.get_main_option("prepend_sys_path") or ""
-    src = pathlib.Path(prepend) / "src"
-    if not pkgs and src.exists():
-        for p in src.iterdir():
-            if p.is_dir() and (p / "__init__.py").exists():
-                pkgs.append(p.name)
+    # Fallback discovery if none specified: scan <project_root> and <project_root>/src
+    if not pkgs:
+        roots = []
+        if prepend:
+            roots.append(pathlib.Path(prepend))
+            roots.append(pathlib.Path(prepend) / "src")
+        for root in roots:
+            if not root or not root.exists():
+                continue
+            for p in root.iterdir():
+                if p.is_dir() and (p / "__init__.py").exists():
+                    pkgs.append(p.name)
 
+    # Import packages and harvest metadata
     for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
@@ -212,13 +244,13 @@ def _collect_metadata() -> list[object]:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
-        # package root (supports __init__.py exposing metadata/Base)
+        # 1) Package root
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        # common submodules
+        # 2) Common submodules
         for subname in ("models",):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
@@ -229,7 +261,7 @@ def _collect_metadata() -> list[object]:
             except Exception:
                 pass
 
-        # walk likely modules
+        # 3) Walk likely modules
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
@@ -245,7 +277,7 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # dedupe by identity
+    # Deduplicate by identity
     uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
