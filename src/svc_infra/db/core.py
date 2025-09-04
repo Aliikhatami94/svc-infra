@@ -47,47 +47,104 @@ ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
-def _collect_metadata() -> List[object]:
-    metadata = []
-    for pkg in DISCOVER_PACKAGES:
+def _collect_metadata() -> list[object]:
+    import importlib
+    import pkgutil
+    found: list[object] = []
+    
+    def _maybe_add(obj: object) -> None:
+        # Accept MetaData directly, or declarative Base with .metadata
+        md = getattr(obj, "metadata", None) or obj
+        if hasattr(md, "tables") and hasattr(md, "schema"):
+            found.append(md)
+    
+    for pkg_name in DISCOVER_PACKAGES:
         try:
-            mod = import_module(pkg)
-        except Exception as e:  # pragma: no cover
-            logger.debug("Failed to import %s: %s", pkg, e)
+            pkg = importlib.import_module(pkg_name)
+        except Exception as e:
+            logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
-        # Common conventions
+    
+        # 1) Try the package root (works if they export Base/metadata at __init__.py)
         for attr in ("metadata", "MetaData", "Base", "base"):
-            obj = getattr(mod, attr, None)
-            if obj is None:
-                # try nested models submodule
-                try:
-                    sub = import_module(f"{pkg}.models")
+            obj = getattr(pkg, attr, None)
+            if obj is not None:
+                _maybe_add(obj)
+    
+        # 2) Also try a common 'models' submodule explicitly
+        for subname in ("models",):
+            try:
+                sub = importlib.import_module(f"{pkg_name}.{subname}")
+                for attr in ("metadata", "MetaData", "Base", "base"):
                     obj = getattr(sub, attr, None)
-                except Exception:
-                    obj = None
-            if obj is None:
+                    if obj is not None:
+                        _maybe_add(obj)
+            except Exception:
+                pass
+    
+        # 3) Walk the whole package tree and look in every module
+        mod_path = getattr(pkg, "__path__", None)
+        if not mod_path:
+            continue  # not a package (single module), nothing to walk
+    
+        for finder, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
+            # Only peek into modules that are likely to contain models
+            if ispkg:
                 continue
-            md = getattr(obj, "metadata", None) or obj
-            # If it's a declarative Base, extract .metadata
-            if hasattr(md, "tables") and hasattr(md, "schema"):  # rough check for MetaData
-                metadata.append(md)
-    return metadata
-
+            if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
+                # keep it cheap; adjust heuristics if needed
+                continue
+            try:
+                mod = importlib.import_module(name)
+            except Exception:
+                continue
+            for attr in ("metadata", "MetaData", "Base", "base"):
+                obj = getattr(mod, attr, None)
+                if obj is not None:
+                    _maybe_add(obj)
+    
+    # Deduplicate by object id to avoid repeats
+    uniq: list[object] = []
+    seen = set()
+    for md in found:
+        if id(md) not in seen:
+            seen.add(id(md))
+            uniq.append(md)
+    return uniq
+    
 target_metadata = _collect_metadata()
 
 # Determine URL: prefer env var DATABASE_URL else alembic.ini sqlalchemy.url
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
-    config.set_main_option("sqlalchemy.url", env_db_url)
+config.set_main_option("sqlalchemy.url", env_db_url)
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+url = config.get_main_option("sqlalchemy.url")
+context.configure(
+    url=url,
+    target_metadata=target_metadata,
+    literal_binds=True,
+    dialect_opts={"paramstyle": "named"},
+    compare_type=True,
+    compare_server_default=True,
+    include_schemas=True,
+)
+with context.begin_transaction():
+    context.run_migrations()
+
+
+def run_migrations_online() -> None:
+connectable = engine_from_config(
+    config.get_section(config.config_ini_section, {}),
+    prefix="sqlalchemy.",
+    poolclass=pool.NullPool,
+)
+with connectable.connect() as connection:
     context.configure(
-        url=url,
+        connection=connection,
         target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
         include_schemas=True,
@@ -95,28 +152,10 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
-
-def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            compare_server_default=True,
-            include_schemas=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
-
 if context.is_offline_mode():
-    run_migrations_offline()
+run_migrations_offline()
 else:
-    run_migrations_online()
+run_migrations_online()
 """
     return tpl.replace("__PACKAGES_LIST__", packages_list)
 
@@ -282,34 +321,48 @@ def _build_alembic_config(project_root: Path | str, script_location: str = "migr
     cfg.set_main_option("prepend_sys_path", str(root))
     return cfg
 
+def _ensure_db_at_head(cfg: Config) -> None:
+    """
+    Bring the target database up to the current head if it's behind.
+    Alembic raises 'Target database is not up to date' during autogenerate
+    when the DB isn't at head; this preflight avoids that.
+    """
+    # This is idempotent if already at head.
+    command.upgrade(cfg, "head")
 
 def revision(
-    project_root: Path | str,
-    message: str,
-    *,
-    autogenerate: bool = False,
-    head: str | None = "head",
-    branch_label: str | None = None,
-    version_path: str | None = None,
-    sql: bool = False,
+        project_root: Path | str,
+        message: str,
+        *,
+        autogenerate: bool = False,
+        head: str | None = "head",
+        branch_label: str | None = None,
+        version_path: str | None = None,
+        sql: bool = False,
+        ensure_head_before_autogenerate: bool = True,
 ) -> None:
-    """Create a new Alembic revision.
+    """
+    Create a new Alembic revision.
 
-    Uses alembic.ini under project_root (created by init_alembic). Respects the
-    DATABASE_URL environment variable if set, which overrides sqlalchemy.url.
-    When autogenerate=True, Alembic compares discovered model metadata to the
-    current database to produce a migration script.
-
-    Args:
-        project_root: Directory containing alembic.ini and the migrations/ folder.
-        message: Human-readable message for the revision.
-        autogenerate: If True, autogenerate operations based on model diffs.
-        head: Base revision to branch from (default "head").
-        branch_label: Optional branch label for the new revision.
-        version_path: Optional versions subfolder to place the revision in.
-        sql: If True, don't write files; emit SQL to stdout instead.
+    If autogenerate=True and ensure_head_before_autogenerate=True (default),
+    we first upgrade the database to head so Alembic can diff models
+    against the *current* DB state without failing.
     """
     cfg = _build_alembic_config(project_root)
+
+    if autogenerate and ensure_head_before_autogenerate:
+        # Make sure DATABASE_URL is present; Alembic relies on it via env.py
+        db_url = cfg.get_main_option("sqlalchemy.url")
+        if not db_url:
+            # Try env var (env.py will also do this, but be explicit here)
+            db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            raise RuntimeError(
+                "DATABASE_URL is not set and sqlalchemy.url is empty. "
+                "Set DATABASE_URL before creating an autogenerated revision."
+            )
+        _ensure_db_at_head(cfg)
+
     command.revision(
         cfg,
         message=message,
