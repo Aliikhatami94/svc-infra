@@ -1,3 +1,129 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Optional, List
+
 import typer
 
+from .core import (
+    init_alembic as core_init_alembic,
+    revision as core_revision,
+    upgrade as core_upgrade,
+    downgrade as core_downgrade,
+    current as core_current,
+    history as core_history,
+    stamp as core_stamp,
+    merge_heads as core_merge_heads,
+)
+
 app = typer.Typer(no_args_is_help=True, add_completion=False)
+
+
+def _apply_database_url(database_url: Optional[str]) -> None:
+    if database_url:
+        os.environ["DATABASE_URL"] = database_url
+
+
+@app.command("init")
+def init(
+    project_root: Path = typer.Option(Path("."), exists=False, file_okay=False, dir_okay=True, resolve_path=True, help="Project root where alembic.ini and migrations/ will be created."),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env DATABASE_URL for this command."),
+    async_db: bool = typer.Option(False, help="Generate async Alembic env.py (for async drivers)."),
+    discover_packages: Optional[List[str]] = typer.Option(None, help="Packages to search for SQLAlchemy metadata; may pass multiple."),
+    overwrite: bool = typer.Option(False, help="Overwrite existing files if present."),
+):
+    _apply_database_url(database_url)
+    core_init_alembic(
+        project_root=project_root,
+        async_db=async_db,
+        discover_packages=discover_packages,
+        overwrite=overwrite,
+    )
+
+
+@app.command()
+def revision(
+    message: str = typer.Option(..., "-m", "--message", help="Revision message."),
+    project_root: Path = typer.Option(Path("."), help="Project root with alembic.ini.", resolve_path=True),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
+    autogenerate: bool = typer.Option(False, help="Autogenerate migrations by comparing metadata."),
+    head: Optional[str] = typer.Option("head", help="Set the head to base this revision on."),
+    branch_label: Optional[str] = typer.Option(None, help="Branch label."),
+    version_path: Optional[str] = typer.Option(None, help="Alternative versions/ path."),
+    sql: bool = typer.Option(False, help="Don't generate Python; dump SQL to stdout."),
+):
+    _apply_database_url(database_url)
+    core_revision(
+        project_root=project_root,
+        message=message,
+        autogenerate=autogenerate,
+        head=head,
+        branch_label=branch_label,
+        version_path=version_path,
+        sql=sql,
+    )
+
+
+@app.command()
+def upgrade(
+    revision_target: str = typer.Argument("head", help="Target revision (default head)."),
+    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
+):
+    _apply_database_url(database_url)
+    core_upgrade(project_root=project_root, revision_target=revision_target)
+
+
+@app.command()
+def downgrade(
+    revision_target: str = typer.Argument("-1", help="Target revision (default -1)."),
+    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
+):
+    _apply_database_url(database_url)
+    core_downgrade(project_root=project_root, revision_target=revision_target)
+
+
+@app.command()
+def current(
+    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
+    verbose: bool = typer.Option(False, help="Verbose output."),
+):
+    _apply_database_url(database_url)
+    core_current(project_root=project_root, verbose=verbose)
+
+
+@app.command()
+def history(
+    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
+    verbose: bool = typer.Option(False, help="Verbose output."),
+):
+    _apply_database_url(database_url)
+    core_history(project_root=project_root, verbose=verbose)
+
+
+@app.command()
+def stamp(
+    revision_target: str = typer.Argument("head"),
+    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
+):
+    _apply_database_url(database_url)
+    core_stamp(project_root=project_root, revision_target=revision_target)
+
+
+@app.command("merge-heads")
+def merge_heads(
+    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
+    message: Optional[str] = typer.Option(None, "-m", "--message", help="Merge revision message."),
+):
+    _apply_database_url(database_url)
+    core_merge_heads(project_root=project_root, message=message)
+
+
+if __name__ == "__main__":
+    app()
