@@ -47,8 +47,13 @@ authlib = "^1.6.2"
 httpx-oauth = "^0.16.1"
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 email-validator = "^2.2.0"
+
+# Database drivers
 asyncpg = "^0.30.0"
 aiosqlite = "^0.20.0"
+psycopg2-binary = "^2.9.9"
+
+# Other infra deps
 mcp = "^1.13.0"
 ai-infra = "^0.1.29"
 

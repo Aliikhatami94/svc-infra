@@ -34,29 +34,28 @@ except Exception:  # pragma: no cover - optional env
 def prepare_process_env(
         project_root: Path | str,
         discover_packages: Optional[Sequence[str]] = None,
-        database_url: Optional[str] = None,
 ) -> None:
-    """Make Alembic runs self-contained (no shell exports needed)."""
-    root = Path(project_root).resolve()
+    """
+    Prepare process environment so Alembic can import the project cleanly.
 
-    # Prevent app startup side-effects while env.py imports your package
+    Notes:
+        - Does NOT set DATABASE_URL (expect it to be set in your .env / environment).
+        - Discovery is automatic via env.py. 'discover_packages' is kept for
+          backward-compat only; prefer leaving it None.
+    """
+    root = Path(project_root).resolve()
     os.environ.setdefault("SKIP_APP_INIT", "1")
 
-    # Make sure Alembic can import your code without PYTHONPATH hacks
-    # (env.py also inserts <project>/src, but this helps external callers too)
+    # Make <project>/src importable (env.py also handles this defensively)
     src_dir = root / "src"
     if src_dir.exists():
         sys_path = os.environ.get("PYTHONPATH", "")
         parts = [str(src_dir)] + ([sys_path] if sys_path else [])
         os.environ["PYTHONPATH"] = os.pathsep.join(parts)
 
-    # Bake discovery for this process
+    # Optional override (discouraged—automatic discovery is preferred)
     if discover_packages:
         os.environ["ALEMBIC_DISCOVER_PACKAGES"] = ",".join(discover_packages)
-
-    # Provide DB URL if the caller passed it
-    if database_url and not os.getenv("DATABASE_URL"):
-        os.environ["DATABASE_URL"] = database_url
 
 def _read_secret_from_file(path: str) -> Optional[str]:
     """Return file contents if path exists, else None."""

@@ -332,13 +332,12 @@ def init_alembic(
         discover_packages: Optional[Sequence[str]] = None,
         overwrite: bool = False,
 ) -> Path:
-    """Initialize Alembic in the target project directory.
+    """
+    Initialize alembic.ini + migrations/ scaffold.
 
-    - Creates alembic.ini (or overwrites if requested).
-    - Creates migrations/ with env.py and versions/.
-    - Ensures a correct script.py.mako (auto-fixes legacy 'pass'-only templates).
-    - env.py will read DATABASE_URL at runtime and discover metadata from
-      provided packages or ALEMBIC_DISCOVER_PACKAGES.
+    Example:
+        >>> # DATABASE_URL from env; discovery via ModelBase or fallback scan
+        >>> init_alembic(".", async_db=False, overwrite=False)
 
     Returns:
         Path to the created migrations directory.
@@ -400,18 +399,22 @@ def init_alembic(
 
 # ---------- Alembic command helpers ----------
 
-
-def _build_alembic_config(project_root: Path | str, script_location: str = "migrations", database_url: Optional[str] = None) -> Config:
+def _build_alembic_config(
+        project_root: Path | str,
+        script_location: str = "migrations",
+) -> Config:
+    """Build Alembic Config based on files + environment."""
     root = Path(project_root).resolve()
     cfg_path = root / "alembic.ini"
     cfg = Config(str(cfg_path)) if cfg_path.exists() else Config()
     cfg.set_main_option("script_location", str((root / script_location).resolve()))
-    db_url = database_url or get_database_url_from_env(required=False) or cfg.get_main_option("sqlalchemy.url")
-    if db_url:
-        cfg.set_main_option("sqlalchemy.url", db_url)
-    # make Alembic interpret prepend_sys_path using os.pathsep (":" on *nix, ";" on Windows)
+
+    # Respect env if set (env.py also prefers env at runtime)
+    env_db_url = os.getenv("DATABASE_URL", "").strip()
+    if env_db_url:
+        cfg.set_main_option("sqlalchemy.url", env_db_url)
+
     cfg.set_main_option("path_separator", "os")
-    # keep your convenience sys.path entry
     cfg.set_main_option("prepend_sys_path", str(root))
     return cfg
 
@@ -434,24 +437,24 @@ def revision(
         version_path: str | None = None,
         sql: bool = False,
         ensure_head_before_autogenerate: bool = True,
-        database_url: Optional[str] = None,            # <--- NEW
-        discover_packages: Optional[Sequence[str]] = None,  # <--- NEW
 ) -> None:
     """
     Create a new Alembic revision.
 
-    If autogenerate=True and ensure_head_before_autogenerate=True (default),
-    we first upgrade the database to head so Alembic can diff models
-    against the *current* DB state without failing.
+    Example (autogenerate):
+        >>> revision(".", "add orders", autogenerate=True)
+
+    Requirements:
+        - DATABASE_URL must be set in the environment.
+        - Model discovery is automatic (prefers ModelBase.metadata).
     """
-    prepare_process_env(project_root, discover_packages, database_url)
-    cfg = _build_alembic_config(project_root, database_url=database_url)
+    prepare_process_env(project_root)  # no URL/pkgs
+    cfg = _build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
 
     if autogenerate and ensure_head_before_autogenerate:
-        db_url = cfg.get_main_option("sqlalchemy.url") or os.getenv("DATABASE_URL")
-        if not db_url:
-            raise RuntimeError("DATABASE_URL is not set and sqlalchemy.url is empty.")
+        if not (cfg.get_main_option("sqlalchemy.url") or os.getenv("DATABASE_URL")):
+            raise RuntimeError("DATABASE_URL is not set.")
         _ensure_db_at_head(cfg)
 
     command.revision(
@@ -464,21 +467,20 @@ def revision(
         sql=sql,
     )
 
+
 def upgrade(
         project_root: Path | str,
         revision_target: str = "head",
-        *,
-        database_url: Optional[str] = None,
-        discover_packages: Optional[Sequence[str]] = None
 ) -> None:
-    """Apply migrations forward to the specified revision.
-
-    Args:
-        project_root: Directory containing alembic.ini and migrations/.
-        revision_target: Target revision identifier (e.g. "head", "ae1027a7acf").
     """
-    prepare_process_env(project_root, discover_packages, database_url)
-    cfg = _build_alembic_config(project_root, database_url=database_url)
+    Apply migrations forward.
+
+    Example:
+        >>> upgrade(".")          # to head
+        >>> upgrade(".", "base")  # or to a specific rev
+    """
+    prepare_process_env(project_root)
+    cfg = _build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
     command.upgrade(cfg, revision_target)
 
@@ -558,7 +560,6 @@ class SetupAndMigrateResult:
 def setup_and_migrate(
         *,
         project_root: Path | str,
-        discover_packages: Optional[Sequence[str]] = None,
         async_db: bool | None = None,
         overwrite_scaffold: bool = False,
         create_db_if_missing: bool = True,
@@ -567,40 +568,38 @@ def setup_and_migrate(
         followup_message: str = "autogen",
 ) -> SetupAndMigrateResult:
     """
-    Ensure the database and Alembic migrations are up to date.
+    Ensure DB + Alembic are ready and up-to-date.
 
-    - Creates the database if missing.
-    - Initializes Alembic scaffolding if not present.
-    - Runs `alembic upgrade head` (safe to call repeatedly).
-    - If no revisions exist, creates an initial revision.
-    - If revisions exist, autogenerates a follow-up revision (optional).
+    Examples:
+        >>> # First run (DATABASE_URL already set in env)
+        >>> setup_and_migrate(project_root=".")
+        >>>
+        >>> # Later, after editing models
+        >>> setup_and_migrate(project_root=".", create_followup_revision=True)
 
-    Use this as the single entrypoint for both first-time setup and
-    applying new model changes. Idempotent and pure Python (no CLI needed).
+    Notes:
+        - Reads DATABASE_URL from environment. Does not set it.
+        - Model discovery is automatic via env.py (prefers ModelBase.metadata).
     """
     root = Path(project_root).resolve()
-    prepare_process_env(root, discover_packages, database_url=None)
+    prepare_process_env(root)
 
-    # 1) Ensure DATABASE_URL and DB existence
     db_url = get_database_url_from_env(required=True)
     if create_db_if_missing:
         ensure_database_exists(db_url)
 
-    # 2) Scaffold Alembic (idempotent)
-    #    - async_db default: infer from DATABASE_URL if not explicitly provided
     from sqlalchemy.engine import make_url as _make_url
     is_async = async_db if async_db is not None else is_async_url(_make_url(db_url))
+
     mig_dir = init_alembic(
         root,
         async_db=is_async,
-        discover_packages=discover_packages,
+        discover_packages=None,   # rely on auto-discovery only
         overwrite=overwrite_scaffold,
     )
-
     versions_dir = mig_dir / "versions"
     alembic_ini = root / "alembic.ini"
 
-    # Build config for Alembic commands
     cfg = _build_alembic_config(project_root=root)
     repair_alembic_state_if_needed(cfg)
 
@@ -608,36 +607,25 @@ def setup_and_migrate(
     created_followup = False
     upgraded = False
 
-    # 3) First, always upgrade to head (safe if there are no revisions yet)
     try:
-        upgrade(root)
+        upgrade(root)   # safe if nothing to do
         upgraded = True
     except Exception:
-        # If this is truly the first run and versions folder is empty, upgrade may fail
-        # because there is no head yet — that’s fine; we’ll create the initial revision below.
         pass
 
-    # Helper: do we have any revision files?
     def _has_revisions() -> bool:
         return any(versions_dir.glob("*.py"))
 
-    # 4) Create an initial revision if none exist
     if not _has_revisions():
         revision(
             project_root=root,
             message=initial_message,
             autogenerate=True,
-            # Make sure DB is at head before autogenerate (no-op on fresh DB)
-            # so Alembic compares against the current DB state.
-            # Our revision() wrapper already upgrades to head when autogenerate=True.
             ensure_head_before_autogenerate=True,
         )
         created_initial = True
-        # Apply the new initial revision
         upgrade(root)
         upgraded = True
-
-    # 5) Optionally create a follow-up revision (for new model changes)
     elif create_followup_revision:
         revision(
             project_root=root,
