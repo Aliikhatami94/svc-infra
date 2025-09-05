@@ -33,7 +33,7 @@ def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> Dict[str, 
 def _render_auth_template(name: str) -> str:
     import importlib.resources as pkg
     from string import Template as _T
-    txt = pkg.files("svc_infra.db.templates.models_schemas.auth").joinpath(name).read_text(encoding="utf-8")
+    txt = pkg.files("svc_infra.db.manage.templates.models_schemas.auth").joinpath(name).read_text(encoding="utf-8")
     return _T(txt).substitute({})  # no variables today
 
 # ---------------- entity templates (loaded from package only) ----------------
@@ -41,10 +41,10 @@ def _render_auth_template(name: str) -> str:
 def _render_entity_template(name: str, subs: Dict[str, Any]) -> str:
     """Render an entity template file using string.Template.
 
-    Looks up templates under svc_infra.db.templates.models_schemas.entity/<name> and requires them to exist.
+    Looks up templates under svc_infra.db.manage.templates.models_schemas.entity/<name> and requires them to exist.
     """
     import importlib.resources as pkg
-    txt = pkg.files("svc_infra.db.templates.models_schemas.entity").joinpath(name).read_text(encoding="utf-8")
+    txt = pkg.files("svc_infra.db.manage.templates.models_schemas.entity").joinpath(name).read_text(encoding="utf-8")
     return Template(txt).substitute(subs)
 
 # ---------------- tiny utilities ----------------

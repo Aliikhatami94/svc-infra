@@ -19,7 +19,7 @@ pip install svc-infra
 
 Two MCP servers are available as Node shims that launch the Python modules via uvx:
 - auth-infra-mcp -> svc_infra.auth.mcp
-- db-management-mcp -> svc_infra.db.mcp
+- db-management-mcp -> svc_infra.db.manage.mcp
 
 Prerequisites:
 - Python 3.11+ available to uvx

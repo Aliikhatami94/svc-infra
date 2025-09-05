@@ -38,7 +38,7 @@ def init_alembic(
 
     Example:
         >>> # DATABASE_URL from env; discovery via ModelBase or fallback scan
-        >>> init_alembic(".", async_db=False, overwrite=False)
+        >>> init_alembic("..", async_db=False, overwrite=False)
 
     Returns:
         Path to the created migrations directory.
@@ -129,7 +129,7 @@ def revision(
     Create a new Alembic revision.
 
     Example (autogenerate):
-        >>> revision(".", "add orders", autogenerate=True)
+        >>> revision("..", "add orders", autogenerate=True)
 
     Requirements:
         - DATABASE_URL must be set in the environment.
@@ -163,8 +163,8 @@ def upgrade(
     Apply migrations forward.
 
     Example:
-        >>> upgrade(".")          # to head
-        >>> upgrade(".", "base")  # or to a specific rev
+        >>> upgrade("..")          # to head
+        >>> upgrade("..", "base")  # or to a specific rev
     """
     prepare_process_env(project_root)
     cfg = _build_alembic_config(project_root)

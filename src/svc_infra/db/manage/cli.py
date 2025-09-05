@@ -33,7 +33,7 @@ def _apply_database_url(database_url: Optional[str]) -> None:
 
 @app.command("init")
 def init(
-    project_root: Path = typer.Option(Path("."), exists=False, file_okay=False, dir_okay=True, resolve_path=True, help="Project root where alembic.ini and migrations/ will be created."),
+    project_root: Path = typer.Option(Path(".."), exists=False, file_okay=False, dir_okay=True, resolve_path=True, help="Project root where alembic.ini and migrations/ will be created."),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env DATABASE_URL for this command."),
     async_db: bool = typer.Option(False, help="Generate async Alembic env.py (for async drivers)."),
     discover_packages: Optional[List[str]] = typer.Option(None, help="Packages to search for SQLAlchemy metadata; may pass multiple."),
@@ -51,7 +51,7 @@ def init(
 @app.command()
 def revision(
     message: str = typer.Option(..., "-m", "--message", help="Revision message."),
-    project_root: Path = typer.Option(Path("."), help="Project root with alembic.ini.", resolve_path=True),
+    project_root: Path = typer.Option(Path(".."), help="Project root with alembic.ini.", resolve_path=True),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
     autogenerate: bool = typer.Option(False, help="Autogenerate migrations by comparing metadata."),
     head: Optional[str] = typer.Option("head", help="Set the head to base this revision on."),
@@ -74,7 +74,7 @@ def revision(
 @app.command()
 def upgrade(
     revision_target: str = typer.Argument("head", help="Target revision (default head)."),
-    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    project_root: Path = typer.Option(Path(".."), resolve_path=True),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
 ):
     _apply_database_url(database_url)
@@ -84,7 +84,7 @@ def upgrade(
 @app.command()
 def downgrade(
     revision_target: str = typer.Argument("-1", help="Target revision (default -1)."),
-    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    project_root: Path = typer.Option(Path(".."), resolve_path=True),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
 ):
     _apply_database_url(database_url)
@@ -93,7 +93,7 @@ def downgrade(
 
 @app.command()
 def current(
-    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    project_root: Path = typer.Option(Path(".."), resolve_path=True),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
     verbose: bool = typer.Option(False, help="Verbose output."),
 ):
@@ -103,7 +103,7 @@ def current(
 
 @app.command()
 def history(
-    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    project_root: Path = typer.Option(Path(".."), resolve_path=True),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
     verbose: bool = typer.Option(False, help="Verbose output."),
 ):
@@ -114,7 +114,7 @@ def history(
 @app.command()
 def stamp(
     revision_target: str = typer.Argument("head"),
-    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    project_root: Path = typer.Option(Path(".."), resolve_path=True),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
 ):
     _apply_database_url(database_url)
@@ -123,7 +123,7 @@ def stamp(
 
 @app.command("merge-heads")
 def merge_heads(
-    project_root: Path = typer.Option(Path("."), resolve_path=True),
+    project_root: Path = typer.Option(Path(".."), resolve_path=True),
     database_url: Optional[str] = typer.Option(None, help="Database URL; overrides env for this command."),
     message: Optional[str] = typer.Option(None, "-m", "--message", help="Merge revision message."),
 ):

@@ -33,9 +33,9 @@ if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    # 0) Prefer svc_infra.db.base.ModelBase.metadata if available
+    # 0) Prefer svc_infra.db.manage.base.ModelBase.metadata if available
     try:
-        from svc_infra.db.base import ModelBase  # type: ignore
+        from svc_infra.db.manage.base import ModelBase  # type: ignore
         md = getattr(ModelBase, "metadata", None)
         if md is not None and hasattr(md, "tables") and md.tables:
             return [md]
