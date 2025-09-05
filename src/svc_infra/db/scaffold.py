@@ -28,81 +28,6 @@ def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> Dict[str, 
     content = _INIT_CONTENT_PAIRED if paired else _INIT_CONTENT_MINIMAL
     return _write(dir_path / "__init__.py", content, overwrite)
 
-# ---------------- generic (entity) inline templates ----------------
-
-_DEFAULT_MODELS_TPL = Template(
-    """from __future__ import annotations
-from datetime import datetime
-from typing import Optional
-import uuid
-
-from sqlalchemy import String, Boolean, DateTime, JSON, Text, func, UniqueConstraint, Index
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.ext.mutable import MutableDict
-
-from svc_infra.db.base import ModelBase
-
-
-class ${Entity}(ModelBase):
-    __tablename__ = "${table_name}"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-
-$tenant_field$soft_delete_field    extra: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
-
-    # auditing (DB-side timestamps)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-$constraints    def __repr__(self) -> str:
-        return f"<${Entity} id={self.id} name={self.name!r}>"
-
-$indexes"""
-)
-
-_DEFAULT_SCHEMAS_TPL = Template(
-    """from __future__ import annotations
-from typing import Optional, Any, Dict
-from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
-
-
-class Timestamped(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    created_at: datetime
-    updated_at: datetime
-
-
-class ${Entity}Base(BaseModel):
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
-    name: str
-    description: Optional[str] = None
-$tenant_field    is_active: bool = True
-    extra: Dict[str, Any] = Field(default_factory=dict)
-
-
-class ${Entity}Read(${Entity}Base, Timestamped):
-    id: str
-
-
-class ${Entity}Create(BaseModel):
-    name: str
-    description: Optional[str] = None
-$tenant_field_create    is_active: bool = True
-    extra: Dict[str, Any] = Field(default_factory=dict)
-
-
-class ${Entity}Update(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-$tenant_field_update    is_active: Optional[bool] = None
-    extra: Optional[Dict[str, Any]] = None
-"""
-)
-
 # ---------------- auth templates (loaded from package) ----------------
 
 def _render_auth_template(name: str) -> str:
@@ -110,6 +35,17 @@ def _render_auth_template(name: str) -> str:
     from string import Template as _T
     txt = pkg.files("svc_infra.db.templates.auth").joinpath(name).read_text(encoding="utf-8")
     return _T(txt).substitute({})  # no variables today
+
+# ---------------- entity templates (loaded from package only) ----------------
+
+def _render_entity_template(name: str, subs: Dict[str, Any]) -> str:
+    """Render an entity template file using string.Template.
+
+    Looks up templates under svc_infra.db.templates.entity/<name> and requires them to exist.
+    """
+    import importlib.resources as pkg
+    txt = pkg.files("svc_infra.db.templates.entity").joinpath(name).read_text(encoding="utf-8")
+    return Template(txt).substitute(subs)
 
 # ---------------- tiny utilities ----------------
 
@@ -182,21 +118,27 @@ def scaffold_core(
         ) if include_tenant else ""
         indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
 
-        models_txt = _DEFAULT_MODELS_TPL.substitute(
-            Entity=ent,
-            table_name=tbl,
-            tenant_field=tenant_model_field,
-            soft_delete_field=soft_delete_model_field,
-            constraints=constraints,
-            indexes=indexes,
+        models_txt = _render_entity_template(
+            "models.py.tmpl",
+            subs={
+                "Entity": ent,
+                "table_name": tbl,
+                "tenant_field": tenant_model_field,
+                "soft_delete_field": soft_delete_model_field,
+                "constraints": constraints,
+                "indexes": indexes,
+            },
         )
 
         tenant_schema_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
-        schemas_txt = _DEFAULT_SCHEMAS_TPL.substitute(
-            Entity=ent,
-            tenant_field=tenant_schema_field,
-            tenant_field_create=tenant_schema_field,
-            tenant_field_update=tenant_schema_field,
+        schemas_txt = _render_entity_template(
+            "schemas.py.tmpl",
+            subs={
+                "Entity": ent,
+                "tenant_field": tenant_schema_field,
+                "tenant_field_create": tenant_schema_field,
+                "tenant_field_update": tenant_schema_field,
+            },
         )
 
     # filenames
@@ -257,13 +199,16 @@ def scaffold_models_core(
             '    )\n'
         ) if include_tenant else ""
         indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
-        txt = _DEFAULT_MODELS_TPL.substitute(
-            Entity=ent,
-            table_name=tbl,
-            tenant_field=tenant_model_field,
-            soft_delete_field=soft_delete_model_field,
-            constraints=constraints,
-            indexes=indexes,
+        txt = _render_entity_template(
+            "models.py.tmpl",
+            subs={
+                "Entity": ent,
+                "table_name": tbl,
+                "tenant_field": tenant_model_field,
+                "soft_delete_field": soft_delete_model_field,
+                "constraints": constraints,
+                "indexes": indexes,
+            },
         )
 
     filename = models_filename or f"{_snake(entity_name)}.py"
@@ -288,11 +233,14 @@ def scaffold_schemas_core(
     else:
         ent = _normalize_entity_name(entity_name)
         tenant_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
-        txt = _DEFAULT_SCHEMAS_TPL.substitute(
-            Entity=ent,
-            tenant_field=tenant_field,
-            tenant_field_create=tenant_field,
-            tenant_field_update=tenant_field,
+        txt = _render_entity_template(
+            "schemas.py.tmpl",
+            subs={
+                "Entity": ent,
+                "tenant_field": tenant_field,
+                "tenant_field_create": tenant_field,
+                "tenant_field_update": tenant_field,
+            },
         )
 
     filename = schemas_filename or f"{_snake(entity_name)}.py"

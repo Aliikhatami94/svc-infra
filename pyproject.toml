@@ -7,6 +7,10 @@ license = "MIT"
 readme = "README.md"
 packages = [{ include = "svc_infra", from = "src" }]
 keywords = ["fastapi", "sqlalchemy", "alembic", "auth", "infra", "async", "pydantic"]
+include = [
+    "src/svc_infra/py.typed",
+    "src/svc_infra/db/templates/**/*",
+]
 
 classifiers = [
     "Development Status :: 4 - Beta",

@@ -1,0 +1,29 @@
+from __future__ import annotations
+from datetime import datetime
+from typing import Optional
+import uuid
+
+from sqlalchemy import String, Boolean, DateTime, JSON, Text, func, UniqueConstraint, Index
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.ext.mutable import MutableDict
+
+from svc_infra.db.base import ModelBase
+
+
+class ${Entity}(ModelBase):
+    __tablename__ = "${table_name}"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+${tenant_field}${soft_delete_field}    extra: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+${constraints}    def __repr__(self) -> str:
+        return f"<${Entity} id={self.id} name={self.name!r}>"
+
+${indexes}

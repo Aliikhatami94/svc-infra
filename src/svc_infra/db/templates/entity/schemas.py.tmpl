@@ -1,0 +1,36 @@
+from __future__ import annotations
+from typing import Optional, Any, Dict
+from datetime import datetime
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class Timestamped(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ${Entity}Base(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    name: str
+    description: Optional[str] = None
+${tenant_field}    is_active: bool = True
+    extra: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ${Entity}Read(${Entity}Base, Timestamped):
+    id: str
+
+
+class ${Entity}Create(BaseModel):
+    name: str
+    description: Optional[str] = None
+${tenant_field_create}    is_active: bool = True
+    extra: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ${Entity}Update(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+${tenant_field_update}    is_active: Optional[bool] = None
+    extra: Optional[Dict[str, Any]] = None

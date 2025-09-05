@@ -12,9 +12,9 @@ from .core import (
     setup_and_migrate,
 )
 from .scaffold import (
-    scaffold_entity_schemas_core,
-    scaffold_entity_models_core,
-    scaffold_entity_core,
+    scaffold_core,
+    scaffold_models_core,
+    scaffold_schemas_core,
 )
 
 mcp = mcp_from_functions(
@@ -31,9 +31,9 @@ mcp = mcp_from_functions(
         merge_heads,
         setup_and_migrate,
         # Scaffolding
-        scaffold_entity_core,
-        scaffold_entity_models_core,
-        scaffold_entity_schemas_core,
+        scaffold_core,
+        scaffold_models_core,
+        scaffold_schemas_core,
     ])
 
 def main():
