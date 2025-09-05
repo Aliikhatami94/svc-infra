@@ -17,26 +17,11 @@ from .utils import (
     build_engine,
     ensure_database_exists,
     prepare_process_env,
-    repair_alembic_state_if_needed
+    repair_alembic_state_if_needed,
+    render_env_py,
+    build_alembic_config,
+    ensure_db_at_head,
 )
-
-# ---------- Alembic env.py renderers ----------
-
-def _render_env_py(packages: Sequence[str]) -> str:
-    packages_list = ", ".join(repr(p) for p in packages)
-    # Load sync env template from package resources
-    import importlib.resources as pkg
-    template_txt = pkg.files("svc_infra.db.templates.setup").joinpath("env_sync.py.tmpl").read_text(encoding="utf-8")
-    return template_txt.replace("__PACKAGES_LIST__", packages_list)
-
-
-def _render_env_py_async(packages: Sequence[str]) -> str:
-    packages_list = ", ".join(repr(p) for p in packages)
-    # Load async env template from package resources
-    import importlib.resources as pkg
-    template_txt = pkg.files("svc_infra.db.templates.setup").joinpath("env_async.py.tmpl").read_text(encoding="utf-8")
-    return template_txt.replace("__PACKAGES_LIST__", packages_list)
-
 
 # ---------- Alembic init ----------
 
@@ -98,7 +83,7 @@ def init_alembic(
     if not pkgs:
         pkgs = []
 
-    env_py_text = _render_env_py_async(pkgs) if async_db else _render_env_py(pkgs)
+    env_py_text = render_env_py(pkgs, async_db=async_db)
     env_path = migrations_dir / "env.py"
     if env_path.exists() and not overwrite:
         try:
@@ -115,33 +100,19 @@ def init_alembic(
 
 # ---------- Alembic command helpers ----------
 
+# use utils.build_alembic_config
+
 def _build_alembic_config(
         project_root: Path | str,
         script_location: str = "migrations",
 ) -> Config:
-    """Build Alembic Config based on files + environment."""
-    root = Path(project_root).resolve()
-    cfg_path = root / "alembic.ini"
-    cfg = Config(str(cfg_path)) if cfg_path.exists() else Config()
-    cfg.set_main_option("script_location", str((root / script_location).resolve()))
+    return build_alembic_config(project_root, script_location=script_location)
 
-    # Respect env if set (env.py also prefers env at runtime)
-    env_db_url = os.getenv("DATABASE_URL", "").strip()
-    if env_db_url:
-        cfg.set_main_option("sqlalchemy.url", env_db_url)
-
-    cfg.set_main_option("path_separator", "os")
-    cfg.set_main_option("prepend_sys_path", str(root))
-    return cfg
+# use utils.ensure_db_at_head
 
 def _ensure_db_at_head(cfg: Config) -> None:
-    """
-    Bring the target database up to the current head if it's behind.
-    Alembic raises 'Target database is not up to date' during autogenerate
-    when the DB isn't at head; this preflight avoids that.
-    """
-    # This is idempotent if already at head.
-    command.upgrade(cfg, "head")
+    ensure_db_at_head(cfg)
+
 
 def revision(
         project_root: Path | str,

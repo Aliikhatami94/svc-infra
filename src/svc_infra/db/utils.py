@@ -213,8 +213,8 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
         return create_async(u, echo=echo, pool_pre_ping=True)
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
-    assert _create_engine is not None  # for type-checkers
-    return _create_engine(u, echo=echo, pool_pre_ping=True)
+    create_sync = _create_engine  # local alias for type-checkers
+    return create_sync(u, echo=echo, pool_pre_ping=True)
 
 
 # ---------- Identifier quoting helpers ----------
@@ -551,6 +551,53 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
     finally:
         eng.dispose()
 
+def render_env_py(packages: Sequence[str], *, async_db: bool) -> str:
+    """Render Alembic env.py content from packaged templates.
+
+    - packages: list of package names to inject into DISCOVER_PACKAGES default.
+    - async_db: choose async or sync template variant.
+    """
+    import importlib.resources as pkg
+    pkg_list = ", ".join(repr(p) for p in packages)
+    tmpl_root = pkg.files("svc_infra.db.templates.setup")
+    name = "env_async.py.tmpl" if async_db else "env_sync.py.tmpl"
+    txt = tmpl_root.joinpath(name).read_text(encoding="utf-8")
+    return txt.replace("__PACKAGES_LIST__", pkg_list)
+
+
+def build_alembic_config(
+        project_root: Path | str,
+        *,
+        script_location: str = "migrations",
+) -> Config:
+    """Build an Alembic Config based on files + environment.
+
+    - Resolves script_location under project_root.
+    - If DATABASE_URL is set, injects into config for runtime use.
+    - Adds prepend_sys_path to ease imports during env.py execution.
+    """
+    from alembic.config import Config as _Config
+
+    root = Path(project_root).resolve()
+    cfg_path = root / "alembic.ini"
+    cfg = _Config(str(cfg_path)) if cfg_path.exists() else _Config()
+    cfg.set_main_option("script_location", str((root / script_location).resolve()))
+
+    env_db_url = os.getenv("DATABASE_URL", "").strip()
+    if env_db_url:
+        cfg.set_main_option("sqlalchemy.url", env_db_url)
+
+    cfg.set_main_option("path_separator", "os")
+    cfg.set_main_option("prepend_sys_path", str(root))
+    return cfg
+
+
+def ensure_db_at_head(cfg: Config) -> None:
+    """Idempotently bring the database to head; safe if already current."""
+    from alembic import command as _command
+    _command.upgrade(cfg, "head")
+
+
 __all__ = [
     # env helpers
     "get_database_url_from_env",
@@ -559,4 +606,8 @@ __all__ = [
     # engines and db bootstrap
     "build_engine",
     "ensure_database_exists",
+    # setup helpers
+    "render_env_py",
+    "build_alembic_config",
+    "ensure_db_at_head",
 ]
