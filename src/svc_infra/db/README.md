@@ -1,139 +1,159 @@
-## svc_infra db CLI
+svc_infra.db CLI integration guide
 
-Manage database setup and Alembic migrations.
+This README covers how to use the database command-line interface exposed by src/svc_infra/db/cli.py. It wraps Alembic utilities and provides scaffolding for SQLAlchemy models and Pydantic schemas.
 
-### Usage
+How to run the CLI
+- If the project is installed as a package: python -m svc_infra.db.cli --help
+- From a repo checkout:
+  - With Poetry: poetry run python -m svc_infra.db.cli --help
+  - With venv: python -m svc_infra.db.cli --help
 
-- Script: `svc-infra db`
-- Poetry: `poetry run svc-infra db --help`
-- Python module (alternative): `python -m svc_infra.cli.run db --help`
+Database URL handling
+- Most commands read the database URL from the DATABASE_URL environment variable.
+- You can override it per-command with the --database-url option (the CLI sets DATABASE_URL for that process only).
+- Examples:
+  - export DATABASE_URL=sqlite:///:memory:
+  - python -m svc_infra.db.cli upgrade --project-root .
+  - python -m svc_infra.db.cli revision -m "init" --database-url sqlite:///./app.db
 
-The CLI reads DATABASE_URL from the environment by default. You can override it per-command with `--database-url`.
+Alembic lifecycle commands
+1) init — create Alembic config and migrations folder
+- Creates alembic.ini in the chosen project root and a migrations/ directory with env.py and versions/.
+- Options:
+  - --project-root PATH: where to create files (default .)
+  - --database-url URL: used to infer dialect in alembic.ini (overrides env)
+  - --async-db / --no-async-db: generate async env.py (for async drivers like sqlite+aiosqlite, postgresql+asyncpg)
+  - --discover-packages PKG ...: packages to import and search for SQLAlchemy metadata
+  - --overwrite: replace existing files
+- Example (sync sqlite):
+  - python -m svc_infra.db.cli init --project-root . --database-url sqlite:///./app.db
+- Example (async):
+  - python -m svc_infra.db.cli init --project-root . --database-url sqlite+aiosqlite:///./app.db --async-db
 
-### Quick start
+2) revision — create a new migration file
+- Options:
+  - -m/--message TEXT: revision message (required)
+  - --project-root PATH: project root that contains alembic.ini
+  - --database-url URL: override env for this command
+  - --autogenerate: compare metadata to DB and generate operations
+  - --head REV: parent head (default head)
+  - --branch-label TEXT
+  - --version-path PATH: custom versions folder
+  - --sql: emit SQL to stdout instead of Python
+- Example (empty migration):
+  - python -m svc_infra.db.cli revision -m "init" --project-root .
+- Example (autogenerate):
+  - python -m svc_infra.db.cli revision -m "add widgets" --autogenerate --project-root .
 
-- Initialize Alembic in your project (creates `alembic.ini` and `migrations/`):
+3) upgrade/downgrade — apply or roll back migrations
+- upgrade [REV]: default head
+  - python -m svc_infra.db.cli upgrade --project-root .
+  - python -m svc_infra.db.cli upgrade ae1027a6acf --project-root .
+- downgrade [REV]: default -1 (one step)
+  - python -m svc_infra.db.cli downgrade --project-root .
+  - python -m svc_infra.db.cli downgrade base --project-root .
 
-  ```bash
-  poetry run svc-infra db init --project-root . --database-url sqlite:///./app.db
-  ```
+4) current/history/stamp/merge-heads — utilities
+- current: show current DB revision
+  - python -m svc_infra.db.cli current --project-root .
+  - python -m svc_infra.db.cli current --project-root . --verbose
+- history: show migration history
+  - python -m svc_infra.db.cli history --project-root .
+  - python -m svc_infra.db.cli history --project-root . --verbose
+- stamp [REV]: set DB to a revision without running migrations
+  - python -m svc_infra.db.cli stamp head --project-root .
+- merge-heads: merge divergent heads
+  - python -m svc_infra.db.cli merge-heads --project-root . -m "merge branches"
 
-- Create a revision file:
+Scaffolding commands
+The CLI can scaffold starter SQLAlchemy models and Pydantic schemas. Outputs are simple, editable files.
 
-  ```bash
-  poetry run svc-infra db revision -m "init"
-  ```
+A) scaffold — generate models and schemas together
+- Usage patterns:
+  - Separate dirs (default filenames derived from entity):
+    - python -m svc_infra.db.cli scaffold \
+      --kind entity \
+      --entity-name WidgetThing \
+      --models-dir ./app/models \
+      --schemas-dir ./app/schemas
+  - Separate dirs with custom filenames:
+    - python -m svc_infra.db.cli scaffold \
+      --kind entity \
+      --entity-name Gizmo \
+      --models-dir ./app/models --models-filename m_gizmo.py \
+      --schemas-dir ./app/schemas --schemas-filename s_gizmo.py
+  - Same dir (paired models.py and schemas.py with a paired __init__.py):
+    - python -m svc_infra.db.cli scaffold \
+      --kind entity \
+      --entity-name Account \
+      --models-dir ./app/account \
+      --schemas-dir ./app/account \
+      --same-dir
+- Options:
+  - --kind [entity|auth]: auth uses built-in templates; entity renders generic model/schema from the entity name
+  - --entity-name TEXT: used to derive class names and default table/filenames (e.g., WidgetThing -> widget_things)
+  - --models-dir PATH, --schemas-dir PATH: target directories; created if missing
+  - --same-dir / --no-same-dir: put both files in one folder (models.py, schemas.py)
+  - --models-filename TEXT, --schemas-filename TEXT: when separate dirs, override default <snake(entity)>.py
+  - --overwrite: allow overwriting existing files
 
-- Apply migrations:
+B) scaffold-models — generate only a model file
+- Example:
+  - python -m svc_infra.db.cli scaffold-models \
+    --dest-dir ./app/models \
+    --entity-name FooBar \
+    --include-tenant \
+    --include-soft-delete
+- Options:
+  - --kind [entity|auth]
+  - --entity-name TEXT
+  - --table-name TEXT: override default table name (defaults to snake_case(entity)+s)
+  - --include-tenant/--no-include-tenant: include tenant_id field and related constraints/index
+  - --include-soft-delete/--no-include-soft-delete: include deleted_at in addition to is_active
+  - --models-filename TEXT: filename override (default <snake(entity)>.py)
+  - --overwrite
 
-  ```bash
-  poetry run svc-infra db upgrade
-  ```
+C) scaffold-schemas — generate only a schema file
+- Example:
+  - python -m svc_infra.db.cli scaffold-schemas \
+    --dest-dir ./app/schemas \
+    --entity-name FooBar \
+    --no-include-tenant
+- Options:
+  - --kind [entity|auth]
+  - --entity-name TEXT
+  - --include-tenant/--no-include-tenant
+  - --schemas-filename TEXT
+  - --overwrite
 
-- Show current head and history:
+Conventions and outputs
+- Entity naming:
+  - The CLI normalizes the entity name: WidgetThing -> class WidgetThing, default table widget_things, default filename widget_thing.py.
+- Outputs:
+  - Model includes id, name, description, is_active, timestamps, and JSON extra; optional tenant_id and soft-delete fields per flags.
+  - Schemas include Base/Create/Update/Read with Timestamped mixin; optional tenant_id per flags.
+- __init__.py:
+  - When using --same-dir, the folder’s __init__.py re-exports models and schemas.
+  - Otherwise, each target dir gets a minimal package marker __init__.py.
+- Print format:
+  - Scaffold commands print a Python dict (not JSON). If you’re parsing the output, account for single quotes.
 
-  ```bash
-  poetry run svc-infra db current
-  poetry run svc-infra db history
-  ```
+Typical end-to-end workflow (SQLite example)
+1) Initialize migrations (sync driver):
+   - python -m svc_infra.db.cli init --project-root . --database-url sqlite:///./app.db
+2) Create an initial revision:
+   - python -m svc_infra.db.cli revision -m "init" --project-root .
+3) Apply migrations to the database:
+   - python -m svc_infra.db.cli upgrade --project-root .
+4) Scaffold a new entity’s model and schema:
+   - python -m svc_infra.db.cli scaffold \
+     --entity-name WidgetThing \
+     --models-dir ./app/models \
+     --schemas-dir ./app/schemas
 
-- Downgrade one step and restamp to head:
+Notes and tips
+- Use an async URL (e.g., sqlite+aiosqlite:///./app.db, postgresql+asyncpg://...) together with --async-db during init if your app uses async engines.
+- For SQLite file URLs, the CLI creates parent directories when needed. Ensure the executing user can write to the chosen path.
+- Aim to keep models importable during autogenerate; use --discover-packages to tell the env script where to find your ModelBase metadata.
+- If you see multiple heads (diverged history), use merge-heads with an appropriate message, then upgrade.
 
-  ```bash
-  poetry run svc-infra db downgrade -1
-  poetry run svc-infra db stamp head
-  ```
-
-- Merge multiple heads (if your repo diverged):
-
-  ```bash
-  poetry run svc-infra db merge-heads -m "merge heads"
-  ```
-
-### Commands
-
-- `init`
-  - Options:
-    - `--project-root PATH` (default `.`) – where `alembic.ini` and `migrations/` are created
-    - `--database-url TEXT` – overrides env `DATABASE_URL` for this command
-    - `--async-db/--no-async-db` – generate async `env.py` (for async drivers like aiosqlite/asyncpg)
-    - `--discover-packages TEXT...` – list of Python packages to search for SQLAlchemy metadata
-    - `--overwrite/--no-overwrite` – overwrite existing files
-
-- `revision`
-  - Options:
-    - `-m, --message TEXT` (required)
-    - `--project-root PATH` (default `.`)
-    - `--database-url TEXT`
-    - `--autogenerate/--no-autogenerate`
-    - `--head TEXT` (default `head`)
-    - `--branch-label TEXT`
-    - `--version-path TEXT`
-    - `--sql/--no-sql`
-
-- `upgrade [REVISION]` (default `head`)
-  - Options: `--project-root PATH`, `--database-url TEXT`
-
-- `downgrade [REVISION]` (default `-1`)
-  - Options: `--project-root PATH`, `--database-url TEXT`
-
-- `current` / `history`
-  - Options: `--project-root PATH`, `--database-url TEXT`, `--verbose`
-
-- `stamp [REVISION]` (default `head`)
-  - Options: `--project-root PATH`, `--database-url TEXT`
-
-- `merge-heads`
-  - Options: `--project-root PATH`, `--database-url TEXT`, `-m, --message TEXT`
-
-### Environment
-
-- `DATABASE_URL` – primary source for DB connection URL
-- `DB_URL` – fallback if `DATABASE_URL` is not set
-- `ALEMBIC_DISCOVER_PACKAGES` – optional comma-separated list of packages for metadata discovery in generated `env.py`
-
-Examples:
-
-```bash
-# Use env-driven config
-export DATABASE_URL=sqlite:///./app.db
-export ALEMBIC_DISCOVER_PACKAGES=my_app.models,another_app.models
-poetry run svc-infra db init --project-root .
-```
-
-Notes:
-- The generated `alembic.ini` and runtime config include `path_separator = os` so Alembic can parse `prepend_sys_path` portably.
-- A local `migrations/script.py.mako` template is written to ensure `revision` works without global templates.
-
-### Programmatic API
-
-You can also use the functions directly:
-
-```python
-from svc_infra.db import (
-    init_alembic,
-    ensure_database_exists,
-    build_engine,
-    init_database_structure,
-)
-
-# Ensure DB exists and scaffold alembic
-init_database_structure(project_root=".")
-
-# Or granular control
-init_alembic(project_root=".", async_db=False, discover_packages=["my_app.models"])  # creates alembic files
-```
-
-### MCP server
-
-An MCP server exposing db management functions is available:
-- Name: `db-management-mcp`
-- Functions: `init_alembic`, `revision`, `upgrade`, `downgrade`, `current`, `history`, `stamp`, `merge_heads`
-- Transport: stdio
-
-Integrate it with an MCP-compatible client to drive migrations programmatically.
-
-### Troubleshooting
-
-- SQLAlchemy 2.0 requires `sqlalchemy.text("...")` for textual SQL in tests or scripts.
-- For SQLite file URLs (e.g., `sqlite:///./data/app.db`), parent directories are created when ensuring the database exists.
