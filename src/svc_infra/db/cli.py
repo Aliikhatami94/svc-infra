@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, List, cast
+from typing import Optional, List
 
 import typer, click
 

@@ -119,9 +119,10 @@ def _normalize_entity_name(name: str) -> str:
 
 def _snake(name: str) -> str:
     import re
-    s1 = re.sub("(.)([A-Z][a-z]+)", r"\\1_\\2", name)
-    s2 = re.sub("([a-z0-9])([A-Z])", r"\\1_\\2", s1)
-    return re.sub("[^a-zA-Z0-9_]+", "_", s2).lower().strip("_")
+    # Insert underscores at CamelCase boundaries, then normalize
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
+    return re.sub(r"[^a-zA-Z0-9_]+", "_", s2).lower().strip("_")
 
 def _suggest_table_name(entity_pascal: str) -> str:
     base = _snake(entity_pascal)
