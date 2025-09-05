@@ -1,5 +1,5 @@
 # svc_infra/auth/providers.py
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
     """
