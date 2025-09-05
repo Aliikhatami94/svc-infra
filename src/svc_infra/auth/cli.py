@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import typer
 
-from .core import (
+from .scaffold import (
     scaffold_auth_core,
     scaffold_auth_models_core,
     scaffold_auth_schemas_core,

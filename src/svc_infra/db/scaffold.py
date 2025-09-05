@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 from string import Template
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Literal
 
-# Reuse the same helpers you used for auth scaffolds --------------------------
-# (inline minimal fallbacks in case you prefer this to be fully standalone)
+# ---------------- helpers ----------------
+
+_INIT_CONTENT = 'from . import models, schemas\n\n__all__ = ["models", "schemas"]\n'
+
 def _normalize_dir(p: Path | str) -> Path:
     p = Path(p)
     return p if p.is_absolute() else (Path.cwd() / p).resolve()
@@ -18,8 +20,11 @@ def _write(dest: Path, content: str, overwrite: bool) -> Dict[str, Any]:
     dest.write_text(content, encoding="utf-8")
     return {"path": str(dest), "action": "wrote"}
 
+def _ensure_init_py(dir_path: Path, overwrite: bool) -> Dict[str, Any]:
+    """Create __init__.py that re-exports models/schemas."""
+    return _write(dir_path / "__init__.py", _INIT_CONTENT, overwrite)
 
-# -------------------- default inlined templates (small & generic) --------------------
+# ---------------- generic (entity) inline templates ----------------
 
 _DEFAULT_MODELS_TPL = Template(
     """from __future__ import annotations
@@ -94,136 +99,17 @@ $tenant_field_update    is_active: Optional[bool] = None
 """
 )
 
+# ---------------- auth templates (loaded from package) ----------------
 
-# -------------------- public API --------------------
+def _render_auth_template(name: str) -> str:
+    import importlib.resources as pkg
+    from string import Template as _T
+    txt = pkg.files("svc_infra.db.templates.auth").joinpath(name).read_text(encoding="utf-8")
+    return _T(txt).substitute({})  # no variables today
 
-def scaffold_entity_core(
-        *,
-        models_dir: Path | str,
-        schemas_dir: Path | str,
-        entity_name: str = "Item",
-        table_name: Optional[str] = None,
-        include_tenant: bool = True,
-        include_soft_delete: bool = False,
-        overwrite: bool = False,
-) -> Dict[str, Any]:
-    """
-    Create minimal model + schemas for a new domain entity.
-
-    Examples:
-        >>> scaffold_entity_core(models_dir="app/models", schemas_dir="app/schemas", entity_name="Project")
-        >>> scaffold_entity_core(models_dir="app/models", schemas_dir="app/schemas", entity_name="Note", include_tenant=False)
-
-    Notes:
-        - Uses svc_infra.db.base.ModelBase for discovery/migrations.
-        - Columns: id (UUID pk), name, description, extra (JSON), is_active (+ optional tenant_id, deleted_at).
-        - Adds audit timestamps (created_at, updated_at).
-    """
-    models_dir = _normalize_dir(models_dir)
-    schemas_dir = _normalize_dir(schemas_dir)
-
-    ent = _normalize_entity_name(entity_name)
-    tbl = table_name or _suggest_table_name(ent)
-
-    # pieces for optional fields/constraints/indexes
-    tenant_model_field = (
-        '    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)\n'
-        if include_tenant else ""
-    )
-    soft_delete_model_field = (
-        '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
-        '    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))\n'
-        if include_soft_delete else
-        '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
-    )
-
-    constraints = ""
-    if include_tenant:
-        # nice starter: keep names unique per-tenant; easy to delete if not wanted
-        constraints = '    __table_args__ = (\n' \
-                      '        UniqueConstraint("tenant_id", "name", name=f"uq_' + tbl + '_tenant_name"),\n' \
-                                                                                         '    )\n'
-
-    indexes = ""
-    if include_tenant:
-        indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n'
-
-    models_txt = _DEFAULT_MODELS_TPL.substitute(
-        Entity=ent,
-        table_name=tbl,
-        tenant_field=tenant_model_field,
-        soft_delete_field=soft_delete_model_field,
-        constraints=constraints,
-        indexes=indexes,
-    )
-
-    tenant_schema_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
-    tenant_schema_field_create = tenant_schema_field
-    tenant_schema_field_update = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
-
-    schemas_txt = _DEFAULT_SCHEMAS_TPL.substitute(
-        Entity=ent,
-        tenant_field=tenant_schema_field,
-        tenant_field_create=tenant_schema_field_create,
-        tenant_field_update=tenant_schema_field_update,
-    )
-
-    models_res = _write(models_dir / f"{_snake(ent)}.py", models_txt, overwrite)
-    schemas_res = _write(schemas_dir / f"{_snake(ent)}.py", schemas_txt, overwrite)
-    return {
-        "status": "ok",
-        "results": {"models": models_res, "schemas": schemas_res},
-    }
-
-
-def scaffold_entity_models_core(
-        *,
-        dest_dir: Path | str,
-        entity_name: str = "Item",
-        table_name: Optional[str] = None,
-        include_tenant: bool = True,
-        include_soft_delete: bool = False,
-        overwrite: bool = False,
-) -> Dict[str, Any]:
-    """Create only the model file for a new entity (see scaffold_entity_core for args)."""
-    tmp = scaffold_entity_core(
-        models_dir=dest_dir,
-        schemas_dir=dest_dir,  # throwaway; we'll ignore output
-        entity_name=entity_name,
-        table_name=table_name,
-        include_tenant=include_tenant,
-        include_soft_delete=include_soft_delete,
-        overwrite=overwrite,
-    )
-    return {"status": "ok", "result": tmp["results"]["models"]}
-
-
-def scaffold_entity_schemas_core(
-        *,
-        dest_dir: Path | str,
-        entity_name: str = "Item",
-        include_tenant: bool = True,
-        overwrite: bool = False,
-) -> Dict[str, Any]:
-    """Create only the schemas file for a new entity (see scaffold_entity_core for args)."""
-    # Render just schemas using same substitution logic
-    ent = _normalize_entity_name(entity_name)
-    tenant_schema_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
-    schemas_txt = _DEFAULT_SCHEMAS_TPL.substitute(
-        Entity=ent,
-        tenant_field=tenant_schema_field,
-        tenant_field_create=tenant_schema_field,
-        tenant_field_update=tenant_schema_field,
-    )
-    dest_dir = _normalize_dir(dest_dir)
-    res = _write(dest_dir / f"{_snake(ent)}.py", schemas_txt, overwrite)
-    return {"status": "ok", "result": res}
-
-
-# -------------------- tiny utilities --------------------
+# ---------------- tiny utilities ----------------
 
 def _normalize_entity_name(name: str) -> str:
-    # PascalCase the given name (cheap & cheerful)
     parts = [p for p in _snake(name).split("_") if p]
     return "".join(p.capitalize() for p in parts) or "Item"
 
@@ -234,6 +120,164 @@ def _snake(name: str) -> str:
     return re.sub("[^a-zA-Z0-9_]+", "_", s2).lower().strip("_")
 
 def _suggest_table_name(entity_pascal: str) -> str:
-    # simple pluralizer fallback: add "s" — devs can rename later
     base = _snake(entity_pascal)
     return base + "s" if not base.endswith("s") else base
+
+# ---------------- unified public API ----------------
+# kind: "entity" (generic) or "auth" (specialized templates)
+
+Kind = Literal["entity", "auth"]
+
+def scaffold_core(
+        *,
+        models_dir: Path | str,
+        schemas_dir: Path | str,
+        kind: Kind = "entity",
+        entity_name: str = "Item",
+        table_name: Optional[str] = None,
+        include_tenant: bool = True,
+        include_soft_delete: bool = False,
+        overwrite: bool = False,
+        same_dir: bool = False,
+) -> Dict[str, Any]:
+    """
+    Create starter model + schema files.
+
+    - Writes to `models.py` and `schemas.py` (always).
+    - If same_dir=True, both are placed in models_dir.
+    """
+    models_dir = _normalize_dir(models_dir)
+    schemas_dir = _normalize_dir(models_dir if same_dir else schemas_dir)
+
+    # --- content per kind ---
+    if kind == "auth":
+        models_txt = _render_auth_template("models.py.tmpl")
+        schemas_txt = _render_auth_template("schemas.py.tmpl")
+    else:
+        ent = _normalize_entity_name(entity_name)
+        tbl = table_name or _suggest_table_name(ent)
+
+        tenant_model_field = (
+            '    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)\n'
+            if include_tenant else ""
+        )
+        soft_delete_model_field = (
+            '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
+            '    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))\n'
+            if include_soft_delete else
+            '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
+        )
+
+        constraints = (
+            '    __table_args__ = (\n'
+            f'        UniqueConstraint("tenant_id", "name", name="uq_{tbl}_tenant_name"),\n'
+            '    )\n'
+        ) if include_tenant else ""
+
+        indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
+
+        models_txt = _DEFAULT_MODELS_TPL.substitute(
+            Entity=ent,
+            table_name=tbl,
+            tenant_field=tenant_model_field,
+            soft_delete_field=soft_delete_model_field,
+            constraints=constraints,
+            indexes=indexes,
+        )
+
+        tenant_schema_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
+        schemas_txt = _DEFAULT_SCHEMAS_TPL.substitute(
+            Entity=ent,
+            tenant_field=tenant_schema_field,
+            tenant_field_create=tenant_schema_field,
+            tenant_field_update=tenant_schema_field,
+        )
+
+    # --- file paths: always models.py / schemas.py ---
+    models_path = models_dir / "models.py"
+    schemas_path = schemas_dir / "schemas.py"
+
+    models_res = _write(models_path, models_txt, overwrite)
+    schemas_res = _write(schemas_path, schemas_txt, overwrite)
+
+    # __init__.py in each destination folder
+    init_results = [ _ensure_init_py(models_dir, overwrite) ]
+    if schemas_dir != models_dir:
+        init_results.append(_ensure_init_py(schemas_dir, overwrite))
+
+    return {"status": "ok", "results": {"models": models_res, "schemas": schemas_res, "inits": init_results}}
+
+def scaffold_models_core(
+        *,
+        dest_dir: Path | str,
+        kind: Kind = "entity",
+        entity_name: str = "Item",
+        table_name: Optional[str] = None,
+        include_tenant: bool = True,
+        include_soft_delete: bool = False,
+        overwrite: bool = False,
+) -> Dict[str, Any]:
+    """Create only models.py in the given directory."""
+    dest = _normalize_dir(dest_dir)
+
+    if kind == "auth":
+        txt = _render_auth_template("models.py.tmpl")
+    else:
+        ent = _normalize_entity_name(entity_name)
+        tbl = table_name or _suggest_table_name(ent)
+        tenant_model_field = (
+            '    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)\n'
+            if include_tenant else ""
+        )
+        soft_delete_model_field = (
+            '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
+            '    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))\n'
+            if include_soft_delete else
+            '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
+        )
+        constraints = (
+            '    __table_args__ = (\n'
+            f'        UniqueConstraint("tenant_id", "name", name="uq_{tbl}_tenant_name"),\n'
+            '    )\n'
+        ) if include_tenant else ""
+        indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
+
+        txt = _DEFAULT_MODELS_TPL.substitute(
+            Entity=ent,
+            table_name=tbl,
+            tenant_field=tenant_model_field,
+            soft_delete_field=soft_delete_model_field,
+            constraints=constraints,
+            indexes=indexes,
+        )
+
+    res = _write(dest / "models.py", txt, overwrite)
+    _ensure_init_py(dest, overwrite)
+    return {"status": "ok", "result": res}
+
+def scaffold_schemas_core(
+        *,
+        dest_dir: Path | str,
+        kind: Kind = "entity",
+        entity_name: str = "Item",
+        include_tenant: bool = True,
+        overwrite: bool = False,
+) -> Dict[str, Any]:
+    """Create only schemas.py in the given directory."""
+    dest = _normalize_dir(dest_dir)
+
+    if kind == "auth":
+        txt = _render_auth_template("schemas.py.tmpl")
+    else:
+        ent = _normalize_entity_name(entity_name)
+        tenant_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
+        txt = _DEFAULT_SCHEMAS_TPL.substitute(
+            Entity=ent,
+            tenant_field=tenant_field,
+            tenant_field_create=tenant_field,
+            tenant_field_update=tenant_field,
+        )
+
+    res = _write(dest / "schemas.py", txt, overwrite)
+    _ensure_init_py(dest, overwrite)
+    return {"status": "ok", "result": res}

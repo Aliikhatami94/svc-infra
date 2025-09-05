@@ -82,7 +82,7 @@ mypy = "^1.11.2"
 types-requests = "^2.32.0.20241016"
 
 [tool.poetry.scripts]
-svc-infra = "svc_infra.cli.main:app"
+svc-infra = "svc_infra.cli.run:app"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

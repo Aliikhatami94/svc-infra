@@ -1,5 +1,6 @@
 from __future__ import annotations
 from fastapi import FastAPI
+
 from .users import get_fastapi_users
 from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings

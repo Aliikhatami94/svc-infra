@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, cast
 
-import typer
+import typer, click
 
 from .core import (
     init_alembic as core_init_alembic,
@@ -17,9 +17,10 @@ from .core import (
     merge_heads as core_merge_heads,
 )
 from .scaffold import (
-    scaffold_entity_core,
-    scaffold_entity_models_core,
-    scaffold_entity_schemas_core,
+    scaffold_core,
+    scaffold_models_core,
+    scaffold_schemas_core,
+    Kind,
 )
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -130,19 +131,99 @@ def merge_heads(
     core_merge_heads(project_root=project_root, message=message)
 
 
-@app.command("scaffold-entity")
-def cli_scaffold_entity(
-        models_dir: Path = typer.Option("app/models", help="Directory to write the model file"),
-        schemas_dir: Path = typer.Option("app/schemas", help="Directory to write the schema file"),
-        entity_name: str = typer.Option("Item", help="Entity class name (PascalCase preferred)"),
-        table_name: Optional[str] = typer.Option(None, help="Optional SQL table name; defaults to snake(entity)+s"),
-        include_tenant: bool = typer.Option(True, help="Include tenant_id + per-tenant name uniqueness"),
-        include_soft_delete: bool = typer.Option(False, help="Include is_active + deleted_at"),
-        overwrite: bool = typer.Option(False, help="Overwrite existing files"),
+@app.command("scaffold")
+def scaffold(
+        kind: str = typer.Option(
+            "entity",
+            "--kind",
+            help="Scaffold type",
+            click_type=click.Choice(["entity", "auth"], case_sensitive=False),
+        ),
+        models_dir: Path = typer.Option(
+            ...,
+            "--models-dir",
+            help="Directory for models (or shared dir if --same-dir)",
+            resolve_path=True,
+        ),
+        schemas_dir: Optional[Path] = typer.Option(
+            None,
+            "--schemas-dir",
+            help="Directory for schemas (ignored if --same-dir)",
+            resolve_path=True,
+        ),
+        entity_name: str = typer.Option(
+            "Item",
+            "--entity-name",
+            help="Entity name (ignored for --kind auth)",
+        ),
+        table_name: Optional[str] = typer.Option(
+            None,
+            "--table-name",
+            help="Explicit table name (defaults to pluralized entity)",
+        ),
+        include_tenant: bool = typer.Option(
+            True,
+            "--include-tenant/--no-include-tenant",
+            help="Include tenant_id column (entity only)",
+        ),
+        include_soft_delete: bool = typer.Option(
+            False,
+            "--include-soft-delete/--no-include-soft-delete",
+            help="Include deleted_at column (entity only)",
+        ),
+        overwrite: bool = typer.Option(
+            False,
+            "--overwrite/--no-overwrite",
+            help="Overwrite existing files",
+        ),
+        same_dir: bool = typer.Option(
+            False,
+            "--same-dir/--split-dirs",
+            help="Write models.py and schemas.py into the same directory",
+        ),
 ):
-    res = scaffold_entity_core(
+    """
+    Scaffold starter models and schemas.
+
+    Examples:
+      svc-infra db scaffold --kind auth --models-dir app/auth --same-dir
+      svc-infra db scaffold --kind entity --models-dir app/things/models --schemas-dir app/things/schemas --entity-name Project
+    """
+    target_schemas_dir = models_dir if same_dir else (schemas_dir or models_dir)
+    kind_norm = cast(Kind, kind.lower())  # satisfy Literal type
+
+    result = scaffold_core(
         models_dir=models_dir,
-        schemas_dir=schemas_dir,
+        schemas_dir=target_schemas_dir,
+        kind=kind_norm,
+        entity_name=entity_name,
+        table_name=table_name,
+        include_tenant=include_tenant,
+        include_soft_delete=include_soft_delete,
+        overwrite=overwrite,
+        same_dir=same_dir,
+    )
+    typer.echo(result)
+
+
+@app.command("scaffold-models")
+def scaffold_models(
+        dest_dir: Path = typer.Option(..., "--dest-dir", resolve_path=True),
+        kind: str = typer.Option(
+            "entity",
+            "--kind",
+            help="Scaffold type",
+            click_type=click.Choice(["entity", "auth"], case_sensitive=False),
+        ),
+        entity_name: str = typer.Option("Item", "--entity-name"),
+        table_name: Optional[str] = typer.Option(None, "--table-name"),
+        include_tenant: bool = typer.Option(True, "--include-tenant/--no-include-tenant"),
+        include_soft_delete: bool = typer.Option(False, "--include-soft-delete/--no-include-soft-delete"),
+        overwrite: bool = typer.Option(False, "--overwrite/--no-overwrite"),
+):
+    res = scaffold_models_core(
+        dest_dir=dest_dir,
+        kind=cast(Kind, kind.lower()),
         entity_name=entity_name,
         table_name=table_name,
         include_tenant=include_tenant,
@@ -152,35 +233,22 @@ def cli_scaffold_entity(
     typer.echo(res)
 
 
-@app.command("scaffold-entity-models")
-def cli_scaffold_entity_models(
-        dest_dir: Path = typer.Option("app/models", help="Directory to write the model file"),
-        entity_name: str = typer.Option("Item", help="Entity class name"),
-        table_name: Optional[str] = typer.Option(None, help="Optional SQL table name"),
-        include_tenant: bool = typer.Option(True, help="Include tenant_id in model"),
-        include_soft_delete: bool = typer.Option(False, help="Include is_active + deleted_at"),
-        overwrite: bool = typer.Option(False, help="Overwrite existing file"),
+@app.command("scaffold-schemas")
+def scaffold_schemas(
+        dest_dir: Path = typer.Option(..., "--dest-dir", resolve_path=True),
+        kind: str = typer.Option(
+            "entity",
+            "--kind",
+            help="Scaffold type",
+            click_type=click.Choice(["entity", "auth"], case_sensitive=False),
+        ),
+        entity_name: str = typer.Option("Item", "--entity-name"),
+        include_tenant: bool = typer.Option(True, "--include-tenant/--no-include-tenant"),
+        overwrite: bool = typer.Option(False, "--overwrite/--no-overwrite"),
 ):
-    res = scaffold_entity_models_core(
+    res = scaffold_schemas_core(
         dest_dir=dest_dir,
-        entity_name=entity_name,
-        table_name=table_name,
-        include_tenant=include_tenant,
-        include_soft_delete=include_soft_delete,
-        overwrite=overwrite,
-    )
-    typer.echo(res)
-
-
-@app.command("scaffold-entity-schemas")
-def cli_scaffold_entity_schemas(
-        dest_dir: Path = typer.Option("app/schemas", help="Directory to write the schema file"),
-        entity_name: str = typer.Option("Item", help="Entity class name"),
-        include_tenant: bool = typer.Option(True, help="Include tenant_id in schemas"),
-        overwrite: bool = typer.Option(False, help="Overwrite existing file"),
-):
-    res = scaffold_entity_schemas_core(
-        dest_dir=dest_dir,
+        kind=cast(Kind, kind.lower()),
         entity_name=entity_name,
         include_tenant=include_tenant,
         overwrite=overwrite,
