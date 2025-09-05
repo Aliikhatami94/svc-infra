@@ -20,9 +20,13 @@ def _write(dest: Path, content: str, overwrite: bool) -> Dict[str, Any]:
     dest.write_text(content, encoding="utf-8")
     return {"path": str(dest), "action": "wrote"}
 
-def _ensure_init_py(dir_path: Path, overwrite: bool) -> Dict[str, Any]:
-    """Create __init__.py that re-exports models/schemas."""
-    return _write(dir_path / "__init__.py", _INIT_CONTENT, overwrite)
+_INIT_CONTENT_PAIRED = 'from . import models, schemas\n\n__all__ = ["models", "schemas"]\n'
+_INIT_CONTENT_MINIMAL = '# package marker; add explicit exports here if desired\n'
+
+def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> Dict[str, Any]:
+    """Create __init__.py; paired=True writes models/schemas re-exports, otherwise minimal."""
+    content = _INIT_CONTENT_PAIRED if paired else _INIT_CONTENT_MINIMAL
+    return _write(dir_path / "__init__.py", content, overwrite)
 
 # ---------------- generic (entity) inline templates ----------------
 
@@ -139,24 +143,27 @@ def scaffold_core(
         include_soft_delete: bool = False,
         overwrite: bool = False,
         same_dir: bool = False,
+        models_filename: Optional[str] = None,   # <--- NEW
+        schemas_filename: Optional[str] = None,  # <--- NEW
 ) -> Dict[str, Any]:
     """
     Create starter model + schema files.
 
-    - Writes to `models.py` and `schemas.py` (always).
-    - If same_dir=True, both are placed in models_dir.
+    Filenames:
+      - same_dir=True  -> models.py + schemas.py (paired).
+      - same_dir=False -> defaults to <snake(entity)>.py in each dir, unless you pass
+                          --models-filename / --schemas-filename.
     """
     models_dir = _normalize_dir(models_dir)
     schemas_dir = _normalize_dir(models_dir if same_dir else schemas_dir)
 
-    # --- content per kind ---
+    # content per kind
     if kind == "auth":
         models_txt = _render_auth_template("models.py.tmpl")
         schemas_txt = _render_auth_template("schemas.py.tmpl")
     else:
         ent = _normalize_entity_name(entity_name)
         tbl = table_name or _suggest_table_name(ent)
-
         tenant_model_field = (
             '    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)\n'
             if include_tenant else ""
@@ -167,13 +174,11 @@ def scaffold_core(
             if include_soft_delete else
             '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
         )
-
         constraints = (
             '    __table_args__ = (\n'
             f'        UniqueConstraint("tenant_id", "name", name="uq_{tbl}_tenant_name"),\n'
             '    )\n'
         ) if include_tenant else ""
-
         indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
 
         models_txt = _DEFAULT_MODELS_TPL.substitute(
@@ -193,17 +198,26 @@ def scaffold_core(
             tenant_field_update=tenant_schema_field,
         )
 
-    # --- file paths: always models.py / schemas.py ---
-    models_path = models_dir / "models.py"
-    schemas_path = schemas_dir / "schemas.py"
+    # filenames
+    if same_dir:
+        models_path = models_dir / "models.py"
+        schemas_path = schemas_dir / "schemas.py"
+    else:
+        default_stub = _snake(entity_name)
+        models_name = models_filename or f"{default_stub}.py"
+        schemas_name = schemas_filename or f"{default_stub}.py"
+        models_path = models_dir / models_name
+        schemas_path = schemas_dir / schemas_name
 
+    # write
     models_res = _write(models_path, models_txt, overwrite)
     schemas_res = _write(schemas_path, schemas_txt, overwrite)
 
-    # __init__.py in each destination folder
-    init_results = [ _ensure_init_py(models_dir, overwrite) ]
+    # __init__ files
+    init_results = []
+    init_results.append(_ensure_init_py(models_dir, overwrite, paired=same_dir))
     if schemas_dir != models_dir:
-        init_results.append(_ensure_init_py(schemas_dir, overwrite))
+        init_results.append(_ensure_init_py(schemas_dir, overwrite, paired=False))
 
     return {"status": "ok", "results": {"models": models_res, "schemas": schemas_res, "inits": init_results}}
 
@@ -216,8 +230,9 @@ def scaffold_models_core(
         include_tenant: bool = True,
         include_soft_delete: bool = False,
         overwrite: bool = False,
+        models_filename: Optional[str] = None,  # <--- NEW
 ) -> Dict[str, Any]:
-    """Create only models.py in the given directory."""
+    """Create only a model file (defaults to <snake(entity)>.py unless models_filename is provided)."""
     dest = _normalize_dir(dest_dir)
 
     if kind == "auth":
@@ -241,7 +256,6 @@ def scaffold_models_core(
             '    )\n'
         ) if include_tenant else ""
         indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
-
         txt = _DEFAULT_MODELS_TPL.substitute(
             Entity=ent,
             table_name=tbl,
@@ -251,8 +265,9 @@ def scaffold_models_core(
             indexes=indexes,
         )
 
-    res = _write(dest / "models.py", txt, overwrite)
-    _ensure_init_py(dest, overwrite)
+    filename = models_filename or f"{_snake(entity_name)}.py"
+    res = _write(dest / filename, txt, overwrite)
+    _ensure_init_py(dest, overwrite, paired=False)
     return {"status": "ok", "result": res}
 
 def scaffold_schemas_core(
@@ -262,8 +277,9 @@ def scaffold_schemas_core(
         entity_name: str = "Item",
         include_tenant: bool = True,
         overwrite: bool = False,
+        schemas_filename: Optional[str] = None,  # <--- NEW
 ) -> Dict[str, Any]:
-    """Create only schemas.py in the given directory."""
+    """Create only a schema file (defaults to <snake(entity)>.py unless schemas_filename is provided)."""
     dest = _normalize_dir(dest_dir)
 
     if kind == "auth":
@@ -278,6 +294,7 @@ def scaffold_schemas_core(
             tenant_field_update=tenant_field,
         )
 
-    res = _write(dest / "schemas.py", txt, overwrite)
-    _ensure_init_py(dest, overwrite)
+    filename = schemas_filename or f"{_snake(entity_name)}.py"
+    res = _write(dest / filename, txt, overwrite)
+    _ensure_init_py(dest, overwrite, paired=False)
     return {"status": "ok", "result": res}
