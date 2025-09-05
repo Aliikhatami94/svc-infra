@@ -22,7 +22,6 @@ def include_crud(app: FastAPI, resources: Sequence[Resources]) -> None:
         Read, Create, Update = make_crud_schemas(
             res.model,
             create_exclude=res.create_exclude,
-            update_optional=res.update_optional,
             read_name=res.read_name,
             create_name=res.create_name,
             update_name=res.update_name,
@@ -34,6 +33,5 @@ def include_crud(app: FastAPI, resources: Sequence[Resources]) -> None:
             update_schema=Update,
             prefix=res.prefix,
             tags=res.tags,
-            id_attr=res.id_attr,
         )
         app.include_router(router)

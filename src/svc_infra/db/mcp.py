@@ -1,6 +1,6 @@
 from ai_infra import mcp_from_functions
 
-from .core import (
+from .setup import (
     init_alembic,
     revision,
     upgrade,

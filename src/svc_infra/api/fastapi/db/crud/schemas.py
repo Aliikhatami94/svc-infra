@@ -5,14 +5,15 @@ from pydantic import BaseModel, ConfigDict, create_model
 from sqlalchemy.orm import Mapper, class_mapper
 from sqlalchemy import Column
 
-def _sa_columns(model: type) -> list[Column]:
+def _sa_columns(model: type[object]) -> list[Column]:
     mapper: Mapper = class_mapper(model)  # raises if not a mapped class
-    return [model.__table__.c[name] for name in mapper.columns.keys()]
+    # Use mapper.columns directly to avoid relying on model.__table__ for typing tools
+    return list(mapper.columns)
+
 
 def _py_type(col: Column) -> type:
     # very small map; expand if you need more types
     from sqlalchemy import String, Text, Integer, Boolean
-    import uuid
     if getattr(col.type, "python_type", None):
         return col.type.python_type  # works for many types incl UUID
     if isinstance(col.type, (String, Text)):
@@ -23,8 +24,9 @@ def _py_type(col: Column) -> type:
         return bool
     return Any
 
+
 def make_crud_schemas(
-        model: type,
+        model: type[object],
         *,
         create_exclude: tuple[str, ...] = ("id",),
         read_name: str | None = None,

@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any, Type, cast
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,25 +12,24 @@ def make_crud_router(
         update_schema: Type[Any],
         prefix: str,
         tags: list[str] | None = None,
-        id_attr: str = "id",
 ) -> APIRouter:
     router_prefix = "/_db" + prefix
     r = APIRouter(prefix=router_prefix, tags=tags or [prefix.strip("/")])
 
-    @r.get("/", response_model=list[read_schema])
-    async def list_items(session: SessionDep):
+    @r.get("/", response_model=cast(Any, list[read_schema]))  # type: ignore[valid-type]
+    async def list_items(session: SessionDep):  # type: ignore[valid-type]
         rows = (await session.execute(select(model))).scalars().all()
         return rows
 
-    @r.get("/{item_id}", response_model=read_schema)
-    async def get_item(item_id: Any, session: SessionDep):
+    @r.get("/{item_id}", response_model=cast(Any, read_schema))
+    async def get_item(item_id: Any, session: SessionDep):  # type: ignore[valid-type]
         row = await session.get(model, item_id)
         if not row:
             raise HTTPException(404, "Not found")
         return row
 
-    @r.post("/", response_model=read_schema, status_code=201)
-    async def create_item(payload: create_schema, session: SessionDep):
+    @r.post("/", response_model=cast(Any, read_schema), status_code=201)
+    async def create_item(payload: create_schema, session: SessionDep):  # type: ignore[valid-type]
         row = model(**payload.model_dump(exclude_unset=True))
         session.add(row)
         try:
@@ -39,8 +38,8 @@ def make_crud_router(
             raise HTTPException(400, f"Integrity error: {e.orig}")
         return row
 
-    @r.patch("/{item_id}", response_model=read_schema)
-    async def update_item(item_id: Any, payload: update_schema, session: SessionDep):
+    @r.patch("/{item_id}", response_model=cast(Any, read_schema))
+    async def update_item(item_id: Any, payload: update_schema, session: SessionDep):  # type: ignore[valid-type]
         row = await session.get(model, item_id)
         if not row:
             raise HTTPException(404, "Not found")
@@ -50,7 +49,7 @@ def make_crud_router(
         return row
 
     @r.delete("/{item_id}", status_code=204)
-    async def delete_item(item_id: Any, session: SessionDep):
+    async def delete_item(item_id: Any, session: SessionDep):  # type: ignore[valid-type]
         row = await session.get(model, item_id)
         if row:
             await session.delete(row)
