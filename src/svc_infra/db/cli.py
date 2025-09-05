@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, cast
 
 import typer, click
 
@@ -133,7 +133,12 @@ def merge_heads(
 
 @app.command("scaffold")
 def scaffold(
-        kind: Kind = typer.Option("entity", help="Kind of scaffold to generate (entity or auth)."),
+        kind: str = typer.Option(
+            "entity",
+            "--kind",
+            help="Kind of scaffold to generate (entity or auth).",
+            click_type=click.Choice(["entity", "auth"], case_sensitive=False),
+        ),
         entity_name: str = typer.Option("Item", help="Entity name (for kind=entity)."),
         models_dir: Path = typer.Option(..., help="Directory for models."),
         schemas_dir: Path = typer.Option(..., help="Directory for schemas."),
@@ -150,7 +155,7 @@ def scaffold(
     res = scaffold_core(
         models_dir=models_dir,
         schemas_dir=schemas_dir,
-        kind=kind,
+        kind=cast(Kind, kind.lower()),
         entity_name=entity_name,
         overwrite=overwrite,
         same_dir=same_dir,
@@ -163,7 +168,7 @@ def scaffold(
 @app.command("scaffold-models")
 def scaffold_models(
         dest_dir: Path = typer.Option(..., "--dest-dir", resolve_path=True),
-        kind: Kind = typer.Option(
+        kind: str = typer.Option(
             "entity",
             "--kind",
             help="Scaffold type",
@@ -181,7 +186,7 @@ def scaffold_models(
 ):
     res = scaffold_models_core(
         dest_dir=dest_dir,
-        kind=kind,
+        kind=cast(Kind, kind.lower()),
         entity_name=entity_name,
         table_name=table_name,
         include_tenant=include_tenant,
@@ -195,7 +200,7 @@ def scaffold_models(
 @app.command("scaffold-schemas")
 def scaffold_schemas(
         dest_dir: Path = typer.Option(..., "--dest-dir", resolve_path=True),
-        kind: Kind = typer.Option(
+        kind: str = typer.Option(
             "entity",
             "--kind",
             help="Scaffold type",
@@ -211,7 +216,7 @@ def scaffold_schemas(
 ):
     res = scaffold_schemas_core(
         dest_dir=dest_dir,
-        kind=kind,
+        kind=cast(Kind, kind.lower()),
         entity_name=entity_name,
         include_tenant=include_tenant,
         overwrite=overwrite,

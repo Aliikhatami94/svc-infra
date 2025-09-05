@@ -11,7 +11,7 @@ def read(p: Path) -> str:
     return Path(p).read_text(encoding="utf-8")
 
 
-# ---------- scaffold_core (same_dir) ----------
+# ---------- scafold_core (same_dir) ----------
 
 def test_scaffold_core_same_dir_creates_paired_files_and_init(tmp_path: Path):
     pkg = tmp_path / "pkg"
