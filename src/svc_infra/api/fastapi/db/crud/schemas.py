@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Any, Optional, Type
+
+from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, create_model
 from sqlalchemy.orm import Mapper, class_mapper
 from sqlalchemy import Column
@@ -26,7 +27,6 @@ def make_crud_schemas(
         model: type,
         *,
         create_exclude: tuple[str, ...] = ("id",),
-        update_optional: tuple[str, ...] | None = None,
         read_name: str | None = None,
         create_name: str | None = None,
         update_name: str | None = None,
