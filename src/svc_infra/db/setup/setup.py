@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
+from functools import wraps
 
 from alembic import command
 from alembic.config import Config
@@ -16,7 +17,7 @@ from .utils import (
     is_async_url,
     build_engine,
     ensure_database_exists,
-    _with_env,
+    prepare_process_env,
     repair_alembic_state_if_needed,
     render_env_py,
     build_alembic_config,
@@ -24,6 +25,14 @@ from .utils import (
 )
 
 # ---------- Alembic init ----------
+
+def _with_env(func):
+    @wraps(func)
+    def _wrapped(project_root: Path | str, *args, **kwargs):
+        prepare_process_env(project_root)
+        return func(project_root, *args, **kwargs)
+    return _wrapped
+
 
 @_with_env
 def init_alembic(

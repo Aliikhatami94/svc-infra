@@ -6,7 +6,6 @@ from sqlalchemy import inspect
 from pathlib import Path
 from typing import Any, Optional, Sequence, Union, TYPE_CHECKING
 from alembic.config import Config
-from functools import wraps
 
 from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
@@ -59,13 +58,6 @@ def prepare_process_env(
     # Optional override (discouraged—automatic discovery is preferred)
     if discover_packages:
         os.environ["ALEMBIC_DISCOVER_PACKAGES"] = ",".join(discover_packages)
-
-def _with_env(func):
-    @wraps(func)
-    def _wrapped(project_root: Path | str, *args, **kwargs):
-        prepare_process_env(project_root)
-        return func(project_root, *args, **kwargs)
-    return _wrapped
 
 def _read_secret_from_file(path: str) -> Optional[str]:
     """Return file contents if path exists, else None."""
