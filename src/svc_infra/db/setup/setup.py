@@ -28,9 +28,24 @@ from .utils import (
 
 def _with_env(func):
     @wraps(func)
-    def _wrapped(project_root: Path | str, *args, **kwargs):
+    def _wrapped(*args, **kwargs):
+        # Try to get project_root from kwargs first
+        if "project_root" in kwargs:
+            project_root = kwargs["project_root"]
+            remaining_args = args
+        else:
+            # Fall back to first positional, if present
+            if not args:
+                raise TypeError("project_root is required")
+            project_root = args[0]
+            remaining_args = args[1:]
+
+        # Load .env etc.
         prepare_process_env(project_root)
-        return func(project_root, *args, **kwargs)
+
+        # Always pass project_root as a keyword to support keyword-only signatures
+        kwargs["project_root"] = project_root
+        return func(*remaining_args, **kwargs)
     return _wrapped
 
 
