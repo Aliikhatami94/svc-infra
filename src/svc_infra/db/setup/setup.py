@@ -133,18 +133,6 @@ def init_alembic(
     return migrations_dir
 
 
-# ---------- Alembic command helpers ----------
-
-# use utils.build_alembic_config
-
-def _build_alembic_config(
-        project_root: Path | str,
-        script_location: str = "migrations",
-) -> Config:
-    return build_alembic_config(project_root, script_location=script_location)
-
-# use utils.ensure_db_at_head
-
 def _ensure_db_at_head(cfg: Config) -> None:
     ensure_db_at_head(cfg)
 
@@ -171,7 +159,7 @@ def revision(
         - DATABASE_URL must be set in the environment.
         - Model discovery is automatic (prefers ModelBase.metadata).
     """
-    cfg = _build_alembic_config(project_root)
+    cfg = build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
 
     if autogenerate and ensure_head_before_autogenerate:
@@ -202,7 +190,7 @@ def upgrade(
         >>> upgrade("..")          # to head
         >>> upgrade("..", "base")  # or to a specific rev
     """
-    cfg = _build_alembic_config(project_root)
+    cfg = build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
     command.upgrade(cfg, revision_target)
 
@@ -215,7 +203,7 @@ def downgrade(project_root: Path | str, revision_target: str = "-1") -> None:
         project_root: Directory containing alembic.ini and migrations/.
         revision_target: Target revision identifier or relative step (e.g. "-1").
     """
-    cfg = _build_alembic_config(project_root)
+    cfg = build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
     command.downgrade(cfg, revision_target)
 
@@ -228,7 +216,7 @@ def current(project_root: Path | str, verbose: bool = False) -> None:
         project_root: Directory containing alembic.ini and migrations/.
         verbose: If True, include detailed revision information.
     """
-    cfg = _build_alembic_config(project_root)
+    cfg = build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
     command.current(cfg, verbose=verbose)
 
@@ -241,7 +229,7 @@ def history(project_root: Path | str, verbose: bool = False) -> None:
         project_root: Directory containing alembic.ini and migrations/.
         verbose: If True, include down revisions, timestamps, and messages.
     """
-    cfg = _build_alembic_config(project_root)
+    cfg = build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
     command.history(cfg, verbose=verbose)
 
@@ -256,7 +244,7 @@ def stamp(project_root: Path | str, revision_target: str = "head") -> None:
         project_root: Directory containing alembic.ini and migrations/.
         revision_target: Target revision identifier (e.g. "head").
     """
-    cfg = _build_alembic_config(project_root)
+    cfg = build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
     command.stamp(cfg, revision_target)
 
@@ -269,7 +257,7 @@ def merge_heads(project_root: Path | str, message: Optional[str] = None) -> None
         project_root: Directory containing alembic.ini and migrations/.
         message: Optional message to use for the merge revision.
     """
-    cfg = _build_alembic_config(project_root)
+    cfg = build_alembic_config(project_root)
     command.merge(cfg, "heads", message=message)
 
 
@@ -318,7 +306,7 @@ def setup_and_migrate(
     versions_dir = mig_dir / "versions"
     alembic_ini = root / "alembic.ini"
 
-    cfg = _build_alembic_config(project_root=root)
+    cfg = build_alembic_config(project_root=root)
     repair_alembic_state_if_needed(cfg)
 
     created_initial = False

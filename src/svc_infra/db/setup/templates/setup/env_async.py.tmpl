@@ -6,6 +6,7 @@ from typing import List
 
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.engine import make_url
 
 # Load logging configuration from alembic.ini
 config = context.config
@@ -109,9 +110,34 @@ def _collect_metadata() -> list[object]:
 
 target_metadata = _collect_metadata()
 
+def _ensure_ssl_default(url_str: str) -> str:
+    u = make_url(url_str)
+    backend = (u.get_backend_name() or "").lower()
+    if backend not in ("postgresql", "postgres"):
+        return url_str
+    # asyncpg wants 'ssl=true' via SQLAlchemy param
+    if any(k in u.query for k in ("ssl", "sslmode", "sslrootcert", "sslcert", "sslkey")):
+        return url_str
+    return str(u.set(query={**u.query, "ssl": "true"}))
+
+def _coerce_to_async_url(url_str: str) -> str:
+    low = url_str.lower()
+    if "+asyncpg" in low or "+aiomysql" in low or "+aiosqlite" in low:
+        return url_str
+    if low.startswith("postgresql+psycopg2://") or low.startswith("postgresql+psycopg://"):
+        return "postgresql+asyncpg://" + url_str.split("://", 1)[1]
+    if low.startswith("postgresql://") or low.startswith("postgres://"):
+        return "postgresql+asyncpg://" + url_str.split("://", 1)[1]
+    if low.startswith("mysql+pymysql://") or low.startswith("mysql://"):
+        return "mysql+aiomysql://" + url_str.split("://", 1)[1]
+    if low.startswith("sqlite://") and not low.startswith("sqlite+aiosqlite://"):
+        return "sqlite+aiosqlite://" + url_str.split("://", 1)[1]
+    return url_str
+
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
-    config.set_main_option("sqlalchemy.url", env_db_url)
+    coerced = _ensure_ssl_default(_coerce_to_async_url(env_db_url))
+    config.set_main_option("sqlalchemy.url", coerced)
 
 def _do_run_migrations(connection):
     context.configure(
@@ -136,4 +162,3 @@ if context.is_offline_mode():
 else:
     import asyncio as _asyncio
     _asyncio.run(run_migrations_online())
-

@@ -6,6 +6,7 @@ from typing import List
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 
 # Load logging configuration from alembic.ini
 config = context.config
@@ -15,7 +16,7 @@ if config.config_file_name is not None:
 logger = logging.getLogger(__name__)
 
 # --- sys.path bootstrap for src-layout projects ---
-import sys, pathlib
+import sys, pathlib, importlib.util
 prepend = config.get_main_option("prepend_sys_path") or ""
 if prepend:
     if prepend not in sys.path:
@@ -111,9 +112,43 @@ def _collect_metadata() -> list[object]:
 
 target_metadata = _collect_metadata()
 
+def _module_available(name: str) -> bool:
+    return importlib.util.find_spec(name) is not None
+
+def _coerce_sync_driver(url_str: str) -> str:
+    """Choose an installed sync driver so create_engine won't import missing dbapi."""
+    u = make_url(url_str)
+    dn = (u.drivername or "").lower()
+    if "+" in dn:
+        return url_str  # already explicit
+    backend = (u.get_backend_name() or "").lower()
+    if backend in ("postgresql", "postgres"):
+        if _module_available("psycopg"):
+            return str(u.set(drivername="postgresql+psycopg"))
+        if _module_available("psycopg2"):
+            return str(u.set(drivername="postgresql+psycopg2"))
+        return url_str
+    if backend == "mysql" and _module_available("pymysql"):
+        return str(u.set(drivername="mysql+pymysql"))
+    # sqlite uses stdlib driver, leave it
+    return url_str
+
+def _ensure_ssl_default(url_str: str) -> str:
+    u = make_url(url_str)
+    backend = (u.get_backend_name() or "").lower()
+    if backend not in ("postgresql", "postgres"):
+        return url_str
+    if any(k in u.query for k in ("sslmode", "ssl", "sslrootcert", "sslcert", "sslkey")):
+        return url_str
+    # default for hosted PGs
+    mode = (os.getenv("DB_SSLMODE_DEFAULT") or os.getenv("PGSSLMODE") or os.getenv("PGSSL_MODE") or "require").strip()
+    return str(u.set(query={**u.query, "sslmode": mode}))
+
+# Prefer DATABASE_URL if present; coerce & apply ssl defaults before setting
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
-    config.set_main_option("sqlalchemy.url", env_db_url)
+    coerced = _ensure_ssl_default(_coerce_sync_driver(env_db_url))
+    config.set_main_option("sqlalchemy.url", coerced)
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -150,4 +185,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

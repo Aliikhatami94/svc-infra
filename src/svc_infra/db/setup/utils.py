@@ -745,7 +745,7 @@ def build_alembic_config(
     """Build an Alembic Config based on files + environment.
 
     - Resolves script_location under project_root.
-    - If DATABASE_URL is set, injects into config for runtime use.
+    - If DATABASE_URL is set, injects into config for runtime use (coerced to a working driver, with sensible SSL defaults).
     - Adds prepend_sys_path to ease imports during env.py execution.
     """
     from alembic.config import Config as _Config
@@ -757,7 +757,13 @@ def build_alembic_config(
 
     env_db_url = os.getenv("DATABASE_URL", "").strip()
     if env_db_url:
-        cfg.set_main_option("sqlalchemy.url", env_db_url)
+        u = make_url(env_db_url)
+        # Add SSL defaults for hosted Postgres unless already provided
+        u = _ensure_ssl_default(u)
+        # If it's a sync URL with no explicit driver, choose an installed one
+        if not is_async_url(u):
+            u = _coerce_sync_driver(u)
+        cfg.set_main_option("sqlalchemy.url", str(u))
 
     cfg.set_main_option("path_separator", "os")
     cfg.set_main_option("prepend_sys_path", str(root))
