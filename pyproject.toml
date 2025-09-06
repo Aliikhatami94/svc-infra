@@ -68,6 +68,7 @@ mcp = "^1.13.0"
 
 # AI is required by svc-infra
 ai-infra = "^0.1.29"
+psycopg2 = "^2.9.10"
 
 [tool.poetry.extras]
 pg = ["psycopg", "asyncpg"]
