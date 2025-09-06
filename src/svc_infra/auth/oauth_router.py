@@ -62,7 +62,6 @@ def oauth_router_with_backend(
         token = await client.authorize_access_token(request)
 
         email = None
-        full_name = None
 
         cfg = providers.get(provider, {})
         kind = cfg.get("kind")
