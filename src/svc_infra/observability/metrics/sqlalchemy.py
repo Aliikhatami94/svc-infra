@@ -9,8 +9,8 @@ except Exception:  # optional
 
 from .base import gauge, counter
 
-_pool_in_use = gauge("db_pool_in_use", "Checked-out connections", labels=["db"])
-_pool_available = gauge("db_pool_available", "Available idle connections", labels=["db"])
+_pool_in_use = gauge("db_pool_in_use", "Checked-out connections", labels=["db"], multiprocess_mode="livesum")
+_pool_available = gauge("db_pool_available", "Available idle connections", labels=["db"], multiprocess_mode="livesum")
 _pool_checked_out_total = counter("db_pool_checkedout_total", "Total checkouts", labels=["db"])
 _pool_checked_in_total = counter("db_pool_checkedin_total", "Total checkins", labels=["db"])
 

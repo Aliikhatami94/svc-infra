@@ -51,10 +51,11 @@ class PrometheusMiddleware:
 
     def __init__(
             self,
-             app: ASGIApp, *,
-             skip_paths: Optional[Iterable[str]] = None,
-             route_resolver: Optional[Callable[[Request], str]] = None
-         ):
+            app: ASGIApp,
+            *,
+            skip_paths: Optional[Iterable[str]] = None,
+            route_resolver: Optional[Callable[[Request], str]] = None,
+    ):
         self.app = app
         self.skip_paths = tuple(skip_paths or ("/metrics",))
         self.route_resolver = route_resolver
@@ -64,19 +65,18 @@ class PrometheusMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Fast short-circuit on skip
         path = scope.get("path") or "/"
         if _should_skip(path, self.skip_paths):
             await self.app(scope, receive, send)
             return
 
         request = Request(scope, receive=receive)
-        route = (self.route_resolver or _route_template)(request)
+        # Use a stable label for inflight so we inc/dec the same series.
+        inflight_label = (self.route_resolver or _route_template)(request)
         method = scope.get("method", "GET")
         start = time.perf_counter()
 
-        # track in-flight (route is unknown until after route resolution; use placeholder)
-        _http_inflight.labels(route).inc()
+        _http_inflight.labels(inflight_label).inc()
 
         status_code_container: dict[str, Any] = {}
 
@@ -88,18 +88,18 @@ class PrometheusMiddleware:
         try:
             await self.app(scope, receive, _send)
         finally:
-            # Recompute route after endpoint resolved
+            # For counters/histograms we prefer the resolved route after routing.
             try:
-                route = _route_template(request)
+                route_for_stats = _route_template(request)
             except Exception:
-                route = "/*unknown*"
+                route_for_stats = "/*unknown*"
 
             elapsed = time.perf_counter() - start
             code = str(status_code_container.get("code", 500))
 
-            _http_requests_total.labels(method, route, code).inc()
-            _http_request_duration.labels(route, method).observe(elapsed)
-            _http_inflight.labels(route).inc(-1)
+            _http_requests_total.labels(method, route_for_stats, code).inc()
+            _http_request_duration.labels(route_for_stats, method).observe(elapsed)
+            _http_inflight.labels(inflight_label).dec()
 
 def metrics_endpoint():
     """Return a Starlette/FastAPI handler that exposes /metrics."""

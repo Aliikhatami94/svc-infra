@@ -51,35 +51,42 @@ def instrument_requests():
     requests.sessions.Session.request = _wrapped  # type: ignore[attr-defined]
 
 def instrument_httpx():
-    import httpx, asyncio
+    import httpx
+
     _orig_sync = httpx.Client.send
     _orig_async = httpx.AsyncClient.send
 
     def _wrap_sync_send(send):
         def _wrapped(self, request, *a, **kw):
-            host = _host(str(request.url)); method = str(request.method or "GET").upper()
+            host = _host(str(request.url))
+            method = str(request.method or "GET").upper()
             start = time.perf_counter()
             try:
                 resp = send(self, request, *a, **kw)
-                code = str(resp.status_code); return resp
+                code = str(resp.status_code)
+                return resp
             except Exception:
-                code = "exc"; raise
+                code = "exc"
+                raise
             finally:
                 _http_client_total.labels(host, method, code).inc()
                 _http_client_duration.labels(host, method).observe(time.perf_counter() - start)
         return _wrapped
 
     async def _wrapped_async(self, request, *a, **kw):
-        host = _host(str(request.url)); method = str(request.method or "GET").upper()
+        host = _host(str(request.url))
+        method = str(request.method or "GET").upper()
         start = time.perf_counter()
         try:
             resp = await _orig_async(self, request, *a, **kw)
-            code = str(resp.status_code); return resp
+            code = str(resp.status_code)
+            return resp
         except Exception:
-            code = "exc"; raise
+            code = "exc"
+            raise
         finally:
             _http_client_total.labels(host, method, code).inc()
             _http_client_duration.labels(host, method).observe(time.perf_counter() - start)
 
-    httpx.Client.send = _wrap_sync_send(_orig_sync)         # type: ignore[assignment]
-    httpx.AsyncClient.send = _wrapped_async                 # type: ignore[assignment]
+    httpx.Client.send = _wrap_sync_send(_orig_sync)      # type: ignore[assignment]
+    httpx.AsyncClient.send = _wrapped_async              # type: ignore[assignment]
