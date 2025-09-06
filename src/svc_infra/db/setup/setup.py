@@ -54,16 +54,14 @@ def init_alembic(
         project_root: Path | str,
         *,
         script_location: str = "migrations",
-        async_db: bool = False,
         discover_packages: Optional[Sequence[str]] = None,
         overwrite: bool = False,
 ) -> Path:
     """
     Initialize alembic.ini + migrations/ scaffold.
 
-    Example:
-        >>> # DATABASE_URL from env; discovery via ModelBase or fallback scan
-        >>> init_alembic("..", async_db=False, overwrite=False)
+    Auto-detects async vs. sync from DATABASE_URL; defaults to sync if the URL
+    can't be resolved at init time.
 
     Returns:
         Path to the created migrations directory.
@@ -105,8 +103,15 @@ def init_alembic(
         script_template.write_text(ALEMBIC_SCRIPT_TEMPLATE, encoding="utf-8")
 
     pkgs = list(discover_packages or [])
-    if not pkgs:
-        pkgs = []
+
+    # ---- Auto-detect async from DATABASE_URL (falls back to sync if unknown)
+    try:
+        from sqlalchemy.engine import make_url as _make_url
+        from .utils import get_database_url_from_env, is_async_url  # local import to avoid cycles
+        db_url = get_database_url_from_env(required=False)
+        async_db = bool(db_url and is_async_url(_make_url(db_url)))
+    except Exception:
+        async_db = False
 
     env_py_text = render_env_py(pkgs, async_db=async_db)
     env_path = migrations_dir / "env.py"
@@ -279,7 +284,6 @@ class SetupAndMigrateResult:
 def setup_and_migrate(
         *,
         project_root: Path | str,
-        async_db: bool | None = None,
         overwrite_scaffold: bool = False,
         create_db_if_missing: bool = True,
         create_followup_revision: bool = True,
@@ -289,16 +293,7 @@ def setup_and_migrate(
     """
     Ensure DB + Alembic are ready and up-to-date.
 
-    Examples:
-        >>> # First run (DATABASE_URL already set in env)
-        >>> setup_and_migrate(project_root=".")
-        >>>
-        >>> # Later, after editing models
-        >>> setup_and_migrate(project_root=".", create_followup_revision=True)
-
-    Notes:
-        - Reads DATABASE_URL from environment. Does not set it.
-        - Model discovery is automatic via env.py (prefers ModelBase.metadata).
+    Auto-detects async vs. sync from DATABASE_URL.
     """
     root = Path(project_root).resolve()
 
@@ -306,12 +301,12 @@ def setup_and_migrate(
     if create_db_if_missing:
         ensure_database_exists(db_url)
 
+    # Auto-detect async from the URL
     from sqlalchemy.engine import make_url as _make_url
-    is_async = async_db if async_db is not None else is_async_url(_make_url(db_url))
+    is_async = is_async_url(_make_url(db_url))
 
     mig_dir = init_alembic(
         root,
-        async_db=is_async,
         discover_packages=None,   # rely on auto-discovery only
         overwrite=overwrite_scaffold,
     )

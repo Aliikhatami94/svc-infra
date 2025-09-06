@@ -57,9 +57,8 @@ def starlette_app():
 
     app = Starlette()
 
-    @app.route("/health")
-    async def health(_):
-        return PlainTextResponse("ok")
+    from starlette.responses import PlainTextResponse
+    app.add_route("/health", lambda _: PlainTextResponse("ok"))
 
     return app
 

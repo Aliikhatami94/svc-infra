@@ -568,13 +568,21 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
         finally:
             eng.dispose()
 
-def render_env_py(packages: Sequence[str], *, async_db: bool) -> str:
+def render_env_py(packages: Sequence[str], *, async_db: bool | None = None) -> str:
     """Render Alembic env.py content from packaged templates.
 
-    - packages: list of package names to inject into DISCOVER_PACKAGES default.
-    - async_db: choose async or sync template variant.
+    - If async_db is None, detect from DATABASE_URL; default to sync if unknown.
     """
     import importlib.resources as pkg
+    from sqlalchemy.engine import make_url as _make_url
+
+    if async_db is None:
+        try:
+            db_url = get_database_url_from_env(required=False)
+            async_db = bool(db_url and is_async_url(_make_url(db_url)))
+        except Exception:
+            async_db = False
+
     pkg_list = ", ".join(repr(p) for p in packages)
     tmpl_root = pkg.files("svc_infra.db.setup.templates.setup")
     name = "env_async.py.tmpl" if async_db else "env_sync.py.tmpl"

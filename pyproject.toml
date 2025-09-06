@@ -112,6 +112,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*",]
 python_functions = ["test_*"]
+filterwarnings = [
+    "ignore:The `route` decorator is deprecated:DeprecationWarning:starlette.*",
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
