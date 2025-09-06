@@ -15,6 +15,7 @@ from .setup import (
     history as core_history,
     stamp as core_stamp,
     merge_heads as core_merge_heads,
+    setup_and_migrate as core_setup_and_migrate,
 )
 from .scaffold import (
     scaffold_core,
@@ -129,6 +130,29 @@ def merge_heads(
 ):
     _apply_database_url(database_url)
     core_merge_heads(project_root=project_root, message=message)
+
+
+@app.command("setup-and-migrate")
+def setup_and_migrate_cmd(
+        project_root: Path = typer.Option(Path(".."), resolve_path=True),
+        database_url: Optional[str] = typer.Option(None, help="Overrides env for this command."),
+        async_db: bool = typer.Option(False, help="Use async driver in alembic.ini."),
+        overwrite_scaffold: bool = typer.Option(False, help="Overwrite alembic scaffold if present."),
+        create_db_if_missing: bool = typer.Option(True),
+        create_followup_revision: bool = typer.Option(True),
+        initial_message: str = typer.Option("initial schema"),
+        followup_message: str = typer.Option("autogen"),
+):
+    _apply_database_url(database_url)
+    core_setup_and_migrate(
+        project_root=project_root,
+        async_db=async_db,
+        overwrite_scaffold=overwrite_scaffold,
+        create_db_if_missing=create_db_if_missing,
+        create_followup_revision=create_followup_revision,
+        initial_message=initial_message,
+        followup_message=followup_message,
+    )
 
 
 @app.command("scaffold")

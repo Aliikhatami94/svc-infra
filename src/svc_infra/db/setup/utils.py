@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os, asyncio
 from sqlalchemy import inspect
 from pathlib import Path
-from typing import Any, Optional, Sequence, Union, TYPE_CHECKING
+from typing import Any, Optional, Sequence, Union, TYPE_CHECKING, Set
 from alembic.config import Config
 
 from sqlalchemy import text
@@ -513,15 +513,15 @@ def ensure_database_exists(url: URL | str) -> None:
         raise RuntimeError(f"Failed to connect to database: {exc}") from exc
 
 def repair_alembic_state_if_needed(cfg: Config) -> None:
-    """If DB points to a non-existent local revision, reset to base."""
+    """If DB points to a non-existent local revision, reset to base (drop alembic_version)."""
     db_url = cfg.get_main_option("sqlalchemy.url") or os.getenv("DATABASE_URL")
     if not db_url:
         return
 
-    # Collect local revision IDs
+    # Gather local revision ids from versions/
     script_location = Path(cfg.get_main_option("script_location"))
     versions_dir = script_location / "versions"
-    local_ids = set()
+    local_ids: Set[str] = set()
     if versions_dir.exists():
         for p in versions_dir.glob("*.py"):
             try:
@@ -535,23 +535,38 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
                     local_ids.add(rid)
                     break
 
-    eng = build_engine(db_url)
-    try:
-        with eng.begin() as c:
-            insp = inspect(c)
-            has_version_tbl = insp.has_table("alembic_version")
-
-            rows = []
-            if has_version_tbl:
-                rows = c.execute(text("SELECT version_num FROM alembic_version")).fetchall()
-
-            missing = any((ver not in local_ids) for (ver,) in rows)
-
-            if missing:
-                # safest reset: drop version table, caller will autogen + upgrade
-                c.execute(text("DROP TABLE IF EXISTS alembic_version"))
-    finally:
-        eng.dispose()
+    url_obj = make_url(db_url)
+    if is_async_url(url_obj):
+        async def _run() -> None:
+            eng = build_engine(url_obj)  # AsyncEngine
+            try:
+                async with eng.begin() as conn:
+                    # Do sync-y inspector / SQL via run_sync
+                    def _check_and_maybe_drop(sync_conn):
+                        insp = inspect(sync_conn)
+                        if not insp.has_table("alembic_version"):
+                            return
+                        rows = list(sync_conn.execute(text("SELECT version_num FROM alembic_version")).fetchall())
+                        missing = any((ver not in local_ids) for (ver,) in rows)
+                        if missing:
+                            sync_conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+                    await conn.run_sync(_check_and_maybe_drop)
+            finally:
+                await eng.dispose()
+        asyncio.run(_run())
+    else:
+        eng = build_engine(url_obj)  # sync Engine
+        try:
+            with eng.begin() as c:
+                insp = inspect(c)
+                if not insp.has_table("alembic_version"):
+                    return
+                rows = list(c.execute(text("SELECT version_num FROM alembic_version")).fetchall())
+                missing = any((ver not in local_ids) for (ver,) in rows)
+                if missing:
+                    c.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        finally:
+            eng.dispose()
 
 def render_env_py(packages: Sequence[str], *, async_db: bool) -> str:
     """Render Alembic env.py content from packaged templates.
