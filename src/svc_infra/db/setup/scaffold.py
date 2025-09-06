@@ -6,8 +6,6 @@ from typing import Dict, Any, Optional, Literal
 
 # ---------------- helpers ----------------
 
-_INIT_CONTENT = 'from . import models, schemas\n\n__all__ = ["models", "schemas"]\n'
-
 def _normalize_dir(p: Path | str) -> Path:
     p = Path(p)
     return p if p.is_absolute() else (Path.cwd() / p).resolve()

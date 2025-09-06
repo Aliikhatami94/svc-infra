@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, Sequence, Iterable
 
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, and_, func, select, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -55,8 +55,10 @@ class Repository:
         obj = await self.get(session, id_value)
         if not obj:
             return None
+        IMMUTABLE = {"id", "created_at", "updated_at"}
         for k, v in data.items():
-            setattr(obj, k, v)
+            if k not in IMMUTABLE:
+                setattr(obj, k, v)
         await session.flush()
         return obj
 
@@ -69,6 +71,7 @@ class Repository:
             await session.flush()
             return True
         await session.delete(obj)
+        await session.flush()
         return True
 
     async def search(
@@ -86,10 +89,14 @@ class Repository:
         for f in fields:
             col = getattr(self.model, f, None)
             if col is not None:
-                conditions.append(col.ilike(ilike))
+                try:
+                    conditions.append(col.cast(String).ilike(ilike))
+                except Exception:
+                    # skip columns that cannot be used in ilike even with cast
+                    continue
         stmt = self._base_select()
         if conditions:
-            stmt = stmt.where(and_(*conditions))
+            stmt = stmt.where(or_(*conditions))
         stmt = stmt.limit(limit).offset(offset)
         if order_by:
             stmt = stmt.order_by(*order_by)
@@ -107,10 +114,13 @@ class Repository:
         for f in fields:
             col = getattr(self.model, f, None)
             if col is not None:
-                conditions.append(col.ilike(ilike))
+                try:
+                    conditions.append(col.cast(String).ilike(ilike))
+                except Exception:
+                    continue
         stmt = self._base_select()
         if conditions:
-            stmt = stmt.where(and_(*conditions))
+            stmt = stmt.where(or_(*conditions))
         # SELECT COUNT(*) FROM (<stmt>) as t
         return (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
 

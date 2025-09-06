@@ -12,16 +12,65 @@ def _sa_columns(model: type[object]) -> list[Column]:
 
 
 def _py_type(col: Column) -> type:
-    from sqlalchemy import String, Text, Integer, Boolean
+    # Prefer SQLAlchemy-provided python_type when available
     if getattr(col.type, "python_type", None):
-        return col.type.python_type
-    if isinstance(col.type, (String, Text)):
+        return col.type.python_type  # type: ignore[no-any-return]
+
+    # Fallback mappings for common types
+    from typing import Any as _Any
+    from datetime import datetime, date
+    from uuid import UUID
+    from sqlalchemy import String, Text, Integer, Boolean, DateTime, Date, JSON
+    try:
+        from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB  # type: ignore
+    except Exception:  # pragma: no cover - optional import
+        PG_UUID = None  # type: ignore
+        JSONB = None  # type: ignore
+
+    t = col.type
+    if PG_UUID is not None and isinstance(t, PG_UUID):
+        return UUID
+    if isinstance(t, (String, Text)):
         return str
-    if isinstance(col.type, Integer):
+    if isinstance(t, Integer):
         return int
-    if isinstance(col.type, Boolean):
+    if isinstance(t, Boolean):
         return bool
-    return Any
+    if isinstance(t, (DateTime,)):
+        return datetime
+    if isinstance(t, (Date,)):
+        return date
+    if isinstance(t, JSON):
+        return dict
+    if JSONB is not None and isinstance(t, JSONB):
+        return dict
+    return _Any
+
+
+def _exclude_from_create(col: Column) -> bool:
+    """Heuristics for excluding columns from Create schema.
+
+    - primary keys
+    - server defaults
+    - SQL/DB-generated values (onupdate)
+    - obvious timestamp names (created_at/updated_at)
+    - autogenerating defaults (uuid.uuid4 etc.)
+    """
+    if col.primary_key:
+        return True
+    if col.server_default is not None:
+        return True
+    # default can be a SQLAlchemy DefaultClause or a Python callable/arg
+    default = getattr(col, "default", None)
+    if getattr(default, "is_sequence", False):
+        return True
+    if getattr(default, "arg", None):  # e.g., default=uuid.uuid4
+        return True
+    if col.onupdate is not None:
+        return True
+    if col.name in {"created_at", "updated_at"}:
+        return True
+    return False
 
 
 def make_crud_schemas(
@@ -37,6 +86,9 @@ def make_crud_schemas(
     ann_create: dict[str, tuple[type, object]] = {}
     ann_update: dict[str, tuple[type, object]] = {}
 
+    # Combine explicit excludes with heuristic excludes
+    explicit_excludes = set(create_exclude)
+
     for col in cols:
         name = col.name
         T = _py_type(col)
@@ -49,7 +101,7 @@ def make_crud_schemas(
 
         ann_read[name] = (T | None if col.nullable else T, None)
 
-        if name not in create_exclude:
+        if name not in explicit_excludes and not _exclude_from_create(col):
             ann_create[name] = ((T | None) if not is_required else T, None if not is_required else ...)
 
         ann_update[name] = (Optional[T], None)

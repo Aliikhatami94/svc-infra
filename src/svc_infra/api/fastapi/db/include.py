@@ -26,6 +26,7 @@ class Resource:
     soft_delete: bool = False            # enables soft-delete endpoints if your model has deleted_at
     search_fields: Optional[list[str]] = None  # used by router_plus if implemented there
     ordering_default: Optional[str] = None
+    allowed_order_fields: Optional[list[str]] = None  # expose to router
 
     # If you already have Pydantic classes, pass them here and we won't autogen
     read_schema: Optional[Type[Any]] = None
@@ -74,6 +75,7 @@ def include_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
             tags=r.tags,
             search_fields=r.search_fields,
             default_ordering=r.ordering_default,
+            allowed_order_fields=r.allowed_order_fields,
             session_dep=SessionDep,      # DI hook for DB session
         )
         app.include_router(router)
