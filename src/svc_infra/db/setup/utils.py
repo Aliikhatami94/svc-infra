@@ -6,10 +6,11 @@ from sqlalchemy import inspect
 from pathlib import Path
 from typing import Any, Optional, Sequence, Union, TYPE_CHECKING, Set
 from alembic.config import Config
+from urllib.parse import urlencode
 
 from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, DBAPIError
 
 from .constants import ASYNC_DRIVER_HINT, DEFAULT_DB_ENV_VARS
 
@@ -200,22 +201,141 @@ def with_database(url: URL | str, database: Optional[str]) -> URL:
 
 # ---------- Engine creation ----------
 
-def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
-    """Create a SQLAlchemy Engine or AsyncEngine based on the URL.
+def _coerce_to_async_url(url: str) -> str:
+    """Coerce common sync driver URLs to async-capable URLs.
 
-    - If the URL uses an async driver, returns an AsyncEngine (requires async extras installed).
-    - Otherwise returns a sync Engine.
-    - Pass `echo=True` to enable SQL echoing.
+    - postgresql:// or postgres://        -> postgresql+asyncpg://
+    - postgresql+psycopg2:// or +psycopg  -> postgresql+asyncpg://
+    - mysql:// or mysql+pymysql://        -> mysql+aiomysql://
+    - sqlite://                           -> sqlite+aiosqlite://
+    If already async (contains +asyncpg/+aiomysql/+aiosqlite), leave unchanged.
     """
+    low = url.lower()
+    if "+asyncpg" in low or "+aiomysql" in low or "+aiosqlite" in low:
+        return url
+    if low.startswith("postgresql+psycopg2://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("postgresql+psycopg://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("postgres://"):
+        return "postgresql+asyncpg://" + url.split("://", 1)[1]
+    if low.startswith("mysql+pymysql://") or low.startswith("mysql://"):
+        return "mysql+aiomysql://" + url.split("://", 1)[1]
+    if low.startswith("sqlite://") and not low.startswith("sqlite+aiosqlite://"):
+        return "sqlite+aiosqlite://" + url.split("://", 1)[1]
+    return url
+
+def _is_mod_available(name: str) -> bool:
+    try:
+        __import__(name)
+        return True
+    except Exception:
+        return False
+
+def _coerce_sync_driver(u: URL) -> URL:
+    """
+    If URL has no explicit sync driver, pick one that’s available.
+    Postgres preference: psycopg (v3) → psycopg2
+    MySQL preference: pymysql
+    SQLite: pysqlite (built-in, usually fine)
+    MSSQL: pyodbc
+    """
+    dn = (u.drivername or "").lower()
+
+    # Already explicit driver? leave it.
+    if "+" in dn:
+        return u
+
+    backend = (u.get_backend_name() or "").lower()
+    if backend in ("postgresql", "postgres"):
+        # prefer psycopg v3 if available; else fallback to psycopg2
+        if _is_mod_available("psycopg"):
+            return u.set(drivername="postgresql+psycopg")
+        elif _is_mod_available("psycopg2"):
+            # bare 'postgresql://' maps to psycopg2 implicitly, but make it explicit
+            return u.set(drivername="postgresql+psycopg2")
+        # last resort: leave as-is (SQLAlchemy will try psycopg2 and may fail if missing)
+
+    if backend == "mysql":
+        # default to pymysql if present
+        if _is_mod_available("pymysql"):
+            return u.set(drivername="mysql+pymysql")
+        return u
+
+    if backend == "sqlite":
+        # usually okay as-is; it uses pysqlite from stdlib
+        return u
+
+    if backend in ("mssql",):
+        if _is_mod_available("pyodbc"):
+            return u.set(drivername="mssql+pyodbc")
+        return u
+
+    # other backends (snowflake, redshift, duckdb, cockroach) usually require explicit drivers
+    return u
+
+
+def _coerce_pg_maintenance_driver(u: URL) -> URL:
+    """
+    Ensure the maintenance connection for Postgres uses a sync driver that is installed,
+    because ensure_database_exists() often needs a *sync* connection for CREATE DATABASE.
+    """
+    # If async → leave to async branch; this is for sync path only.
+    if "+" in (u.drivername or ""):
+        # If explicit async driver was given, leave it (caller decides).
+        return u
+    backend = (u.get_backend_name() or "").lower()
+    if backend in ("postgresql", "postgres"):
+        # prefer psycopg, then psycopg2
+        if _is_mod_available("psycopg"):
+            return u.set(drivername="postgresql+psycopg")
+        if _is_mod_available("psycopg2"):
+            return u.set(drivername="postgresql+psycopg2")
+    return u
+
+def _ensure_ssl_default(u: URL) -> URL:
+    backend = (u.get_backend_name() or "").lower()
+    if backend not in ("postgresql", "postgres"):
+        return u
+
+    driver = (u.drivername or "").lower()
+
+    # If any SSL hint already present, do nothing
+    if any(k in u.query for k in ("sslmode", "ssl", "sslrootcert", "sslcert", "sslkey")):
+        return u
+
+    # Allow env override; support both common spellings
+    mode_env = os.getenv("DB_SSLMODE_DEFAULT") or os.getenv("PGSSLMODE") or os.getenv("PGSSL_MODE")
+    mode = (mode_env or "").strip()
+
+    if "+asyncpg" in driver:
+        # asyncpg: use 'ssl=true' (SQLAlchemy forwards to asyncpg)
+        if "ssl" not in u.query:
+            return u.set(query={**u.query, "ssl": "true"})
+        return u
+    else:
+        # libpq-based drivers: use sslmode (default 'require' for hosted PG)
+        mode = mode or "require"
+        return u.set(query={**u.query, "sslmode": mode})
+
+def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
+    u = _ensure_ssl_default(u)
     if is_async_url(u):
+        # async path unchanged
         create_async = _create_async_engine
         if create_async is None:
             raise RuntimeError("Async driver URL provided but SQLAlchemy async extras are not available.")
         return create_async(u, echo=echo, pool_pre_ping=True)
+
+    # sync path: coerce a reasonable driver if not explicit
+    u = _coerce_sync_driver(u)
+
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
-    create_sync = _create_engine  # local alias for type-checkers
+    create_sync = _create_engine
     return create_sync(u, echo=echo, pool_pre_ping=True)
 
 
@@ -249,38 +369,65 @@ async def _pg_create_database_async(url: URL) -> None:
     if not target_db:
         return
 
-    maintenance_url = with_database(url, "postgres")
+    u = _ensure_ssl_default(make_url(url))
+    maintenance_url = with_database(u, "postgres")
     engine: AsyncEngineType = build_engine(maintenance_url)  # type: ignore[assignment]
-    async with engine.begin() as conn:
-        exists = await conn.scalar(
-            text("SELECT 1 AS one FROM pg_database WHERE datname = :name"),
-            {"name": target_db},
-        )
-        if not exists:
-            quoted = _pg_quote_ident(target_db)
-            await conn.execution_options(isolation_level="AUTOCOMMIT").execute(
-                text(f'CREATE DATABASE "{quoted}"')
+
+    try:
+        async with engine.begin() as conn:
+            exists = await conn.scalar(
+                text("SELECT 1 AS one FROM pg_database WHERE datname = :name"),
+                {"name": target_db},
             )
-    await engine.dispose()
+            if not exists:
+                quoted = _pg_quote_ident(target_db)
+                await conn.execution_options(isolation_level="AUTOCOMMIT").execute(
+                    text(f'CREATE DATABASE "{quoted}"')
+                )
+    except DBAPIError as e:
+        if "permission denied" in str(e).lower():
+            pass
+        else:
+            raise
+    finally:
+        await engine.dispose()
 
 
 def _pg_create_database_sync(url: URL) -> None:
     target_db = url.database
     if not target_db:
         return
-    maintenance_url = with_database(make_url(url), "postgres")
-    engine: SyncEngine = build_engine(maintenance_url)  # type: ignore[assignment]
-    with engine.begin() as conn:
-        exists = conn.scalar(
-            text("SELECT 1 AS one FROM pg_database WHERE datname = :name"),
-            {"name": target_db},
-        )
-        if not exists:
-            quoted = _pg_quote_ident(target_db)
-            conn.execution_options(isolation_level="AUTOCOMMIT").execute(
-                text(f'CREATE DATABASE "{quoted}"')
-            )
-    engine.dispose()
+
+    # Build a maintenance URL pointing at the 'postgres' DB
+    u = _ensure_ssl_default(make_url(url))
+    maintenance_url = with_database(u, "postgres")
+
+    # Make sure it has an installed *sync* driver (psycopg or psycopg2)
+    maintenance_url = _coerce_pg_maintenance_driver(maintenance_url)
+
+    # Try connecting to 'postgres'; if that fails (some hosts restrict it), try 'template1'
+    try:
+        engine: SyncEngine = build_engine(maintenance_url)  # type: ignore[assignment]
+    except Exception:
+        alt_url = with_database(maintenance_url, "template1")
+        engine = build_engine(alt_url)  # type: ignore[assignment]
+
+    try:
+        with engine.begin() as conn:
+            exists = conn.scalar(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": target_db})
+            if not exists:
+                quoted = _pg_quote_ident(target_db)
+                conn.execution_options(isolation_level="AUTOCOMMIT").execute(
+                    text(f'CREATE DATABASE "{quoted}"')
+                )
+    except DBAPIError as e:
+        # If permission error, log and continue (DB likely pre-provisioned on the host)
+        if "permission denied" in str(e).lower():
+            pass
+        else:
+            raise
+    finally:
+        engine.dispose()
 
 
 async def _mysql_create_database_async(url: URL) -> None:

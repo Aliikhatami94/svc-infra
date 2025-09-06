@@ -1,6 +1,6 @@
 from __future__ import annotations
+
 import time
-from typing import Optional
 from urllib.parse import urlparse
 
 from .base import counter, histogram

@@ -12,37 +12,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from svc_infra.db.setup.utils import _coerce_to_async_url
+
 logger = logging.getLogger(__name__)
 
 _engine: AsyncEngine | None = None
 _SessionLocal: async_sessionmaker[AsyncSession] | None = None
-
-
-def _coerce_to_async_url(url: str) -> str:
-    """Coerce common sync driver URLs to async-capable URLs.
-
-    - postgresql:// or postgres://        -> postgresql+asyncpg://
-    - postgresql+psycopg2:// or +psycopg  -> postgresql+asyncpg://
-    - mysql:// or mysql+pymysql://        -> mysql+aiomysql://
-    - sqlite://                           -> sqlite+aiosqlite://
-    If already async (contains +asyncpg/+aiomysql/+aiosqlite), leave unchanged.
-    """
-    low = url.lower()
-    if "+asyncpg" in low or "+aiomysql" in low or "+aiosqlite" in low:
-        return url
-    if low.startswith("postgresql+psycopg2://"):
-        return "postgresql+asyncpg://" + url.split("://", 1)[1]
-    if low.startswith("postgresql+psycopg://"):
-        return "postgresql+asyncpg://" + url.split("://", 1)[1]
-    if low.startswith("postgresql://"):
-        return "postgresql+asyncpg://" + url.split("://", 1)[1]
-    if low.startswith("postgres://"):
-        return "postgresql+asyncpg://" + url.split("://", 1)[1]
-    if low.startswith("mysql+pymysql://") or low.startswith("mysql://"):
-        return "mysql+aiomysql://" + url.split("://", 1)[1]
-    if low.startswith("sqlite://") and not low.startswith("sqlite+aiosqlite://"):
-        return "sqlite+aiosqlite://" + url.split("://", 1)[1]
-    return url
 
 
 def _init_engine_and_session(url: str) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:

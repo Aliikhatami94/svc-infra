@@ -54,7 +54,7 @@ passlib = { extras = ["bcrypt"], version = "^1.7.4" }
 email-validator = "^2.2.0"
 
 # Database drivers (all optional)
-psycopg = { version = "^3.1.18", extras = ["binary"], optional = true }   # v3
+psycopg = {extras = ["binary"], version = "^3.2.9"}   # v3
 asyncpg = { version = "^0.30.0", optional = true }
 aiosqlite = { version = "^0.20.0", optional = true }
 pymysql = { version = "^1.1.1", optional = true }
@@ -76,6 +76,7 @@ opentelemetry-instrumentation-requests = "^0.57b0"
 opentelemetry-instrumentation-httpx = "^0.57b0"
 opentelemetry-exporter-otlp = "^1.36.0"
 opentelemetry-propagator-b3 = "^1.36.0"
+prometheus-client = "^0.22.1"
 
 [tool.poetry.extras]
 # Postgres v3

@@ -26,15 +26,15 @@ from .utils import (
 
 # ---------- Alembic init ----------
 
+
 def _with_env(func):
     @wraps(func)
     def _wrapped(*args, **kwargs):
-        # Try to get project_root from kwargs first
+        # project_root handling (as you already have)
         if "project_root" in kwargs:
             project_root = kwargs["project_root"]
             remaining_args = args
         else:
-            # Fall back to first positional, if present
             if not args:
                 raise TypeError("project_root is required")
             project_root = args[0]
@@ -43,7 +43,12 @@ def _with_env(func):
         # Load .env etc.
         prepare_process_env(project_root)
 
-        # Always pass project_root as a keyword to support keyword-only signatures
+        # >>> NEW: optionally accept a database_url kwarg and apply it to env
+        db_url = kwargs.pop("database_url", None)
+        if db_url:
+            os.environ["DATABASE_URL"] = str(db_url)
+
+        # Always pass project_root as a keyword
         kwargs["project_root"] = project_root
         return func(*remaining_args, **kwargs)
     return _wrapped
