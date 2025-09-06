@@ -8,7 +8,7 @@ from .integration import SessionDep
 def db_health_router(*, prefix: str = "/_db/health", include_in_schema: bool = False) -> APIRouter:
     """Return a simple DB liveness router.
 
-    - prefix: mount path for the health endpoints (default "/health").
+    - prefix: mount path for the health endpoints (default "/_db/health").
     - include_in_schema: whether to show in OpenAPI docs (default False).
     """
     r = APIRouter(prefix=prefix, tags=["health"], include_in_schema=include_in_schema)

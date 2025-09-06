@@ -15,7 +15,7 @@ from svc_infra.db.manage.management import make_crud_schemas
 @dataclass
 class Resource:
     # Required
-    model: Type[Any]
+    model: type[object]
     prefix: str  # e.g. "/projects"
 
     # Optional FastAPI presentation
@@ -71,12 +71,13 @@ def include_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
             read_schema=Read,
             create_schema=Create,
             update_schema=Update,
-            prefix=r.prefix,             # we don't pre-pend /_db here; router_plus can do that if you prefer
+            prefix=r.prefix,
             tags=r.tags,
             search_fields=r.search_fields,
             default_ordering=r.ordering_default,
             allowed_order_fields=r.allowed_order_fields,
             session_dep=SessionDep,      # DI hook for DB session
+            # Note: router_plus mounts under "/_db" by default. Override via mount_under_db_prefix=False if desired.
         )
         app.include_router(router)
 

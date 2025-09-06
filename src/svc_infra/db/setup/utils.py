@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import OperationalError
 
-from .constants import ASYNC_DRIVER_HINT
+from .constants import ASYNC_DRIVER_HINT, DEFAULT_DB_ENV_VARS
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine as SyncEngine
@@ -121,7 +121,7 @@ def _compose_url_from_parts() -> Optional[str]:
 
 def get_database_url_from_env(
         required: bool = True,
-        env_vars: Sequence[str] = ("DATABASE_URL", "PRIVATE_DATABASE_URL", "DB_URL")
+        env_vars: Sequence[str] = DEFAULT_DB_ENV_VARS,
 ) -> Optional[str]:
     """
     Resolve the database connection string, with support for:

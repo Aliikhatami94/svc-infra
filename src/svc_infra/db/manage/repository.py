@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Sequence, Iterable
+from typing import Any, Optional, Sequence, Iterable, Set
 
 from sqlalchemy import Select, and_, func, select, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,19 +12,34 @@ class Repository:
     Very small async repository around a mapped SQLAlchemy model.
     """
 
-    def __init__(self, *, model: type[Any], id_attr: str = "id", soft_delete: bool = False, soft_delete_field: str = "deleted_at"):
+    def __init__(
+        self,
+        *,
+        model: type[Any],
+        id_attr: str = "id",
+        soft_delete: bool = False,
+        soft_delete_field: str = "deleted_at",
+        soft_delete_flag_field: str | None = None,
+        immutable_fields: Optional[Set[str]] = None,
+    ):
         self.model = model
         self.id_attr = id_attr
         self.soft_delete = soft_delete
         self.soft_delete_field = soft_delete_field
+        self.soft_delete_flag_field = soft_delete_flag_field
+        self.immutable_fields: Set[str] = set(immutable_fields or {"id", "created_at", "updated_at"})
 
     def _id_column(self) -> InstrumentedAttribute:
         return getattr(self.model, self.id_attr)
 
     def _base_select(self) -> Select:
         stmt = select(self.model)
-        if self.soft_delete and hasattr(self.model, self.soft_delete_field):
-            stmt = stmt.where(getattr(self.model, self.soft_delete_field).is_(None))
+        if self.soft_delete:
+            # Filter out soft-deleted rows by timestamp and/or active flag
+            if hasattr(self.model, self.soft_delete_field):
+                stmt = stmt.where(getattr(self.model, self.soft_delete_field).is_(None))
+            if self.soft_delete_flag_field and hasattr(self.model, self.soft_delete_flag_field):
+                stmt = stmt.where(getattr(self.model, self.soft_delete_flag_field).is_(True))
         return stmt
 
     # basic ops
@@ -55,9 +70,8 @@ class Repository:
         obj = await self.get(session, id_value)
         if not obj:
             return None
-        IMMUTABLE = {"id", "created_at", "updated_at"}
         for k, v in data.items():
-            if k not in IMMUTABLE:
+            if k not in self.immutable_fields:
                 setattr(obj, k, v)
         await session.flush()
         return obj
@@ -66,8 +80,12 @@ class Repository:
         obj = await session.get(self.model, id_value)
         if not obj:
             return False
-        if self.soft_delete and hasattr(self.model, self.soft_delete_field):
-            setattr(obj, self.soft_delete_field, func.now())
+        if self.soft_delete:
+            # Prefer timestamp, also optionally set flag to False
+            if hasattr(self.model, self.soft_delete_field):
+                setattr(obj, self.soft_delete_field, func.now())
+            if self.soft_delete_flag_field and hasattr(self.model, self.soft_delete_flag_field):
+                setattr(obj, self.soft_delete_flag_field, False)
             await session.flush()
             return True
         await session.delete(obj)

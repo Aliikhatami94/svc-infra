@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import logging
 from typing import Annotated, AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import (
@@ -96,21 +97,17 @@ def attach_db_to_api(app: FastAPI, *, dsn_env: str = "DATABASE_URL") -> None:
 
 
 def attach_db_to_api_with_url(app: FastAPI, *, url: str) -> None:
-    """Same as attach_db_to_api but pass URL directly instead of env var (sync URLs will be coerced)."""
-
-    @app.on_event("startup")
-    async def _startup() -> None:  # noqa: ANN202
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
         global _engine, _SessionLocal
-        if _engine is None:
-            _engine, _SessionLocal = _init_engine_and_session(url)
-
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:  # noqa: ANN202
-        global _engine, _SessionLocal
-        if _engine is not None:
+        _engine, _SessionLocal = _init_engine_and_session(url)
+        try:
+            yield
+        finally:
             await _engine.dispose()
             _engine = None
             _SessionLocal = None
+    app.router.lifespan_context = lifespan
 
 
 __all__ = ["SessionDep", "attach_db_to_api", "attach_db_to_api_with_url"]

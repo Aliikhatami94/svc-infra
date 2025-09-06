@@ -80,6 +80,8 @@ def make_crud_schemas(
         read_name: str | None = None,
         create_name: str | None = None,
         update_name: str | None = None,
+        read_exclude: tuple[str, ...] = (),
+        update_exclude: tuple[str, ...] = (),
 ) -> tuple[type[BaseModel], type[BaseModel], type[BaseModel]]:
     cols = _sa_columns(model)
     ann_read: dict[str, tuple[type, object]] = {}
@@ -88,6 +90,8 @@ def make_crud_schemas(
 
     # Combine explicit excludes with heuristic excludes
     explicit_excludes = set(create_exclude)
+    read_ex = set(read_exclude)
+    update_ex = set(update_exclude)
 
     for col in cols:
         name = col.name
@@ -99,12 +103,14 @@ def make_crud_schemas(
                 and not col.primary_key
         )
 
-        ann_read[name] = (T | None if col.nullable else T, None)
+        if name not in read_ex:
+            ann_read[name] = (T | None if col.nullable else T, None)
 
         if name not in explicit_excludes and not _exclude_from_create(col):
             ann_create[name] = ((T | None) if not is_required else T, None if not is_required else ...)
 
-        ann_update[name] = (Optional[T], None)
+        if name not in update_ex:
+            ann_update[name] = (Optional[T], None)
 
     Read = create_model(read_name or f"{model.__name__}Read", **ann_read)   # type: ignore[arg-type]
     Create = create_model(create_name or f"{model.__name__}Create", **ann_create)  # type: ignore[arg-type]
