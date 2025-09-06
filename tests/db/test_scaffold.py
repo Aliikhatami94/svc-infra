@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from svc_infra.db.manage.scaffold import (
+from svc_infra.db.setup.scaffold import (
     scaffold_core,
     scaffold_models_core,
     scaffold_schemas_core,

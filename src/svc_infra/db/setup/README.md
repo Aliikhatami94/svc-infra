@@ -1,20 +1,20 @@
-svc_infra.db.manage CLI integration guide
+svc_infra.db.setup CLI integration guide
 
 This README covers how to use the database command-line interface exposed by src/svc_infra/db/cli.py. It wraps Alembic utilities and provides scaffolding for SQLAlchemy models and Pydantic schemas.
 
 How to run the CLI
-- If the project is installed as a package: python -m svc_infra.db.manage.cli --help
+- If the project is installed as a package: python -m svc_infra.db.setup.cli --help
 - From a repo checkout:
-  - With Poetry: poetry run python -m svc_infra.db.manage.cli --help
-  - With venv: python -m svc_infra.db.manage.cli --help
+  - With Poetry: poetry run python -m svc_infra.db.setup.cli --help
+  - With venv: python -m svc_infra.db.setup.cli --help
 
 Database URL handling
 - Most commands read the database URL from the DATABASE_URL environment variable.
 - You can override it per-command with the --database-url option (the CLI sets DATABASE_URL for that process only).
 - Examples:
   - export DATABASE_URL=sqlite:///:memory:
-  - python -m svc_infra.db.manage.cli upgrade --project-root .
-  - python -m svc_infra.db.manage.cli revision -m "init" --database-url sqlite:///./app.db
+  - python -m svc_infra.db.setup.cli upgrade --project-root .
+  - python -m svc_infra.db.setup.cli revision -m "init" --database-url sqlite:///./app.db
 
 Alembic lifecycle commands
 1) init — create Alembic config and migrations folder
@@ -26,9 +26,9 @@ Alembic lifecycle commands
   - --discover-packages PKG ...: packages to import and search for SQLAlchemy metadata
   - --overwrite: replace existing files
 - Example (sync sqlite):
-  - python -m svc_infra.db.manage.cli init --project-root . --database-url sqlite:///./app.db
+  - python -m svc_infra.db.setup.cli init --project-root . --database-url sqlite:///./app.db
 - Example (async):
-  - python -m svc_infra.db.manage.cli init --project-root . --database-url sqlite+aiosqlite:///./app.db --async-db
+  - python -m svc_infra.db.setup.cli init --project-root . --database-url sqlite+aiosqlite:///./app.db --async-db
 
 2) revision — create a new migration file
 - Options:
@@ -41,29 +41,29 @@ Alembic lifecycle commands
   - --version-path PATH: custom versions folder
   - --sql: emit SQL to stdout instead of Python
 - Example (empty migration):
-  - python -m svc_infra.db.manage.cli revision -m "init" --project-root .
+  - python -m svc_infra.db.setup.cli revision -m "init" --project-root .
 - Example (autogenerate):
-  - python -m svc_infra.db.manage.cli revision -m "add widgets" --autogenerate --project-root .
+  - python -m svc_infra.db.setup.cli revision -m "add widgets" --autogenerate --project-root .
 
 3) upgrade/downgrade — apply or roll back migrations
 - upgrade [REV]: default head
-  - python -m svc_infra.db.manage.cli upgrade --project-root .
-  - python -m svc_infra.db.manage.cli upgrade ae1027a6acf --project-root .
+  - python -m svc_infra.db.setup.cli upgrade --project-root .
+  - python -m svc_infra.db.setup.cli upgrade ae1027a6acf --project-root .
 - downgrade [REV]: default -1 (one step)
-  - python -m svc_infra.db.manage.cli downgrade --project-root .
-  - python -m svc_infra.db.manage.cli downgrade base --project-root .
+  - python -m svc_infra.db.setup.cli downgrade --project-root .
+  - python -m svc_infra.db.setup.cli downgrade base --project-root .
 
 4) current/history/stamp/merge-heads — utilities
 - current: show current DB revision
-  - python -m svc_infra.db.manage.cli current --project-root .
-  - python -m svc_infra.db.manage.cli current --project-root . --verbose
+  - python -m svc_infra.db.setup.cli current --project-root .
+  - python -m svc_infra.db.setup.cli current --project-root . --verbose
 - history: show migration history
-  - python -m svc_infra.db.manage.cli history --project-root .
-  - python -m svc_infra.db.manage.cli history --project-root . --verbose
+  - python -m svc_infra.db.setup.cli history --project-root .
+  - python -m svc_infra.db.setup.cli history --project-root . --verbose
 - stamp [REV]: set DB to a revision without running migrations
-  - python -m svc_infra.db.manage.cli stamp head --project-root .
+  - python -m svc_infra.db.setup.cli stamp head --project-root .
 - merge-heads: merge divergent heads
-  - python -m svc_infra.db.manage.cli merge-heads --project-root . -m "merge branches"
+  - python -m svc_infra.db.setup.cli merge-heads --project-root . -m "merge branches"
 
 Scaffolding commands
 The CLI can scaffold starter SQLAlchemy models and Pydantic schemas. Outputs are simple, editable files.
@@ -71,19 +71,19 @@ The CLI can scaffold starter SQLAlchemy models and Pydantic schemas. Outputs are
 A) scaffold — generate models and schemas together
 - Usage patterns:
   - Separate dirs (default filenames derived from entity):
-    - python -m svc_infra.db.manage.cli scaffold \
+    - python -m svc_infra.db.setup.cli scaffold \
       --kind entity \
       --entity-name WidgetThing \
       --models-dir ./app/models \
       --schemas-dir ./app/schemas
   - Separate dirs with custom filenames:
-    - python -m svc_infra.db.manage.cli scaffold \
+    - python -m svc_infra.db.setup.cli scaffold \
       --kind entity \
       --entity-name Gizmo \
       --models-dir ./app/models --models-filename m_gizmo.py \
       --schemas-dir ./app/schemas --schemas-filename s_gizmo.py
   - Same dir (paired models.py and schemas.py with a paired __init__.py):
-    - python -m svc_infra.db.manage.cli scaffold \
+    - python -m svc_infra.db.setup.cli scaffold \
       --kind entity \
       --entity-name Account \
       --models-dir ./app/account \
@@ -99,7 +99,7 @@ A) scaffold — generate models and schemas together
 
 B) scaffold-models — generate only a model file
 - Example:
-  - python -m svc_infra.db.manage.cli scaffold-models \
+  - python -m svc_infra.db.setup.cli scaffold-models \
     --dest-dir ./app/models \
     --entity-name FooBar \
     --include-tenant \
@@ -115,7 +115,7 @@ B) scaffold-models — generate only a model file
 
 C) scaffold-schemas — generate only a schema file
 - Example:
-  - python -m svc_infra.db.manage.cli scaffold-schemas \
+  - python -m svc_infra.db.setup.cli scaffold-schemas \
     --dest-dir ./app/schemas \
     --entity-name FooBar \
     --no-include-tenant
@@ -140,13 +140,13 @@ Conventions and outputs
 
 Typical end-to-end workflow (SQLite example)
 1) Initialize migrations (sync driver):
-   - python -m svc_infra.db.manage.cli init --project-root . --database-url sqlite:///./app.db
+   - python -m svc_infra.db.setup.cli init --project-root . --database-url sqlite:///./app.db
 2) Create an initial revision:
-   - python -m svc_infra.db.manage.cli revision -m "init" --project-root .
+   - python -m svc_infra.db.setup.cli revision -m "init" --project-root .
 3) Apply migrations to the database:
-   - python -m svc_infra.db.manage.cli upgrade --project-root .
+   - python -m svc_infra.db.setup.cli upgrade --project-root .
 4) Scaffold a new entity’s model and schema:
-   - python -m svc_infra.db.manage.cli scaffold \
+   - python -m svc_infra.db.setup.cli scaffold \
      --entity-name WidgetThing \
      --models-dir ./app/models \
      --schemas-dir ./app/schemas

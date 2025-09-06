@@ -34,7 +34,7 @@ if ENV_DISCOVER:
 def _collect_metadata() -> list[object]:
     # 0) Prefer ModelBase.metadata
     try:
-        from svc_infra.db.manage.base import ModelBase  # type: ignore
+        from svc_infra.db.setup.base import ModelBase  # type: ignore
         md = getattr(ModelBase, "metadata", None)
         if md is not None and hasattr(md, "tables") and md.tables:
             return [md]

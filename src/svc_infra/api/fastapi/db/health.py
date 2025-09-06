@@ -23,4 +23,3 @@ def db_health_router(*, prefix: str = "/_db/health", include_in_schema: bool = F
 
 
 __all__ = ["db_health_router"]
-
