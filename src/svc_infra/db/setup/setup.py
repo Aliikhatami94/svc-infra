@@ -16,7 +16,7 @@ from .utils import (
     is_async_url,
     build_engine,
     ensure_database_exists,
-    prepare_process_env,
+    _with_env,
     repair_alembic_state_if_needed,
     render_env_py,
     build_alembic_config,
@@ -25,6 +25,7 @@ from .utils import (
 
 # ---------- Alembic init ----------
 
+@_with_env
 def init_alembic(
         project_root: Path | str,
         *,
@@ -114,6 +115,7 @@ def _ensure_db_at_head(cfg: Config) -> None:
     ensure_db_at_head(cfg)
 
 
+@_with_env
 def revision(
         project_root: Path | str,
         message: str,
@@ -135,7 +137,6 @@ def revision(
         - DATABASE_URL must be set in the environment.
         - Model discovery is automatic (prefers ModelBase.metadata).
     """
-    prepare_process_env(project_root)  # no URL/pkgs
     cfg = _build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
 
@@ -155,6 +156,7 @@ def revision(
     )
 
 
+@_with_env
 def upgrade(
         project_root: Path | str,
         revision_target: str = "head",
@@ -166,11 +168,12 @@ def upgrade(
         >>> upgrade("..")          # to head
         >>> upgrade("..", "base")  # or to a specific rev
     """
-    prepare_process_env(project_root)
     cfg = _build_alembic_config(project_root)
     repair_alembic_state_if_needed(cfg)
     command.upgrade(cfg, revision_target)
 
+
+@_with_env
 def downgrade(project_root: Path | str, revision_target: str = "-1") -> None:
     """Revert migrations down to the specified revision or relative step.
 
@@ -183,6 +186,7 @@ def downgrade(project_root: Path | str, revision_target: str = "-1") -> None:
     command.downgrade(cfg, revision_target)
 
 
+@_with_env
 def current(project_root: Path | str, verbose: bool = False) -> None:
     """Print the current database revision(s).
 
@@ -195,6 +199,7 @@ def current(project_root: Path | str, verbose: bool = False) -> None:
     command.current(cfg, verbose=verbose)
 
 
+@_with_env
 def history(project_root: Path | str, verbose: bool = False) -> None:
     """Show the migration history for this project.
 
@@ -207,6 +212,7 @@ def history(project_root: Path | str, verbose: bool = False) -> None:
     command.history(cfg, verbose=verbose)
 
 
+@_with_env
 def stamp(project_root: Path | str, revision_target: str = "head") -> None:
     """Set the current database revision without running migrations.
 
@@ -221,6 +227,7 @@ def stamp(project_root: Path | str, revision_target: str = "head") -> None:
     command.stamp(cfg, revision_target)
 
 
+@_with_env
 def merge_heads(project_root: Path | str, message: Optional[str] = None) -> None:
     """Create a merge revision that joins multiple migration heads.
 
@@ -244,6 +251,7 @@ class SetupAndMigrateResult:
     created_followup_revision: bool
     upgraded: bool
 
+@_with_env
 def setup_and_migrate(
         *,
         project_root: Path | str,
@@ -269,7 +277,6 @@ def setup_and_migrate(
         - Model discovery is automatic via env.py (prefers ModelBase.metadata).
     """
     root = Path(project_root).resolve()
-    prepare_process_env(root)
 
     db_url = get_database_url_from_env(required=True)
     if create_db_if_missing:
