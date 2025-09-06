@@ -3,20 +3,49 @@ from __future__ import annotations
 import os
 import atexit
 import uuid
-from typing import Optional, Dict
+from typing import Dict, List
 
 from opentelemetry import trace
 from opentelemetry.propagate import set_global_textmap
+
+# Try to load propagators defensively; not all installs ship all extras.
+_available_propagators: List[object] = []
+try:
+    from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator
+    _available_propagators.append(TraceContextTextMapPropagator())
+except Exception:
+    pass
+try:
+    from opentelemetry.propagators.baggage import W3CBaggagePropagator
+    _available_propagators.append(W3CBaggagePropagator())
+except Exception:
+    pass
+try:
+    # B3 is in a separate package in many installs; guard it.
+    from opentelemetry.propagators.b3 import B3MultiFormat
+    _available_propagators.append(B3MultiFormat())
+except Exception:
+    pass
+
+# Fallback: if nothing loaded, at least keep W3C tracecontext via API default.
+if not _available_propagators:
+    try:
+        from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator
+        _available_propagators.append(TraceContextTextMapPropagator())
+    except Exception:
+        _available_propagators = []  # let OpenTelemetry’s default remain in place
+
 from opentelemetry.propagators.composite import CompositePropagator
-from opentelemetry.propagators.b3 import B3MultiFormat
-from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator
-from opentelemetry.propagators.baggage import W3CBaggagePropagator
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as OTLPgExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as OTLPhttpExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+    OTLPSpanExporter as OTLPgExporter,
+)
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    OTLPSpanExporter as OTLPhttpExporter,
+)
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
 
@@ -24,7 +53,7 @@ def setup_tracing(
         *,
         service_name: str,
         endpoint: str = "http://localhost:4317",
-        protocol: str = "grpc",   # or "http/protobuf"
+        protocol: str = "grpc",  # or "http/protobuf"
         sample_ratio: float = 0.1,
         instrument_fastapi: bool = True,
         instrument_sqlalchemy: bool = True,
@@ -45,7 +74,6 @@ def setup_tracing(
         "service.name": service_name,
         "service.version": service_version or os.getenv("SERVICE_VERSION") or "unknown",
         "deployment.environment": deployment_env or os.getenv("DEPLOYMENT_ENV") or "dev",
-        # help de-dupe instances in backends
         "service.instance.id": os.getenv("HOSTNAME") or str(uuid.uuid4()),
     }
     resource = Resource.create({k: v for k, v in attrs.items() if v is not None})
@@ -60,23 +88,15 @@ def setup_tracing(
     if protocol == "grpc":
         exporter = OTLPgExporter(endpoint=endpoint, insecure=True, headers=headers)
     else:
-        # default OTLP/HTTP port derivation if left at the usual 4317
         http_endpoint = endpoint.replace(":4317", ":4318")
         exporter = OTLPhttpExporter(endpoint=http_endpoint, headers=headers)
 
     processor = BatchSpanProcessor(exporter)
     provider.add_span_processor(processor)
 
-    # --- Propagators (support W3C + B3 by default)
-    set_global_textmap(
-        CompositePropagator(
-            [
-                TraceContextTextMapPropagator(),
-                W3CBaggagePropagator(),
-                B3MultiFormat(),
-            ]
-        )
-    )
+    # --- Propagators (use whatever we could import)
+    if _available_propagators:
+        set_global_textmap(CompositePropagator(_available_propagators))
 
     # --- Auto-instrumentation (best-effort, never fail boot)
     try:
@@ -114,7 +134,13 @@ def setup_tracing(
         except Exception:
             pass
 
-    # ensure flush on interpreter exit as a backstop
     atexit.register(shutdown)
-
     return shutdown
+
+
+# Small helper for structured logs
+def log_trace_context() -> dict[str, str]:
+    c = trace.get_current_span().get_span_context()
+    if not c.is_valid:
+        return {}
+    return {"trace_id": f"{c.trace_id:032x}", "span_id": f"{c.span_id:016x}"}

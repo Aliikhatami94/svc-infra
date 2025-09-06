@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Iterable, Optional, Any, Callable
 
 from .settings import ObservabilitySettings
+from .metrics.asgi import add_prometheus
+from .metrics.http import instrument_requests, instrument_httpx
 from .metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
 from .tracing.setup import setup_tracing
 
@@ -27,21 +29,16 @@ def enable_observability(
     """
     cfg = ObservabilitySettings()
 
-    # --- Metrics (Prometheus) - lazy import to keep optional
+    # --- Metrics (Prometheus)
     if cfg.METRICS_ENABLED and app is not None:
-        try:
-            from .metrics.asgi import add_prometheus  # lazy
-            path = metrics_path or cfg.METRICS_PATH
-            add_prometheus(
-                app,
-                path=path,
-                skip_paths=tuple(skip_metric_paths or (path, "/health", "/healthz")),
-            )
-        except Exception:
-            # do not fail app boot if prometheus is missing or something else goes wrong
-            pass
+        path = metrics_path or cfg.METRICS_PATH
+        add_prometheus(
+            app,
+            path=path,
+            skip_paths=tuple(skip_metric_paths or (path, "/health", "/healthz")),
+        )
 
-    # --- SQLAlchemy pool metrics (optional)
+    # --- DB pool metrics (best effort)
     if db_engines:
         for eng in db_engines:
             try:
@@ -66,7 +63,17 @@ def enable_observability(
             instrument_httpx=True,
         )
 
-    # --- Auto-wire shutdown to app if possible (FastAPI/Starlette compatible)
+    # --- HTTP client metrics (best effort)
+    try:
+        instrument_requests()
+    except Exception:
+        pass
+    try:
+        instrument_httpx()
+    except Exception:
+        pass
+
+    # --- Auto-wire shutdown to app if possible
     if auto_wire_shutdown and app is not None:
         try:
             if hasattr(app, "add_event_handler"):
