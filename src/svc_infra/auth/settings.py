@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional, List
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class OIDCProvider(BaseModel):
@@ -11,9 +11,12 @@ class OIDCProvider(BaseModel):
     client_secret: SecretStr
     scope: str = "openid email profile"
 
+class JWTSettings(BaseModel):
+    secret: SecretStr
+    lifetime_seconds: int = 60 * 60 * 24 * 7
+
 class AuthSettings(BaseSettings):
-    jwt_secret: SecretStr = Field(..., description="JWT secret")
-    jwt_lifetime_seconds: int = 60 * 60 * 24 * 7
+    jwt: Optional[JWTSettings] = None
 
     # Built-ins (all optional)
     google_client_id: Optional[str] = None
@@ -34,12 +37,18 @@ class AuthSettings(BaseSettings):
     # Generic OIDC providers (Okta, Auth0, Keycloak, Azure AD via issuer, etc.)
     oidc_providers: List[OIDCProvider] = Field(default_factory=list)
 
-    model_config = SettingsConfigDict(env_prefix="AUTH_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="AUTH_",
+        env_file=".env",
+        extra="ignore",
+        env_nested_delimiter="__",
+    )
 
 _settings: AuthSettings | None = None
 
 def get_auth_settings() -> AuthSettings:
     global _settings
     if _settings is None:
-        _settings = AuthSettings
+        # Instantiate to load from environment and cache singleton
+        _settings = AuthSettings()
     return _settings

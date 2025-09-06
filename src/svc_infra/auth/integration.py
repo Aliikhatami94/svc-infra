@@ -6,8 +6,8 @@ from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings
 
 from .settings import get_auth_settings
+from pydantic import ValidationError
 
-auth_settings = get_auth_settings()
 
 def include_auth(
         app: FastAPI,
@@ -31,7 +31,15 @@ def include_auth(
     app.include_router(auth_router, prefix=auth_prefix, tags=["auth"])
     app.include_router(users_router, prefix=auth_prefix, tags=["users"])
 
-    providers = providers_from_settings(auth_settings)
+    # Compute providers from settings lazily; handle missing jwt_secret gracefully for tests
+    try:
+        settings_obj = get_auth_settings()
+    except ValidationError:
+        class _Dummy:
+            pass
+        settings_obj = _Dummy()
+
+    providers = providers_from_settings(settings_obj)
     if providers:
         app.include_router(
             oauth_router_with_backend(

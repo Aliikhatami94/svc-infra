@@ -9,7 +9,6 @@ from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
 from .settings import get_auth_settings
 
-auth_settings = get_auth_settings()
 
 def get_fastapi_users(
     user_model: Any,
@@ -36,9 +35,10 @@ def get_fastapi_users(
         yield UserManager(user_db)
 
     def get_jwt_strategy() -> JWTStrategy:
+        settings = get_auth_settings()
         return JWTStrategy(
-            secret=auth_settings.jwt_secret.get_secret_value(),
-            lifetime_seconds=auth_settings.jwt_lifetime_seconds,
+            secret=settings.jwt_secret.get_secret_value(),
+            lifetime_seconds=settings.jwt_lifetime_seconds,
         )
 
     bearer_transport = BearerTransport(tokenUrl=f"{auth_prefix}/jwt/login")
