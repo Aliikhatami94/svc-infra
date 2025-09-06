@@ -323,20 +323,33 @@ def _ensure_ssl_default(u: URL) -> URL:
 def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
     u = _ensure_ssl_default(u)
+
+    # --- Async path (unchanged) ---
     if is_async_url(u):
-        # async path unchanged
         create_async = _create_async_engine
         if create_async is None:
             raise RuntimeError("Async driver URL provided but SQLAlchemy async extras are not available.")
+        # No special handling needed for async drivers like asyncpg/aiomysql/aiosqlite
         return create_async(u, echo=echo, pool_pre_ping=True)
 
-    # sync path: coerce a reasonable driver if not explicit
+    # --- Sync path ---
+    # Coerce a reasonable sync driver if none was specified
     u = _coerce_sync_driver(u)
 
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
-    create_sync = _create_engine
-    return create_sync(u, echo=echo, pool_pre_ping=True)
+
+    # psycopg3 quirk: ensure password is explicitly forwarded via connect_args
+    connect_args: dict[str, Any] = {}
+    dn = (u.drivername or "").lower()
+    if dn.startswith("postgresql+psycopg") and u.password:
+        connect_args["password"] = u.password
+
+    kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
+    if connect_args:
+        kwargs["connect_args"] = connect_args
+
+    return _create_engine(u, **kwargs)
 
 
 # ---------- Identifier quoting helpers ----------
@@ -763,7 +776,8 @@ def build_alembic_config(
         # If it's a sync URL with no explicit driver, choose an installed one
         if not is_async_url(u):
             u = _coerce_sync_driver(u)
-        cfg.set_main_option("sqlalchemy.url", str(u))
+        # IMPORTANT: don't mask password
+        cfg.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
     cfg.set_main_option("path_separator", "os")
     cfg.set_main_option("prepend_sys_path", str(root))

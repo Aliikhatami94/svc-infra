@@ -6,7 +6,7 @@ from typing import List
 
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import make_url, URL
 
 # Load logging configuration from alembic.ini
 config = context.config
@@ -16,7 +16,7 @@ if config.config_file_name is not None:
 logger = logging.getLogger(__name__)
 
 # --- sys.path bootstrap for src-layout projects ---
-import sys, pathlib
+import sys, pathlib, importlib.util
 prepend = config.get_main_option("prepend_sys_path") or ""
 if prepend:
     if prepend not in sys.path:
@@ -110,34 +110,36 @@ def _collect_metadata() -> list[object]:
 
 target_metadata = _collect_metadata()
 
-def _ensure_ssl_default(url_str: str) -> str:
-    u = make_url(url_str)
-    backend = (u.get_backend_name() or "").lower()
-    if backend not in ("postgresql", "postgres"):
-        return url_str
-    # asyncpg wants 'ssl=true' via SQLAlchemy param
-    if any(k in u.query for k in ("ssl", "sslmode", "sslrootcert", "sslcert", "sslkey")):
-        return url_str
-    return str(u.set(query={**u.query, "ssl": "true"}))
-
-def _coerce_to_async_url(url_str: str) -> str:
-    low = url_str.lower()
+def _coerce_to_async_url(u: URL) -> URL:
+    low = (u.drivername or "").lower()
     if "+asyncpg" in low or "+aiomysql" in low or "+aiosqlite" in low:
-        return url_str
-    if low.startswith("postgresql+psycopg2://") or low.startswith("postgresql+psycopg://"):
-        return "postgresql+asyncpg://" + url_str.split("://", 1)[1]
-    if low.startswith("postgresql://") or low.startswith("postgres://"):
-        return "postgresql+asyncpg://" + url_str.split("://", 1)[1]
-    if low.startswith("mysql+pymysql://") or low.startswith("mysql://"):
-        return "mysql+aiomysql://" + url_str.split("://", 1)[1]
-    if low.startswith("sqlite://") and not low.startswith("sqlite+aiosqlite://"):
-        return "sqlite+aiosqlite://" + url_str.split("://", 1)[1]
-    return url_str
+        return u
+    backend = (u.get_backend_name() or "").lower()
+    if backend in ("postgresql", "postgres"):
+        return u.set(drivername="postgresql+asyncpg")
+    if backend == "mysql":
+        return u.set(drivername="mysql+aiomysql")
+    if backend == "sqlite":
+        return u.set(drivername="sqlite+aiosqlite")
+    return u
 
+def _ensure_ssl_default_async(u: URL) -> URL:
+    backend = (u.get_backend_name() or "").lower()
+    if backend in ("postgresql", "postgres"):
+        # asyncpg prefers 'ssl=true' via SQLAlchemy param; if already present, keep it
+        if any(k in u.query for k in ("ssl", "sslmode", "sslrootcert", "sslcert", "sslkey")):
+            return u
+        return u.set(query={**u.query, "ssl": "true"})
+    return u
+
+# Prefer DATABASE_URL if present; coerce & apply ssl defaults before setting.
+# IMPORTANT: never use str(URL) because it masks passwords; use render_as_string(hide_password=False).
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
-    coerced = _ensure_ssl_default(_coerce_to_async_url(env_db_url))
-    config.set_main_option("sqlalchemy.url", coerced)
+    u = make_url(env_db_url)
+    u = _coerce_to_async_url(u)
+    u = _ensure_ssl_default_async(u)
+    config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
 def _do_run_migrations(connection):
     context.configure(
@@ -152,10 +154,10 @@ def _do_run_migrations(connection):
 
 async def run_migrations_online() -> None:
     url = config.get_main_option("sqlalchemy.url")
-    connectable = create_async_engine(url)
-    async with connectable.connect() as connection:
+    engine = create_async_engine(url)
+    async with engine.connect() as connection:
         await connection.run_sync(_do_run_migrations)
-    await connectable.dispose()
+    await engine.dispose()
 
 if context.is_offline_mode():
     raise SystemExit("Run offline migrations with a sync env.py or set offline to False.")

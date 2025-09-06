@@ -77,6 +77,7 @@ opentelemetry-instrumentation-httpx = "^0.57b0"
 opentelemetry-exporter-otlp = "^1.36.0"
 opentelemetry-propagator-b3 = "^1.36.0"
 prometheus-client = "^0.22.1"
+psycopg2-binary = "^2.9.10"
 
 [tool.poetry.extras]
 # Postgres v3

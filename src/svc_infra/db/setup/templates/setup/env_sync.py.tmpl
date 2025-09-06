@@ -5,8 +5,7 @@ import logging
 from typing import List
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import make_url, URL
 
 # Load logging configuration from alembic.ini
 config = context.config
@@ -27,6 +26,9 @@ if prepend:
         if s not in sys.path:
             sys.path.insert(0, s)
 
+# Prefer our engine helper so we get SSL defaults + driver coercion + psycopg3 password forwarding
+from svc_infra.db.setup.utils import build_engine
+
 # Discover metadata from packages, but prefer the central ModelBase first
 DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
@@ -43,7 +45,7 @@ def _collect_metadata() -> list[object]:
     except Exception as e:
         logger.debug("ModelBase not available or empty: %s", e)
 
-    # 1) Fallback: discover across packages (your existing logic)
+    # 1) Fallback: discover across packages
     import importlib, pkgutil, pathlib
     found: list[object] = []
 
@@ -115,40 +117,41 @@ target_metadata = _collect_metadata()
 def _module_available(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
 
-def _coerce_sync_driver(url_str: str) -> str:
-    """Choose an installed sync driver so create_engine won't import missing dbapi."""
-    u = make_url(url_str)
+def _coerce_sync_driver(u: URL) -> URL:
+    """Choose an installed sync driver so create_engine won't import a missing DBAPI."""
     dn = (u.drivername or "").lower()
     if "+" in dn:
-        return url_str  # already explicit
+        return u  # already explicit
     backend = (u.get_backend_name() or "").lower()
     if backend in ("postgresql", "postgres"):
         if _module_available("psycopg"):
-            return str(u.set(drivername="postgresql+psycopg"))
+            return u.set(drivername="postgresql+psycopg")
         if _module_available("psycopg2"):
-            return str(u.set(drivername="postgresql+psycopg2"))
-        return url_str
+            return u.set(drivername="postgresql+psycopg2")
+        return u
     if backend == "mysql" and _module_available("pymysql"):
-        return str(u.set(drivername="mysql+pymysql"))
+        return u.set(drivername="mysql+pymysql")
     # sqlite uses stdlib driver, leave it
-    return url_str
+    return u
 
-def _ensure_ssl_default(url_str: str) -> str:
-    u = make_url(url_str)
+def _ensure_ssl_default(u: URL) -> URL:
     backend = (u.get_backend_name() or "").lower()
     if backend not in ("postgresql", "postgres"):
-        return url_str
+        return u
     if any(k in u.query for k in ("sslmode", "ssl", "sslrootcert", "sslcert", "sslkey")):
-        return url_str
+        return u
     # default for hosted PGs
     mode = (os.getenv("DB_SSLMODE_DEFAULT") or os.getenv("PGSSLMODE") or os.getenv("PGSSL_MODE") or "require").strip()
-    return str(u.set(query={**u.query, "sslmode": mode}))
+    return u.set(query={**u.query, "sslmode": mode})
 
-# Prefer DATABASE_URL if present; coerce & apply ssl defaults before setting
+# Prefer DATABASE_URL if present; coerce & apply ssl defaults before setting.
+# IMPORTANT: never use str(URL) because it masks passwords; use render_as_string(hide_password=False).
 env_db_url = os.getenv("DATABASE_URL")
 if env_db_url:
-    coerced = _ensure_ssl_default(_coerce_sync_driver(env_db_url))
-    config.set_main_option("sqlalchemy.url", coerced)
+    u = make_url(env_db_url)
+    u = _coerce_sync_driver(u)
+    u = _ensure_ssl_default(u)
+    config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -165,12 +168,9 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
+    url = config.get_main_option("sqlalchemy.url")
+    engine = build_engine(url, echo=False)
+    with engine.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -180,6 +180,7 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             context.run_migrations()
+    engine.dispose()
 
 if context.is_offline_mode():
     run_migrations_offline()
