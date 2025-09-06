@@ -4,7 +4,7 @@ from typing import Iterable, Optional, Any, Callable
 
 from .settings import ObservabilitySettings
 from .metrics.asgi import add_prometheus
-from .metrics.http import instrument_requests, instrument_httpx
+from .metrics.http import instrument_requests, instrument_httpx, counter, histogram
 from .metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
 from .tracing.setup import setup_tracing
 

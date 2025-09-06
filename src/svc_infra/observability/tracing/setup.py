@@ -11,12 +11,12 @@ from opentelemetry.propagate import set_global_textmap
 # Try to load propagators defensively; not all installs ship all extras.
 _available_propagators: List[object] = []
 try:
-    from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator
+    from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator # type: ignore[attr-defined]
     _available_propagators.append(TraceContextTextMapPropagator())
 except Exception:
     pass
 try:
-    from opentelemetry.propagators.baggage import W3CBaggagePropagator
+    from opentelemetry.propagators.baggage import W3CBaggagePropagator # type: ignore[attr-defined]
     _available_propagators.append(W3CBaggagePropagator())
 except Exception:
     pass
@@ -30,7 +30,7 @@ except Exception:
 # Fallback: if nothing loaded, at least keep W3C tracecontext via API default.
 if not _available_propagators:
     try:
-        from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator
+        from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator # type: ignore[attr-defined]
         _available_propagators.append(TraceContextTextMapPropagator())
     except Exception:
         _available_propagators = []  # let OpenTelemetry’s default remain in place
