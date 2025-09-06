@@ -1,0 +1,30 @@
+groups:
+  - name: svc-infra-defaults
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_server_requests_total{code=~"5.."}[5m])) / sum(rate(http_server_requests_total[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High 5xx error ratio
+          description: 5xx error ratio exceeded 5% for 10m.
+
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, route)) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High request latency p95
+          description: p95 latency over 1s for 10m.
+
+      - alert: DBPoolSaturation
+        expr: sum(db_pool_in_use) / (sum(db_pool_in_use) + sum(db_pool_available)) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: DB pool saturation
+          description: DB connection pool > 90% utilized for 10m.
+

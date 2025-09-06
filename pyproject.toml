@@ -10,6 +10,7 @@ keywords = ["fastapi", "sqlalchemy", "alembic", "auth", "infra", "async", "pydan
 include = [
     "src/svc_infra/py.typed",
     "src/svc_infra/db/templates/**/*",
+    "src/svc_infra/observability/templates/**/*",
 ]
 
 classifiers = [
@@ -69,6 +70,13 @@ mcp = "^1.13.0"
 # AI is required by svc-infra
 ai-infra = "^0.1.29"
 psycopg2 = "^2.9.10"
+prometheus-client = "^0.22.1"
+opentelemetry-sdk = "^1.36.0"
+opentelemetry-instrumentation-fastapi = "^0.57b0"
+opentelemetry-instrumentation-sqlalchemy = "^0.57b0"
+opentelemetry-instrumentation-requests = "^0.57b0"
+opentelemetry-instrumentation-httpx = "^0.57b0"
+opentelemetry-exporter-otlp = "^1.36.0"
 
 [tool.poetry.extras]
 pg = ["psycopg", "asyncpg"]
@@ -78,6 +86,15 @@ mssql = ["pyodbc"]
 snowflake = ["snowflake-connector-python"]
 redshift = ["redshift-connector"]
 duckdb = ["duckdb"]
+metrics = ["prometheus-client"]
+tracing = [
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "opentelemetry-instrumentation-fastapi",
+    "opentelemetry-instrumentation-requests",
+    "opentelemetry-instrumentation-httpx",
+    "opentelemetry-instrumentation-sqlalchemy",
+]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"

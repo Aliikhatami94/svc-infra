@@ -1,0 +1,43 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:  # default :4317
+      http:  # default :4318
+
+processors:
+  batch: {}
+
+exporters:
+  # Logs spans/metrics locally for debugging; keep enabled in dev
+  logging:
+    loglevel: info
+
+  # Enable one of these by uncommenting and setting envs
+  # otlp/tempo:
+  #   endpoint: ${OTEL_TEMPO_ENDPOINT}
+  #   tls:
+  #     insecure: true
+  # prometheusremotewrite:
+  #   endpoint: ${PROM_REMOTE_WRITE_ENDPOINT}
+  #   tls:
+  #     insecure: ${PROM_REMOTE_WRITE_INSECURE:false}
+
+  # prometheus:
+  #   endpoint: ":9464"   # Collector exposes metrics for Prom scrape
+
+service:
+  telemetry:
+    logs:
+      level: "info"
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging]
+      # exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging]
+      # exporters: [prometheus, prometheusremotewrite]
+

@@ -13,8 +13,8 @@ def _make_router(path: str) -> APIRouter:
     return router
 
 
-def test_include_auth_without_providers(monkeypatch):
-    """When no providers are returned, include_auth should only register the auth and users routers."""
+def test_enable_auth_without_providers(monkeypatch):
+    """When no providers are returned, enable_auth should only register the auth and users routers."""
     auth_router = _make_router("/auth_foo")
     users_router = _make_router("/user_me")
 
@@ -25,7 +25,7 @@ def test_include_auth_without_providers(monkeypatch):
     monkeypatch.setattr(integration, "providers_from_settings", lambda settings: {})
 
     app = FastAPI()
-    integration.include_auth(
+    integration.enable_auth(
         app,
         user_model=None,
         schema_read=None,
@@ -43,8 +43,8 @@ def test_include_auth_without_providers(monkeypatch):
     assert not any(p.startswith("/_db/auth/oauth") for p in paths)
 
 
-def test_include_auth_with_providers(monkeypatch):
-    """When providers exist, include_auth should register the oauth router returned by oauth_router_with_backend."""
+def test_enable_auth_with_providers(monkeypatch):
+    """When providers exist, enable_auth should register the oauth router returned by oauth_router_with_backend."""
     auth_router = _make_router("/auth_foo")
     users_router = _make_router("/user_me")
 
@@ -67,7 +67,7 @@ def test_include_auth_with_providers(monkeypatch):
     monkeypatch.setattr(integration, "oauth_router_with_backend", fake_oauth_router_with_backend)
 
     app = FastAPI()
-    integration.include_auth(
+    integration.enable_auth(
         app,
         user_model=None,
         schema_read=None,

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://grafana.com/schemas/dashboard/v1.json",
+  "title": "Service Observability (RED & USE)",
+  "editable": true,
+  "tags": ["svc-infra", "observability"],
+  "panels": [
+    {"type": "row", "title": "API (RED)"},
+    {
+      "type": "timeseries",
+      "title": "Request rate (req/s)",
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_total[5m]))",
+          "legendFormat": "{{method}} {{route}} {{code}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Error ratio",
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_total{code=~\"5..\"}[5m])) / sum(rate(http_server_requests_total[5m]))",
+          "legendFormat": "5xx ratio"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p95 (s)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {"type": "row", "title": "DB Pool (USE)"},
+    {
+      "type": "timeseries",
+      "title": "Pool in use",
+      "targets": [
+        {"expr": "sum(db_pool_in_use)", "legendFormat": "in use"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Pool available",
+      "targets": [
+        {"expr": "sum(db_pool_available)", "legendFormat": "available"}
+      ]
+    }
+  ],
+  "time": {"from": "now-6h", "to": "now"}
+}
+

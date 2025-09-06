@@ -9,7 +9,7 @@ from .settings import get_auth_settings
 from pydantic import ValidationError
 
 
-def include_auth(
+def enable_auth(
         app: FastAPI,
         *,
         user_model,
