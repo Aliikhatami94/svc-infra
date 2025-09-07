@@ -126,7 +126,7 @@ def revision(
         sql: bool = False,
         ensure_head_before_autogenerate: bool = True,
         database_url: Optional[str] = None,
-) -> None:
+) -> dict:
     """
     Create a new Alembic revision.
 
@@ -155,6 +155,7 @@ def revision(
         version_path=version_path,
         sql=sql,
     )
+    return {"ok": True, "action": "revision", "project_root": str(root), "message": message, "autogenerate": autogenerate}
 
 
 def upgrade(
@@ -182,7 +183,7 @@ def downgrade(
         *,
         revision_target: str = "-1",
         database_url: Optional[str] = None,
-) -> None:
+) -> dict:
     """Revert migrations down to the specified revision or relative step.
 
     Args:
@@ -193,6 +194,7 @@ def downgrade(
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
     command.downgrade(cfg, revision_target)
+    return {"ok": True, "action": "downgrade", "project_root": str(root), "target": revision_target}
 
 
 def current(
@@ -244,12 +246,13 @@ def stamp(
         *,
         revision_target: str = "head",
         database_url: Optional[str] = None,
-) -> None:
+) -> dict:
     """Set the current database revision without running migrations. Useful for marking an existing database as up-to-date."""
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
     command.stamp(cfg, revision_target)
+    return {"ok": True, "action": "stamp", "project_root": str(root), "target": revision_target}
 
 
 def merge_heads(
@@ -257,11 +260,12 @@ def merge_heads(
         *,
         message: Optional[str] = None,
         database_url: Optional[str] = None,
-) -> None:
+) -> dict:
     """Create a merge revision that joins multiple migration heads."""
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     command.merge(cfg, "heads", message=message)
+    return {"ok": True, "action": "merge_heads", "project_root": str(root), "message": message}
 
 
 # ---------- High-level convenience API ----------
@@ -294,7 +298,7 @@ def setup_and_migrate(
         create_followup_revision: bool = True,
         initial_message: str = "initial schema",
         followup_message: str = "autogen",
-        database_url: str,                      # <— MAKE THIS REQUIRED
+        database_url: str,
 ) -> dict:
     """
     Ensure DB + Alembic are ready and up-to-date.

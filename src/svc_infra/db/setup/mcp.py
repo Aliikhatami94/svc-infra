@@ -13,6 +13,7 @@ from .core import (
     history,
     stamp,
     merge_heads,
+    setup_and_migrate,
 )
 from .scaffold import (
     scaffold_core,
@@ -57,6 +58,7 @@ mcp = mcp_from_functions(
         history,
         stamp,
         merge_heads,
+        setup_and_migrate,
         # Scaffolding
         scaffold_core,
         scaffold_models_core,
