@@ -7,7 +7,6 @@ from typing import List
 from alembic import context
 from sqlalchemy.engine import make_url, URL
 
-# helpers from svc-infra
 from svc_infra.db.setup.utils import (
     _coerce_sync_driver,
     _ensure_ssl_default,
@@ -15,7 +14,7 @@ from svc_infra.db.setup.utils import (
     build_engine,
 )
 
-# Load logging configuration from alembic.ini
+# Logging
 config = context.config
 if config.config_file_name is not None:
     import logging.config
@@ -34,9 +33,31 @@ if prepend:
         if s not in sys.path:
             sys.path.insert(0, s)
 
+# --- robust x-arg parsing for all Alembic versions ---
+def _x_args_dict() -> dict:
+    try:
+        # Alembic >= 1.8 uses as_dictionary kw only
+        return context.get_x_argument(as_dictionary=True)  # type: ignore[arg-type]
+    except TypeError:
+        try:
+            # Some versions just return a list even if you pass kw
+            xs = context.get_x_argument()
+        except TypeError:
+            # Very old signatures
+            xs = []
+    # Parse ["k=v", "flag"] into dict
+    out = {}
+    for item in xs:
+        if "=" in item:
+            k, v = item.split("=", 1)
+            out[k] = v
+        else:
+            out[item] = ""
+    return out
+
 # --- Resolve effective DB URL (priority: -x -> env -> helper -> ini) ---
-_x = context.get_x_argument(asdict=True) if hasattr(context, "get_x_argument") else {}
-cli_dburl = (_x or {}).get("dburl", "").strip()
+_x = _x_args_dict()
+cli_dburl = _x.get("dburl", "").strip()
 env_dburl = os.getenv("DATABASE_URL", "").strip()
 try:
     helper_dburl = get_database_url_from_env(required=False) or ""
@@ -48,9 +69,9 @@ effective_url = cli_dburl or env_dburl or helper_dburl or ini_dburl
 if not effective_url:
     raise RuntimeError(
         "No database URL found. Provide via:\n"
-        "  * env: DATABASE_URL=...\n"
-        "  * or CLI: alembic -x dburl=...\n"
-        "  * or alembic.ini [sqlalchemy.url]\n"
+        "  • env: DATABASE_URL=...\n"
+        "  • or CLI: alembic -x dburl=...\n"
+        "  • or alembic.ini [sqlalchemy.url]\n"
     )
 
 u = make_url(effective_url)
@@ -58,7 +79,7 @@ u = _coerce_sync_driver(u)
 u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
-# --- Metadata discovery (prefer central ModelBase, then scan) ---
+# --- metadata discovery (prefer ModelBase) ---
 DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
