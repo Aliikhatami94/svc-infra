@@ -713,19 +713,8 @@ def render_env_py(packages: Sequence[str], *, async_db: bool | None = None) -> s
     return txt.replace("__PACKAGES_LIST__", pkg_list)
 
 
-def build_alembic_config(
-        project_root: Path | str,
-        *,
-        script_location: str = "migrations",
-) -> Config:
-    """Build an Alembic Config based on files + environment.
-
-    - Resolves script_location under project_root.
-    - If DATABASE_URL is set, injects into config for runtime use (coerced to a working driver, with sensible SSL defaults).
-    - Adds prepend_sys_path to ease imports during env.py execution.
-    """
+def build_alembic_config(project_root: Path | str, *, script_location: str = "migrations") -> Config:
     from alembic.config import Config as _Config
-
     root = Path(project_root).resolve()
     cfg_path = root / "alembic.ini"
     cfg = _Config(str(cfg_path)) if cfg_path.exists() else _Config()
@@ -734,13 +723,14 @@ def build_alembic_config(
     env_db_url = os.getenv("DATABASE_URL", "").strip()
     if env_db_url:
         u = make_url(env_db_url)
-        # Add SSL defaults for hosted Postgres unless already provided
         u = _ensure_ssl_default(u)
-        # If it's a sync URL with no explicit driver, choose an installed one
         if not is_async_url(u):
             u = _coerce_sync_driver(u)
-        # IMPORTANT: don't mask password
         cfg.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
+
+    # ADD THIS guard:
+    if not cfg.get_main_option("sqlalchemy.url"):
+        raise RuntimeError("No SQLAlchemy URL resolved. Pass `database_url` to this function or set DATABASE_URL.")
 
     cfg.set_main_option("path_separator", "os")
     cfg.set_main_option("prepend_sys_path", str(root))

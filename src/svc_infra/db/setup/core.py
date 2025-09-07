@@ -26,17 +26,11 @@ from svc_infra.db.setup.utils import (
 # ---------- Alembic init ----------
 
 def _prepare_env(project_root: Path | str, *, database_url: Optional[str] = None) -> Path:
-    """
-    Prepare process env so Alembic can run from any host/runtime:
-
-    - Loads .env and sets PYTHONPATH for src-layout
-    - Optionally injects DATABASE_URL for this call only
-    - Returns absolute project root Path
-    """
     root = Path(project_root).resolve()
     prepare_process_env(root)
     if database_url:
-        os.environ["DATABASE_URL"] = str(database_url)
+        os.environ["DATABASE_URL"] = str(database_url)  # OK to set for this process
+    os.chdir(root)  # <— ADD THIS: normalize relative paths like migrations/ and templates
     return root
 
 
@@ -131,6 +125,7 @@ def revision(
         version_path: str | None = None,
         sql: bool = False,
         ensure_head_before_autogenerate: bool = True,
+        database_url: Optional[str] = None,
 ) -> None:
     """
     Create a new Alembic revision.
@@ -142,7 +137,6 @@ def revision(
         - DATABASE_URL must be set in the environment.
         - Model discovery is automatic (prefers ModelBase.metadata).
     """
-    database_url = get_database_url_from_env(required=False)
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
@@ -165,9 +159,10 @@ def revision(
 
 def upgrade(
         project_root: Path | str,
-        *,
         revision_target: str = "head",
-) -> None:
+        *,
+        database_url: Optional[str] = None,
+) -> dict:
     """
     Apply migrations forward.
 
@@ -175,17 +170,18 @@ def upgrade(
         >>> upgrade("..")          # to head
         >>> upgrade("..", "base")  # or to a specific rev
     """
-    database_url = get_database_url_from_env(required=True)
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
     command.upgrade(cfg, revision_target)
+    return {"ok": True, "action": "upgrade", "project_root": str(root), "target": revision_target}
 
 
 def downgrade(
         project_root: Path | str,
         *,
         revision_target: str = "-1",
+        database_url: Optional[str] = None,
 ) -> None:
     """Revert migrations down to the specified revision or relative step.
 
@@ -193,7 +189,6 @@ def downgrade(
         project_root: Directory containing alembic.ini and migrations/.
         revision_target: Target revision identifier or relative step (e.g. "-1").
     """
-    database_url = get_database_url_from_env(required=True)
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
@@ -202,24 +197,26 @@ def downgrade(
 
 def current(
         project_root: Path | str,
-        *,
         verbose: bool = False,
-) -> None:
+        *,
+        database_url: Optional[str] = None,
+) -> dict:
     """Print the current database revision(s)."""
-    database_url = get_database_url_from_env(required=False)
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
+    # capture output? For MCP a simple ack is fine
     command.current(cfg, verbose=verbose)
+    return {"ok": True, "action": "current", "project_root": str(root), "verbose": verbose}
 
 
 def history(
         project_root: Path | str,
         *,
         verbose: bool = False,
+        database_url: Optional[str] = None,
 ) -> None:
     """Show the migration history for this project."""
-    database_url = get_database_url_from_env(required=False)
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
@@ -230,9 +227,9 @@ def stamp(
         project_root: Path | str,
         *,
         revision_target: str = "head",
+        database_url: Optional[str] = None,
 ) -> None:
     """Set the current database revision without running migrations. Useful for marking an existing database as up-to-date."""
-    database_url = get_database_url_from_env(required=False)
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
@@ -243,9 +240,9 @@ def merge_heads(
         project_root: Path | str,
         *,
         message: Optional[str] = None,
+        database_url: Optional[str] = None,
 ) -> None:
     """Create a merge revision that joins multiple migration heads."""
-    database_url = get_database_url_from_env(required=False)
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     command.merge(cfg, "heads", message=message)
@@ -281,9 +278,8 @@ def setup_and_migrate(
         create_followup_revision: bool = True,
         initial_message: str = "initial schema",
         followup_message: str = "autogen",
-        return_dict: bool = True,
-        database_url: str = None,
-) -> SetupAndMigrateResult:
+        database_url: str,                      # <— MAKE THIS REQUIRED
+) -> dict:
     """
     Ensure DB + Alembic are ready and up-to-date.
 
@@ -294,13 +290,9 @@ def setup_and_migrate(
     if create_db_if_missing:
         ensure_database_exists(database_url)
 
-    # Auto-detect async from the URL (kept for parity; not used directly here)
-    from sqlalchemy.engine import make_url as _make_url
-    _ = is_async_url(_make_url(database_url))
-
     mig_dir = init_alembic(
         root,
-        discover_packages=None,   # rely on auto-discovery only
+        discover_packages=None,
         overwrite=overwrite_scaffold,
         database_url=database_url,
     )
@@ -315,7 +307,7 @@ def setup_and_migrate(
     upgraded = False
 
     try:
-        upgrade(root)   # safe if nothing to do
+        upgrade(root, database_url=database_url)
         upgraded = True
     except Exception:
         pass
@@ -329,9 +321,10 @@ def setup_and_migrate(
             message=initial_message,
             autogenerate=True,
             ensure_head_before_autogenerate=True,
+            database_url=database_url,
         )
         created_initial = True
-        upgrade(root)
+        upgrade(root, database_url=database_url)
         upgraded = True
     elif create_followup_revision:
         revision(
@@ -339,20 +332,22 @@ def setup_and_migrate(
             message=followup_message,
             autogenerate=True,
             ensure_head_before_autogenerate=True,
+            database_url=database_url,
         )
         created_followup = True
-        upgrade(root)
+        upgrade(root, database_url=database_url)
         upgraded = True
 
-    result = SetupAndMigrateResult(
-        project_root=root,
-        migrations_dir=mig_dir,
-        alembic_ini=alembic_ini,
-        created_initial_revision=created_initial,
-        created_followup_revision=created_followup,
-        upgraded=upgraded,
-    )
-    return result.to_dict() if return_dict else result
+    return {
+        "ok": True,
+        "action": "setup_and_migrate",
+        "project_root": str(root),
+        "migrations_dir": str(mig_dir),
+        "alembic_ini": str(alembic_ini),
+        "created_initial_revision": created_initial,
+        "created_followup_revision": created_followup,
+        "upgraded": upgraded,
+    }
 
 
 __all__ = [
