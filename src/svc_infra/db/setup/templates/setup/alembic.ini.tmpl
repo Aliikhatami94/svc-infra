@@ -3,8 +3,10 @@
 path_separator = os
 script_location = {script_location}
 
-# Used only for offline mode; env.py will use DATABASE_URL if set
-sqlalchemy.url = {sqlalchemy_url}
+# NOTE:
+# - Leave sqlalchemy.url empty in VCS. env.py will use DATABASE_URL if set.
+# - For offline runs, either export DATABASE_URL or temporarily edit this value.
+sqlalchemy.url =
 
 dialect_name = {dialect_name}
 
@@ -39,4 +41,3 @@ formatter = generic
 
 [formatter_generic]
 format = %(levelname)-5.5s [%(name)s] %(message)s
-

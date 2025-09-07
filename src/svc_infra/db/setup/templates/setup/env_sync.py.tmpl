@@ -7,6 +7,8 @@ from typing import List
 from alembic import context
 from sqlalchemy.engine import make_url, URL
 
+from svc_infra.db.setup.utils import _coerce_sync_driver, _ensure_ssl_default
+
 # Load logging configuration from alembic.ini
 config = context.config
 if config.config_file_name is not None:
@@ -116,33 +118,6 @@ target_metadata = _collect_metadata()
 
 def _module_available(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
-
-def _coerce_sync_driver(u: URL) -> URL:
-    """Choose an installed sync driver so create_engine won't import a missing DBAPI."""
-    dn = (u.drivername or "").lower()
-    if "+" in dn:
-        return u  # already explicit
-    backend = (u.get_backend_name() or "").lower()
-    if backend in ("postgresql", "postgres"):
-        if _module_available("psycopg"):
-            return u.set(drivername="postgresql+psycopg")
-        if _module_available("psycopg2"):
-            return u.set(drivername="postgresql+psycopg2")
-        return u
-    if backend == "mysql" and _module_available("pymysql"):
-        return u.set(drivername="mysql+pymysql")
-    # sqlite uses stdlib driver, leave it
-    return u
-
-def _ensure_ssl_default(u: URL) -> URL:
-    backend = (u.get_backend_name() or "").lower()
-    if backend not in ("postgresql", "postgres"):
-        return u
-    if any(k in u.query for k in ("sslmode", "ssl", "sslrootcert", "sslcert", "sslkey")):
-        return u
-    # default for hosted PGs
-    mode = (os.getenv("DB_SSLMODE_DEFAULT") or os.getenv("PGSSLMODE") or os.getenv("PGSSL_MODE") or "require").strip()
-    return u.set(query={**u.query, "sslmode": mode})
 
 # Prefer DATABASE_URL if present; coerce & apply ssl defaults before setting.
 # IMPORTANT: never use str(URL) because it masks passwords; use render_as_string(hide_password=False).

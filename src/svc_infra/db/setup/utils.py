@@ -320,6 +320,15 @@ def _ensure_ssl_default(u: URL) -> URL:
         mode = mode or "require"
         return u.set(query={**u.query, "sslmode": mode})
 
+def _ensure_ssl_default_async(u: URL) -> URL:
+    backend = (u.get_backend_name() or "").lower()
+    if backend in ("postgresql", "postgres"):
+        # asyncpg prefers 'ssl=true' via SQLAlchemy param; if already present, keep it
+        if any(k in u.query for k in ("ssl", "sslmode", "sslrootcert", "sslcert", "sslkey")):
+            return u
+        return u.set(query={**u.query, "ssl": "true"})
+    return u
+
 def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
     u = _ensure_ssl_default(u)
