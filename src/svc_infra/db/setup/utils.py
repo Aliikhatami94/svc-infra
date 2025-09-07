@@ -664,6 +664,8 @@ async def _redshift_create_database_async(url: URL) -> None:
 # ---------- Entry: ensure database ----------
 
 def ensure_database_exists(url: URL | str) -> None:
+    if url is None:
+        raise RuntimeError("ensure_database_exists: database URL is required but None was provided.")
     u = make_url(url) if isinstance(url, str) else url
     backend = (u.get_backend_name() or "").lower()
 

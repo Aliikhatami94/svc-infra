@@ -298,23 +298,24 @@ def setup_and_migrate(
         create_followup_revision: bool = True,
         initial_message: str = "initial schema",
         followup_message: str = "autogen",
-        database_url: str,
+        database_url: Optional[str] = None,
 ) -> dict:
     """
     Ensure DB + Alembic are ready and up-to-date.
 
     Auto-detects async vs. sync from DATABASE_URL.
     """
-    root = _prepare_env(project_root, database_url=database_url)
+    resolved_url = database_url or get_database_url_from_env(required=True)
+    root = _prepare_env(project_root, database_url=resolved_url)
 
     if create_db_if_missing:
-        ensure_database_exists(database_url)
+        ensure_database_exists(resolved_url)
 
     mig_dir = init_alembic(
         root,
         discover_packages=None,
         overwrite=overwrite_scaffold,
-        database_url=database_url,
+        database_url=resolved_url,
     )
     versions_dir = mig_dir / "versions"
     alembic_ini = root / "alembic.ini"

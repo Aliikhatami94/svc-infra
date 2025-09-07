@@ -6,12 +6,12 @@ Lightweight wrapper around Alembic that standardizes env setup, scaffold generat
 
 ### Installed as a package
 ```bash
-python -m svc_infra.db.setup.cli --help
+python -m svc_infra.db --help
 ```
 
 ### From a checkout
-- **Poetry**: `poetry run python -m svc_infra.db.setup.cli --help`
-- **venv**: `python -m svc_infra.db.setup.cli --help`
+- **Poetry**: `poetry run python -m svc_infra.db --help`
+- **venv**: `python -m svc_infra.db --help`
 
 > **Tip**: Most commands need a project root (where alembic.ini and migrations/ live). Pass `--project-root .` if you're already in that folder.
 > 
@@ -27,11 +27,11 @@ python -m svc_infra.db.setup.cli --help
 
 ```bash
 export DATABASE_URL="postgresql://user:pass@host:5432/dbname"
-poetry run python -m svc_infra.db.setup.cli upgrade --project-root .
+poetry run python -m svc_infra.db upgrade --project-root .
 ```
 
 ```bash
-poetry run python -m svc_infra.db.setup.cli revision \
+poetry run python -m svc_infra.db revision \
   -m "init" \
   --database-url "sqlite:///./app.db" \
   --project-root .
@@ -64,14 +64,14 @@ Creates `alembic.ini` and `migrations/` with an `env.py` tailored to your URL (a
 
 ```bash
 # Sync sqlite
-poetry run python -m svc_infra.db.setup.cli init \
+poetry run python -m svc_infra.db init \
   --project-root . \
   --database-url "sqlite:///./app.db"
 ```
 
 ```bash
 # Async postgres
-poetry run python -m svc_infra.db.setup.cli init \
+poetry run python -m svc_infra.db init \
   --project-root . \
   --database-url "postgresql+asyncpg://user:pass@host/db"
 ```
@@ -92,14 +92,14 @@ poetry run python -m svc_infra.db.setup.cli init \
 
 ```bash
 # Empty revision
-poetry run python -m svc_infra.db.setup.cli revision \
+poetry run python -m svc_infra.db revision \
   -m "init" \
   --project-root .
 ```
 
 ```bash
 # Autogenerate from models metadata
-poetry run python -m svc_infra.db.setup.cli revision \
+poetry run python -m svc_infra.db revision \
   -m "add widgets" \
   --autogenerate \
   --project-root .
@@ -109,34 +109,34 @@ poetry run python -m svc_infra.db.setup.cli revision \
 
 ```bash
 # Upgrade to latest
-poetry run python -m svc_infra.db.setup.cli upgrade head --project-root .
+poetry run python -m svc_infra.db upgrade head --project-root .
 
 # Upgrade to a specific revision
-poetry run python -m svc_infra.db.setup.cli upgrade abcdef123456 --project-root .
+poetry run python -m svc_infra.db upgrade abcdef123456 --project-root .
 
 # Step back one revision
-poetry run python -m svc_infra.db.setup.cli downgrade -1 --project-root .
+poetry run python -m svc_infra.db downgrade -1 --project-root .
 
 # Downgrade to base
-poetry run python -m svc_infra.db.setup.cli downgrade base --project-root .
+poetry run python -m svc_infra.db downgrade base --project-root .
 ```
 
 ### 4) Utilities: current / history / stamp / merge-heads
 
 ```bash
 # Show current DB revision
-poetry run python -m svc_infra.db.setup.cli current --project-root .
-poetry run python -m svc_infra.db.setup.cli current --project-root . --verbose
+poetry run python -m svc_infra.db current --project-root .
+poetry run python -m svc_infra.db current --project-root . --verbose
 
 # Show history
-poetry run python -m svc_infra.db.setup.cli history --project-root .
-poetry run python -m svc_infra.db.setup.cli history --project-root . --verbose
+poetry run python -m svc_infra.db history --project-root .
+poetry run python -m svc_infra.db history --project-root . --verbose
 
 # Set the DB marker without running migrations
-poetry run python -m svc_infra.db.setup.cli stamp head --project-root .
+poetry run python -m svc_infra.db stamp head --project-root .
 
 # Merge divergent heads
-poetry run python -m svc_infra.db.setup.cli merge-heads \
+poetry run python -m svc_infra.db merge-heads \
   --project-root . \
   -m "merge branches"
 ```
@@ -153,12 +153,12 @@ End-to-end helper: ensure DB exists, create Alembic scaffold if missing, create 
 
 ```bash
 # Minimal (relies on DATABASE_URL in env)
-poetry run python -m svc_infra.db.setup.cli setup-and-migrate --project-root .
+poetry run python -m svc_infra.db setup-and-migrate --project-root .
 ```
 
 ```bash
 # With explicit messages and no scaffold overwrite
-poetry run python -m svc_infra.db.setup.cli setup-and-migrate \
+poetry run python -m svc_infra.db setup-and-migrate \
   --project-root . \
   --no-overwrite-scaffold \
   --initial-message "initial schema with user auth" \
@@ -167,14 +167,14 @@ poetry run python -m svc_infra.db.setup.cli setup-and-migrate \
 
 ```bash
 # Don't attempt DB creation (use existing DB only)
-poetry run python -m svc_infra.db.setup.cli setup-and-migrate \
+poetry run python -m svc_infra.db setup-and-migrate \
   --project-root . \
   --create-db-if-missing false
 ```
 
 ```bash
 # Skip follow-up revision
-poetry run python -m svc_infra.db.setup.cli setup-and-migrate \
+poetry run python -m svc_infra.db setup-and-migrate \
   --project-root . \
   --create-followup-revision false
 ```
@@ -192,7 +192,7 @@ Generate simple, editable starter files.
 #### Separate dirs (default filenames from entity name):
 
 ```bash
-poetry run python -m svc_infra.db.setup.cli scaffold \
+poetry run python -m svc_infra.db scaffold \
   --kind entity \
   --entity-name WidgetThing \
   --models-dir ./app/models \
@@ -202,7 +202,7 @@ poetry run python -m svc_infra.db.setup.cli scaffold \
 #### Same dir:
 
 ```bash
-poetry run python -m svc_infra.db.setup.cli scaffold \
+poetry run python -m svc_infra.db scaffold \
   --kind entity \
   --entity-name Account \
   --models-dir ./app/account \
@@ -213,7 +213,7 @@ poetry run python -m svc_infra.db.setup.cli scaffold \
 #### Auth starter:
 
 ```bash
-poetry run python -m svc_infra.db.setup.cli scaffold \
+poetry run python -m svc_infra.db scaffold \
   --kind auth \
   --models-dir ./app/auth \
   --schemas-dir ./app/auth
@@ -227,7 +227,7 @@ poetry run python -m svc_infra.db.setup.cli scaffold \
 ### scaffold-models — only models
 
 ```bash
-poetry run python -m svc_infra.db.setup.cli scaffold-models \
+poetry run python -m svc_infra.db scaffold-models \
   --dest-dir ./app/models \
   --kind entity \
   --entity-name FooBar \
@@ -245,7 +245,7 @@ poetry run python -m svc_infra.db.setup.cli scaffold-models \
 ### scaffold-schemas — only schemas
 
 ```bash
-poetry run python -m svc_infra.db.setup.cli scaffold-schemas \
+poetry run python -m svc_infra.db scaffold-schemas \
   --dest-dir ./app/schemas \
   --kind entity \
   --entity-name FooBar \
@@ -270,20 +270,20 @@ poetry run python -m svc_infra.db.setup.cli scaffold-schemas \
 
 ```bash
 # 1) Init scaffold
-poetry run python -m svc_infra.db.setup.cli init \
+poetry run python -m svc_infra.db init \
   --project-root . \
   --database-url "sqlite:///./app.db"
 
 # 2) First revision
-poetry run python -m svc_infra.db.setup.cli revision \
+poetry run python -m svc_infra.db revision \
   -m "init" \
   --project-root .
 
 # 3) Apply
-poetry run python -m svc_infra.db.setup.cli upgrade --project-root .
+poetry run python -m svc_infra.db upgrade --project-root .
 
 # 4) Scaffold an entity
-poetry run python -m svc_infra.db.setup.cli scaffold \
+poetry run python -m svc_infra.db scaffold \
   --entity-name WidgetThing \
   --models-dir ./app/models \
   --schemas-dir ./app/schemas
