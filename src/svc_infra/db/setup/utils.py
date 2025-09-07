@@ -127,18 +127,80 @@ def get_database_url_from_env(
 ) -> Optional[str]:
     """
     Resolve the database connection string, with support for:
-      - Primary env vars: DATABASE_URL, PRIVATE_DATABASE_URL, DB_URL (in that order).
+      - Primary env vars (in order): DEFAULT_DB_ENV_VARS (e.g. DATABASE_URL, PRIVATE_DATABASE_URL, DB_URL).
       - Secret file pointers: <NAME>_FILE (reads file contents).
       - Well-known locations: DATABASE_URL_FILE, /run/secrets/database_url.
       - Composed from parts: DB_* (host, port, name, user, password, params).
-    This works for public or private networks—private DNS/socket addresses are just host strings.
+    When a value is found, it is also written back into os.environ["DATABASE_URL"] for downstream code.
     """
-    # 1) Direct envs
-    from dotenv import load_dotenv
+    # Load .env without clobbering existing process env
     load_dotenv(override=False)
-    db_url = os.getenv("DATABASE_URL", "")
-    os.environ["DATABASE_URL"] = db_url
-    return db_url
+
+    # 1) Direct envs (and support "file:" or absolute path values)
+    for key in env_vars:
+        val = os.getenv(key)
+        if val and val.strip():
+            s = val.strip()
+            # Some platforms inject a file-pointer-like value
+            if s.startswith("file:"):
+                s = s[5:]
+            if os.path.isabs(s) and Path(s).exists():
+                file_val = _read_secret_from_file(s)
+                if file_val:
+                    os.environ["DATABASE_URL"] = file_val
+                    return file_val
+            os.environ["DATABASE_URL"] = s
+            return s
+
+        # Companion NAME_FILE secret path (e.g., DATABASE_URL_FILE)
+        file_key = f"{key}_FILE"
+        file_path = os.getenv(file_key)
+        if file_path:
+            file_val = _read_secret_from_file(file_path)
+            if file_val:
+                os.environ["DATABASE_URL"] = file_val
+                return file_val
+
+    # 2) Conventional secret envs
+    file_path = os.getenv("DATABASE_URL_FILE")
+    if file_path:
+        file_val = _read_secret_from_file(file_path)
+        if file_val:
+            os.environ["DATABASE_URL"] = file_val
+            return file_val
+
+    # 3) Docker/K8s default secret mount
+    file_val = _read_secret_from_file("/run/secrets/database_url")
+    if file_val:
+        os.environ["DATABASE_URL"] = file_val
+        return file_val
+
+    # 4) Compose from parts (DB_DIALECT/DB_DRIVER/DB_HOST/.../DB_PARAMS)
+    composed = _compose_url_from_parts()
+    if composed:
+        os.environ["DATABASE_URL"] = composed
+        return composed
+
+    if required:
+        raise RuntimeError(
+            "Database URL not set. Set DATABASE_URL (or PRIVATE_DATABASE_URL / DB_URL), "
+            "or provide DB_* parts (DB_HOST, DB_NAME, etc.), or a *_FILE secret."
+        )
+    return None
+
+def _ensure_timeout_default(u: URL) -> URL:
+    """
+    Ensure a conservative connection timeout is present for libpq-based drivers.
+    For psycopg/psycopg2, 'connect_timeout' is honored via the query string.
+    """
+    backend = (u.get_backend_name() or "").lower()
+    if backend not in ("postgresql", "postgres"):
+        return u
+    if "connect_timeout" in u.query:
+        return u
+    # Default 10s unless overridden
+    t = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
+    return u.set(query={**u.query, "connect_timeout": str(t)})
 
 # ---------- URL utilities ----------
 
@@ -286,23 +348,29 @@ def _ensure_ssl_default_async(u: URL) -> URL:
 def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
     u = _ensure_ssl_default(u)
+    u = _ensure_timeout_default(u)   # <-- ADD THIS
 
-    # --- Async path (unchanged) ---
+    # Async
     if is_async_url(u):
         create_async = _create_async_engine
         if create_async is None:
             raise RuntimeError("Async driver URL provided but SQLAlchemy async extras are not available.")
-        # No special handling needed for async drivers like asyncpg/aiomysql/aiosqlite
-        return create_async(u, echo=echo, pool_pre_ping=True)
 
-    # --- Sync path ---
-    # Coerce a reasonable sync driver if none was specified
+        connect_args: dict[str, Any] = {}
+        # asyncpg honors a top-level 'timeout' connect kwarg
+        if "+asyncpg" in (u.drivername or ""):
+            connect_args["timeout"] = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
+
+        kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
+        if connect_args:
+            kwargs["connect_args"] = connect_args
+        return create_async(u, **kwargs)
+
+    # Sync
     u = _coerce_sync_driver(u)
-
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
 
-    # psycopg3 quirk: ensure password is explicitly forwarded via connect_args
     connect_args: dict[str, Any] = {}
     dn = (u.drivername or "").lower()
     if dn.startswith("postgresql+psycopg") and u.password:
@@ -728,9 +796,12 @@ def build_alembic_config(project_root: Path | str, *, script_location: str = "mi
             u = _coerce_sync_driver(u)
         cfg.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
-    # ADD THIS guard:
+    # >>> ADD THIS GUARD <<<
     if not cfg.get_main_option("sqlalchemy.url"):
-        raise RuntimeError("No SQLAlchemy URL resolved. Pass `database_url` to this function or set DATABASE_URL.")
+        raise RuntimeError(
+            "No SQLAlchemy URL resolved. Pass `database_url` to the calling function "
+            "or set DATABASE_URL in the environment."
+        )
 
     cfg.set_main_option("path_separator", "os")
     cfg.set_main_option("prepend_sys_path", str(root))

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import io, contextlib, os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
@@ -29,8 +29,8 @@ def _prepare_env(project_root: Path | str, *, database_url: Optional[str] = None
     root = Path(project_root).resolve()
     prepare_process_env(root)
     if database_url:
-        os.environ["DATABASE_URL"] = str(database_url)  # OK to set for this process
-    os.chdir(root)  # <— ADD THIS: normalize relative paths like migrations/ and templates
+        os.environ["DATABASE_URL"] = str(database_url)
+    os.chdir(root)  # normalize relative paths for Alembic & templates
     return root
 
 
@@ -205,9 +205,16 @@ def current(
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
-    # capture output? For MCP a simple ack is fine
-    command.current(cfg, verbose=verbose)
-    return {"ok": True, "action": "current", "project_root": str(root), "verbose": verbose}
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        command.current(cfg, verbose=verbose)
+    return {
+        "ok": True,
+        "action": "current",
+        "project_root": str(root),
+        "verbose": verbose,
+        "stdout": buf.getvalue(),
+    }
 
 
 def history(
@@ -215,12 +222,21 @@ def history(
         *,
         verbose: bool = False,
         database_url: Optional[str] = None,
-) -> None:
+) -> dict:
     """Show the migration history for this project."""
     root = _prepare_env(project_root, database_url=database_url)
     cfg = build_alembic_config(root)
     repair_alembic_state_if_needed(cfg)
-    command.history(cfg, verbose=verbose)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        command.history(cfg, verbose=verbose)
+    return {
+        "ok": True,
+        "action": "history",
+        "project_root": str(root),
+        "verbose": verbose,
+        "stdout": buf.getvalue(),
+    }
 
 
 def stamp(
