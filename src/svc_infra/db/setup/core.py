@@ -189,7 +189,6 @@ def downgrade(
     """Revert migrations down to the specified revision or relative step.
 
     Args:
-        project_root: Directory containing alembic.ini and migrations/.
         revision_target: Target revision identifier or relative step (e.g. "-1").
     """
     root = _prepare_env(database_url=database_url)
@@ -309,7 +308,6 @@ def setup_and_migrate(
         ensure_database_exists(resolved_url)
 
     mig_dir = init_alembic(
-        root,
         discover_packages=None,
         overwrite=overwrite_scaffold,
         database_url=resolved_url,
@@ -325,7 +323,7 @@ def setup_and_migrate(
     upgraded = False
 
     try:
-        upgrade(root, database_url=database_url)
+        upgrade(database_url=database_url)
         upgraded = True
     except Exception:
         pass
@@ -335,25 +333,23 @@ def setup_and_migrate(
 
     if not _has_revisions():
         revision(
-            project_root=root,
             message=initial_message,
             autogenerate=True,
             ensure_head_before_autogenerate=True,
             database_url=database_url,
         )
         created_initial = True
-        upgrade(root, database_url=database_url)
+        upgrade(database_url=database_url)
         upgraded = True
     elif create_followup_revision:
         revision(
-            project_root=root,
             message=followup_message,
             autogenerate=True,
             ensure_head_before_autogenerate=True,
             database_url=database_url,
         )
         created_followup = True
-        upgrade(root, database_url=database_url)
+        upgrade(database_url=database_url)
         upgraded = True
 
     return {
