@@ -100,7 +100,7 @@ mypy = "^1.11.2"
 types-requests = "^2.32.0.20241016"
 
 [tool.poetry.scripts]
-svc-infra = "svc_infra.db.setup.cli:app"
+svc-infra = "svc_infra.cli:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

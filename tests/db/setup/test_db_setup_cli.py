@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from svc_infra.db.setup.cli import app, _apply_database_url
+from svc_infra.cli import app, _apply_database_url
 
 
 @pytest.fixture

@@ -1,0 +1,8 @@
+{
+  "name": "mcp-stdio-publish",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "svc-infra-cli-mcp": "mcp-shim/bin/svc-infra-cli-mcp.js"
+  }
+}
