@@ -7,6 +7,7 @@ from typing import Optional, Sequence
 
 from alembic import command
 from alembic.config import Config
+from dotenv import load_dotenv
 from sqlalchemy.engine import make_url
 
 from svc_infra.app.root import resolve_project_root
@@ -32,7 +33,8 @@ def _prepare_env(
 ) -> Path:
     root = resolve_project_root()
     root.mkdir(parents=True, exist_ok=True)
-    prepare_process_env(root)
+    load_dotenv(dotenv_path=(root / ".env"), override=False)
+    prepare_process_env(root)  # sets PYTHONPATH etc.
     if database_url:
         os.environ["DATABASE_URL"] = str(database_url)
     if chdir:
