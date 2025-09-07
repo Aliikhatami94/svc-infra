@@ -57,7 +57,7 @@ async def svc_infra_subcommand_help(
 
 
 mcp = mcp_from_functions(
-    name="svc-infra-mcp",
+    name="svc-infra-cli-mcp",
     functions=[
         svc_infra_help,
         svc_infra_subcommand_help,
