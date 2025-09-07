@@ -7,10 +7,11 @@ from typing import List
 from alembic import context
 from sqlalchemy.engine import make_url, URL
 
-# pull our helpers (driver coercion + SSL defaults + engine factory)
+# helpers from svc-infra
 from svc_infra.db.setup.utils import (
     _coerce_sync_driver,
     _ensure_ssl_default,
+    get_database_url_from_env,
     build_engine,
 )
 
@@ -33,14 +34,37 @@ if prepend:
         if s not in sys.path:
             sys.path.insert(0, s)
 
-# Discover metadata from packages, but prefer the central ModelBase first
+# --- Resolve effective DB URL (priority: -x -> env -> helper -> ini) ---
+_x = context.get_x_argument(asdict=True) if hasattr(context, "get_x_argument") else {}
+cli_dburl = (_x or {}).get("dburl", "").strip()
+env_dburl = os.getenv("DATABASE_URL", "").strip()
+try:
+    helper_dburl = get_database_url_from_env(required=False) or ""
+except Exception:
+    helper_dburl = ""
+ini_dburl = (config.get_main_option("sqlalchemy.url") or "").strip()
+
+effective_url = cli_dburl or env_dburl or helper_dburl or ini_dburl
+if not effective_url:
+    raise RuntimeError(
+        "No database URL found. Provide via:\n"
+        "  * env: DATABASE_URL=...\n"
+        "  * or CLI: alembic -x dburl=...\n"
+        "  * or alembic.ini [sqlalchemy.url]\n"
+    )
+
+u = make_url(effective_url)
+u = _coerce_sync_driver(u)
+u = _ensure_ssl_default(u)
+config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
+
+# --- Metadata discovery (prefer central ModelBase, then scan) ---
 DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    # 0) Prefer svc_infra.db.setup.base.ModelBase.metadata if available
     try:
         from svc_infra.db.setup.base import ModelBase  # type: ignore
         md = getattr(ModelBase, "metadata", None)
@@ -49,7 +73,6 @@ def _collect_metadata() -> list[object]:
     except Exception as e:
         logger.debug("ModelBase not available or empty: %s", e)
 
-    # 1) Fallback: discover across packages
     import importlib, pkgutil, pathlib
     found: list[object] = []
 
@@ -58,8 +81,7 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    pkgs = list(DISCOVER_PACKAGES)
-
+    pkgs = list(DISCOVER_PACKAGES) or []
     if not pkgs:
         roots = []
         if prepend:
@@ -118,26 +140,6 @@ def _collect_metadata() -> list[object]:
 
 target_metadata = _collect_metadata()
 
-def _module_available(name: str) -> bool:
-    return importlib.util.find_spec(name) is not None
-
-# --- Resolve the *effective* URL, then ALWAYS coerce driver + SSL ---
-# 1) If DATABASE_URL env var is present, use it.
-env_db_url = os.getenv("DATABASE_URL")
-
-# 2) Otherwise fall back to whatever alembic.ini currently has.
-effective_url_str = env_db_url or config.get_main_option("sqlalchemy.url") or ""
-
-if effective_url_str:
-    u = make_url(effective_url_str)
-    # choose an installed sync driver (psycopg -> psycopg2 fallback) and set SSL defaults
-    u = _coerce_sync_driver(u)
-    u = _ensure_ssl_default(u)
-    # IMPORTANT: don't hide password or SQLAlchemy might reparse and drop it
-    coerced_str = u.render_as_string(hide_password=False)
-    # record back into the config so downstream (offline mode, log, etc.) sees the coerced URL
-    config.set_main_option("sqlalchemy.url", coerced_str)
-
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -154,7 +156,6 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     url = config.get_main_option("sqlalchemy.url")
-    # use our helper to build the engine so psycopg3 password forwarding etc. are applied
     engine = build_engine(url, echo=False)
     with engine.connect() as connection:
         context.configure(
