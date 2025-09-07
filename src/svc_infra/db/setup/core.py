@@ -27,10 +27,11 @@ from svc_infra.db.setup.utils import (
 
 def _prepare_env(project_root: Path | str, *, database_url: Optional[str] = None) -> Path:
     root = Path(project_root).resolve()
+    root.mkdir(parents=True, exist_ok=True)  # ensure it exists before chdir
     prepare_process_env(root)
     if database_url:
         os.environ["DATABASE_URL"] = str(database_url)
-    os.chdir(root)  # normalize relative paths for Alembic & templates
+    os.chdir(root)
     return root
 
 
