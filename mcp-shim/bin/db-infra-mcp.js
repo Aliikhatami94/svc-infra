@@ -9,12 +9,13 @@ const SPEC = `git+${REPO}@${REF}`;
 
 // Run: uvx --from SPEC python -m <module> --transport stdio <passthrough-args>
 const args = [
-  "--quiet",
-  ...(process.env.UVX_REFRESH ? ["--refresh"] : []),
-  "--from", SPEC,
-  "python", "-m", "svc_infra.db.setup.mcp",
-  "--transport", "stdio",
-  ...process.argv.slice(2)
+    "--quiet",
+    ...(process.env.UVX_REFRESH ? ["--refresh"] : []),
+    "--from", SPEC,
+    "--with", "psycopg[binary]",
+    "python", "-m", "svc_infra.db.setup.mcp",
+    "--transport", "stdio",
+    ...process.argv.slice(2)
 ];
 
 const child = spawn(UVX, args, { stdio: "inherit", shell: process.platform === "win32" });

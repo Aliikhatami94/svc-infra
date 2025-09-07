@@ -237,34 +237,31 @@ def _coerce_sync_driver(u: URL) -> URL:
     """
     If URL has no explicit sync driver, pick one that’s available.
     Postgres preference: psycopg (v3) → psycopg2
-    MySQL preference: pymysql
-    SQLite: pysqlite (built-in, usually fine)
-    MSSQL: pyodbc
+    Optional override: DB_FORCE_DRIVER=psycopg|psycopg2
     """
     dn = (u.drivername or "").lower()
-
-    # Already explicit driver? leave it.
     if "+" in dn:
         return u
 
     backend = (u.get_backend_name() or "").lower()
     if backend in ("postgresql", "postgres"):
-        # prefer psycopg v3 if available; else fallback to psycopg2
+        force = (os.getenv("DB_FORCE_DRIVER") or "").strip().lower()
+        if force in {"psycopg", "psycopg2"}:
+            return u.set(drivername=f"postgresql+{force}")
+
+        # prefer psycopg v3 if present; else psycopg2; else leave bare (SA default)
         if _is_mod_available("psycopg"):
             return u.set(drivername="postgresql+psycopg")
-        elif _is_mod_available("psycopg2"):
-            # bare 'postgresql://' maps to psycopg2 implicitly, but make it explicit
+        if _is_mod_available("psycopg2"):
             return u.set(drivername="postgresql+psycopg2")
-        # last resort: leave as-is (SQLAlchemy will try psycopg2 and may fail if missing)
+        return u
 
     if backend == "mysql":
-        # default to pymysql if present
         if _is_mod_available("pymysql"):
             return u.set(drivername="mysql+pymysql")
         return u
 
     if backend == "sqlite":
-        # usually okay as-is; it uses pysqlite from stdlib
         return u
 
     if backend in ("mssql",):
@@ -272,7 +269,6 @@ def _coerce_sync_driver(u: URL) -> URL:
             return u.set(drivername="mssql+pyodbc")
         return u
 
-    # other backends (snowflake, redshift, duckdb, cockroach) usually require explicit drivers
     return u
 
 
