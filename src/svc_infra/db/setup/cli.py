@@ -6,7 +6,7 @@ from typing import Optional, List, cast
 
 import typer, click
 
-from .setup import (
+from .core import (
     init_alembic as core_init_alembic,
     revision as core_revision,
     upgrade as core_upgrade,

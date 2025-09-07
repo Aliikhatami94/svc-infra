@@ -134,6 +134,9 @@ def get_database_url_from_env(
     This works for public or private networks—private DNS/socket addresses are just host strings.
     """
     # 1) Direct envs
+    from dotenv import load_dotenv
+    load_dotenv(override=False)
+    os.environ["DATABASE_URL"] = os.getenv("DATABASE_URL", "")
     for key in env_vars:
         val = os.getenv(key)
         if val and val.strip():

@@ -13,7 +13,7 @@ DEFAULT_DB_ENV_VARS: Sequence[str] = (
 ASYNC_DRIVER_HINT = re.compile(r"\+(?:async|asyncpg|aiosqlite|aiomysql|asyncmy|aio\w+)")
 
 # Alembic templates loaded from package resources (svc_infra.db.setup.templates.setup)
-# Kept as module-level constants for compatibility with setup.py
+# Kept as module-level constants for compatibility with core.py
 try:
     import importlib.resources as pkg
 
