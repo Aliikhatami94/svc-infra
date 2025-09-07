@@ -136,53 +136,9 @@ def get_database_url_from_env(
     # 1) Direct envs
     from dotenv import load_dotenv
     load_dotenv(override=False)
-    os.environ["DATABASE_URL"] = os.getenv("DATABASE_URL", "")
-    for key in env_vars:
-        val = os.getenv(key)
-        if val and val.strip():
-            s = val.strip()
-            # Some platforms inject "file:" or path-like values—read them
-            if s.startswith("file:"):
-                s = s[5:]
-            if os.path.isabs(s) and Path(s).exists():
-                file_val = _read_secret_from_file(s)
-                if file_val:
-                    return file_val
-            return s
-
-        # Companion NAME_FILE secret path
-        file_key = f"{key}_FILE"
-        file_path = os.getenv(file_key)
-        if file_path:
-            file_val = _read_secret_from_file(file_path)
-            if file_val:
-                return file_val
-
-    # 2) Conventional secret envs
-    for file_key in ("DATABASE_URL_FILE",):
-        file_path = os.getenv(file_key)
-        if file_path:
-            file_val = _read_secret_from_file(file_path)
-            if file_val:
-                return file_val
-
-    # 3) Docker/K8s default secret mount
-    file_val = _read_secret_from_file("/run/secrets/database_url")
-    if file_val:
-        return file_val
-
-    # 4) Compose from parts (supports private DNS / unix sockets)
-    composed = _compose_url_from_parts()
-    if composed:
-        return composed
-
-    if required:
-        raise RuntimeError(
-            "Database URL not set. Set DATABASE_URL (or PRIVATE_DATABASE_URL / DB_URL), "
-            "or provide DB_* parts (DB_HOST, DB_NAME, etc.), or a *_FILE secret."
-        )
-    return None
-
+    db_url = os.getenv("DATABASE_URL", "")
+    os.environ["DATABASE_URL"] = db_url
+    return db_url
 
 # ---------- URL utilities ----------
 
