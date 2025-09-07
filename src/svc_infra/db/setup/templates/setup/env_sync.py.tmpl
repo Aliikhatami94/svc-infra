@@ -7,7 +7,12 @@ from typing import List
 from alembic import context
 from sqlalchemy.engine import make_url, URL
 
-from svc_infra.db.setup.utils import _coerce_sync_driver, _ensure_ssl_default
+# pull our helpers (driver coercion + SSL defaults + engine factory)
+from svc_infra.db.setup.utils import (
+    _coerce_sync_driver,
+    _ensure_ssl_default,
+    build_engine,
+)
 
 # Load logging configuration from alembic.ini
 config = context.config
@@ -27,9 +32,6 @@ if prepend:
         s = str(src_path)
         if s not in sys.path:
             sys.path.insert(0, s)
-
-# Prefer our engine helper so we get SSL defaults + driver coercion + psycopg3 password forwarding
-from svc_infra.db.setup.utils import build_engine
 
 # Discover metadata from packages, but prefer the central ModelBase first
 DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
@@ -119,14 +121,22 @@ target_metadata = _collect_metadata()
 def _module_available(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
 
-# Prefer DATABASE_URL if present; coerce & apply ssl defaults before setting.
-# IMPORTANT: never use str(URL) because it masks passwords; use render_as_string(hide_password=False).
+# --- Resolve the *effective* URL, then ALWAYS coerce driver + SSL ---
+# 1) If DATABASE_URL env var is present, use it.
 env_db_url = os.getenv("DATABASE_URL")
-if env_db_url:
-    u = make_url(env_db_url)
+
+# 2) Otherwise fall back to whatever alembic.ini currently has.
+effective_url_str = env_db_url or config.get_main_option("sqlalchemy.url") or ""
+
+if effective_url_str:
+    u = make_url(effective_url_str)
+    # choose an installed sync driver (psycopg -> psycopg2 fallback) and set SSL defaults
     u = _coerce_sync_driver(u)
     u = _ensure_ssl_default(u)
-    config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
+    # IMPORTANT: don't hide password or SQLAlchemy might reparse and drop it
+    coerced_str = u.render_as_string(hide_password=False)
+    # record back into the config so downstream (offline mode, log, etc.) sees the coerced URL
+    config.set_main_option("sqlalchemy.url", coerced_str)
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -144,6 +154,7 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     url = config.get_main_option("sqlalchemy.url")
+    # use our helper to build the engine so psycopg3 password forwarding etc. are applied
     engine = build_engine(url, echo=False)
     with engine.connect() as connection:
         context.configure(

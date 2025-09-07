@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
-from functools import wraps
 
 from alembic import command
 from alembic.config import Config

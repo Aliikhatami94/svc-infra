@@ -6,7 +6,6 @@ from sqlalchemy import inspect
 from pathlib import Path
 from typing import Any, Optional, Sequence, Union, TYPE_CHECKING, Set
 from alembic.config import Config
-from urllib.parse import urlencode
 
 from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
