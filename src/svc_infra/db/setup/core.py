@@ -10,8 +10,8 @@ from alembic.config import Config
 from sqlalchemy.engine import make_url
 
 # Import shared constants and utils
-from .constants import ALEMBIC_INI_TEMPLATE, ALEMBIC_SCRIPT_TEMPLATE
-from .utils import (
+from svc_infra.db.setup.constants import ALEMBIC_INI_TEMPLATE, ALEMBIC_SCRIPT_TEMPLATE
+from svc_infra.db.setup.utils import (
     get_database_url_from_env,
     is_async_url,
     build_engine,
@@ -263,6 +263,16 @@ class SetupAndMigrateResult:
     created_followup_revision: bool
     upgraded: bool
 
+    def to_dict(self) -> dict:
+        return {
+            "project_root": str(self.project_root),
+            "migrations_dir": str(self.migrations_dir),
+            "alembic_ini": str(self.alembic_ini),
+            "created_initial_revision": self.created_initial_revision,
+            "created_followup_revision": self.created_followup_revision,
+            "upgraded": self.upgraded,
+        }
+
 def setup_and_migrate(
         *,
         project_root: Path | str,
@@ -272,6 +282,7 @@ def setup_and_migrate(
         initial_message: str = "initial schema",
         followup_message: str = "autogen",
         database_url: Optional[str] = None,
+        return_dict: bool = True,
 ) -> SetupAndMigrateResult:
     """
     Ensure DB + Alembic are ready and up-to-date.
@@ -336,7 +347,7 @@ def setup_and_migrate(
         upgrade(root, database_url=database_url)
         upgraded = True
 
-    return SetupAndMigrateResult(
+    result = SetupAndMigrateResult(
         project_root=root,
         migrations_dir=mig_dir,
         alembic_ini=alembic_ini,
@@ -344,6 +355,7 @@ def setup_and_migrate(
         created_followup_revision=created_followup,
         upgraded=upgraded,
     )
+    return result.to_dict() if return_dict else result
 
 
 __all__ = [
