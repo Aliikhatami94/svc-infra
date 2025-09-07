@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import typer, sys
+import typer, sys, os
+from pathlib import Path
 
 from svc_infra.cli.alembic_cmds import resolve_project_root
 
@@ -25,6 +26,30 @@ Notes:
 * You can set DATABASE_URL in your environment, or pass --database-url to commands.
 * You can point `--project-root` at your Alembic root; if omitted we auto-detect.
 """
+
+def load_env_file(env_path: str | Path = ".env") -> None:
+    """
+    Load all key=value pairs from a .env file and export them to os.environ.
+
+    Args:
+        env_path: Path to the .env file (default: ./.env).
+    """
+    env_file = Path(env_path)
+    if not env_file.exists():
+        raise FileNotFoundError(f".env file not found at {env_file.resolve()}")
+
+    with env_file.open("r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue  # skip malformed lines
+
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ[key] = value
 
 def cmd_doctor() -> None:
     """Provides environment info of current project for debugging."""
