@@ -15,7 +15,7 @@ from .health import _make_db_health_router
 def add_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
     for r in resources:
         repo = Repository(model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete)
-        svc = Service(repo)
+        svc = r.service_factory(repo) if r.service_factory else Service(repo)
         if r.read_schema and r.create_schema and r.update_schema:
             Read, Create, Update = r.read_schema, r.create_schema, r.update_schema
         else:

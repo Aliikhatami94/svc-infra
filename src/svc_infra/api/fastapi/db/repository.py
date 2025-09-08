@@ -5,7 +5,7 @@ from typing import Any, Optional, Sequence, Iterable, Set
 from sqlalchemy import Select, and_, func, select, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
-
+from sqlalchemy.orm import class_mapper
 
 class Repository:
     """
@@ -28,6 +28,9 @@ class Repository:
         self.soft_delete_field = soft_delete_field
         self.soft_delete_flag_field = soft_delete_flag_field
         self.immutable_fields: Set[str] = set(immutable_fields or {"id", "created_at", "updated_at"})
+
+    def _model_columns(self) -> set[str]:
+        return {c.key for c in class_mapper(self.model).columns}
 
     def _id_column(self) -> InstrumentedAttribute:
         return getattr(self.model, self.id_attr)
@@ -61,7 +64,9 @@ class Repository:
         return (await session.execute(stmt)).scalars().first()
 
     async def create(self, session: AsyncSession, data: dict[str, Any]) -> Any:
-        obj = self.model(**data)
+        valid = self._model_columns()
+        filtered = {k: v for k, v in data.items() if k in valid}
+        obj = self.model(**filtered)
         session.add(obj)
         await session.flush()
         return obj
@@ -70,8 +75,9 @@ class Repository:
         obj = await self.get(session, id_value)
         if not obj:
             return None
+        valid = self._model_columns()
         for k, v in data.items():
-            if k not in self.immutable_fields:
+            if k in valid and k not in self.immutable_fields:
                 setattr(obj, k, v)
         await session.flush()
         return obj
