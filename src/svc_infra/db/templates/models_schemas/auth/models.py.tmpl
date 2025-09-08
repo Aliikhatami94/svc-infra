@@ -12,6 +12,7 @@ from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from svc_infra.db.base import ModelBase
 from svc_infra.auth.user_default import _pwd
+from svc_infra.db.uniq import make_unique_indexes
 
 
 class User(ModelBase):
@@ -60,23 +61,12 @@ class User(ModelBase):
         return f"<User id={self.id} email={self.email!r}>"
 
 
-# ---------- Uniqueness: case-insensitive email per-tenant ----------
-# Because tenant_id is Optional (nullable), use two partial unique indexes:
-# - When tenant_id IS NULL: email (lowercased) must be globally unique
-# - When tenant_id IS NOT NULL: (tenant_id, lower(email)) must be unique
-Index(
-    "uq_users_email_lower_global",
-    func.lower(User.email),
-    unique=True,
-    postgresql_where=User.tenant_id.is_(None),
-)
-Index(
-    "uq_users_email_lower_per_tenant",
-    func.lower(User.email),
-    User.tenant_id,
-    unique=True,
-    postgresql_where=User.tenant_id.isnot(None),
-)
-
-# Optional helper index for case-insensitive lookups (non-unique)
-Index("ix_users_email_lower", func.lower(User.email))
+# Unique indexes, including case-insensitive and/or tenant-scoped.
+for _ix in make_unique_indexes(
+    User,
+    unique_ci=["email"],            # case-insensitive unique email
+    tenant_field="tenant_id",       # scoped by tenant if provided
+):
+    # Simply iterating keeps them registered with the Table metadata.
+    # (No further action needed if you use Alembic autogenerate or metadata.create_all.)
+    pass

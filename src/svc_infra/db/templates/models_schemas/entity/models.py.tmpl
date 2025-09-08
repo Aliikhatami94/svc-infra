@@ -1,29 +1,52 @@
+# models/${table_name}.py
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 import uuid
 
-from sqlalchemy import String, Boolean, DateTime, JSON, Text, func, UniqueConstraint, Index
+from sqlalchemy import String, Boolean, DateTime, JSON, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict
 
 from svc_infra.db.base import ModelBase
+from svc_infra.db.uniq import make_unique_indexes
 
 
 class ${Entity}(ModelBase):
     __tablename__ = "${table_name}"
 
+    # identity
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # core fields
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
 
-${tenant_field}${soft_delete_field}    extra: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
+${tenant_field}\
+${soft_delete_field}\
+    # misc (avoid attr name "metadata" clash)
+    extra: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    # auditing (DB-side timestamps)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
-${constraints}    def __repr__(self) -> str:
+    def __repr__(self) -> str:
         return f"<${Entity} id={self.id} name={self.name!r}>"
 
-${indexes}
+
+# --- Uniqueness policy --------------------------------------------------------
+# Register functional unique indexes (case-insensitive on "name"),
+# optionally scoped by tenant if present.
+for _ix in make_unique_indexes(
+    ${Entity},
+    unique_ci=["name"]${tenant_arg}
+):
+    # Iteration is enough to attach them to the Table metadata
+    # (Alembic autogenerate / metadata.create_all will pick them up)
+    pass

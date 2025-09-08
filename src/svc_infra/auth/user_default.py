@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from fastapi import HTTPException
 from fastapi_users.password import PasswordHelper
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func
 
 from svc_infra.api.fastapi.db.service_hooks import ServiceWithHooks
 from svc_infra.api.fastapi.db.repository import Repository
