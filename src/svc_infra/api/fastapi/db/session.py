@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from svc_infra.db.setup.utils import _coerce_to_async_url
+from svc_infra.db.utils import _coerce_to_async_url
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,6 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-
 
 def attach_db_to_api(app: FastAPI, *, dsn_env: str = "DATABASE_URL") -> None:
     """Register startup/shutdown hooks to manage an async SQLAlchemy engine.

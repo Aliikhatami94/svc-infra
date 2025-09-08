@@ -7,7 +7,7 @@ from sqlalchemy import select
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
 
-from svc_infra.api.fastapi.db.integration import SessionDep
+from svc_infra.api.fastapi.db.session import SessionDep
 
 def oauth_router_with_backend(
         user_model: type,

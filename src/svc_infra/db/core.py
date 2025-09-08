@@ -9,8 +9,8 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.engine import make_url
 
-from svc_infra.db.setup.constants import ALEMBIC_INI_TEMPLATE, ALEMBIC_SCRIPT_TEMPLATE
-from svc_infra.db.setup.utils import (
+from svc_infra.db.constants import ALEMBIC_INI_TEMPLATE, ALEMBIC_SCRIPT_TEMPLATE
+from svc_infra.db.utils import (
     get_database_url_from_env,
     is_async_url,
     build_engine,

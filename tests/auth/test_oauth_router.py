@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from svc_infra.auth import oauth_router as oauth_router_module
 from svc_infra.auth.oauth_router import oauth_router_with_backend
-from svc_infra.api.fastapi.db.integration import get_session
+from svc_infra.api.fastapi.db.session import get_session
 
 
 class FakeAuthStrategy:

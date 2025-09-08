@@ -1,8 +1,8 @@
 from sqlalchemy import text, inspect
 from alembic.config import Config
 
-from svc_infra.db.setup import utils
-from svc_infra.db.setup.utils import (
+from svc_infra.db import utils
+from svc_infra.db.utils import (
     with_database,
     _pg_quote_ident,
     _mysql_quote_ident,

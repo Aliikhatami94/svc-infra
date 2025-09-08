@@ -2,7 +2,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Response, status
 from sqlalchemy import text
 
-from .integration import SessionDep
+from .session import SessionDep
 
 
 def db_health_router(*, prefix: str = "/_db/health", include_in_schema: bool = False) -> APIRouter:

@@ -5,11 +5,11 @@ from typing import Any, Optional, Sequence, Type
 
 from fastapi import FastAPI
 
-from svc_infra.api.fastapi.db.integration import SessionDep
-from svc_infra.db.manage.repository import Repository
-from svc_infra.db.manage.service import Service
-from svc_infra.db.manage.router_plus import make_crud_router_plus
-from svc_infra.db.manage.management import make_crud_schemas
+from svc_infra.api.fastapi.db.session import SessionDep
+from svc_infra.api.fastapi.db.repository import Repository
+from svc_infra.api.fastapi.db.service import Service
+from svc_infra.api.fastapi.db.crud_router import make_crud_router_plus
+from svc_infra.api.fastapi.db.management import make_crud_schemas
 
 
 @dataclass
