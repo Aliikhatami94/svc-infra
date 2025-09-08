@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, Sequence, Type, cast, Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Depends, HTTPException
 
 from .session import SessionDep
 from .http import (
@@ -47,7 +46,7 @@ def make_crud_router_plus(
             lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
             op: Annotated[OrderParams,       Depends(dep_order)],
             sp: Annotated[SearchParams,      Depends(dep_search)],
-            session: SessionDep,
+            session: SessionDep,   # type: ignore[name-defined]
     ):
         order_spec = op.order_by or default_ordering
         order_fields = _parse_ordering_to_fields(order_spec)
@@ -80,7 +79,7 @@ def make_crud_router_plus(
     @r.get("/{item_id}", response_model=cast(Any, read_schema))
     async def get_item(
             item_id: Any,
-            session: SessionDep
+            session: SessionDep   # type: ignore[name-defined]
     ):
         row = await service.get(session, item_id)
         if not row:
@@ -91,27 +90,21 @@ def make_crud_router_plus(
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
     @r.post("/", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(
-            session: SessionDep,
-            payload: dict = Body(...)
+            payload: create_schema,   # type: ignore[name-defined]
+            session: SessionDep,   # type: ignore[name-defined]
     ):
-        try:
-            data = create_schema.model_validate(payload).model_dump(exclude_unset=True)
-            return await service.create(session, data)
-        except IntegrityError as e:
-            raise HTTPException(status_code=409, detail="Constraint violation") from e
+        data = payload.model_dump(exclude_unset=True)
+        return await service.create(session, data)
 
     # UPDATE (PATCH)
     @r.patch("/{item_id}", response_model=cast(Any, read_schema))
     async def update_item(
             item_id: Any,
-            session: SessionDep,
-            payload: dict = Body(...)
+            payload: update_schema,   # type: ignore[name-defined]
+            session: SessionDep,   # type: ignore[name-defined]
     ):
-        try:
-            data = update_schema.model_validate(payload).model_dump(exclude_unset=True)
-            row = await service.update(session, item_id, data)
-        except IntegrityError as e:
-            raise HTTPException(status_code=409, detail="Constraint violation") from e
+        data = payload.model_dump(exclude_unset=True)
+        row = await service.update(session, item_id, data)
         if not row:
             raise HTTPException(404, "Not found")
         return row
@@ -120,7 +113,7 @@ def make_crud_router_plus(
     @r.delete("/{item_id}", status_code=204)
     async def delete_item(
             item_id: Any,
-            session: SessionDep
+            session: SessionDep   # type: ignore[name-defined]
     ):
         ok = await service.delete(session, item_id)
         if not ok:
