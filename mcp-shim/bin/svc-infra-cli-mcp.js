@@ -15,7 +15,7 @@ const args = [
     ...(process.env.UVX_REFRESH ? ["--refresh"] : []),
     "--from", SPEC,          // primary package: svc-infra
     "--with", AI_INFRA_SPEC, // additional dep: ai-infra (pinned)
-    "python", "-m", "svc_infra.mcp.cli_mcp",
+    "python", "-m", "svc_infra.mcp.svc_infra_mcp",
     "--transport", "stdio",
     ...process.argv.slice(2)
 ];
