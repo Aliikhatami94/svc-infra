@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Optional
 import uuid
 
+from svc_infra.auth.user_default import _pwd
+
 from sqlalchemy import (
     String, Boolean, DateTime, JSON, Text, func, UniqueConstraint, Index
 )
@@ -26,7 +28,7 @@ class User(ModelBase):
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
 
     @property
-    def password(self) -> str:
+    def password(self) -> str:  # never readable
         raise AttributeError("password is write-only")
 
     @password.setter
