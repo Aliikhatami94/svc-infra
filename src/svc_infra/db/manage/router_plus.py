@@ -41,6 +41,7 @@ def make_crud_router_plus(
 
     # LIST (no trailing slash)
     @r.get("", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
+    @r.get("/", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
     async def list_items(
             lp: LimitOffsetParams = Depends(),
             op: OrderParams = Depends(),
@@ -84,6 +85,7 @@ def make_crud_router_plus(
 
     # CREATE (no trailing slash)
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
+    @r.post("/", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(payload: dict = Body(...), session=Depends(session_dep)):
         try:
             data = create_schema.model_validate(payload).model_dump(exclude_unset=True)
