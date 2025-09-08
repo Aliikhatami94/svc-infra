@@ -23,8 +23,16 @@ class User(ModelBase):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # auth state
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+
+    @property
+    def password(self) -> str:
+        raise AttributeError("password is write-only")
+
+    @password.setter
+    def password(self, raw: str) -> None:
+        self.password_hash = _pwd.hash(raw)
+
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     disabled_reason: Mapped[Optional[str]] = mapped_column(Text)
 

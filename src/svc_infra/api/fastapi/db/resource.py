@@ -26,5 +26,5 @@ class Resource:
 
     create_exclude: tuple[str, ...] = ("id",)
 
-    # NEW: let callers provide a custom service constructor
+    # NEW – optional hook to build a custom Service
     service_factory: Optional[Callable[[Repository], Service]] = None
