@@ -30,7 +30,7 @@ class SearchParams(BaseModel):
 
 def dep_search(
         q: Optional[str] = Query(None, description="Search query"),
-        fields: Optional[str] = Query(None, description="Comma-separated fields to search"),
+        fields: Optional[str] = Query(None, description="Comma-separated list of fields"),
 ) -> SearchParams:
     return SearchParams(q=q, fields=fields)
 

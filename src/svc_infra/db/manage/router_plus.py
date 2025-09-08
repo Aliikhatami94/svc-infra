@@ -42,8 +42,7 @@ def make_crud_router_plus(
             fields.append(p)
         return fields
 
-    # LIST (no trailing slash)
-    @r.get("", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
+    @r.get("", response_model=cast(Any, Page[read_schema]))   # type: ignore[valid-type]
     @r.get("/", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
     async def list_items(
             lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
