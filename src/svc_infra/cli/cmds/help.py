@@ -24,10 +24,10 @@ Notes:
 * You can point `--project-root` at your Alembic root; if omitted we auto-detect.
 """
 
-def cmd_doctor() -> None:
+def cmd_doctor():
     """Provides environment info of current project for debugging."""
     import pathlib
-    root= resolve_project_root()
+    root = resolve_project_root()
     typer.echo(f"Root:         {root}")
     typer.echo(f"Python:       {sys.executable}")
     typer.echo(f"Package:      {__package__ or 'svc_infra'}")
