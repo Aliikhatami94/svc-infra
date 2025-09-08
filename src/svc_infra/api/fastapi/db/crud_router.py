@@ -5,7 +5,7 @@ from typing import Any, Optional, Sequence, Type, cast, Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from . import SessionDep
+from .session import SessionDep
 from .http import (
     LimitOffsetParams, OrderParams, SearchParams, Page, build_order_by,
     dep_limit_offset, dep_order, dep_search,
@@ -24,7 +24,6 @@ def make_crud_router_plus(
         search_fields: Optional[Sequence[str]] = None,
         default_ordering: Optional[str] = None,
         allowed_order_fields: Optional[list[str]] = None,
-        session_dep: Any,
         mount_under_db_prefix: bool = True,
 ) -> APIRouter:
     router_prefix = ("/_db" + prefix) if mount_under_db_prefix else prefix
@@ -48,7 +47,7 @@ def make_crud_router_plus(
             lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
             op: Annotated[OrderParams,       Depends(dep_order)],
             sp: Annotated[SearchParams,      Depends(dep_search)],
-            session=SessionDep
+            session: SessionDep,
     ):
         order_spec = op.order_by or default_ordering
         order_fields = _parse_ordering_to_fields(order_spec)
@@ -79,7 +78,10 @@ def make_crud_router_plus(
 
     # GET by id
     @r.get("/{item_id}", response_model=cast(Any, read_schema))
-    async def get_item(item_id: Any, session=Depends(session_dep)):
+    async def get_item(
+            item_id: Any,
+            session: SessionDep
+    ):
         row = await service.get(session, item_id)
         if not row:
             raise HTTPException(404, "Not found")
@@ -88,7 +90,10 @@ def make_crud_router_plus(
     # CREATE (no trailing slash)
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
     @r.post("/", response_model=cast(Any, read_schema), status_code=201)
-    async def create_item(payload: dict = Body(...), session=Depends(session_dep)):
+    async def create_item(
+            session: SessionDep,
+            payload: dict = Body(...)
+    ):
         try:
             data = create_schema.model_validate(payload).model_dump(exclude_unset=True)
             return await service.create(session, data)
@@ -97,7 +102,11 @@ def make_crud_router_plus(
 
     # UPDATE (PATCH)
     @r.patch("/{item_id}", response_model=cast(Any, read_schema))
-    async def update_item(item_id: Any, payload: dict = Body(...), session=Depends(session_dep)):
+    async def update_item(
+            item_id: Any,
+            session: SessionDep,
+            payload: dict = Body(...)
+    ):
         try:
             data = update_schema.model_validate(payload).model_dump(exclude_unset=True)
             row = await service.update(session, item_id, data)
@@ -109,7 +118,10 @@ def make_crud_router_plus(
 
     # DELETE
     @r.delete("/{item_id}", status_code=204)
-    async def delete_item(item_id: Any, session=Depends(session_dep)):
+    async def delete_item(
+            item_id: Any,
+            session: SessionDep
+    ):
         ok = await service.delete(session, item_id)
         if not ok:
             raise HTTPException(404, "Not found")

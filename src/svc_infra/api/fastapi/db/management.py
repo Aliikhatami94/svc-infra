@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 from pydantic import BaseModel, ConfigDict, create_model
 from sqlalchemy.orm import Mapper, class_mapper
 from sqlalchemy import Column

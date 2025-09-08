@@ -5,7 +5,6 @@ from typing import Any, Optional, Sequence, Type
 
 from fastapi import FastAPI
 
-from svc_infra.api.fastapi.db.session import SessionDep
 from svc_infra.api.fastapi.db.repository import Repository
 from svc_infra.api.fastapi.db.service import Service
 from svc_infra.api.fastapi.db.crud_router import make_crud_router_plus
@@ -76,8 +75,6 @@ def include_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
             search_fields=r.search_fields,
             default_ordering=r.ordering_default,
             allowed_order_fields=r.allowed_order_fields,
-            session_dep=SessionDep,      # DI hook for DB session
-            # Note: router_plus mounts under "/_db" by default. Override via mount_under_db_prefix=False if desired.
         )
         app.include_router(router)
 
