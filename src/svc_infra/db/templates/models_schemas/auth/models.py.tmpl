@@ -4,14 +4,15 @@ from typing import Optional
 import uuid
 
 from sqlalchemy import (
-    String, Boolean, DateTime, JSON, Text, func, UniqueConstraint, Index
+    String, Boolean, DateTime, JSON, Text, func, Index
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.ext.mutable import MutableDict, MutableList  # <-- add
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from svc_infra.db.base import ModelBase
 from svc_infra.auth.user_default import _pwd
+
 
 class User(ModelBase):
     __tablename__ = "users"
@@ -24,10 +25,12 @@ class User(ModelBase):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # auth state
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
 
+    # Write-only facade over password
     @property
-    def password(self) -> str:  # never readable
+    def password(self) -> str:
         raise AttributeError("password is write-only")
 
     @password.setter
@@ -53,12 +56,27 @@ class User(ModelBase):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "email", name="uq_users_tenant_email"),
-    )
-
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email!r}>"
 
-# define functional index *after* class definition
+
+# ---------- Uniqueness: case-insensitive email per-tenant ----------
+# Because tenant_id is Optional (nullable), use two partial unique indexes:
+# - When tenant_id IS NULL: email (lowercased) must be globally unique
+# - When tenant_id IS NOT NULL: (tenant_id, lower(email)) must be unique
+Index(
+    "uq_users_email_lower_global",
+    func.lower(User.email),
+    unique=True,
+    postgresql_where=User.tenant_id.is_(None),
+)
+Index(
+    "uq_users_email_lower_per_tenant",
+    func.lower(User.email),
+    User.tenant_id,
+    unique=True,
+    postgresql_where=User.tenant_id.isnot(None),
+)
+
+# Optional helper index for case-insensitive lookups (non-unique)
 Index("ix_users_email_lower", func.lower(User.email))
