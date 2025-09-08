@@ -5,7 +5,10 @@ from typing import Any, Optional, Sequence, Type, cast, Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from .http import LimitOffsetParams, OrderParams, Page, SearchParams, build_order_by
+from .http import (
+    LimitOffsetParams, OrderParams, SearchParams, Page, build_order_by,
+    dep_limit_offset, dep_order, dep_search,
+)
 from .service import Service
 
 
@@ -43,9 +46,9 @@ def make_crud_router_plus(
     @r.get("", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
     @r.get("/", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
     async def list_items(
-            lp: Annotated[LimitOffsetParams, Depends(LimitOffsetParams)],
-            op: Annotated[OrderParams, Depends(OrderParams)],
-            sp: Annotated[SearchParams, Depends(SearchParams)],
+            lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
+            op: Annotated[OrderParams,       Depends(dep_order)],
+            sp: Annotated[SearchParams,      Depends(dep_search)],
             session=Depends(session_dep),
     ):
         order_spec = op.order_by or default_ordering

@@ -6,43 +6,42 @@ from pydantic import BaseModel
 
 T = TypeVar("T")
 
-
 class LimitOffsetParams(BaseModel):
-    limit: int = Query(50, ge=1, le=1000)
-    offset: int = Query(0, ge=0)
+    limit: int
+    offset: int
 
+def dep_limit_offset(
+        limit: int = Query(50, ge=1, le=1000),
+        offset: int = Query(0, ge=0),
+) -> LimitOffsetParams:
+    return LimitOffsetParams(limit=limit, offset=offset)
 
 class OrderParams(BaseModel):
-    # comma-separated, e.g. "-created_at,name"
-    order_by: Optional[str] = Query(None, description="Comma-separated fields; prefix with '-' for DESC")
+    order_by: Optional[str] = None
 
+def dep_order(
+        order_by: Optional[str] = Query(None, description="Comma-separated fields; '-' for DESC"),
+) -> OrderParams:
+    return OrderParams(order_by=order_by)
 
 class SearchParams(BaseModel):
-    # free text query
-    q: Optional[str] = Query(None, description="Search query")
-    # restrict to fields if provided (else router chooses sensible defaults)
-    fields: Optional[str] = Query(None, description="Comma-separated list of fields to search")
+    q: Optional[str] = None
+    fields: Optional[str] = None
 
+def dep_search(
+        q: Optional[str] = Query(None, description="Search query"),
+        fields: Optional[str] = Query(None, description="Comma-separated fields to search"),
+) -> SearchParams:
+    return SearchParams(q=q, fields=fields)
 
 class Page(BaseModel, Generic[T]):
     total: int
     items: List[T]
     limit: int
     offset: int
-
     @classmethod
-    def from_items(
-            cls,
-            *,
-            total: int,
-            items: Sequence[T] | Iterable[T],
-            limit: int,
-            offset: int,
-    ) -> "Page[T]":
+    def from_items(cls, *, total: int, items: Sequence[T] | Iterable[T], limit: int, offset: int) -> "Page[T]":
         return cls(total=total, items=list(items), limit=limit, offset=offset)
-
-
-# Utility used by tests and router to build SQLAlchemy order_by list from field specs
 
 def build_order_by(model: Any, fields: Sequence[str]) -> list[Any]:
     """Translate ["-created_at", "name"] to [desc(Model.created_at), asc(Model.name)].
