@@ -8,7 +8,7 @@ from alembic import context
 from sqlalchemy.engine import make_url, URL
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from svc_infra.db.setup.utils import (
+from svc_infra.db.utils import (
     get_database_url_from_env,
     _ensure_ssl_default_async as _ensure_ssl_default,
 )

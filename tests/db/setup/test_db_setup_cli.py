@@ -35,7 +35,7 @@ class TestApplyDatabaseUrl:
 
 
 class TestInitCommand:
-    @patch("svc_infra.db.setup.cli.core_init_alembic")
+    @patch("svc_infra.db.cli.core_init_alembic")
     def test_init_with_defaults(self, mock_init, runner):
         result = runner.invoke(app, ["init"])
 
@@ -47,7 +47,7 @@ class TestInitCommand:
         assert kwargs["discover_packages"] is None
         assert kwargs["overwrite"] is False
 
-    @patch("svc_infra.db.setup.cli.core_init_alembic")
+    @patch("svc_infra.db.cli.core_init_alembic")
     def test_init_with_all_options(self, mock_init, runner, mock_env):
         result = runner.invoke(app, [
             "init",
@@ -69,7 +69,7 @@ class TestInitCommand:
 
 
 class TestRevisionCommand:
-    @patch("svc_infra.db.setup.cli.core_revision")
+    @patch("svc_infra.db.cli.core_revision")
     def test_revision_with_required_message(self, mock_revision, runner):
         result = runner.invoke(app, ["revision", "--message", "Test migration"])
 
@@ -83,7 +83,7 @@ class TestRevisionCommand:
         assert kwargs["version_path"] is None
         assert kwargs["sql"] is False
 
-    @patch("svc_infra.db.setup.cli.core_revision")
+    @patch("svc_infra.db.cli.core_revision")
     def test_revision_with_all_options(self, mock_revision, runner, mock_env):
         result = runner.invoke(app, [
             "revision",
@@ -115,7 +115,7 @@ class TestRevisionCommand:
 
 
 class TestUpgradeCommand:
-    @patch("svc_infra.db.setup.cli.core_upgrade")
+    @patch("svc_infra.db.cli.core_upgrade")
     def test_upgrade_with_defaults(self, mock_upgrade, runner):
         result = runner.invoke(app, ["upgrade"])
 
@@ -124,7 +124,7 @@ class TestUpgradeCommand:
         args, kwargs = mock_upgrade.call_args
         assert kwargs["revision_target"] == "head"
 
-    @patch("svc_infra.db.setup.cli.core_upgrade")
+    @patch("svc_infra.db.cli.core_upgrade")
     def test_upgrade_with_target(self, mock_upgrade, runner, mock_env):
         result = runner.invoke(app, [
             "upgrade",
@@ -142,7 +142,7 @@ class TestUpgradeCommand:
 
 
 class TestDowngradeCommand:
-    @patch("svc_infra.db.setup.cli.core_downgrade")
+    @patch("svc_infra.db.cli.core_downgrade")
     def test_downgrade_with_defaults(self, mock_downgrade, runner):
         result = runner.invoke(app, ["downgrade"])
 
@@ -151,7 +151,7 @@ class TestDowngradeCommand:
         args, kwargs = mock_downgrade.call_args
         assert kwargs["revision_target"] == "-1"
 
-    @patch("svc_infra.db.setup.cli.core_downgrade")
+    @patch("svc_infra.db.cli.core_downgrade")
     def test_downgrade_with_target(self, mock_downgrade, runner, mock_env):
         result = runner.invoke(app, [
             "downgrade",
@@ -169,7 +169,7 @@ class TestDowngradeCommand:
 
 
 class TestCurrentCommand:
-    @patch("svc_infra.db.setup.cli.core_current")
+    @patch("svc_infra.db.cli.core_current")
     def test_current_with_defaults(self, mock_current, runner):
         result = runner.invoke(app, ["current"])
 
@@ -178,7 +178,7 @@ class TestCurrentCommand:
         args, kwargs = mock_current.call_args
         assert kwargs["verbose"] is False
 
-    @patch("svc_infra.db.setup.cli.core_current")
+    @patch("svc_infra.db.cli.core_current")
     def test_current_with_verbose(self, mock_current, runner, mock_env):
         result = runner.invoke(app, [
             "current",
@@ -196,7 +196,7 @@ class TestCurrentCommand:
 
 
 class TestHistoryCommand:
-    @patch("svc_infra.db.setup.cli.core_history")
+    @patch("svc_infra.db.cli.core_history")
     def test_history_with_defaults(self, mock_history, runner):
         result = runner.invoke(app, ["history"])
 
@@ -205,7 +205,7 @@ class TestHistoryCommand:
         args, kwargs = mock_history.call_args
         assert kwargs["verbose"] is False
 
-    @patch("svc_infra.db.setup.cli.core_history")
+    @patch("svc_infra.db.cli.core_history")
     def test_history_with_verbose(self, mock_history, runner, mock_env):
         result = runner.invoke(app, [
             "history",
@@ -223,7 +223,7 @@ class TestHistoryCommand:
 
 
 class TestStampCommand:
-    @patch("svc_infra.db.setup.cli.core_stamp")
+    @patch("svc_infra.db.cli.core_stamp")
     def test_stamp_with_defaults(self, mock_stamp, runner):
         result = runner.invoke(app, ["stamp"])
 
@@ -232,7 +232,7 @@ class TestStampCommand:
         args, kwargs = mock_stamp.call_args
         assert kwargs["revision_target"] == "head"
 
-    @patch("svc_infra.db.setup.cli.core_stamp")
+    @patch("svc_infra.db.cli.core_stamp")
     def test_stamp_with_target(self, mock_stamp, runner, mock_env):
         result = runner.invoke(app, [
             "stamp",
@@ -250,7 +250,7 @@ class TestStampCommand:
 
 
 class TestMergeHeadsCommand:
-    @patch("svc_infra.db.setup.cli.core_merge_heads")
+    @patch("svc_infra.db.cli.core_merge_heads")
     def test_merge_heads_with_defaults(self, mock_merge, runner):
         result = runner.invoke(app, ["merge-heads"])
 
@@ -259,7 +259,7 @@ class TestMergeHeadsCommand:
         args, kwargs = mock_merge.call_args
         assert kwargs["message"] is None
 
-    @patch("svc_infra.db.setup.cli.core_merge_heads")
+    @patch("svc_infra.db.cli.core_merge_heads")
     def test_merge_heads_with_message(self, mock_merge, runner, mock_env):
         result = runner.invoke(app, [
             "merge-heads",
@@ -277,7 +277,7 @@ class TestMergeHeadsCommand:
 
 
 class TestScaffoldCommand:
-    @patch("svc_infra.db.setup.cli.scaffold_core")
+    @patch("svc_infra.db.cli.scaffold_core")
     def test_scaffold_entity_with_defaults(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated entity scaffolding"
 
@@ -296,7 +296,7 @@ class TestScaffoldCommand:
         assert kwargs["overwrite"] is False
         assert kwargs["same_dir"] is False
 
-    @patch("svc_infra.db.setup.cli.scaffold_core")
+    @patch("svc_infra.db.cli.scaffold_core")
     def test_scaffold_auth_with_options(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated auth scaffolding"
 
@@ -335,7 +335,7 @@ class TestScaffoldCommand:
 
 
 class TestScaffoldModelsCommand:
-    @patch("svc_infra.db.setup.cli.scaffold_models_core")
+    @patch("svc_infra.db.cli.scaffold_models_core")
     def test_scaffold_models_with_defaults(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated models"
 
@@ -354,7 +354,7 @@ class TestScaffoldModelsCommand:
         assert kwargs["include_soft_delete"] is False
         assert kwargs["overwrite"] is False
 
-    @patch("svc_infra.db.setup.cli.scaffold_models_core")
+    @patch("svc_infra.db.cli.scaffold_models_core")
     def test_scaffold_models_with_all_options(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated auth models"
 
@@ -384,7 +384,7 @@ class TestScaffoldModelsCommand:
 
 
 class TestScaffoldSchemasCommand:
-    @patch("svc_infra.db.setup.cli.scaffold_schemas_core")
+    @patch("svc_infra.db.cli.scaffold_schemas_core")
     def test_scaffold_schemas_with_defaults(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated schemas"
 
@@ -402,7 +402,7 @@ class TestScaffoldSchemasCommand:
         assert kwargs["include_tenant"] is True
         assert kwargs["overwrite"] is False
 
-    @patch("svc_infra.db.setup.cli.scaffold_schemas_core")
+    @patch("svc_infra.db.cli.scaffold_schemas_core")
     def test_scaffold_schemas_with_options(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated auth schemas"
 
@@ -440,7 +440,7 @@ class TestIntegration:
 
     @patch.dict(os.environ, {}, clear=True)
     def test_database_url_environment_isolation(self, runner):
-        with patch("svc_infra.db.setup.cli.core_upgrade") as mock_upgrade:
+        with patch("svc_infra.db.cli.core_upgrade") as mock_upgrade:
             result1 = runner.invoke(app, [
                 "upgrade",
                 "--database-url", "postgresql://test1@localhost/db1",
@@ -456,7 +456,7 @@ class TestIntegration:
         result = runner.invoke(app, ["nonexistent-command"])
         assert result.exit_code != 0
 
-    @patch("svc_infra.db.setup.cli.core_init_alembic")
+    @patch("svc_infra.db.cli.core_init_alembic")
     def test_command_exception_handling(self, mock_init, runner):
         mock_init.side_effect = Exception("Test error")
 

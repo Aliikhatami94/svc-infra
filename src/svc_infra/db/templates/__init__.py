@@ -1,2 +1,2 @@
-# package marker for svc_infra.db.setup.templates
+# package marker for svc_infra.db.templates
 

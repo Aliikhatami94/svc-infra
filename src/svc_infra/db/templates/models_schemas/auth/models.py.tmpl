@@ -3,8 +3,6 @@ from datetime import datetime
 from typing import Optional
 import uuid
 
-from svc_infra.auth.user_default import _pwd
-
 from sqlalchemy import (
     String, Boolean, DateTime, JSON, Text, func, UniqueConstraint, Index
 )
@@ -13,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict, MutableList  # <-- add
 
 from svc_infra.db.base import ModelBase
+from svc_infra.auth.user_default import _pwd
 
 class User(ModelBase):
     __tablename__ = "users"

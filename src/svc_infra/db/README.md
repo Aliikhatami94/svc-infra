@@ -1,4 +1,4 @@
-# svc_infra.db.setup — CLI Guide
+# svc_infra.db — CLI Guide
 
 Lightweight wrapper around Alembic that standardizes env setup, scaffold generation, and common migration workflows. It also includes simple generators for SQLAlchemy models and Pydantic schemas.
 

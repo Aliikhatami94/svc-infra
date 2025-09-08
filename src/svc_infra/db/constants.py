@@ -12,12 +12,12 @@ DEFAULT_DB_ENV_VARS: Sequence[str] = (
 # Regex used to detect async drivers from URL drivername
 ASYNC_DRIVER_HINT = re.compile(r"\+(?:async|asyncpg|aiosqlite|aiomysql|asyncmy|aio\w+)")
 
-# Alembic templates loaded from package resources (svc_infra.db.setup.templates.setup)
+# Alembic templates loaded from package resources (svc_infra.db.templates.setup)
 # Kept as module-level constants for compatibility with core.py
 try:
     import importlib.resources as pkg
 
-    _tmpl_pkg = pkg.files("svc_infra.db.setup.templates.setup")
+    _tmpl_pkg = pkg.files("svc_infra.db.templates.setup")
     ALEMBIC_INI_TEMPLATE = _tmpl_pkg.joinpath("alembic.ini.tmpl").read_text(encoding="utf-8")
     ALEMBIC_SCRIPT_TEMPLATE = _tmpl_pkg.joinpath("script.py.mako.tmpl").read_text(encoding="utf-8")
 except Exception:
