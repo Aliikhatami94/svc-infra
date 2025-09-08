@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from uuid import UUID
 from typing import Optional, Any, Dict, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
@@ -21,7 +23,7 @@ class UserBase(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")  # <-- matches model.extra
 
 class UserRead(UserBase, Timestamped):
-    id: str
+    id: UUID
     last_login: Optional[datetime] = None
     disabled_reason: Optional[str] = None
 
