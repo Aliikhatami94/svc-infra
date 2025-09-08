@@ -3,6 +3,10 @@ from __future__ import annotations
 from enum import Enum
 
 from ai_infra.mcp.server.tools import mcp_from_functions
+from ai_infra.llm.tools.custom.cli import (
+    cli_cmd_help,
+    cli_subcmd_help,
+)
 
 CLI_PROG = "svc-infra"
 
