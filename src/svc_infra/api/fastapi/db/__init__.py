@@ -1,10 +1,9 @@
 from .session import SessionDep
-from .health import db_health_router
-from svc_infra.api.fastapi.db.add import add_database, add_resources
+from svc_infra.api.fastapi.db.add import add_database, add_resources, add_db_health
 
 __all__ = [
     "SessionDep",
-    "db_health_router",
+    "add_db_health",
     "add_database",
     "add_resources",
 ]
