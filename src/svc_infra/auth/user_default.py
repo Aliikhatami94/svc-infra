@@ -2,6 +2,7 @@ from typing import Any, Dict
 from fastapi import HTTPException
 from fastapi_users.password import PasswordHelper
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from svc_infra.api.fastapi.db.service_hooks import ServiceWithHooks
 from svc_infra.api.fastapi.db.repository import Repository
@@ -9,7 +10,7 @@ from svc_infra.api.fastapi.db.repository import Repository
 _pwd = PasswordHelper()
 
 def make_default_user_service(repo: Repository):
-    Model = repo.model  # <-- capture the actual mapped model from the repo
+    Model = repo.model  # capture the mapped class
 
     def _user_pre_create(data: Dict[str, Any]) -> Dict[str, Any]:
         data = dict(data)
@@ -20,11 +21,10 @@ def make_default_user_service(repo: Repository):
             data["extra"] = data.pop("metadata")
         data.setdefault("roles", [])
 
-        # BEFORE insert: app-level guard (nice 409) aligned with DB uniqueness
+        # attach existence checker (case-insensitive email, tenant scoped)
         email = data.get("email")
         tenant_id = data.get("tenant_id")
         if email is not None:
-            # case-insensitive email; scope by tenant (NULL => global)
             where = [func.lower(Model.email) == func.lower(email)]
             if hasattr(Model, "tenant_id"):
                 if tenant_id is None:
@@ -35,9 +35,7 @@ def make_default_user_service(repo: Repository):
             async def _exists(session):
                 return await repo.exists(session, where=where)
 
-            # stash the callback so Service.create can await it (has session)
             data["_precreate_exists_check"] = _exists
-
         return data
 
     def _user_pre_update(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -47,7 +45,7 @@ def make_default_user_service(repo: Repository):
         if "metadata" in data:
             data["extra"] = data.pop("metadata")
 
-        # Optional: also protect email change from creating dupes
+        # optional: protect email change too
         email = data.get("email")
         tenant_id = data.get("tenant_id")
         if email is not None:
@@ -61,21 +59,34 @@ def make_default_user_service(repo: Repository):
             async def _exists(session):
                 return await repo.exists(session, where=where)
 
-            data["_precreate_exists_check"] = _exists  # reuse same key
-
+            data["_preupdate_exists_check"] = _exists
         return data
 
     class _Svc(ServiceWithHooks):
         async def create(self, session, data):
+            # IMPORTANT: run pre_create first
+            data = await self.pre_create(data)
             exists_cb = data.pop("_precreate_exists_check", None)
             if exists_cb and await exists_cb(session):
                 raise HTTPException(status_code=409, detail="User with this email already exists.")
-            return await super().create(session, data)
+            try:
+                return await self.repo.create(session, data)
+            except IntegrityError as e:
+                # race-safety / fallback
+                if "uq_users_tenant_id" in str(e.orig) or "ci_email" in str(e.orig):
+                    raise HTTPException(status_code=409, detail="User with this email already exists.") from e
+                raise
 
         async def update(self, session, id_value, data):
-            exists_cb = data.pop("_precreate_exists_check", None)
+            data = await self.pre_update(data)
+            exists_cb = data.pop("_preupdate_exists_check", None)
             if exists_cb and await exists_cb(session):
                 raise HTTPException(status_code=409, detail="User with this email already exists.")
-            return await super().update(session, id_value, data)
+            try:
+                return await self.repo.update(session, id_value, data)
+            except IntegrityError as e:
+                if "uq_users_tenant_id" in str(e.orig) or "ci_email" in str(e.orig):
+                    raise HTTPException(status_code=409, detail="User with this email already exists.") from e
+                raise
 
     return _Svc(repo, pre_create=_user_pre_create, pre_update=_user_pre_update)
