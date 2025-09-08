@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from enum import Enum
 
 from pydantic import BaseModel
@@ -25,7 +23,6 @@ async def svc_infra_help(database_url: Optional[str] = None) -> dict:
     root = _prepare_env(database_url=db_url, chdir=False)
     text = await _run_from_root(root, ["--help"])
     return {"ok": True, "action": "help", "project_root": str(root), "help": text}
-
 
 class Subcommand(str, Enum):
     init = "init"

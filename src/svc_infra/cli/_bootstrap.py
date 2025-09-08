@@ -70,5 +70,5 @@ def _bootstrap(
     load_env_if_present(path, override=override)
 
 
-def pre(app: typer.Typer) -> None:
+def pre_cli(app: typer.Typer) -> None:
     app.callback()(_bootstrap)
