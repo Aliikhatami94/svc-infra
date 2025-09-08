@@ -12,7 +12,6 @@ app = typer.Typer(
     add_completion=False,
     help=_HELP
 )
-
 pre_cli(app)
 register_alembic(app)
 register_scaffold(app)
