@@ -1,8 +1,5 @@
-from __future__ import annotations
-
+from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import Any, Optional, Sequence, Type, cast, Annotated
-
-from fastapi import APIRouter, Depends, HTTPException
 
 from .session import SessionDep
 from .http import (
@@ -26,7 +23,11 @@ def make_crud_router_plus(
         mount_under_db_prefix: bool = True,
 ) -> APIRouter:
     router_prefix = ("/_db" + prefix) if mount_under_db_prefix else prefix
-    r = APIRouter(prefix=router_prefix, tags=tags or [prefix.strip("/")])
+    r = APIRouter(
+        prefix=router_prefix,
+        tags=tags or [prefix.strip("/")],
+        redirect_slashes=False,  # avoid 307 that can drop body in some clients
+    )
 
     def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:
         if not order_spec:
@@ -36,7 +37,7 @@ def make_crud_router_plus(
         for p in pieces:
             name = p[1:] if p.startswith("-") else p
             if allowed_order_fields and name not in (allowed_order_fields or []):
-                continue  # silently ignore disallowed
+                continue
             fields.append(p)
         return fields
 
@@ -75,33 +76,32 @@ def make_crud_router_plus(
             total=total, items=items, limit=lp.limit, offset=lp.offset
         )
 
-    # GET by id
     @r.get("/{item_id}", response_model=cast(Any, read_schema))
     async def get_item(
             item_id: Any,
-            session: SessionDep   # type: ignore[name-defined]
+            session: SessionDep,   # type: ignore[name-defined]
     ):
         row = await service.get(session, item_id)
         if not row:
             raise HTTPException(404, "Not found")
         return row
 
-    # CREATE (no trailing slash)
+    # CREATE — body is explicit, and non-default (session) comes before default (payload=Body(...))
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
     @r.post("/", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(
-            payload: create_schema,   # type: ignore[name-defined]
-            session: SessionDep,   # type: ignore[name-defined]
+            session: SessionDep,                      # type: ignore[name-defined]
+            payload: create_schema = Body(...),       # type: ignore[name-defined]
     ):
         data = payload.model_dump(exclude_unset=True)
         return await service.create(session, data)
 
-    # UPDATE (PATCH)
+    # UPDATE
     @r.patch("/{item_id}", response_model=cast(Any, read_schema))
     async def update_item(
             item_id: Any,
-            payload: update_schema,   # type: ignore[name-defined]
-            session: SessionDep,   # type: ignore[name-defined]
+            session: SessionDep,                      # type: ignore[name-defined]
+            payload: update_schema = Body(...),       # type: ignore[name-defined]
     ):
         data = payload.model_dump(exclude_unset=True)
         row = await service.update(session, item_id, data)
@@ -109,15 +109,14 @@ def make_crud_router_plus(
             raise HTTPException(404, "Not found")
         return row
 
-    # DELETE
     @r.delete("/{item_id}", status_code=204)
     async def delete_item(
             item_id: Any,
-            session: SessionDep   # type: ignore[name-defined]
+            session: SessionDep,   # type: ignore[name-defined]
     ):
         ok = await service.delete(session, item_id)
         if not ok:
             raise HTTPException(404, "Not found")
-        return  # 204 No Content
+        return
 
     return r
