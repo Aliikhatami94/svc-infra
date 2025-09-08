@@ -4,7 +4,7 @@ from typing import Optional, Sequence
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from svc_infra.auth.user_default import make_default_user_service
+from svc_infra.api.fastapi.db.user.user_default import make_default_user_service
 from .repository import Repository
 from .service import Service
 from .crud_router import make_crud_router_plus

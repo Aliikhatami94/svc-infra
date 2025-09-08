@@ -1,13 +1,13 @@
 from __future__ import annotations
+
 from fastapi import FastAPI
-
-from .users import get_fastapi_users
-from .oauth_router import oauth_router_with_backend
-from .providers import providers_from_settings
-
-from .settings import get_auth_settings
 from pydantic import ValidationError
 
+from svc_infra.api.fastapi.db.user.users import get_fastapi_users
+
+from .oauth_router import oauth_router_with_backend
+from .providers import providers_from_settings
+from .settings import get_auth_settings
 
 def enable_auth(
         app: FastAPI,

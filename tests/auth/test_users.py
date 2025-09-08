@@ -8,7 +8,7 @@ import pytest
 from fastapi import APIRouter
 from pydantic import BaseModel, SecretStr
 
-import svc_infra.auth.users as users_mod
+import svc_infra.api.fastapi.db.user.users as users_mod
 
 
 # -----------------------------

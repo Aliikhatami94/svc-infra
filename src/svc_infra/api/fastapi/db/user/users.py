@@ -7,7 +7,7 @@ from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
-from .settings import get_auth_settings
+from svc_infra.auth.settings import get_auth_settings
 
 
 def get_fastapi_users(
