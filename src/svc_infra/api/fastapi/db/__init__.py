@@ -1,12 +1,10 @@
-from .session import SessionDep, attach_db_to_api, attach_db_to_api_with_url
+from .session import SessionDep
 from .health import db_health_router
-from .add import Resource, include_resources
+from svc_infra.api.fastapi.db.add import add_database, add_resources
 
 __all__ = [
     "SessionDep",
-    "attach_db_to_api",
-    "attach_db_to_api_with_url",
     "db_health_router",
-    "Resource",
-    "include_resources",
+    "add_database",
+    "add_resources",
 ]
