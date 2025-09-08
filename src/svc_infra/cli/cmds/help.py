@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 _HELP = """\
 svc-infra — service infrastructure CLI
 
