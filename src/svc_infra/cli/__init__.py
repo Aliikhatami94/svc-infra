@@ -4,17 +4,16 @@ import typer
 
 from svc_infra.cli.foundation.typer_bootstrap import pre_cli
 from svc_infra.cli.cmds import (
-    register_app, register_alembic, register_scaffold, HELP
+    register_alembic, register_scaffold, _HELP
 )
 
 app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
-    help=HELP
+    help=_HELP
 )
 
 pre_cli(app)
-register_app(app)
 register_alembic(app)
 register_scaffold(app)
 
