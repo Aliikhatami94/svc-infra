@@ -6,6 +6,12 @@ from enum import StrEnum
 from functools import cache
 from typing import NamedTuple
 
+from dotenv import load_dotenv
+from pathlib import Path
+from typing import Optional, List
+
+from svc_infra.app.root import resolve_project_root
+
 
 class Environment(StrEnum):
     LOCAL = "local"
@@ -112,3 +118,36 @@ def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
     if nonprod is not None:
         return nonprod
     raise ValueError("pick(): No value found for environment and 'nonprod' was not provided.")
+
+def find_env_file(start: Optional[Path] = None) -> Optional[Path]:
+    env_file = os.getenv("APP_ENV_FILE") or os.getenv("SVC_INFRA_ENV_FILE")
+    if env_file:
+        p = Path(env_file).expanduser()
+        return p if p.exists() else None
+
+    cur = (start or Path.cwd()).resolve()
+    for p in [cur, *cur.parents]:
+        candidate = p / ".env"
+        if candidate.exists():
+            return candidate
+    return None
+
+def load_env_if_present(path: Optional[Path], *, override: bool = False) -> List[str]:
+    if not path:
+        return []
+    before = dict(os.environ)
+    load_dotenv(dotenv_path=path, override=override)
+    changed = []
+    for k, v in os.environ.items():
+        if k not in before or before.get(k) != v:
+            changed.append(k)
+    return sorted(changed)
+
+def prepare_env() -> Path:
+    """
+    Return (project_root, debug_note). No chdir here; runner handles cwd.
+    """
+    root = resolve_project_root()
+    env_file = find_env_file(start=root)
+    load_env_if_present(env_file, override=False)
+    return root

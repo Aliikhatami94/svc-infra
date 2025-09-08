@@ -2,18 +2,24 @@ from __future__ import annotations
 
 import typer
 
-from svc_infra.cli.alembic_cmds import register as register_alembic
-from svc_infra.cli.scaffold_cmds import register as register_scaffold
-from svc_infra.cli.app_cmds import register as register_app, HELP
-from svc_infra.cli._bootstrap import pre_cli as _pre
+from svc_infra.cli.foundation.typer_bootstrap import pre_cli
+from svc_infra.cli.cmds import (
+    register_app, register_alembic, register_scaffold, HELP
+)
 
-app = typer.Typer(no_args_is_help=True, add_completion=False, help=HELP)
+app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    help=HELP
+)
 
-# Attach all commands to the ONE app
-_pre(app)
+pre_cli(app)
 register_app(app)
 register_alembic(app)
 register_scaffold(app)
 
-if __name__ == "__main__":
+def main():
     app()
+
+if __name__ == "__main__":
+    main()

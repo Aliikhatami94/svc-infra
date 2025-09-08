@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import typer, os
 
-from pathlib import Path
 from typing import Optional, List
 
 from svc_infra.db.setup.core import (
@@ -16,23 +15,12 @@ from svc_infra.db.setup.core import (
     merge_heads as core_merge_heads,
     setup_and_migrate as core_setup_and_migrate,
 )
-from svc_infra.cli.common import apply_database_url
 
 
-def resolve_project_root(project_root: Optional[Path] = None) -> Path:
-    # 1) explicit arg
-    if project_root is not None:
-        return project_root.resolve()
-    # 2) env override
-    env_root = os.getenv("SVC_INFRA_PROJECT_ROOT")
-    if env_root:
-        return Path(env_root).expanduser().resolve()
-    # 3) walk up for a repo/app root
-    start = Path.cwd().resolve()
-    for d in [start, *start.parents]:
-        if (d / "pyproject.toml").exists() or (d / ".git").exists() or (d / "alembic.ini").exists() or (d / "migrations").exists():
-            return d
-    return start
+def apply_database_url(database_url: Optional[str]) -> None:
+    """If provided, set DATABASE_URL for the current process."""
+    if database_url:
+        os.environ["DATABASE_URL"] = database_url
 
 def cmd_init(
         database_url: Optional[str] = typer.Option(
