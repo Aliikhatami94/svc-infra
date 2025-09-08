@@ -16,7 +16,7 @@ const args = [
     "--quiet",
     ...(process.env.UVX_REFRESH ? ["--refresh"] : []),
     "--from", SPEC,          // svc-infra
-    "--from", AI_INFRA_SPEC, // ai-infra (pinned)
+    "--from", AI_INFRA_SPEC, // ai-infra
     "python", "-m", "svc_infra.mcp.cli_mcp",
     "--transport", "stdio",
     ...process.argv.slice(2)
