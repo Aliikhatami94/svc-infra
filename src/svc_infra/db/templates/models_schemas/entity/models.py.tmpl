@@ -82,7 +82,7 @@ def _compose(*hooks: Optional[PreHook]) -> PreHook:
         return out
     return _runner
 
-def make_entity_service(
+def create_entity_service(
     repo: "Repository",
     *,
     # Uniqueness defaults (match the indexes above)

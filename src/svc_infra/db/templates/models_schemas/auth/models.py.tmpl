@@ -104,7 +104,7 @@ def _compose(*hooks: Optional[PreHook]) -> PreHook:
         return out
     return _runner
 
-def make_auth_service(
+def create_auth_service(
     repo: Repository,
     *,
     # Uniqueness settings (rarely changed)
