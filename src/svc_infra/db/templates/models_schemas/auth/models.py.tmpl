@@ -11,9 +11,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from svc_infra.db.base import ModelBase
-from svc_infra.auth.user_default import _pwd
+from svc_infra.api.fastapi.db.user.user_logic import _pwd
 from svc_infra.db.uniq import make_unique_indexes
-
 
 class User(ModelBase):
     __tablename__ = "users"
