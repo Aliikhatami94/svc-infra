@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: fastapi-overview
+    orgId: 1
+    folder: Observability
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards
