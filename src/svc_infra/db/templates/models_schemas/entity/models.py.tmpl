@@ -1,7 +1,7 @@
 # models/${table_name}.py
 from __future__ import annotations
 from datetime import datetime
-from typing import Optional
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 import uuid
 
 from sqlalchemy import String, Boolean, DateTime, JSON, Text, func
@@ -11,7 +11,10 @@ from sqlalchemy.ext.mutable import MutableDict
 
 from svc_infra.db.base import ModelBase
 from svc_infra.db.uniq import make_unique_indexes
+from svc_infra.db.uniq_hooks import dedupe_service
+from svc_infra.api.fastapi.db.repository import Repository
 
+# ------------------------------ Model ------------------------------
 
 class ${Entity}(ModelBase):
     __tablename__ = "${table_name}"
@@ -41,12 +44,72 @@ ${soft_delete_field}\
 
 
 # --- Uniqueness policy --------------------------------------------------------
-# Register functional unique indexes (case-insensitive on "name"),
+# Functional unique indexes (case-insensitive on "name"),
 # optionally scoped by tenant if present.
 for _ix in make_unique_indexes(
     ${Entity},
     unique_ci=["name"]${tenant_arg}
 ):
-    # Iteration is enough to attach them to the Table metadata
-    # (Alembic autogenerate / metadata.create_all will pick them up)
+    # Iterating registers them on the Table metadata (alembic/autogenerate will pick them up).
     pass
+
+
+# ----------------------- Service factory (entity) -----------------------------
+
+PreHook = Callable[[Dict[str, Any]], Dict[str, Any]]
+ColumnSpec = Union[str, Sequence[str]]
+
+def _map_entity_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Basic payload normalization common to most entities:
+      - metadata (schema alias) -> extra (column)
+      - normalize name (trim whitespace)
+    Extend per-project via extra_pre_create/extra_pre_update in make_entity_service.
+    """
+    d = dict(data)
+    if "metadata" in d:
+        d["extra"] = d.pop("metadata")
+    if "name" in d and isinstance(d["name"], str):
+        d["name"] = d["name"].strip()
+    return d
+
+def _compose(*hooks: Optional[PreHook]) -> PreHook:
+    """Chain multiple pre-hooks left-to-right, skipping Nones."""
+    def _runner(payload: Dict[str, Any]) -> Dict[str, Any]:
+        out = payload
+        for h in hooks:
+            if h:
+                out = h(out)
+        return out
+    return _runner
+
+def make_entity_service(
+    repo: Repository,
+    *,
+    # Uniqueness defaults (match the indexes above)
+    unique_ci: Iterable[ColumnSpec] = ("name",),
+    tenant_field: Optional[str] = ${"None" if "${tenant_field}".strip()=="" else '"tenant_id"'},
+    # Allow projects to extend behavior without writing a whole service
+    extra_pre_create: Optional[PreHook] = None,
+    extra_pre_update: Optional[PreHook] = None,
+    # Optional: override 409 messages per-spec, e.g. {("name",): "Item name already exists."}
+    messages: Optional[dict[Tuple[str, ...], str]] = None,
+):
+    """
+    Build a generic entity Service that:
+      • Normalizes payload (metadata→extra, trims name)
+      • Enforces uniqueness via dedupe_service (CI by default on 'name')
+      • Returns 409 like: "Record with name='Foo' already exists."
+      • Accepts extra pre-hooks for project-specific rules.
+    """
+    pre_create = _compose(_map_entity_fields, extra_pre_create)
+    pre_update = _compose(_map_entity_fields, extra_pre_update)
+
+    return dedupe_service(
+        repo,
+        unique_ci=unique_ci,
+        tenant_field=tenant_field,
+        messages=messages,
+        pre_create=pre_create,
+        pre_update=pre_update,
+    )

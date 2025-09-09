@@ -17,6 +17,8 @@ from svc_infra.db.uniq import make_unique_indexes
 from svc_infra.db.uniq_hooks import dedupe_service
 from svc_infra.api.fastapi.db.repository import Repository
 
+# ------------------------------ Model ------------------------------
+
 class User(ModelBase):
     __tablename__ = "users"
 
