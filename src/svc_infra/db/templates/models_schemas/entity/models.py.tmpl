@@ -1,3 +1,4 @@
+# models/${table_name}.py
 from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
@@ -41,7 +42,6 @@ ${soft_delete_field}\
     def __repr__(self) -> str:
         return f"<${Entity} id={self.id} name={self.name!r}>"
 
-
 # --- Uniqueness policy --------------------------------------------------------
 # Functional unique indexes (case-insensitive on "name"),
 # optionally scoped by tenant if present.
@@ -51,7 +51,6 @@ for _ix in make_unique_indexes(
 ):
     # Iterating registers them on the Table metadata (alembic/autogenerate will pick them up).
     pass
-
 
 # ----------------------- Service factory (entity) -----------------------------
 
@@ -87,7 +86,7 @@ def make_entity_service(
     *,
     # Uniqueness defaults (match the indexes above)
     unique_ci: Iterable[ColumnSpec] = ("name",),
-    tenant_field: Optional[str] = ${"None" if "${tenant_field}".strip()=="" else '"tenant_id"'},
+    tenant_field: Optional[str] = ${tenant_default},
     # Allow projects to extend behavior without writing a whole service
     extra_pre_create: Optional[PreHook] = None,
     extra_pre_update: Optional[PreHook] = None,
