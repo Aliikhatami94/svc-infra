@@ -59,6 +59,26 @@ class User(ModelBase):
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email!r}>"
 
+# --- Input data pre-processing hooks ------------------------------------------
+
+def user_pre_create(data: Dict[str, Any]) -> Dict[str, Any]:
+    data = dict(data)
+    if "password" in data:
+        data["password_hash"] = _pwd.hash(data.pop("password"))
+    if "metadata" in data:
+        data["extra"] = data.pop("metadata")
+    data.setdefault("roles", [])
+    return data
+
+def user_pre_update(data: Dict[str, Any]) -> Dict[str, Any]:
+    data = dict(data)
+    if "password" in data:
+        data["password_hash"] = _pwd.hash(data.pop("password"))
+    if "metadata" in data:
+        data["extra"] = data.pop("metadata")
+    return data
+
+# --- Uniqueness policy --------------------------------------------------------
 
 # Unique indexes, including case-insensitive and/or tenant-scoped.
 for _ix in make_unique_indexes(
