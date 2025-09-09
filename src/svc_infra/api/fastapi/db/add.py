@@ -4,7 +4,6 @@ from typing import Optional, Sequence
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from svc_infra.api.fastapi.db.user.user_default import make_default_user_service
 from .repository import Repository
 from .service import Service
 from .crud_router import make_crud_router_plus
@@ -13,11 +12,6 @@ from .resource import Resource
 from .session import initialize_session, dispose_session
 from .health import _make_db_health_router
 
-def _looks_like_user_model(model: type) -> bool:
-    # minimal/robust: users have email + password_hash.
-    # (You can tighten this with hasattr(model, "extra") / "roles" if you want.)
-    return hasattr(model, "email") and hasattr(model, "password_hash")
-
 def add_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
     for r in resources:
         repo = Repository(model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete)
@@ -25,10 +19,7 @@ def add_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
         # 1) explicit app-provided factory wins
         if r.service_factory:
             svc = r.service_factory(repo)
-        # 2) otherwise, auto-apply our default user service if model looks like a user
-        elif _looks_like_user_model(r.model):
-            svc = make_default_user_service(repo)
-        # 3) else, generic service
+        # 2) else, generic service
         else:
             svc = Service(repo)
 

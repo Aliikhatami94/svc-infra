@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, Callable
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -28,7 +28,9 @@ def dedupe_service(
         unique_cs: Iterable[ColumnSpec] = (),
         unique_ci: Iterable[ColumnSpec] = (),
         tenant_field: Optional[str] = None,
-        messages: Optional[dict[Tuple[str, ...], str]] = None,  # optional override
+        messages: Optional[dict[Tuple[str, ...], str]] = None,
+        pre_create: Optional[Callable[[dict], dict]] = None,  # NEW
+        pre_update: Optional[Callable[[dict], dict]] = None,  # NEW
 ):
     """
     Build a Service subclass with uniqueness pre-checks:
@@ -75,6 +77,7 @@ def dedupe_service(
             try:
                 return await self.repo.create(session, data)
             except IntegrityError as e:
+                # DB race fallback; keep message generic (or inspect constraint if you prefer)
                 raise HTTPException(status_code=409, detail="Record already exists.") from e
 
         async def update(self, session, id_value, data):
@@ -85,4 +88,4 @@ def dedupe_service(
             except IntegrityError as e:
                 raise HTTPException(status_code=409, detail="Record already exists.") from e
 
-    return _Svc(repo)
+    return _Svc(repo, pre_create=pre_create, pre_update=pre_update)
