@@ -10,8 +10,6 @@ import typer
 
 PKG_TPL_ROOT = "svc_infra.observability.grafana"
 
-app = typer.Typer(no_args_is_help=True)
-
 # ------------------------- small utils -------------------------
 
 def _pkg_file(*parts: str) -> str:
