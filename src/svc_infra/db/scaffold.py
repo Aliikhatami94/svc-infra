@@ -99,6 +99,7 @@ def scaffold_core(
     else:
         ent = _normalize_entity_name(entity_name)
         tbl = table_name or _suggest_table_name(ent)
+
         tenant_model_field = (
             '    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)\n'
             if include_tenant else ""
@@ -109,13 +110,8 @@ def scaffold_core(
             if include_soft_delete else
             '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
         )
-        constraints = (
-            '    __table_args__ = (\n'
-            f'        UniqueConstraint("tenant_id", "name", name="uq_{tbl}_tenant_name"),\n'
-            '    )\n'
-        ) if include_tenant else ""
-        indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
 
+        tenant_arg = ', tenant_field="tenant_id"' if include_tenant else ""
         models_txt = _render_entity_template(
             "models.py.tmpl",
             subs={
@@ -123,8 +119,7 @@ def scaffold_core(
                 "table_name": tbl,
                 "tenant_field": tenant_model_field,
                 "soft_delete_field": soft_delete_model_field,
-                "constraints": constraints,
-                "indexes": indexes,
+                "tenant_arg": tenant_arg,
             },
         )
 
@@ -181,6 +176,7 @@ def scaffold_models_core(
     else:
         ent = _normalize_entity_name(entity_name)
         tbl = table_name or _suggest_table_name(ent)
+
         tenant_model_field = (
             '    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)\n'
             if include_tenant else ""
@@ -191,12 +187,7 @@ def scaffold_models_core(
             if include_soft_delete else
             '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
         )
-        constraints = (
-            '    __table_args__ = (\n'
-            f'        UniqueConstraint("tenant_id", "name", name="uq_{tbl}_tenant_name"),\n'
-            '    )\n'
-        ) if include_tenant else ""
-        indexes = f'Index("ix_{tbl}_tenant_id", {ent}.tenant_id)\n' if include_tenant else ""
+        tenant_arg = ', tenant_field="tenant_id"' if include_tenant else ""
         txt = _render_entity_template(
             "models.py.tmpl",
             subs={
@@ -204,8 +195,7 @@ def scaffold_models_core(
                 "table_name": tbl,
                 "tenant_field": tenant_model_field,
                 "soft_delete_field": soft_delete_model_field,
-                "constraints": constraints,
-                "indexes": indexes,
+                "tenant_arg": tenant_arg,
             },
         )
 
