@@ -1,18 +1,21 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Optional
 import uuid
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
 from sqlalchemy import (
-    String, Boolean, DateTime, JSON, Text, func, Index
+    String, Boolean, DateTime, JSON, Text, func
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 
+from fastapi_users.password import PasswordHelper
+
 from svc_infra.db.base import ModelBase
-from svc_infra.api.fastapi.db.user.user_logic import _pwd
 from svc_infra.db.uniq import make_unique_indexes
+from svc_infra.db.uniq_hooks import dedupe_service
+from svc_infra.api.fastapi.db.repository import Repository
 
 class User(ModelBase):
     __tablename__ = "users"
@@ -59,33 +62,80 @@ class User(ModelBase):
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email!r}>"
 
-# --- Input data pre-processing hooks ------------------------------------------
-
-def user_pre_create(data: Dict[str, Any]) -> Dict[str, Any]:
-    data = dict(data)
-    if "password" in data:
-        data["password_hash"] = _pwd.hash(data.pop("password"))
-    if "metadata" in data:
-        data["extra"] = data.pop("metadata")
-    data.setdefault("roles", [])
-    return data
-
-def user_pre_update(data: Dict[str, Any]) -> Dict[str, Any]:
-    data = dict(data)
-    if "password" in data:
-        data["password_hash"] = _pwd.hash(data.pop("password"))
-    if "metadata" in data:
-        data["extra"] = data.pop("metadata")
-    return data
-
 # --- Uniqueness policy --------------------------------------------------------
 
 # Unique indexes, including case-insensitive and/or tenant-scoped.
 for _ix in make_unique_indexes(
-    User,
-    unique_ci=["email"],            # case-insensitive unique email
-    tenant_field="tenant_id",       # scoped by tenant if provided
+        User,
+        unique_ci=["email"],            # case-insensitive unique email
+        tenant_field="tenant_id",       # scoped by tenant if provided
 ):
     # Simply iterating keeps them registered with the Table metadata.
     # (No further action needed if you use Alembic autogenerate or metadata.create_all.)
     pass
+
+# --- User service factory ------------------------------------------------------
+
+_pwd = PasswordHelper()
+
+PreHook = Callable[[Dict[str, Any]], Dict[str, Any]]
+ColumnSpec = Union[str, Sequence[str]]
+
+
+def _map_user_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize inbound payload for our User model."""
+    d = dict(data)
+    # password -> password_hash
+    if "password" in d:
+        d["password_hash"] = _pwd.hash(d.pop("password"))
+    # metadata(alias) -> extra(column)
+    if "metadata" in d:
+        d["extra"] = d.pop("metadata")
+    # roles default
+    d.setdefault("roles", [])
+    return d
+
+
+def _compose(*hooks: Optional[PreHook]) -> PreHook:
+    """Chain multiple pre-hooks left-to-right, skipping Nones."""
+    def _runner(payload: Dict[str, Any]) -> Dict[str, Any]:
+        out = payload
+        for h in hooks:
+            if h:
+                out = h(out)
+        return out
+    return _runner
+
+
+def make_user_service(
+        repo: Repository,
+        *,
+        # Uniqueness settings (rarely changed)
+        unique_ci: Iterable[ColumnSpec] = ("email",),
+        tenant_field: Optional[str] = "tenant_id",
+        # Optional: caller can inject extra transforms/validation
+        extra_pre_create: Optional[PreHook] = None,
+        extra_pre_update: Optional[PreHook] = None,
+        # Optional: customize 409 messages per spec if you want
+        messages: Optional[dict[Tuple[str, ...], str]] = None,
+):
+    """
+    Build a user-aware Service that:
+      • Hashes passwords and maps payload fields (pre_create / pre_update)
+      • Enforces case-insensitive unique email (optionally tenant-scoped)
+      • Returns 409s like: "Record with email='x' already exists."
+      • Lets you add extra pre-hooks if needed (kept simple for most apps)
+    """
+    # Compose our field mapper with any project-specific hooks
+    pre_create = _compose(_map_user_fields, extra_pre_create)
+    pre_update = _compose(_map_user_fields, extra_pre_update)
+
+    # Reuse the generic dedupe service but inject our user pre-hooks
+    return dedupe_service(
+        repo,
+        unique_ci=unique_ci,
+        tenant_field=tenant_field,
+        messages=messages,
+        pre_create=pre_create,
+        pre_update=pre_update,
+    )

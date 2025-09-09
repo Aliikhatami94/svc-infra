@@ -9,7 +9,6 @@ from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
 from svc_infra.auth.settings import get_auth_settings
 
-
 def get_fastapi_users(
     user_model: Any,
     user_schema_read: Any,
