@@ -112,6 +112,8 @@ def scaffold_core(
         )
 
         tenant_arg = ', tenant_field="tenant_id"' if include_tenant else ""
+        tenant_default = '"tenant_id"' if include_tenant else "None"
+
         models_txt = _render_entity_template(
             "models.py.tmpl",
             subs={
@@ -120,6 +122,7 @@ def scaffold_core(
                 "tenant_field": tenant_model_field,
                 "soft_delete_field": soft_delete_model_field,
                 "tenant_arg": tenant_arg,
+                "tenant_default": tenant_default,
             },
         )
 
