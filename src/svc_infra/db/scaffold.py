@@ -28,11 +28,11 @@ def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> Dict[str, 
 
 # ---------------- auth templates (loaded from package) ----------------
 
-def _render_auth_template(name: str) -> str:
+def _render_auth_template(name: str, subs: Dict[str, Any]) -> str:
     import importlib.resources as pkg
     from string import Template as _T
     txt = pkg.files("svc_infra.db.templates.models_schemas.auth").joinpath(name).read_text(encoding="utf-8")
-    return _T(txt).substitute({})  # no variables today
+    return _T(txt).substitute(subs)
 
 # ---------------- entity templates (loaded from package only) ----------------
 
@@ -94,8 +94,17 @@ def scaffold_core(
 
     # content per kind
     if kind == "auth":
-        models_txt = _render_auth_template("models.py.tmpl")
-        schemas_txt = _render_auth_template("schemas.py.tmpl")
+        auth_ent = _normalize_entity_name(entity_name or "User")
+        auth_tbl = table_name or _suggest_table_name(auth_ent)
+
+        models_txt = _render_auth_template(
+            "models.py.tmpl",
+            subs={"AuthEntity": auth_ent, "auth_table_name": auth_tbl},
+        )
+        schemas_txt = _render_auth_template(
+            "schemas.py.tmpl",
+            subs={"AuthEntity": auth_ent},
+        )
     else:
         ent = _normalize_entity_name(entity_name)
         tbl = table_name or _suggest_table_name(ent)
@@ -175,7 +184,12 @@ def scaffold_models_core(
     dest = _normalize_dir(dest_dir)
 
     if kind == "auth":
-        txt = _render_auth_template("models.py.tmpl")
+        auth_ent = _normalize_entity_name(entity_name or "User")
+        auth_tbl = table_name or _suggest_table_name(auth_ent)
+        txt = _render_auth_template(
+            "models.py.tmpl",
+            subs={"AuthEntity": auth_ent, "auth_table_name": auth_tbl},
+        )
     else:
         ent = _normalize_entity_name(entity_name)
         tbl = table_name or _suggest_table_name(ent)
@@ -222,7 +236,11 @@ def scaffold_schemas_core(
     dest = _normalize_dir(dest_dir)
 
     if kind == "auth":
-        txt = _render_auth_template("schemas.py.tmpl")
+        auth_ent = _normalize_entity_name(entity_name or "User")
+        txt = _render_auth_template(
+            "schemas.py.tmpl",
+            subs={"AuthEntity": auth_ent},
+        )
     else:
         ent = _normalize_entity_name(entity_name)
         tenant_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""

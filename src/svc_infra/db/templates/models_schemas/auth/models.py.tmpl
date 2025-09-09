@@ -3,9 +3,7 @@ from datetime import datetime
 import uuid
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
-from sqlalchemy import (
-    String, Boolean, DateTime, JSON, Text, func
-)
+from sqlalchemy import String, Boolean, DateTime, JSON, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict, MutableList
@@ -17,10 +15,13 @@ from svc_infra.db.uniq import make_unique_indexes
 from svc_infra.db.uniq_hooks import dedupe_service
 from svc_infra.api.fastapi.db.repository import Repository
 
+# --- local password helper must be defined before class (used by property) ---
+_pwd = PasswordHelper()
+
 # ------------------------------ Model ------------------------------
 
-class User(ModelBase):
-    __tablename__ = "users"
+class ${AuthEntity}(ModelBase):
+    __tablename__ = "${auth_table_name}"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -62,30 +63,26 @@ class User(ModelBase):
     )
 
     def __repr__(self) -> str:
-        return f"<User id={self.id} email={self.email!r}>"
+        return f"<${AuthEntity} id={self.id} email={self.email!r}>"
 
 # --- Uniqueness policy --------------------------------------------------------
 
 # Unique indexes, including case-insensitive and/or tenant-scoped.
 for _ix in make_unique_indexes(
-        User,
-        unique_ci=["email"],            # case-insensitive unique email
-        tenant_field="tenant_id",       # scoped by tenant if provided
+    ${AuthEntity},
+    unique_ci=["email"],            # case-insensitive unique email
+    tenant_field="tenant_id",       # scoped by tenant if provided
 ):
-    # Simply iterating keeps them registered with the Table metadata.
-    # (No further action needed if you use Alembic autogenerate or metadata.create_all.)
+    # Registered with Table metadata (alembic/autogenerate will pick them up)
     pass
 
-# --- User service factory ------------------------------------------------------
-
-_pwd = PasswordHelper()
+# --- Auth service factory ------------------------------------------------------
 
 PreHook = Callable[[Dict[str, Any]], Dict[str, Any]]
 ColumnSpec = Union[str, Sequence[str]]
 
-
-def _map_user_fields(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalize inbound payload for our User model."""
+def _map_auth_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize inbound payload for the auth model."""
     d = dict(data)
     # password -> password_hash
     if "password" in d:
@@ -97,7 +94,6 @@ def _map_user_fields(data: Dict[str, Any]) -> Dict[str, Any]:
     d.setdefault("roles", [])
     return d
 
-
 def _compose(*hooks: Optional[PreHook]) -> PreHook:
     """Chain multiple pre-hooks left-to-right, skipping Nones."""
     def _runner(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -108,31 +104,27 @@ def _compose(*hooks: Optional[PreHook]) -> PreHook:
         return out
     return _runner
 
-
-def make_user_service(
-        repo: Repository,
-        *,
-        # Uniqueness settings (rarely changed)
-        unique_ci: Iterable[ColumnSpec] = ("email",),
-        tenant_field: Optional[str] = "tenant_id",
-        # Optional: caller can inject extra transforms/validation
-        extra_pre_create: Optional[PreHook] = None,
-        extra_pre_update: Optional[PreHook] = None,
-        # Optional: customize 409 messages per spec if you want
-        messages: Optional[dict[Tuple[str, ...], str]] = None,
+def make_auth_service(
+    repo: Repository,
+    *,
+    # Uniqueness settings (rarely changed)
+    unique_ci: Iterable[ColumnSpec] = ("email",),
+    tenant_field: Optional[str] = "tenant_id",
+    # Optional: caller can inject extra transforms/validation
+    extra_pre_create: Optional[PreHook] = None,
+    extra_pre_update: Optional[PreHook] = None,
+    # Optional: customize 409 messages per spec if you want
+    messages: Optional[dict[Tuple[str, ...], str]] = None,
 ):
     """
-    Build a user-aware Service that:
+    Build an auth-aware Service that:
       • Hashes passwords and maps payload fields (pre_create / pre_update)
       • Enforces case-insensitive unique email (optionally tenant-scoped)
       • Returns 409s like: "Record with email='x' already exists."
-      • Lets you add extra pre-hooks if needed (kept simple for most apps)
     """
-    # Compose our field mapper with any project-specific hooks
-    pre_create = _compose(_map_user_fields, extra_pre_create)
-    pre_update = _compose(_map_user_fields, extra_pre_update)
+    pre_create = _compose(_map_auth_fields, extra_pre_create)
+    pre_update = _compose(_map_auth_fields, extra_pre_update)
 
-    # Reuse the generic dedupe service but inject our user pre-hooks
     return dedupe_service(
         repo,
         unique_ci=unique_ci,

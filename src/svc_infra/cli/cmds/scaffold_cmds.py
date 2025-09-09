@@ -13,13 +13,9 @@ from svc_infra.db.scaffold import (
 
 
 def cmd_scaffold(
-        kind: str = typer.Option(
-            "entity",
-            "--kind",
-            help="Kind of scaffold to generate (entity or auth).",
-            click_type=click.Choice(["entity", "auth"], case_sensitive=False),
-        ),
-        entity_name: str = typer.Option("Item", help="Entity name (for kind=entity)."),
+        kind: str = typer.Option("entity", "--kind", click_type=click.Choice(["entity", "auth"], case_sensitive=False)),
+        entity_name: str = typer.Option("Item", help="Class name for entity/auth (e.g., User, Member, Product)."),
+        table_name: Optional[str] = typer.Option(None, help="Optional table name (defaults to plural snake of entity name)."),
         models_dir: Path = typer.Option(..., help="Directory for models."),
         schemas_dir: Path = typer.Option(..., help="Directory for schemas."),
         overwrite: bool = typer.Option(False, help="Overwrite existing files."),
@@ -37,6 +33,7 @@ def cmd_scaffold(
         schemas_dir=schemas_dir,
         kind=cast(Kind, kind.lower()),
         entity_name=entity_name,
+        table_name=table_name,
         overwrite=overwrite,
         same_dir=same_dir,
         models_filename=models_filename,

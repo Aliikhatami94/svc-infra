@@ -10,7 +10,7 @@ class Timestamped(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-class UserBase(BaseModel):
+class ${AuthEntity}Base(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     email: EmailStr
     full_name: Optional[str] = None
@@ -20,21 +20,21 @@ class UserBase(BaseModel):
     tenant_id: Optional[str] = None
     roles: List[str] = Field(default_factory=list)
     mfa_enabled: bool = False
-    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")  # <-- matches model.extra
+    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")  # matches model.extra
 
-class UserRead(UserBase, Timestamped):
+class ${AuthEntity}Read(${AuthEntity}Base, Timestamped):
     id: UUID
     last_login: Optional[datetime] = None
     disabled_reason: Optional[str] = None
 
-class UserCreate(BaseModel):
+class ${AuthEntity}Create(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     full_name: Optional[str] = None
     tenant_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
-class UserUpdate(BaseModel):
+class ${AuthEntity}Update(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     password: Optional[str] = None
@@ -47,6 +47,6 @@ class UserUpdate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     disabled_reason: Optional[str] = None
 
-class UserPasswordUpdate(BaseModel):
+class ${AuthEntity}PasswordUpdate(BaseModel):
     current_password: Optional[str] = None
     new_password: str = Field(min_length=8)
