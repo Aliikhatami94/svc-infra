@@ -10,7 +10,7 @@ from .metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
 from .tracing.setup import setup_tracing
 
 
-def enable_observability(
+def add_observability(
         app: Any | None = None,
         *,
         service_version: str | None = None,

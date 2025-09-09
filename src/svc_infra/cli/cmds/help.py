@@ -1,5 +1,10 @@
 _HELP = """\
-svc-infra — service infrastructure CLI
+# svc-infra — service infrastructure CLI
+
+## Allows for common infra tasks:
+  - Alembic DB migrations (setup, create, migrate, stamp, etc)
+  - Scaffold starter models/schemas for auth or entities
+  - Setup OpenTelemetry observability (tracing/metrics/logs)
 
 How to run (pick what fits your workflow):
 

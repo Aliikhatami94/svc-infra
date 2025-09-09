@@ -47,7 +47,7 @@ def test_observability_settings_defaults():
 
 
 # ------------------------------------------------------------------------------
-# enable_observability (no prometheus installed)
+# add_observability (no prometheus installed)
 # ------------------------------------------------------------------------------
 
 @pytest.fixture
@@ -84,17 +84,17 @@ def _purged_module(name: str):
             sys.modules[name] = saved
 
 
-def test_enable_observability_without_prometheus_exposes_501(starlette_app):
+def test_add_observability_without_prometheus_exposes_501(starlette_app):
     import os
     os.environ["SVC_INFRA_DISABLE_PROMETHEUS"] = "1"
     # Ensure prometheus-client cannot import
     with _purged_module("prometheus_client"):
         from starlette.testclient import TestClient
 
-        from svc_infra.observability import enable_observability
+        from svc_infra.observability import add_observability
 
         # should not raise even without prometheus installed
-        shutdown = enable_observability(starlette_app)
+        shutdown = add_observability(starlette_app)
         assert callable(shutdown)
 
         with TestClient(starlette_app) as c:
@@ -104,7 +104,7 @@ def test_enable_observability_without_prometheus_exposes_501(starlette_app):
             assert "prometheus-client not installed" in r.text
 
 
-def test_enable_observability_auto_shutdown_hook(starlette_app, monkeypatch):
+def test_add_observability_auto_shutdown_hook(starlette_app, monkeypatch):
     # Capture shutdown handler registration
     calls = []
 
@@ -113,9 +113,9 @@ def test_enable_observability_auto_shutdown_hook(starlette_app, monkeypatch):
 
     monkeypatch.setattr(starlette_app, "add_event_handler", fake_add_event_handler)
 
-    from svc_infra.observability import enable_observability
+    from svc_infra.observability import add_observability
 
-    shutdown = enable_observability(starlette_app)
+    shutdown = add_observability(starlette_app)
     assert callable(shutdown)
     # registered exactly once for "shutdown"
     assert any(evt == "shutdown" for (evt, _) in calls)

@@ -4,7 +4,7 @@ import typer
 
 from svc_infra.cli.foundation.typer_bootstrap import pre_cli
 from svc_infra.cli.cmds import (
-    register_alembic, register_scaffold, _HELP
+    _HELP, register_alembic, register_scaffold, register_obs
 )
 
 app = typer.Typer(
@@ -15,6 +15,7 @@ app = typer.Typer(
 pre_cli(app)
 register_alembic(app)
 register_scaffold(app)
+register_obs(app)
 
 def main():
     app()

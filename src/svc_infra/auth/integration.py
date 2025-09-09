@@ -9,7 +9,7 @@ from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings
 from .settings import get_auth_settings
 
-def enable_auth(
+def add_auth(
         app: FastAPI,
         *,
         user_model,

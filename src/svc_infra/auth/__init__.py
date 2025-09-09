@@ -1,5 +1,5 @@
-from .integration import enable_auth
+from .integration import add_auth
 
 __all__ = [
-    "enable_auth",
+    "add_auth",
 ]
