@@ -1,7 +1,7 @@
 # models/${table_name}.py
 from __future__ import annotations
 from datetime import datetime
-from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union, TYPE_CHECKING
 import uuid
 
 from sqlalchemy import String, Boolean, DateTime, JSON, Text, func
@@ -12,7 +12,10 @@ from sqlalchemy.ext.mutable import MutableDict
 from svc_infra.db.base import ModelBase
 from svc_infra.db.uniq import make_unique_indexes
 from svc_infra.db.uniq_hooks import dedupe_service
-from svc_infra.api.fastapi.db.repository import Repository
+
+if TYPE_CHECKING:
+    # only for type hints; avoids importing at runtime
+    from svc_infra.api.fastapi.db.repository import Repository
 
 # ------------------------------ Model ------------------------------
 
@@ -80,7 +83,7 @@ def _compose(*hooks: Optional[PreHook]) -> PreHook:
     return _runner
 
 def make_entity_service(
-    repo: Repository,
+    repo: "Repository",
     *,
     # Uniqueness defaults (match the indexes above)
     unique_ci: Iterable[ColumnSpec] = ("name",),
@@ -88,7 +91,7 @@ def make_entity_service(
     # Allow projects to extend behavior without writing a whole service
     extra_pre_create: Optional[PreHook] = None,
     extra_pre_update: Optional[PreHook] = None,
-    # Optional: override 409 messages per-spec, e.g. {("name",): "Item name already exists."}
+    # Optional: override 409 messages per-spec, e.g. {("name",): "${Entity} name already exists."}
     messages: Optional[dict[Tuple[str, ...], str]] = None,
 ):
     """
