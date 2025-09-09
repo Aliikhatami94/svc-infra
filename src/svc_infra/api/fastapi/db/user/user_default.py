@@ -30,7 +30,6 @@ def make_default_user_service(repo: Repository):
         repo,
         unique_ci=["email"],
         tenant_field="tenant_id",
-        messages={("email",): "User with this email already exists."},
     )
 
     # Then inject your prehooks by subclassing once
