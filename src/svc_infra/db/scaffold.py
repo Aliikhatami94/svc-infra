@@ -191,6 +191,7 @@ def scaffold_models_core(
             '    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)\n'
         )
         tenant_arg = ', tenant_field="tenant_id"' if include_tenant else ""
+        tenant_default = '"tenant_id"' if include_tenant else "None"
         txt = _render_entity_template(
             "models.py.tmpl",
             subs={
@@ -199,6 +200,7 @@ def scaffold_models_core(
                 "tenant_field": tenant_model_field,
                 "soft_delete_field": soft_delete_model_field,
                 "tenant_arg": tenant_arg,
+                "tenant_default": tenant_default,
             },
         )
 

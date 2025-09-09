@@ -26,9 +26,7 @@ class ${Entity}(ModelBase):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
 
-${tenant_field}\
-${soft_delete_field}\
-    # misc (avoid attr name "metadata" clash)
+${tenant_field}${soft_delete_field}    # misc (avoid attr name "metadata" clash)
     extra: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
 
     # auditing (DB-side timestamps)
