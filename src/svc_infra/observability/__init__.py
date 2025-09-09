@@ -9,7 +9,6 @@ from ..observability.metrics.base import counter, histogram
 from .metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
 from .tracing.setup import setup_tracing
 
-
 def add_observability(
         app: Any | None = None,
         *,
