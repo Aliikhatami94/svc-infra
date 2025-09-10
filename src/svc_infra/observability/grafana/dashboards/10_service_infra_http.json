@@ -1,0 +1,58 @@
+{
+  "title": "Service Infrastructure • HTTP",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "RPS by Route",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (route) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route!=\"\"}[$__rate_interval]))", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors by Status",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (code) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",code!~\"2..|3..\"}[$__rate_interval]))", "legendFormat": "{{code}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 Latency by Route (s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (route, le) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",route!=\"\"}[$__rate_interval])))", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "type": "heatmap",
+      "title": "Latency Histogram (all routes)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (le) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]))" }
+      ],
+      "options": { "yAxis": { "decimals": 3 } }
+    },
+    {
+      "type": "table",
+      "title": "Top Error Routes (5xx then 4xx)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        { "refId": "A", "expr": "topk(10, sum by (route) (rate(http_server_requests_total{code=~\"5..\",route!=\"\"}[$__rate_interval])))", "legendFormat": "5xx {{route}}" },
+        { "refId": "B", "expr": "topk(10, sum by (route) (rate(http_server_requests_total{code=~\"4..\",route!=\"\"}[$__rate_interval])))", "legendFormat": "4xx {{route}}" }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      { "name": "job", "type": "query", "datasource": "Prometheus", "query": "label_values(job)", "refresh": 1, "includeAll": true, "multi": true },
+      { "name": "instance", "type": "query", "datasource": "Prometheus", "query": "label_values(http_server_requests_total, instance)", "refresh": 1, "includeAll": true, "multi": true },
+      { "name": "method", "type": "query", "datasource": "Prometheus", "query": "label_values(http_server_requests_total, method)", "refresh": 1, "includeAll": true, "multi": true }
+    ]
+  }
+}

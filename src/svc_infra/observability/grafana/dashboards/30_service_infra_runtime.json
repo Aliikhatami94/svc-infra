@@ -1,0 +1,38 @@
+{
+  "title": "Service Infrastructure • Runtime",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "table",
+      "title": "Python Info",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "python_info" }
+      ],
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Collections (rate) by Gen",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        { "refId": "A", "expr": "rate(python_gc_collections_total{generation=\"0\"}[$__rate_interval])", "legendFormat": "gen0" },
+        { "refId": "B", "expr": "rate(python_gc_collections_total{generation=\"1\"}[$__rate_interval])", "legendFormat": "gen1" },
+        { "refId": "C", "expr": "rate(python_gc_collections_total{generation=\"2\"}[$__rate_interval])", "legendFormat": "gen2" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "GC Objects Collected (rate) by Gen",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        { "refId": "A", "expr": "rate(python_gc_objects_collected_total{generation=\"0\"}[$__rate_interval])", "legendFormat": "gen0" },
+        { "refId": "B", "expr": "rate(python_gc_objects_collected_total{generation=\"1\"}[$__rate_interval])", "legendFormat": "gen1" },
+        { "refId": "C", "expr": "rate(python_gc_objects_collected_total{generation=\"2\"}[$__rate_interval])", "legendFormat": "gen2" }
+      ]
+    }
+  ]
+}

@@ -39,14 +39,12 @@ def _try_autostart_docker() -> None:
     system = platform.system()
     try:
         if system == "Darwin":
-            # Try to launch Docker Desktop and wait up to ~30s
             subprocess.Popen(["open", "-g", "-a", "Docker"])
             for _ in range(30):
                 if _docker_running():
                     return
                 time.sleep(1)
         elif system == "Windows":
-            # Best-effort start; path may vary by install
             exe = r"C:\Program Files\Docker\Docker\Docker Desktop.exe"
             if Path(exe).exists():
                 subprocess.Popen([exe], shell=False)
@@ -55,7 +53,7 @@ def _try_autostart_docker() -> None:
                         return
                     time.sleep(1)
         else:
-            # Linux: we will not sudo; just bail if not running
+            # Linux: don't sudo; just bail if not running
             pass
     except Exception:
         pass
@@ -63,11 +61,8 @@ def _try_autostart_docker() -> None:
 # --------------------- native fallback bits --------------------
 
 NATIVE_GRAFANA_URLS = {
-    # darwin arm64 (Apple Silicon)
     ("Darwin", "arm64"): "https://dl.grafana.com/oss/release/grafana-11.1.4.darwin-arm64.tar.gz",
-    # darwin x86_64
     ("Darwin", "x86_64"): "https://dl.grafana.com/oss/release/grafana-11.1.4.darwin-amd64.tar.gz",
-    # linux x86_64
     ("Linux", "x86_64"): "https://dl.grafana.com/oss/release/grafana-11.1.4.linux-amd64.tar.gz",
 }
 NATIVE_PROM_URLS = {
@@ -84,11 +79,10 @@ def _download_and_unpack(url: str, dest_dir: Path) -> Path:
     filename = dest_dir / url.split("/")[-1]
     if not filename.exists():
         typer.echo(f"Downloading {url} …")
-        urlretrieve(url, filename)  # nosec - from official release URLs
-    # Unpack (supports .tar.gz / .zip)
-    if str(filename).endswith(".tar.gz") or str(filename).endswith(".tgz"):
+        urlretrieve(url, filename)  # nosec
+    if str(filename).endswith((".tar.gz", ".tgz")):
         with tarfile.open(filename, "r:gz") as tf:
-            tf.extractall(dest_dir)  # nosec - local dev utility
+            tf.extractall(dest_dir)  # nosec
             top = sorted(set(p.parts[0] for p in map(Path, tf.getnames()) if "/" in p))[0]
             return dest_dir / top
     if str(filename).endswith(".zip"):
@@ -112,7 +106,6 @@ def _native_up(root: Path, grafana_port: int, prom_port: int) -> None:
     g_dir = _download_and_unpack(g_url, bin_dir)
     p_dir = _download_and_unpack(p_url, bin_dir)
 
-    # Prometheus config already rendered by _write_prom() below
     prom_cmd = [
         str(p_dir / "prometheus"),
         f"--config.file={root / 'prometheus.yml'}",
@@ -125,7 +118,6 @@ def _native_up(root: Path, grafana_port: int, prom_port: int) -> None:
         f"--config={root / 'grafana.ini'}",
     ]
 
-    # Prepare grafana.ini minimally to set admin creds and provisioning
     _write_text(root / "grafana.ini", f"""
 [security]
 admin_user = admin
@@ -140,15 +132,12 @@ http_port = {grafana_port}
 http_addr =
 """.strip())
 
-    # Ensure dirs
     (root / "graf-data").mkdir(parents=True, exist_ok=True)
     (root / "prom-data").mkdir(parents=True, exist_ok=True)
 
-    # Launch both detached (best-effort)
     promp = subprocess.Popen(prom_cmd, cwd=p_dir)  # nosec
     grafp = subprocess.Popen(graf_cmd, cwd=g_dir)  # nosec
 
-    # Write PID files for later down()
     _write_text(root / "prometheus.pid", str(promp.pid))
     _write_text(root / "grafana.pid", str(grafp.pid))
 
@@ -168,7 +157,15 @@ def _native_down(root: Path) -> None:
 
 # -------------------- shared file emission --------------------
 
-def _emit_common_files(root: Path, metrics_url: str) -> None:
+_DASH_FILES = [
+    ("00_service_infra_overview.json", "dashboards", "00_service_infra_overview.json"),
+    ("10_service_infra_http.json",      "dashboards", "10_service_infra_http.json"),
+    ("20_service_infra_db.json",        "dashboards", "20_service_infra_db.json"),
+    ("30_service_infra_runtime.json",   "dashboards", "30_service_infra_runtime.json"),
+    ("40_service_infra_clients.json",   "dashboards", "40_service_infra_clients.json"),
+]
+
+def _emit_common_files(root: Path, metrics_url: str, remote_write: dict[str, str] | None = None) -> None:
     (root / "provisioning" / "datasources").mkdir(parents=True, exist_ok=True)
     (root / "provisioning" / "dashboards").mkdir(parents=True, exist_ok=True)
     (root / "dashboards").mkdir(parents=True, exist_ok=True)
@@ -177,9 +174,10 @@ def _emit_common_files(root: Path, metrics_url: str) -> None:
     compose_tmpl = _pkg_file("templates", "docker-compose.yml.tmpl")
     _write_text(root / "docker-compose.yml", compose_tmpl)
 
-    # provisioning (static)
+    # provisioning (static): single folder "Service Infrastructure"
     _write_text(root / "provisioning" / "datasources" / "datasource.yml",
                 _pkg_file("templates", "provisioning", "datasource.yml"))
+    # dashboards provider — points to /var/lib/grafana/dashboards
     _write_text(root / "provisioning" / "dashboards" / "dashboards.yml",
                 _pkg_file("templates", "provisioning", "dashboards.yml"))
 
@@ -191,15 +189,28 @@ def _emit_common_files(root: Path, metrics_url: str) -> None:
         metrics_path=mpath,
         target=target,
     )
+
+    # optional remote_write for Grafana Cloud / Thanos
+    if remote_write and remote_write.get("url"):
+        # Append a simple remote_write block
+        prom_tmpl += "\nremote_write:\n  - url: \"{url}\"\n".format(url=remote_write["url"])
+        if remote_write.get("user") or remote_write.get("password"):
+            prom_tmpl += "    basic_auth:\n"
+            if remote_write.get("user"):
+                prom_tmpl += f"      username: \"{remote_write['user']}\"\n"
+            if remote_write.get("password"):
+                prom_tmpl += f"      password: \"{remote_write['password']}\"\n"
+
     _write_text(root / "prometheus.yml", prom_tmpl)
 
-    # dashboard json
-    _write_text(root / "dashboards" / "svc_infra_overview.json",
-                _pkg_file("dashboards", "svc_infra_overview.json"))
+    # dashboards (packaged JSONs)
+    for dst_name, pkg_dir, pkg_name in _DASH_FILES:
+        _write_text(root / "dashboards" / dst_name, _pkg_file(pkg_dir, pkg_name))
 
 def _port_free(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    import socket as _s
+    with _s.socket(_s.AF_INET, _s.SOCK_STREAM) as s:
+        s.setsockopt(_s.SOL_SOCKET, _s.SO_REUSEADDR, 1)
         return s.connect_ex(("127.0.0.1", port)) != 0
 
 def _choose_port(preferred: int, limit: int = 10) -> int:
@@ -210,16 +221,35 @@ def _choose_port(preferred: int, limit: int = 10) -> int:
         p += 1
     return preferred
 
+def _docker_compose_up(compose_file: Path, env: dict, grafana_port: int, prom_port: int) -> tuple[bool, int, int]:
+    """
+    Try to bring up compose. If ports are busy, try next ports a few times.
+    Returns (ok, grafana_port, prom_port).
+    """
+    attempts = 5
+    gp, pp = grafana_port, prom_port
+    for _ in range(attempts):
+        env["PROM_PORT"] = str(pp)
+        env["GRAFANA_PORT"] = str(gp)
+        try:
+            subprocess.run(["docker", "compose", "-f", str(compose_file), "up", "-d"], check=True, env=env)
+            return True, gp, pp
+        except subprocess.CalledProcessError:
+            # bump ports and retry
+            gp += 1
+            pp += 1
+    return False, grafana_port, prom_port
+
 # ---------------------- main commands ------------------------
 
 def up(
-        metrics_url: str = typer.Option("http://host.docker.internal:8000/metrics"),
-        grafana_port: int = typer.Option(3000),
-        prom_port: int = typer.Option(9090),
-        backend: str = typer.Option("auto"),
-        emit_only: bool = typer.Option(False),
-        open_browser: bool = typer.Option(True),
-        remote_write_url: str = typer.Option("", help="Prom remote_write URL (Grafana Cloud)"),
+        metrics_url: str = typer.Option("http://host.docker.internal:8000/metrics", help="Prometheus scrape URL (your app)."),
+        grafana_port: int = typer.Option(3000, help="Grafana port to expose."),
+        prom_port: int = typer.Option(9090, help="Prometheus port to expose."),
+        backend: str = typer.Option("auto", help="auto|docker|native"),
+        emit_only: bool = typer.Option(False, help="Just write files under .obs/ (for dev/uat/prod deployment)."),
+        open_browser: bool = typer.Option(True, help="Open Grafana in your browser after start."),
+        remote_write_url: str = typer.Option("", help="Prom remote_write URL (Grafana Cloud/Thanos/etc)"),
         remote_write_user: str = typer.Option("", help="Basic auth username (Grafana Cloud Metrics instance ID)"),
         remote_write_password: str = typer.Option("", help="API key/password"),
 ):
@@ -228,7 +258,13 @@ def up(
     Works with Docker (preferred) or a native fallback (no Docker).
     """
     root = Path(".obs")
-    _emit_common_files(root, metrics_url)
+    remote_write = {
+        "url": remote_write_url.strip(),
+        "user": remote_write_user.strip(),
+        "password": remote_write_password.strip(),
+    } if remote_write_url.strip() else None
+
+    _emit_common_files(root, metrics_url, remote_write=remote_write)
 
     grafana_port = _choose_port(grafana_port)
     prom_port    = _choose_port(prom_port)
@@ -252,13 +288,10 @@ def up(
 
     if chosen == "docker":
         env = os.environ.copy()
-        env["PROM_PORT"] = str(prom_port)
-        env["GRAFANA_PORT"] = str(grafana_port)
-        subprocess.run(
-            ["docker", "compose", "-f", str(root / "docker-compose.yml"), "up", "-d"],
-            check=True,
-            env=env,
-        )
+        ok, g_used, p_used = _docker_compose_up(root / "docker-compose.yml", env, grafana_port, prom_port)
+        if not ok:
+            raise typer.Exit(code=1)
+        grafana_port, prom_port = g_used, p_used
         typer.echo(f"[docker] Grafana:    http://localhost:{grafana_port}  (admin/admin)")
         typer.echo(f"[docker] Prometheus: http://localhost:{prom_port}")
     elif chosen == "native":
@@ -278,10 +311,8 @@ def up(
 def down():
     """Stop Prometheus + Grafana (docker or native)."""
     root = Path(".obs")
-    # Docker down (ignore errors)
     if (root / "docker-compose.yml").exists() and shutil.which("docker"):
         subprocess.run(["docker", "compose", "-f", str(root / "docker-compose.yml"), "down"], check=False)
-    # Native down
     _native_down(root)
     typer.echo("Stopped Prometheus + Grafana.")
 

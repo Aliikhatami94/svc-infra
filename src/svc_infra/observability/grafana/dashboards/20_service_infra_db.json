@@ -1,0 +1,33 @@
+{
+  "title": "Service Infrastructure • Database",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Pool In Use vs Available",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (job) (db_pool_in_use{job=~\"$job\",instance=~\"$instance\"})", "legendFormat": "in_use" },
+        { "refId": "B", "expr": "sum by (job) (db_pool_available{job=~\"$job\",instance=~\"$instance\"})", "legendFormat": "available" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Checkouts / Checkins (rate)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (job) (rate(db_pool_checkedout_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]))", "legendFormat": "checked_out/s" },
+        { "refId": "B", "expr": "sum by (job) (rate(db_pool_checkedin_total{job=~\"$job\",instance=~\"$instance\"}[$__rate_interval]))", "legendFormat": "checked_in/s" }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      { "name": "job", "type": "query", "datasource": "Prometheus", "query": "label_values(job)", "refresh": 1, "includeAll": true, "multi": true },
+      { "name": "instance", "type": "query", "datasource": "Prometheus", "query": "label_values(db_pool_in_use, instance)", "refresh": 1, "includeAll": true, "multi": true }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Service Infrastructure • Clients (HTTP Outbound)",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Client Requests per Second",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(http_client_requests_total[$__rate_interval]))", "legendFormat": "all" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Client p95 Latency (s)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket[$__rate_interval])))", "legendFormat": "p95" }
+      ]
+    }
+  ]
+}
