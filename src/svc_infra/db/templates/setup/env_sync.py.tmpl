@@ -14,6 +14,20 @@ from svc_infra.db.utils import (
     build_engine,
 )
 
+try:
+    from svc_infra.db.types import GUID as _GUID  # type: ignore
+except Exception:  # keep env.py robust if package unavailable at import time
+    _GUID = None
+
+def _render_item(type_, obj, autogen_context):
+    if type_ == "type" and (
+        (_GUID is not None and isinstance(obj, _GUID))
+        or getattr(obj, "__class__", None).__name__ == "GUID"
+    ):
+        autogen_context.imports.add("from svc_infra.db.types import GUID")
+        return "GUID()"
+    return False
+
 # Logging
 config = context.config
 if config.config_file_name is not None:
@@ -209,6 +223,7 @@ def run_migrations_offline() -> None:
         include_object=_include_object_factory(url),
         version_table=os.getenv("ALEMBIC_VERSION_TABLE", "alembic_version"),
         version_table_schema=os.getenv("ALEMBIC_VERSION_SCHEMA") or None,
+        render_item=_render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -226,6 +241,7 @@ def run_migrations_online() -> None:
             include_object=_include_object_factory(url),
             version_table=os.getenv("ALEMBIC_VERSION_TABLE", "alembic_version"),
             version_table_schema=os.getenv("ALEMBIC_VERSION_SCHEMA") or None,
+            render_item=_render_item,
         )
         with context.begin_transaction():
             context.run_migrations()
