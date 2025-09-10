@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, cast
 import typer, click
 
-from svc_infra.db.relational.scaffold import (
+from svc_infra.db.sql.scaffold import (
     scaffold_core,
     scaffold_models_core,
     scaffold_schemas_core,

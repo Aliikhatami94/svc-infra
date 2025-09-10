@@ -1,1 +1,1 @@
-from svc_infra.db.relational.core import __all__
+from svc_infra.db.sql.core import __all__

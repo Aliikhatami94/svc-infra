@@ -5,13 +5,13 @@ from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Uni
 import uuid
 
 from sqlalchemy import String, Boolean, DateTime, JSON, Text, text
-from svc_infra.db.relational.types import GUID
+from svc_infra.db.sql.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict
 
-from svc_infra.db.relational.base import ModelBase
-from svc_infra.db.relational.uniq import make_unique_indexes
-from svc_infra.db.relational.uniq_hooks import dedupe_service
+from svc_infra.db.sql.base import ModelBase
+from svc_infra.db.sql.uniq import make_unique_indexes
+from svc_infra.db.sql.uniq_hooks import dedupe_service
 
 if TYPE_CHECKING:
     # only for type hints; avoids importing at runtime

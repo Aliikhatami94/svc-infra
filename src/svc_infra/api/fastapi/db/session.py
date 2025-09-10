@@ -4,7 +4,7 @@ from typing import Annotated, AsyncIterator, Tuple
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from svc_infra.db.relational.utils import _coerce_to_async_url
+from svc_infra.db.sql.utils import _coerce_to_async_url
 
 logger = logging.getLogger(__name__)
 

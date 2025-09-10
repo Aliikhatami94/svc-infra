@@ -14,7 +14,7 @@ Production-ready observability with one-call setup for FastAPI applications.
 from fastapi import FastAPI
 from svc_infra.observability import ObservabilitySettings, add_prometheus, setup_tracing
 from svc_infra.observability import bind_sqlalchemy_pool_metrics
-from svc_infra.db.relational.manage import make_crud_router_plus
+from svc_infra.db.sql.manage import make_crud_router_plus
 
 app = FastAPI()
 engine = make_crud_router_plus()  # optional
