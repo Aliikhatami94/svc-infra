@@ -3,8 +3,8 @@ from datetime import datetime
 import uuid
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
-from sqlalchemy import String, Boolean, DateTime, JSON, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Boolean, DateTime, JSON, Text, text
+from svc_infra.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 
@@ -23,7 +23,7 @@ _pwd = PasswordHelper()
 class ${AuthEntity}(ModelBase):
     __tablename__ = "${auth_table_name}"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
 
     email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)
     full_name: Mapped[Optional[str]] = mapped_column(String(255))
@@ -55,12 +55,13 @@ class ${AuthEntity}(ModelBase):
     extra: Mapped[dict] = mapped_column("metadata", MutableDict.as_mutable(JSON), default=dict)
 
     # auditing (DB-side timestamps)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
-    )
+    created_at = mapped_column(DateTime(timezone=True),
+                               server_default=text("CURRENT_TIMESTAMP"),
+                               nullable=False)
+    updated_at = mapped_column(DateTime(timezone=True),
+                               server_default=text("CURRENT_TIMESTAMP"),
+                               onupdate=text("CURRENT_TIMESTAMP"),
+                               nullable=False)
 
     def __repr__(self) -> str:
         return f"<${AuthEntity} id={self.id} email={self.email!r}>"

@@ -16,7 +16,6 @@ from svc_infra.db.core import (
     setup_and_migrate as core_setup_and_migrate,
 )
 
-
 def apply_database_url(database_url: Optional[str]) -> None:
     """If provided, set DATABASE_URL for the current process."""
     if database_url:

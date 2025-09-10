@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union, TYPE_CHECKING
 import uuid
 
-from sqlalchemy import String, Boolean, DateTime, JSON, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Boolean, DateTime, JSON, Text, text
+from svc_infra.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.mutable import MutableDict
 
@@ -23,7 +23,7 @@ class ${Entity}(ModelBase):
     __tablename__ = "${table_name}"
 
     # identity
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
 
     # core fields
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -33,12 +33,13 @@ ${tenant_field}${soft_delete_field}    # misc (avoid attr name "metadata" clash)
     extra: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
 
     # auditing (DB-side timestamps)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
-    )
+    created_at = mapped_column(DateTime(timezone=True),
+                               server_default=text("CURRENT_TIMESTAMP"),
+                               nullable=False)
+    updated_at = mapped_column(DateTime(timezone=True),
+                               server_default=text("CURRENT_TIMESTAMP"),
+                               onupdate=text("CURRENT_TIMESTAMP"),
+                               nullable=False)
 
     def __repr__(self) -> str:
         return f"<${Entity} id={self.id} name={self.name!r}>"

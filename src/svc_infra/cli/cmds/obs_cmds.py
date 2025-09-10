@@ -188,11 +188,11 @@ def _native_down(root: Path) -> None:
 # -------------------- shared file emission --------------------
 
 _DASH_FILES = [
-    ("00_service_infra_overview.json", "dashboards", "00_service_infra_overview.json"),
-    ("10_service_infra_http.json",      "dashboards", "10_service_infra_http.json"),
-    ("20_service_infra_db.json",        "dashboards", "20_service_infra_db.json"),
-    ("30_service_infra_runtime.json",   "dashboards", "30_service_infra_runtime.json"),
-    ("40_service_infra_clients.json",   "dashboards", "40_service_infra_clients.json"),
+    ("00_overview.json", "dashboards", "00_overview.json"),
+    ("10_http.json",      "dashboards", "10_http.json"),
+    ("20_db.json",        "dashboards", "20_db.json"),
+    ("30_runtime.json",   "dashboards", "30_runtime.json"),
+    ("40_clients.json",   "dashboards", "40_clients.json"),
 ]
 
 def _emit_common_files(root: Path, metrics_url: str, remote_write: dict[str, str] | None = None) -> None:
