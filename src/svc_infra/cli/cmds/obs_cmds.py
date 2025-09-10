@@ -5,8 +5,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import urlretrieve
 from string import Template
-import platform
-import typer
+import typer, socket, platform
 
 PKG_TPL_ROOT = "svc_infra.observability.grafana"
 
@@ -198,15 +197,31 @@ def _emit_common_files(root: Path, metrics_url: str) -> None:
     _write_text(root / "dashboards" / "fastapi_overview.json",
                 _pkg_file("dashboards", "fastapi_overview.json"))
 
+def _port_free(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.connect_ex(("127.0.0.1", port)) != 0
+
+def _choose_port(preferred: int, limit: int = 10) -> int:
+    p = preferred
+    for _ in range(limit):
+        if _port_free(p):
+            return p
+        p += 1
+    return preferred  # last resort (let docker/native raise)
+
 # ---------------------- main commands ------------------------
 
 def up(
-        metrics_url: str = typer.Option("http://host.docker.internal:8000/metrics", help="Prometheus scrape URL (your app)."),
-        grafana_port: int = typer.Option(3000, help="Grafana port to expose."),
-        prom_port: int = typer.Option(9090, help="Prometheus port to expose."),
-        backend: str = typer.Option("auto", help="auto|docker|native"),
-        emit_only: bool = typer.Option(False, help="Just write files under .obs/ (for dev/uat/prod deployment)."),
-        open_browser: bool = typer.Option(True, help="Open Grafana in your browser after start."),
+        metrics_url: str = typer.Option("http://host.docker.internal:8000/metrics"),
+        grafana_port: int = typer.Option(3000),
+        prom_port: int = typer.Option(9090),
+        backend: str = typer.Option("auto"),
+        emit_only: bool = typer.Option(False),
+        open_browser: bool = typer.Option(True),
+        remote_write_url: str = typer.Option("", help="Prom remote_write URL (Grafana Cloud)"),
+        remote_write_user: str = typer.Option("", help="Basic auth username (Grafana Cloud Metrics instance ID)"),
+        remote_write_password: str = typer.Option("", help="API key/password"),
 ):
     """
     Start Prometheus + Grafana to observe your app's metrics.
@@ -214,6 +229,9 @@ def up(
     """
     root = Path(".obs")
     _emit_common_files(root, metrics_url)
+
+    grafana_port = _choose_port(grafana_port)
+    prom_port    = _choose_port(prom_port)
 
     if emit_only:
         typer.echo("Wrote .obs/ files (emit-only). Hand off to your deployment tooling.")

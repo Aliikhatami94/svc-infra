@@ -150,12 +150,12 @@ def cmd_setup_and_migrate(
 
 
 def register(app: typer.Typer) -> None:
-    app.command("init")(cmd_init)
-    app.command("revision")(cmd_revision)
-    app.command("upgrade")(cmd_upgrade)
-    app.command("downgrade")(cmd_downgrade)
-    app.command("current")(cmd_current)
-    app.command("history")(cmd_history)
-    app.command("stamp")(cmd_stamp)
-    app.command("merge-heads")(cmd_merge_heads)
-    app.command("setup-and-migrate")(cmd_setup_and_migrate)
+    app.command("db-init")(cmd_init)
+    app.command("db-revision")(cmd_revision)
+    app.command("db-upgrade")(cmd_upgrade)
+    app.command("db-downgrade")(cmd_downgrade)
+    app.command("db-current")(cmd_current)
+    app.command("db-history")(cmd_history)
+    app.command("db-stamp")(cmd_stamp)
+    app.command("db-merge-heads")(cmd_merge_heads)
+    app.command("db-setup-and-migrate")(cmd_setup_and_migrate)
