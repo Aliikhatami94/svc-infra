@@ -1,0 +1,148 @@
+{
+  "title": "FastAPI Overview",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": true,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Requests per Second (RPS)",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate (RPS, non-2xx/3xx)",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",code!~\"2..|3..\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+    },
+    {
+      "type": "stat",
+      "title": "p95 Latency (s)",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval])))",
+          "legendFormat": "p95"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+    },
+    {
+      "type": "timeSeries",
+      "title": "HTTP Requests by Status",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (code) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
+          "legendFormat": "{{code}}"
+        }
+      ]
+    },
+    {
+      "type": "timeSeries",
+      "title": "In-flight Requests",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (http_server_inflight_requests{job=~\"$job\",instance=~\"$instance\",route=~\"$route\"})",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeSeries",
+      "title": "DB Pool: In Use / Available",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (job) (db_pool_in_use{job=~\"$job\",instance=~\"$instance\"})", "legendFormat": "in_use" },
+        { "refId": "B", "expr": "sum by (job) (db_pool_available{job=~\"$job\",instance=~\"$instance\"})", "legendFormat": "available" }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Routes by RPS",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (route) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route!=\"\"}[$__rate_interval])))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "options": { "showHeader": true }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "job",
+        "label": "Job",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(job)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(http_server_requests_total, instance)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "method",
+        "label": "Method",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(http_server_requests_total, method)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "route",
+        "label": "Route",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(http_server_requests_total, route)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      { "builtIn": 1, "type": "dashboard", "name": "Annotations & Alerts", "enable": true }
+    ]
+  }
+}

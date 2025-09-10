@@ -194,8 +194,8 @@ def _emit_common_files(root: Path, metrics_url: str) -> None:
     _write_text(root / "prometheus.yml", prom_tmpl)
 
     # dashboard json
-    _write_text(root / "dashboards" / "fastapi_overview.json",
-                _pkg_file("dashboards", "fastapi_overview.json"))
+    _write_text(root / "dashboards" / "svc_infra_overview.json",
+                _pkg_file("dashboards", "svc_infra_overview.json"))
 
 def _port_free(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -208,7 +208,7 @@ def _choose_port(preferred: int, limit: int = 10) -> int:
         if _port_free(p):
             return p
         p += 1
-    return preferred  # last resort (let docker/native raise)
+    return preferred
 
 # ---------------------- main commands ------------------------
 
