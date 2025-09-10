@@ -1,10 +1,10 @@
 from typing import Any, Callable, Optional
 
-from .service import Service
+from .service import SqlService
 
 PreHook = Callable[[dict[str, Any]], dict[str, Any]]
 
-class ServiceWithHooks(Service):
+class SqlServiceWithHooks(SqlService):
     def __init__(self, repo, pre_create: Optional[PreHook] = None, pre_update: Optional[PreHook] = None):
         super().__init__(repo)
         self._pre_create = pre_create

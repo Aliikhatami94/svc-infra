@@ -38,14 +38,14 @@ class Project(Base):
 
 ```python
 from fastapi import FastAPI
-from svc_infra.api.fastapi.db import include_resources, Resource
+from svc_infra.api.fastapi.db.sql import include_resources, SqlResource
 
 app = FastAPI(title="My API")
 
 include_resources(
     app,
     resources=[
-        Resource(
+        SqlResource(
             model=Project,
             prefix="/projects",
             tags=["projects"],
@@ -82,7 +82,7 @@ Now you have endpoints under `/_db/projects`:
 If you want to provide your own request/response models, pass them directly:
 
 ```python
-Resource(
+SqlResource(
     model=Project,
     prefix="/projects",
     read_schema=ProjectRead,
@@ -99,8 +99,8 @@ You can register as many as you need:
 
 ```python
 include_resources(app, [
-    Resource(model=Project, prefix="/projects"),
-    Resource(model=Task, prefix="/tasks"),
+    SqlResource(model=Project, prefix="/projects"),
+    SqlResource(model=Task, prefix="/tasks"),
 ])
 ```
 

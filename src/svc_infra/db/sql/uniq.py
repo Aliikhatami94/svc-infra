@@ -7,7 +7,7 @@ ColumnSpec = Union[str, Sequence[str]]
 def _as_tuple(spec: ColumnSpec) -> Tuple[str, ...]:
     return (spec,) if isinstance(spec, str) else tuple(spec)
 
-def make_unique_indexes(
+def make_unique_sql_indexes(
         model: type,
         *,
         unique_cs: Iterable[ColumnSpec] = (),

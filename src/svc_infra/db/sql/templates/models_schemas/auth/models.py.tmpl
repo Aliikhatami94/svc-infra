@@ -11,9 +11,9 @@ from sqlalchemy.ext.mutable import MutableDict, MutableList
 from fastapi_users.password import PasswordHelper
 
 from svc_infra.db.sql.base import ModelBase
-from svc_infra.db.sql.uniq import make_unique_indexes
-from svc_infra.db.sql.uniq_hooks import dedupe_service
-from svc_infra.api.fastapi.db.repository import Repository
+from svc_infra.db.sql.uniq import make_unique_sql_indexes
+from svc_infra.db.sql.uniq_hooks import dedupe_sql_service
+from svc_infra.api.fastapi.db.sql.repository import SqlRepository
 
 # --- local password helper must be defined before class (used by property) ---
 _pwd = PasswordHelper()
@@ -69,7 +69,7 @@ class ${AuthEntity}(ModelBase):
 # --- Uniqueness policy --------------------------------------------------------
 
 # Unique indexes, including case-insensitive and/or tenant-scoped.
-for _ix in make_unique_indexes(
+for _ix in make_unique_sql_indexes(
     ${AuthEntity},
     unique_ci=["email"],            # case-insensitive unique email
     tenant_field="tenant_id",       # scoped by tenant if provided
@@ -106,7 +106,7 @@ def _compose(*hooks: Optional[PreHook]) -> PreHook:
     return _runner
 
 def create_auth_service(
-    repo: Repository,
+    repo: SqlRepository,
     *,
     # Uniqueness settings (rarely changed)
     unique_ci: Iterable[ColumnSpec] = ("email",),
@@ -126,7 +126,7 @@ def create_auth_service(
     pre_create = _compose(_map_auth_fields, extra_pre_create)
     pre_update = _compose(_map_auth_fields, extra_pre_update)
 
-    return dedupe_service(
+    return dedupe_sql_service(
         repo,
         unique_ci=unique_ci,
         tenant_field=tenant_field,

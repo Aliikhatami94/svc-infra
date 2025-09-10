@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
 
-from svc_infra.api.fastapi.db import Repository
+from svc_infra.api.fastapi.db.sql import SqlRepository
 import svc_infra.api.fastapi.db.sql.repository as repo_mod
 
 
@@ -61,7 +61,7 @@ async def session() -> AsyncSession:
 
 @pytest.mark.asyncio
 async def test_repository_crud_hard_delete(session: AsyncSession):
-    repo = Repository(model=Item)
+    repo = SqlRepository(model=Item)
 
     # create
     a = await repo.create(session, {"name": "alpha"})
@@ -94,7 +94,7 @@ async def test_repository_crud_hard_delete(session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_repository_soft_delete_timestamp_only(session: AsyncSession):
-    repo = Repository(model=SoftItem, soft_delete=True)
+    repo = SqlRepository(model=SoftItem, soft_delete=True)
 
     s1 = await repo.create(session, {"name": "x"})
     s2 = await repo.create(session, {"name": "y"})
@@ -120,7 +120,7 @@ async def test_repository_soft_delete_timestamp_only(session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_repository_soft_delete_with_flag(session: AsyncSession):
-    repo = Repository(model=SoftItem, soft_delete=True, soft_delete_flag_field="active")
+    repo = SqlRepository(model=SoftItem, soft_delete=True, soft_delete_flag_field="active")
 
     s1 = await repo.create(session, {"name": "x"})
     _ = await repo.create(session, {"name": "y"})
@@ -139,7 +139,7 @@ async def test_repository_soft_delete_with_flag(session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_repository_search_and_count_filtered(session: AsyncSession):
-    repo = Repository(model=Item)
+    repo = SqlRepository(model=Item)
     _ = await repo.create(session, {"name": "Alpha"})
     _ = await repo.create(session, {"name": "beta"})
     _ = await repo.create(session, {"name": "ALP"})
@@ -153,7 +153,7 @@ async def test_repository_search_and_count_filtered(session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_repository_exists_and_ordering_none(session: AsyncSession):
-    repo = Repository(model=Item)
+    repo = SqlRepository(model=Item)
     _ = await repo.create(session, {"name": "c"})
     _ = await repo.create(session, {"name": "d"})
 

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
 
-from svc_infra.api.fastapi.db.sql.session import SessionDep
+from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
 def oauth_router_with_backend(
         user_model: type,
@@ -54,7 +54,7 @@ def oauth_router_with_backend(
         return await client.authorize_redirect(request, str(redirect_uri))
 
     @r.get("/{provider}/callback", name="oauth_callback")
-    async def oauth_callback(request: Request, provider: str, session: SessionDep):
+    async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
         client = oauth.create_client(provider)
         if not client:
             raise HTTPException(404, "Provider not configured")

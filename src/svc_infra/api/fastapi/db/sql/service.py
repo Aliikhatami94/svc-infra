@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 from typing import Any, Sequence
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .repository import Repository
+from .repository import SqlRepository
 
-
-class Service:
+class SqlService:
     """
     Small orchestration layer. Extend/override for business logic, RBAC, etc.
     """
 
-    def __init__(self, repo: Repository):
+    def __init__(self, repo: SqlRepository):
         self.repo = repo
 
     # hooks — override in subclasses if needed

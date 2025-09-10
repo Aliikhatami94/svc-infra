@@ -4,24 +4,24 @@ from typing import Optional, Sequence
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from .repository import Repository
-from .service import Service
+from .repository import SqlRepository
+from .service import SqlService
 from .crud_router import make_crud_router_plus
 from .management import make_crud_schemas
-from .resource import Resource
+from .resource import SqlResource
 from .session import initialize_session, dispose_session
 from .health import _make_db_health_router
 
-def add_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
+def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
     for r in resources:
-        repo = Repository(model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete)
+        repo = SqlRepository(model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete)
 
         # 1) explicit app-provided factory wins
         if r.service_factory:
             svc = r.service_factory(repo)
         # 2) else, generic service
         else:
-            svc = Service(repo)
+            svc = SqlService(repo)
 
         if r.read_schema and r.create_schema and r.update_schema:
             Read, Create, Update = r.read_schema, r.create_schema, r.update_schema
@@ -48,7 +48,7 @@ def add_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
         )
         app.include_router(router)
 
-def add_sql(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DATABASE_URL") -> None:
+def add_sql_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DATABASE_URL") -> None:
     """Configure DB lifecycle for the app (either explicit URL or from env)."""
     if url:
         @asynccontextmanager
@@ -72,7 +72,7 @@ def add_sql(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DATABASE
     async def _shutdown() -> None:  # noqa: ANN202
         await dispose_session()
 
-def add_db_health(app: FastAPI, *, prefix: str = "/_db/health", include_in_schema: bool = False) -> None:
+def add_sql_health(app: FastAPI, *, prefix: str = "/_db/health", include_in_schema: bool = False) -> None:
     app.include_router(_make_db_health_router(prefix=prefix, include_in_schema=include_in_schema))
 
-__all__ = ["add_resources", "add_sql", "add_db_health"]
+__all__ = ["add_sql_resources", "add_sql_db", "add_sql_health"]

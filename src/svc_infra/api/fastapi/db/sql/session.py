@@ -34,7 +34,7 @@ async def dispose_session() -> None:
 
 async def get_session() -> AsyncIterator[AsyncSession]:
     if _SessionLocal is None:
-        raise RuntimeError("Database not initialized. Call add_sql(app, ...) first.")
+        raise RuntimeError("Database not initialized. Call add_sql_db(app, ...) first.")
     async with _SessionLocal() as session:
         try:
             yield session
@@ -43,6 +43,6 @@ async def get_session() -> AsyncIterator[AsyncSession]:
             await session.rollback()
             raise
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SqlSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
-__all__ = ["SessionDep", "initialize_session", "dispose_session"]
+__all__ = ["SqlSessionDep", "initialize_session", "dispose_session"]

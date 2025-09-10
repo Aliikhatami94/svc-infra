@@ -1,8 +1,9 @@
-from .sql import SessionDep, add_sql, add_resources, add_db_health
+from .sql import SqlSessionDep, add_sql_db, add_sql_resources, add_sql_health, SqlResource
 
 __all__ = [
-    "SessionDep",
-    "add_db_health",
-    "add_sql",
-    "add_resources",
+    "SqlSessionDep",
+    "SqlResource",
+    "add_sql_health",
+    "add_sql_db",
+    "add_sql_resources",
 ]

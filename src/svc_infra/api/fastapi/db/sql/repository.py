@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 from sqlalchemy.orm import class_mapper
 
-class Repository:
+class SqlRepository:
     """
     Very small async repository around a mapped SQLAlchemy model.
     """

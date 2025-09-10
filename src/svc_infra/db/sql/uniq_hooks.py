@@ -5,8 +5,8 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from svc_infra.api.fastapi.db.sql.repository import Repository
-from svc_infra.api.fastapi.db.sql.service_hooks import ServiceWithHooks
+from svc_infra.api.fastapi.db.sql.repository import SqlRepository
+from svc_infra.api.fastapi.db.sql.service_hooks import SqlServiceWithHooks
 
 ColumnSpec = Union[str, Sequence[str]]
 
@@ -22,8 +22,8 @@ def _nice_label(fields: Sequence[str], data: Dict[str, Any]) -> str:
         return f"{f}={data.get(f)!r}"
     return "(" + ", ".join(f"{f}={data.get(f)!r}" for f in fields) + ")"
 
-def dedupe_service(
-        repo: Repository,
+def dedupe_sql_service(
+        repo: SqlRepository,
         *,
         unique_cs: Iterable[ColumnSpec] = (),
         unique_ci: Iterable[ColumnSpec] = (),
@@ -70,7 +70,7 @@ def dedupe_service(
                     msg = messages.get(fields) or f"Record with {_nice_label(fields, data)} already exists."
                     raise HTTPException(status_code=409, detail=msg)
 
-    class _Svc(ServiceWithHooks):
+    class _Svc(SqlServiceWithHooks):
         async def create(self, session, data):
             data = await self.pre_create(data)
             await _precheck(session, data, exclude_id=None)

@@ -8,7 +8,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 
-from svc_infra.api.fastapi.db import make_crud_router_plus
+from svc_infra.api.fastapi.db.sql import make_crud_router_plus
 
 
 class _Col:

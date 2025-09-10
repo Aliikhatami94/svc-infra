@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import Any, Optional, Type, Callable
 
-from .service import Service
-from .repository import Repository
+from .service import SqlService
+from .repository import SqlRepository
 
 @dataclass
-class Resource:
+class SqlResource:
     model: type[object]
     prefix: str
     tags: Optional[list[str]] = None
@@ -26,5 +26,5 @@ class Resource:
 
     create_exclude: tuple[str, ...] = ("id",)
 
-    # NEW – optional hook to build a custom Service
-    service_factory: Optional[Callable[[Repository], Service]] = None
+    # NEW – optional hook to build a custom SqlService
+    service_factory: Optional[Callable[[SqlRepository], SqlService]] = None

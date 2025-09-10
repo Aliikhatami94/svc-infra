@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from pydantic import ValidationError
 
-from svc_infra.api.fastapi.db import get_fastapi_users
+from svc_infra.api.fastapi.db.sql import get_fastapi_users
 
 from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings

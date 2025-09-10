@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from typing import Any, Sequence
 
-from svc_infra.api.fastapi.db import Service
+from svc_infra.api.fastapi.db.sql import SqlService
 
 
 class DummyRepo:
@@ -52,7 +52,7 @@ class DummyRepo:
 
 @pytest.mark.asyncio
 async def test_service_pass_through_and_hooks():
-    class MyService(Service):
+    class MyService(SqlService):
         async def pre_create(self, data: dict[str, Any]) -> dict[str, Any]:
             data = dict(data)
             data["touched"] = True

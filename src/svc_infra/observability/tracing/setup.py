@@ -37,7 +37,7 @@ if not _available_propagators:
 
 from opentelemetry.propagators.composite import CompositePropagator
 
-from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.resources import SqlResource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
@@ -76,7 +76,7 @@ def setup_tracing(
         "deployment.environment": deployment_env or os.getenv("DEPLOYMENT_ENV") or "dev",
         "service.instance.id": os.getenv("HOSTNAME") or str(uuid.uuid4()),
     }
-    resource = Resource.create({k: v for k, v in attrs.items() if v is not None})
+    resource = SqlResource.create({k: v for k, v in attrs.items() if v is not None})
 
     provider = TracerProvider(
         resource=resource,
