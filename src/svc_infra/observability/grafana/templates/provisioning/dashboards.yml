@@ -1,6 +1,6 @@
 apiVersion: 1
 providers:
-  - name: service-infra-pack
+  - name: Service Infrastructure
     orgId: 1
     folder: Service Infrastructure
     type: file

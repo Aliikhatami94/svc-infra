@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os, tarfile, zipfile, subprocess, time, webbrowser, shutil
+import os, tarfile, zipfile, subprocess, time, webbrowser, shutil, json
 from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import urlretrieve
@@ -18,6 +18,36 @@ def _pkg_file(*parts: str) -> str:
 def _write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+def _patch_dashboard_datasource(dash_path: Path, prom_uid: str = "prom") -> None:
+    """
+    Ensure the dashboard uses the Prometheus datasource with a stable UID ('prom')
+    and that template variables have allValue='.*' so 'All' matches all series.
+    """
+    try:
+        data = json.loads(dash_path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    ds_obj = {"type": "prometheus", "uid": prom_uid}
+
+    for p in data.get("panels", []):
+        if p.get("type") == "row" and "panels" in p:
+            for sp in p["panels"]:
+                sp["datasource"] = ds_obj
+        p["datasource"] = ds_obj
+        for t in p.get("targets", []):
+            t["datasource"] = ds_obj
+
+    templ = data.get("templating", {}).get("list", [])
+    for v in templ:
+        v["datasource"] = ds_obj
+        if v.get("includeAll"):
+            v["allValue"] = ".*"
+        v.setdefault("refresh", 2)
+
+    data["datasource"] = ds_obj
+    dash_path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":"), indent=2), encoding="utf-8")
 
 def _exists(cmd: list[str]) -> bool:
     try:
@@ -205,7 +235,10 @@ def _emit_common_files(root: Path, metrics_url: str, remote_write: dict[str, str
 
     # dashboards (packaged JSONs)
     for dst_name, pkg_dir, pkg_name in _DASH_FILES:
-        _write_text(root / "dashboards" / dst_name, _pkg_file(pkg_dir, pkg_name))
+        out_path = root / "dashboards" / dst_name
+        _write_text(out_path, _pkg_file(pkg_dir, pkg_name))
+        # NEW: bind datasource & fix variable All handling
+        _patch_dashboard_datasource(out_path, prom_uid="prom")
 
 def _port_free(port: int) -> bool:
     import socket as _s
