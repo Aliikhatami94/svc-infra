@@ -2,7 +2,7 @@
   "title": "Service Infrastructure • Overview",
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "refresh": "5s",
   "panels": [
@@ -10,40 +10,43 @@
       "type": "stat",
       "title": "Requests per Second (RPS)",
       "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "req/s", "decimals": 3 } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
+          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[30s]))",
           "legendFormat": "{{job}}"
         }
-      ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+      ]
     },
     {
       "type": "stat",
       "title": "Error Rate (RPS)",
       "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "req/s", "decimals": 3 } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",code!~\"2..|3..\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
+          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",code!~\"2..|3..\",method=~\"$method\",route=~\"$route\"}[30s]))",
           "legendFormat": "{{job}}"
         }
-      ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+      ]
     },
     {
       "type": "stat",
       "title": "p95 Latency (s)",
       "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[30s])))",
           "legendFormat": "p95"
         }
-      ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+      ]
     },
     {
       "type": "timeseries",
@@ -52,7 +55,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (code) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
+          "expr": "sum by (code) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[30s]))",
           "legendFormat": "{{code}}"
         }
       ]
@@ -82,14 +85,15 @@
       "type": "table",
       "title": "Top Routes by RPS",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "req/s", "decimals": 3 } },
+      "options": { "showHeader": true },
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(10, sum by (route) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route!=\"\"}[$__rate_interval])))",
+          "expr": "topk(10, sum by (route) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route!=\"\"}[30s])))",
           "legendFormat": "{{route}}"
         }
-      ],
-      "options": { "showHeader": true }
+      ]
     },
     {
       "type": "timeseries",
@@ -98,7 +102,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_client_requests_total[$__rate_interval]))"
+          "expr": "sum by (job) (rate(http_client_requests_total{job=~\"$job\"}[30s]))",
+          "legendFormat": "{{job}}"
         }
       ]
     },
@@ -106,10 +111,11 @@
       "type": "timeseries",
       "title": "Client p95 Latency (s)",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket{job=~\"$job\"}[30s])))",
           "legendFormat": "p95"
         }
       ]
