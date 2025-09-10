@@ -777,7 +777,7 @@ def render_env_py(packages: Sequence[str], *, async_db: bool | None = None) -> s
             async_db = False
 
     pkg_list = ", ".join(repr(p) for p in packages)
-    tmpl_root = pkg.files("svc_infra.db.templates.setup")
+    tmpl_root = pkg.files("svc_infra.db.relational.templates.setup")
     name = "env_async.py.tmpl" if async_db else "env_sync.py.tmpl"
     txt = tmpl_root.joinpath(name).read_text(encoding="utf-8")
     return txt.replace("__PACKAGES_LIST__", pkg_list)

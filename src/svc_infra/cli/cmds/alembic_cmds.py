@@ -4,7 +4,7 @@ import typer, os
 
 from typing import Optional, List
 
-from svc_infra.db.core import (
+from svc_infra.db.relational.core import (
     init_alembic as core_init_alembic,
     revision as core_revision,
     upgrade as core_upgrade,
