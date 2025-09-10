@@ -12,7 +12,6 @@ from svc_infra.db.sql.resource import SqlResource
 from .crud_router import make_crud_router_plus_sql
 from .health import _make_db_health_router
 from .management import make_crud_schemas
-from .service import SqlService
 from .session import dispose_session, initialize_session
 
 
@@ -20,11 +19,11 @@ def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
     for r in resources:
         repo = SqlRepository(model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete)
 
-        # 1) explicit app-provided factory wins
         if r.service_factory:
             svc = r.service_factory(repo)
-        # 2) else, generic service
         else:
+            from .service import SqlService
+
             svc = SqlService(repo)
 
         if r.read_schema and r.create_schema and r.update_schema:

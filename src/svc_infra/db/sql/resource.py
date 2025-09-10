@@ -1,8 +1,13 @@
-from dataclasses import dataclass
-from typing import Any, Callable, Optional, Type
+from __future__ import annotations
 
-from svc_infra.api.fastapi.db.sql.service import SqlService
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Callable, Optional
+
 from svc_infra.db.sql.repository import SqlRepository
+
+if TYPE_CHECKING:
+    # TYPE_CHECKING prevents a runtime import; only used by type checkers
+    from svc_infra.api.fastapi.db.sql.service import SqlService
 
 
 @dataclass
@@ -17,9 +22,9 @@ class SqlResource:
     ordering_default: Optional[str] = None
     allowed_order_fields: Optional[list[str]] = None
 
-    read_schema: Optional[Type[Any]] = None
-    create_schema: Optional[Type[Any]] = None
-    update_schema: Optional[Type[Any]] = None
+    read_schema: Optional[type] = None
+    create_schema: Optional[type] = None
+    update_schema: Optional[type] = None
 
     read_name: Optional[str] = None
     create_name: Optional[str] = None
@@ -27,5 +32,5 @@ class SqlResource:
 
     create_exclude: tuple[str, ...] = ("id",)
 
-    # NEW – optional hook to build a custom SqlService
-    service_factory: Optional[Callable[[SqlRepository], SqlService]] = None
+    # Only a type reference; no runtime dependency on FastAPI layer
+    service_factory: Optional[Callable[[SqlRepository], "SqlService"]] = None
