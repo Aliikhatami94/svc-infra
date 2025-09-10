@@ -1,10 +1,12 @@
 import os
 from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 from typer.testing import CliRunner
 
-from svc_infra.cli import app, _apply_database_url
+from svc_infra.cli import app
+from svc_infra.cli.cmds.db.sql.alembic_cmds import apply_database_url
 
 
 @pytest.fixture
@@ -23,14 +25,14 @@ def mock_env():
 
 
 class TestApplyDatabaseUrl:
-    def test_apply_database_url_sets_env(self, mock_env):
+    def testapply_database_url_sets_env(self, mock_env):
         test_url = "postgresql://test:test@localhost/testdb"
-        _apply_database_url(test_url)
+        apply_database_url(test_url)
         assert os.environ["DATABASE_URL"] == test_url
 
-    def test_apply_database_url_none_does_nothing(self, mock_env):
+    def testapply_database_url_none_does_nothing(self, mock_env):
         original = os.environ.get("DATABASE_URL")
-        _apply_database_url(None)
+        apply_database_url(None)
         assert os.environ.get("DATABASE_URL") == original
 
 
@@ -49,14 +51,21 @@ class TestInitCommand:
 
     @patch("svc_infra.db.sql.cli.core_init_alembic")
     def test_init_with_all_options(self, mock_init, runner, mock_env):
-        result = runner.invoke(app, [
-            "init",
-            "--project-root", "/tmp/test",
-            "--database-url", "postgresql://test:test@localhost/testdb",
-            "--discover-packages", "pkg1",
-            "--discover-packages", "pkg2",
-            "--overwrite",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "postgresql://test:test@localhost/testdb",
+                "--discover-packages",
+                "pkg1",
+                "--discover-packages",
+                "pkg2",
+                "--overwrite",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "postgresql://test:test@localhost/testdb"
@@ -85,17 +94,26 @@ class TestRevisionCommand:
 
     @patch("svc_infra.db.sql.cli.core_revision")
     def test_revision_with_all_options(self, mock_revision, runner, mock_env):
-        result = runner.invoke(app, [
-            "revision",
-            "--message", "Test migration",
-            "--project-root", "/tmp/test",
-            "--database-url", "sqlite:///test.db",
-            "--autogenerate",
-            "--head", "abc123",
-            "--branch-label", "feature",
-            "--version-path", "/tmp/versions",
-            "--sql",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "revision",
+                "--message",
+                "Test migration",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "sqlite:///test.db",
+                "--autogenerate",
+                "--head",
+                "abc123",
+                "--branch-label",
+                "feature",
+                "--version-path",
+                "/tmp/versions",
+                "--sql",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "sqlite:///test.db"
@@ -126,12 +144,17 @@ class TestUpgradeCommand:
 
     @patch("svc_infra.db.sql.cli.core_upgrade")
     def test_upgrade_with_target(self, mock_upgrade, runner, mock_env):
-        result = runner.invoke(app, [
-            "upgrade",
-            "abc123",
-            "--project-root", "/tmp/test",
-            "--database-url", "postgresql://test@localhost/db",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "upgrade",
+                "abc123",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "postgresql://test@localhost/db",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "postgresql://test@localhost/db"
@@ -153,12 +176,17 @@ class TestDowngradeCommand:
 
     @patch("svc_infra.db.sql.cli.core_downgrade")
     def test_downgrade_with_target(self, mock_downgrade, runner, mock_env):
-        result = runner.invoke(app, [
-            "downgrade",
-            "base",
-            "--project-root", "/tmp/test",
-            "--database-url", "sqlite:///test.db",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "downgrade",
+                "base",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "sqlite:///test.db",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "sqlite:///test.db"
@@ -180,12 +208,17 @@ class TestCurrentCommand:
 
     @patch("svc_infra.db.sql.cli.core_current")
     def test_current_with_verbose(self, mock_current, runner, mock_env):
-        result = runner.invoke(app, [
-            "current",
-            "--project-root", "/tmp/test",
-            "--database-url", "postgresql://localhost/db",
-            "--verbose",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "current",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "postgresql://localhost/db",
+                "--verbose",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "postgresql://localhost/db"
@@ -207,12 +240,17 @@ class TestHistoryCommand:
 
     @patch("svc_infra.db.sql.cli.core_history")
     def test_history_with_verbose(self, mock_history, runner, mock_env):
-        result = runner.invoke(app, [
-            "history",
-            "--project-root", "/tmp/test",
-            "--database-url", "mysql://user@localhost/db",
-            "--verbose",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "history",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "mysql://user@localhost/db",
+                "--verbose",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "mysql://user@localhost/db"
@@ -234,12 +272,17 @@ class TestStampCommand:
 
     @patch("svc_infra.db.sql.cli.core_stamp")
     def test_stamp_with_target(self, mock_stamp, runner, mock_env):
-        result = runner.invoke(app, [
-            "stamp",
-            "abc123",
-            "--project-root", "/tmp/test",
-            "--database-url", "sqlite:///test.db",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "stamp",
+                "abc123",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "sqlite:///test.db",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "sqlite:///test.db"
@@ -261,12 +304,18 @@ class TestMergeHeadsCommand:
 
     @patch("svc_infra.db.sql.cli.core_merge_heads")
     def test_merge_heads_with_message(self, mock_merge, runner, mock_env):
-        result = runner.invoke(app, [
-            "merge-heads",
-            "--project-root", "/tmp/test",
-            "--database-url", "postgresql://localhost/db",
-            "--message", "Merge conflicting heads",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "merge-heads",
+                "--project-root",
+                "/tmp/test",
+                "--database-url",
+                "postgresql://localhost/db",
+                "--message",
+                "Merge conflicting heads",
+            ],
+        )
 
         assert result.exit_code == 0
         assert os.environ["DATABASE_URL"] == "postgresql://localhost/db"
@@ -281,11 +330,16 @@ class TestScaffoldCommand:
     def test_scaffold_entity_with_defaults(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated entity scaffolding"
 
-        result = runner.invoke(app, [
-            "scaffold",
-            "--models-dir", "/tmp/models",
-            "--schemas-dir", "/tmp/schemas",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "scaffold",
+                "--models-dir",
+                "/tmp/models",
+                "--schemas-dir",
+                "/tmp/schemas",
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Generated entity scaffolding" in result.output
@@ -300,17 +354,26 @@ class TestScaffoldCommand:
     def test_scaffold_auth_with_options(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated auth scaffolding"
 
-        result = runner.invoke(app, [
-            "scaffold",
-            "--kind", "auth",
-            "--entity-name", "User",
-            "--models-dir", "/tmp/app/auth",
-            "--schemas-dir", "/tmp/app/auth",
-            "--overwrite",
-            "--same-dir",
-            "--models-filename", "auth_models.py",
-            "--schemas-filename", "auth_schemas.py",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "scaffold",
+                "--kind",
+                "auth",
+                "--entity-name",
+                "User",
+                "--models-dir",
+                "/tmp/app/auth",
+                "--schemas-dir",
+                "/tmp/app/auth",
+                "--overwrite",
+                "--same-dir",
+                "--models-filename",
+                "auth_models.py",
+                "--schemas-filename",
+                "auth_schemas.py",
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Generated auth scaffolding" in result.output
@@ -324,12 +387,18 @@ class TestScaffoldCommand:
         assert kwargs["schemas_filename"] == "auth_schemas.py"
 
     def test_scaffold_invalid_kind(self, runner):
-        result = runner.invoke(app, [
-            "scaffold",
-            "--kind", "invalid",
-            "--models-dir", "/tmp/models",
-            "--schemas-dir", "/tmp/schemas",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "scaffold",
+                "--kind",
+                "invalid",
+                "--models-dir",
+                "/tmp/models",
+                "--schemas-dir",
+                "/tmp/schemas",
+            ],
+        )
 
         assert result.exit_code != 0
 
@@ -339,10 +408,14 @@ class TestScaffoldModelsCommand:
     def test_scaffold_models_with_defaults(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated models"
 
-        result = runner.invoke(app, [
-            "scaffold-models",
-            "--dest-dir", "/tmp/models",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "scaffold-models",
+                "--dest-dir",
+                "/tmp/models",
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Generated models" in result.output
@@ -358,17 +431,25 @@ class TestScaffoldModelsCommand:
     def test_scaffold_models_with_all_options(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated auth models"
 
-        result = runner.invoke(app, [
-            "scaffold-models",
-            "--dest-dir", "/tmp/auth",
-            "--kind", "auth",
-            "--entity-name", "User",
-            "--table-name", "users",
-            "--no-include-tenant",
-            "--include-soft-delete",
-            "--overwrite",
-            "--models-filename", "user_models.py",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "scaffold-models",
+                "--dest-dir",
+                "/tmp/auth",
+                "--kind",
+                "auth",
+                "--entity-name",
+                "User",
+                "--table-name",
+                "users",
+                "--no-include-tenant",
+                "--include-soft-delete",
+                "--overwrite",
+                "--models-filename",
+                "user_models.py",
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Generated auth models" in result.output
@@ -388,10 +469,14 @@ class TestScaffoldSchemasCommand:
     def test_scaffold_schemas_with_defaults(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated schemas"
 
-        result = runner.invoke(app, [
-            "scaffold-schemas",
-            "--dest-dir", "/tmp/schemas",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "scaffold-schemas",
+                "--dest-dir",
+                "/tmp/schemas",
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Generated schemas" in result.output
@@ -406,15 +491,22 @@ class TestScaffoldSchemasCommand:
     def test_scaffold_schemas_with_options(self, mock_scaffold, runner):
         mock_scaffold.return_value = "Generated auth schemas"
 
-        result = runner.invoke(app, [
-            "scaffold-schemas",
-            "--dest-dir", "/tmp/auth",
-            "--kind", "auth",
-            "--entity-name", "User",
-            "--no-include-tenant",
-            "--overwrite",
-            "--schemas-filename", "user_schemas.py",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "scaffold-schemas",
+                "--dest-dir",
+                "/tmp/auth",
+                "--kind",
+                "auth",
+                "--entity-name",
+                "User",
+                "--no-include-tenant",
+                "--overwrite",
+                "--schemas-filename",
+                "user_schemas.py",
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Generated auth schemas" in result.output
@@ -441,10 +533,14 @@ class TestIntegration:
     @patch.dict(os.environ, {}, clear=True)
     def test_database_url_environment_isolation(self, runner):
         with patch("svc_infra.db.sql.cli.core_upgrade") as mock_upgrade:
-            result1 = runner.invoke(app, [
-                "upgrade",
-                "--database-url", "postgresql://test1@localhost/db1",
-            ])
+            result1 = runner.invoke(
+                app,
+                [
+                    "upgrade",
+                    "--database-url",
+                    "postgresql://test1@localhost/db1",
+                ],
+            )
             assert result1.exit_code == 0
 
             result2 = runner.invoke(app, ["upgrade"])

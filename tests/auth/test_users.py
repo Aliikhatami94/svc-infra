@@ -87,7 +87,12 @@ def patch_dependencies(monkeypatch):
 
 def _set_settings(monkeypatch, secret: str, lifetime: int):
     """Patch get_auth_settings() in the factory module to return desired values."""
-    monkeypatch.setattr(users_mod, "get_auth_settings", lambda: FakeSettings(secret, lifetime), raising=True)
+    monkeypatch.setattr(
+        users_mod,
+        "get_auth_settings",
+        lambda: FakeSettings(secret, lifetime),
+        raising=True,
+    )
 
 
 def test_factory_returns_objects_and_respects_prefix(monkeypatch):
@@ -123,7 +128,11 @@ def test_factory_returns_objects_and_respects_prefix(monkeypatch):
         if hasattr(transport, attr):
             resolved = getattr(transport, attr)
             break
-    if resolved is None and hasattr(transport, "get_login_path") and callable(transport.get_login_path):
+    if (
+        resolved is None
+        and hasattr(transport, "get_login_path")
+        and callable(transport.get_login_path)
+    ):
         resolved = transport.get_login_path()
 
     # If the path is introspectable, verify it; otherwise accept type check only

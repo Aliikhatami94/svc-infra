@@ -4,20 +4,19 @@ import os
 import warnings
 from enum import StrEnum
 from functools import cache
-from typing import NamedTuple
+from pathlib import Path
+from typing import List, NamedTuple, Optional
 
 from dotenv import load_dotenv
-from pathlib import Path
-from typing import Optional, List
 
 from svc_infra.app.root import resolve_project_root
 
 
 class Environment(StrEnum):
     LOCAL = "local"
-    DEV   = "dev"
-    TEST  = "test"
-    PROD  = "prod"
+    DEV = "dev"
+    TEST = "test"
+    PROD = "prod"
 
 
 # Map common aliases -> canonical
@@ -96,7 +95,12 @@ def get_environment_flags(environment: Environment | None = None) -> Environment
 # Handy globals
 CURRENT_ENVIRONMENT: Environment = get_current_environment()
 ENV_FLAGS: EnvironmentFlags = get_environment_flags(CURRENT_ENVIRONMENT)
-IS_LOCAL, IS_DEV, IS_TEST, IS_PROD = ENV_FLAGS.is_local, ENV_FLAGS.is_dev, ENV_FLAGS.is_test, ENV_FLAGS.is_prod
+IS_LOCAL, IS_DEV, IS_TEST, IS_PROD = (
+    ENV_FLAGS.is_local,
+    ENV_FLAGS.is_dev,
+    ENV_FLAGS.is_test,
+    ENV_FLAGS.is_prod,
+)
 
 
 def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
@@ -119,6 +123,7 @@ def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
         return nonprod
     raise ValueError("pick(): No value found for environment and 'nonprod' was not provided.")
 
+
 def find_env_file(start: Optional[Path] = None) -> Optional[Path]:
     env_file = os.getenv("APP_ENV_FILE") or os.getenv("SVC_INFRA_ENV_FILE")
     if env_file:
@@ -132,6 +137,7 @@ def find_env_file(start: Optional[Path] = None) -> Optional[Path]:
             return candidate
     return None
 
+
 def load_env_if_present(path: Optional[Path], *, override: bool = False) -> List[str]:
     if not path:
         return []
@@ -142,6 +148,7 @@ def load_env_if_present(path: Optional[Path], *, override: bool = False) -> List
         if k not in before or before.get(k) != v:
             changed.append(k)
     return sorted(changed)
+
 
 def prepare_env() -> Path:
     """

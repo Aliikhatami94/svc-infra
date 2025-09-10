@@ -1,28 +1,42 @@
 from __future__ import annotations
 
-import os
 import atexit
+import os
 import uuid
-from typing import Dict, List
+from typing import Any, Callable, Dict, List
 
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as OTLPgExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    OTLPSpanExporter as OTLPhttpExporter,
+)
 from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.composite import CompositePropagator
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
 # Try to load propagators defensively; not all installs ship all extras.
 _available_propagators: List[object] = []
 try:
-    from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator # type: ignore[attr-defined]
+    from opentelemetry.propagators.tracecontext import (  # type: ignore[attr-defined]
+        TraceContextTextMapPropagator,
+    )
+
     _available_propagators.append(TraceContextTextMapPropagator())
 except Exception:
     pass
 try:
-    from opentelemetry.propagators.baggage import W3CBaggagePropagator # type: ignore[attr-defined]
+    from opentelemetry.propagators.baggage import W3CBaggagePropagator  # type: ignore[attr-defined]
+
     _available_propagators.append(W3CBaggagePropagator())
 except Exception:
     pass
 try:
     # B3 is in a separate package in many installs; guard it.
     from opentelemetry.propagators.b3 import B3MultiFormat
+
     _available_propagators.append(B3MultiFormat())
 except Exception:
     pass
@@ -30,39 +44,29 @@ except Exception:
 # Fallback: if nothing loaded, at least keep W3C tracecontext via API default.
 if not _available_propagators:
     try:
-        from opentelemetry.propagators.tracecontext import TraceContextTextMapPropagator # type: ignore[attr-defined]
+        from opentelemetry.propagators.tracecontext import (  # type: ignore[attr-defined]
+            TraceContextTextMapPropagator,
+        )
+
         _available_propagators.append(TraceContextTextMapPropagator())
     except Exception:
         _available_propagators = []  # let OpenTelemetry’s default remain in place
 
-from opentelemetry.propagators.composite import CompositePropagator
-
-from opentelemetry.sdk.resources import SqlResource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-    OTLPSpanExporter as OTLPgExporter,
-)
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-    OTLPSpanExporter as OTLPhttpExporter,
-)
-from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
-
 
 def setup_tracing(
-        *,
-        service_name: str,
-        endpoint: str = "http://localhost:4317",
-        protocol: str = "grpc",  # or "http/protobuf"
-        sample_ratio: float = 0.1,
-        instrument_fastapi: bool = True,
-        instrument_sqlalchemy: bool = True,
-        instrument_requests: bool = True,
-        instrument_httpx: bool = True,
-        service_version: str | None = None,
-        deployment_env: str | None = None,
-        headers: Dict[str, str] | None = None,
-) -> callable:
+    *,
+    service_name: str,
+    endpoint: str = "http://localhost:4317",
+    protocol: str = "grpc",  # or "http/protobuf"
+    sample_ratio: float = 0.1,
+    instrument_fastapi: bool = True,
+    instrument_sqlalchemy: bool = True,
+    instrument_requests: bool = True,
+    instrument_httpx: bool = True,
+    service_version: str | None = None,
+    deployment_env: str | None = None,
+    headers: Dict[str, str] | None = None,
+) -> Callable[..., Any]:
     """
     Initialize OpenTelemetry tracing + common instrumentations.
 
@@ -76,7 +80,7 @@ def setup_tracing(
         "deployment.environment": deployment_env or os.getenv("DEPLOYMENT_ENV") or "dev",
         "service.instance.id": os.getenv("HOSTNAME") or str(uuid.uuid4()),
     }
-    resource = SqlResource.create({k: v for k, v in attrs.items() if v is not None})
+    resource = Resource.create({k: v for k, v in attrs.items() if v is not None})
 
     provider = TracerProvider(
         resource=resource,
@@ -102,6 +106,7 @@ def setup_tracing(
     try:
         if instrument_fastapi:
             from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
             FastAPIInstrumentor().instrument()
     except Exception:
         pass
@@ -109,6 +114,7 @@ def setup_tracing(
     try:
         if instrument_sqlalchemy:
             from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
             SQLAlchemyInstrumentor().instrument()
     except Exception:
         pass
@@ -116,6 +122,7 @@ def setup_tracing(
     try:
         if instrument_requests:
             from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
             RequestsInstrumentor().instrument()
     except Exception:
         pass
@@ -123,6 +130,7 @@ def setup_tracing(
     try:
         if instrument_httpx:
             from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
             HTTPXClientInstrumentor().instrument()
     except Exception:
         pass

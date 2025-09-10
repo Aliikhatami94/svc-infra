@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from typing import Any, Optional, Type, Callable
+from typing import Any, Callable, Optional, Type
 
-from .service import SqlService
-from .repository import SqlRepository
+from svc_infra.api.fastapi.db.sql.service import SqlService
+from svc_infra.db.sql.repository import SqlRepository
+
 
 @dataclass
 class SqlResource:

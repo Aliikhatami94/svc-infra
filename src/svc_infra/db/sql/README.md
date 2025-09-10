@@ -14,7 +14,7 @@ python -m svc_infra.db --help
 - **venv**: `python -m svc_infra.db --help`
 
 > **Tip**: Most commands need a project root (where alembic.ini and migrations/ live). Pass `--project-root .` if you're already in that folder.
-> 
+>
 > **Note**: In this CLI the default `--project-root` is `..`, so be explicit if you're running from the project root.
 
 ## Database URL Handling

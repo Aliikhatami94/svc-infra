@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import Any
 
 from pydantic import SecretStr
@@ -74,7 +75,14 @@ def test_linkedin_provider_included_with_urls_and_scope():
 
 def test_generic_oidc_providers_list_with_default_scope_and_rstrip():
     class OIDCItem:
-        def __init__(self, name: str, issuer: str, client_id: str, client_secret: SecretStr, scope: str | None = None):
+        def __init__(
+            self,
+            name: str,
+            issuer: str,
+            client_id: str,
+            client_secret: SecretStr,
+            scope: str | None = None,
+        ):
             self.name = name
             self.issuer = issuer
             self.client_id = client_id
@@ -82,15 +90,29 @@ def test_generic_oidc_providers_list_with_default_scope_and_rstrip():
             self.scope = scope
 
     items = [
-        OIDCItem("okta", "https://okta.example.com/", "okta-id", SecretStr("okta-secret"), None),
-        OIDCItem("auth0", "https://example.auth0.com", "auth0-id", SecretStr("auth0-secret"), "openid email"),
+        OIDCItem(
+            "okta",
+            "https://okta.example.com/",
+            "okta-id",
+            SecretStr("okta-secret"),
+            None,
+        ),
+        OIDCItem(
+            "auth0",
+            "https://example.auth0.com",
+            "auth0-id",
+            SecretStr("auth0-secret"),
+            "openid email",
+        ),
     ]
     s = _settings(oidc_providers=items)
     reg = providers_from_settings(s)
 
     ok = reg["okta"]
     assert ok["kind"] == "oidc"
-    assert ok["issuer"] == "https://okta.example.com"  # rstrip('/')</n    assert ok["client_id"] == "okta-id"
+    assert (
+        ok["issuer"] == "https://okta.example.com"
+    )  # rstrip('/')</n    assert ok["client_id"] == "okta-id"
     assert ok["client_secret"] == "okta-secret"
     assert ok["scope"] == "openid email profile"  # default
 
@@ -112,4 +134,3 @@ def test_missing_pairs_skip_providers():
     s2 = _settings(github_client_secret=SecretStr("sec"))
     reg2 = providers_from_settings(s2)
     assert "github" not in reg2
-

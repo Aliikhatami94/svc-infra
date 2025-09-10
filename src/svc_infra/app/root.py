@@ -1,22 +1,40 @@
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 from typing import Iterable, Optional
-import os, subprocess
 
 DEFAULT_SENTRIES: tuple[str, ...] = (
-    ".git", ".hg", ".svn",
-    "alembic.ini", "migrations", "migrations/env.py", "migrations/script.py.mako",
-    "pyproject.toml", "setup.cfg", "setup.py", "Pipfile", "requirements.txt",
-    "poetry.lock", "pdm.lock", "uv.lock", "hatch.toml",
-    "src", "app", "backend",
-    ".project-root", ".svc-infra-root",
+    ".git",
+    ".hg",
+    ".svn",
+    "alembic.ini",
+    "migrations",
+    "migrations/env.py",
+    "migrations/script.py.mako",
+    "pyproject.toml",
+    "setup.cfg",
+    "setup.py",
+    "Pipfile",
+    "requirements.txt",
+    "poetry.lock",
+    "pdm.lock",
+    "uv.lock",
+    "hatch.toml",
+    "src",
+    "app",
+    "backend",
+    ".project-root",
+    ".svc-infra-root",
 )
 
 ENV_VAR = "PROJECT_ROOT"
 
+
 def _is_root_marker(dir_: Path, sentries: Iterable[str]) -> bool:
     return any((dir_ / name).exists() for name in sentries)
+
 
 def _git_toplevel(start: Path) -> Optional[Path]:
     try:
@@ -30,11 +48,12 @@ def _git_toplevel(start: Path) -> Optional[Path]:
     except Exception:
         return None
 
+
 def resolve_project_root(
-        start: Optional[Path] = None,
-        *,
-        env_var: str = ENV_VAR,
-        extra_sentries: Iterable[str] = (),
+    start: Optional[Path] = None,
+    *,
+    env_var: str = ENV_VAR,
+    extra_sentries: Iterable[str] = (),
 ) -> Path:
     env = os.getenv(env_var)
     if env:

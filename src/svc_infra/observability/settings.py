@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class ObservabilitySettings(BaseSettings):
@@ -27,7 +27,9 @@ class ObservabilitySettings(BaseSettings):
     OTEL_EXPORTER_PROTOCOL: str = Field(
         default="grpc", description='Exporter protocol: "grpc" or "http/protobuf"'
     )
-    OTEL_SAMPLER_RATIO: float = Field(default=0.1, ge=0.0, le=1.0, description="Trace sampling ratio")
+    OTEL_SAMPLER_RATIO: float = Field(
+        default=0.1, ge=0.0, le=1.0, description="Trace sampling ratio"
+    )
 
     model_config = {
         "env_prefix": "",

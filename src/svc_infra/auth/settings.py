@@ -1,19 +1,23 @@
 from __future__ import annotations
 
-from typing import Optional, List
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from typing import List, Optional
+
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class OIDCProvider(BaseModel):
     name: str
-    issuer: str                     # e.g., "https://dev-abc123.okta.com" or "https://YOUR_DOMAIN.auth0.com"
+    issuer: str  # e.g., "https://dev-abc123.okta.com" or "https://YOUR_DOMAIN.auth0.com"
     client_id: str
     client_secret: SecretStr
     scope: str = "openid email profile"
 
+
 class JWTSettings(BaseModel):
     secret: SecretStr
     lifetime_seconds: int = 60 * 60 * 24 * 7
+
 
 class AuthSettings(BaseSettings):
     jwt: Optional[JWTSettings] = None
@@ -44,7 +48,9 @@ class AuthSettings(BaseSettings):
         env_nested_delimiter="__",
     )
 
+
 _settings: AuthSettings | None = None
+
 
 def get_auth_settings() -> AuthSettings:
     global _settings

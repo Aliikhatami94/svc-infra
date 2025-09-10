@@ -1,17 +1,16 @@
 import pytest
 from sqlalchemy import text
 
-from svc_infra.db import (
-    get_database_url_from_env,
-    is_async_url,
+from svc_infra.db.sql.core import init_alembic, revision
+from svc_infra.db.sql.utils import (
     build_engine,
     ensure_database_exists,
-    init_alembic,
-    revision,
+    get_database_url_from_env,
+    is_async_url,
 )
 
-
 # ---------- Env helpers ----------
+
 
 def test_get_database_url_from_env_precedence_and_required(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
@@ -33,6 +32,7 @@ def test_get_database_url_from_env_precedence_and_required(monkeypatch):
 
 # ---------- URL helpers ----------
 
+
 def test_is_async_url_detects_variants():
     assert is_async_url("sqlite+aiosqlite:///:memory:") is True
     assert is_async_url("postgresql+asyncpg://u:p@localhost/db") is True
@@ -44,6 +44,7 @@ def test_is_async_url_detects_variants():
 
 # ---------- Engine build ----------
 
+
 def test_build_engine_sync_sqlite_and_ping():
     url = "sqlite:///:memory:"
     eng = build_engine(url)
@@ -54,6 +55,7 @@ def test_build_engine_sync_sqlite_and_ping():
 
 
 # ---------- ensure_database_exists ----------
+
 
 def test_ensure_database_exists_sqlite_creates_parent_dir(tmp_path):
     db_dir = tmp_path / "nested"
@@ -72,6 +74,7 @@ def test_ensure_database_exists_sqlite_creates_parent_dir(tmp_path):
 
 
 # ---------- Alembic scaffolding ----------
+
 
 def test_init_alembic_sync_creates_files(tmp_path, monkeypatch):
     # auto-detect sync from env
@@ -109,6 +112,7 @@ def test_init_alembic_async_creates_files(tmp_path, monkeypatch):
 
 
 # ---------- Alembic command helper (smoke) ----------
+
 
 def test_alembic_revision_creates_version_file(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")

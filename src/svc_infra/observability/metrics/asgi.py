@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import time, os
-from typing import Optional, Iterable, Any, Callable
+import os
+import time
+from typing import Any, Callable, Iterable, Optional
 
 from starlette.requests import Request
-from starlette.responses import Response, PlainTextResponse
+from starlette.responses import PlainTextResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from .base import registry, counter, histogram, gauge
 from ..settings import ObservabilitySettings
+from .base import counter, gauge, histogram, registry
 
 # ---- Lazy metric creation so that prometheus-client is optional ----
 
@@ -16,6 +17,7 @@ _prom_ready: bool = False
 _http_requests_total = None
 _http_request_duration = None
 _http_inflight = None
+
 
 def _init_metrics() -> None:
     global _prom_ready, _http_requests_total, _http_request_duration, _http_inflight
@@ -67,11 +69,11 @@ class PrometheusMiddleware:
     """Minimal, fast metrics middleware for any ASGI app (lazy + optional)."""
 
     def __init__(
-            self,
-            app: ASGIApp,
-            *,
-            skip_paths: Optional[Iterable[str]] = None,
-            route_resolver: Optional[Callable[[Request], str]] = None,
+        self,
+        app: ASGIApp,
+        *,
+        skip_paths: Optional[Iterable[str]] = None,
+        route_resolver: Optional[Callable[[Request], str]] = None,
     ):
         self.app = app
         self.skip_paths = tuple(skip_paths or ("/metrics",))
@@ -141,15 +143,18 @@ def metrics_endpoint():
     If prometheus-client is unavailable OR disabled via env, return 501.
     """
     if os.getenv("SVC_INFRA_DISABLE_PROMETHEUS") == "1":
+
         async def disabled(_):
             return PlainTextResponse(
                 "prometheus-client not installed; install svc-infra[metrics] to enable /metrics",
                 status_code=501,
             )
+
         return disabled
 
     try:
-        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
         reg = registry()
 
         async def handler(_: Request) -> Response:
@@ -158,11 +163,13 @@ def metrics_endpoint():
 
         return handler
     except Exception:
+
         async def handler(_: Request) -> Response:
             return PlainTextResponse(
                 "prometheus-client not installed; install svc-infra[metrics] to enable /metrics",
                 status_code=501,
             )
+
         return handler
 
 
@@ -176,6 +183,7 @@ def add_prometheus(app, *, path: str = "/metrics", skip_paths: Optional[Iterable
     # Add route
     try:
         from fastapi import APIRouter
+
         router = APIRouter()
         router.add_api_route(path, endpoint=metrics_endpoint(), include_in_schema=False)
         app.include_router(router)

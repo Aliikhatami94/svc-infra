@@ -1,20 +1,24 @@
 from __future__ import annotations
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, Callable
+
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from svc_infra.api.fastapi.db.sql.repository import SqlRepository
 from svc_infra.api.fastapi.db.sql.service_hooks import SqlServiceWithHooks
+from svc_infra.db.sql.repository import SqlRepository
 
 ColumnSpec = Union[str, Sequence[str]]
+
 
 def _as_tuple(spec: ColumnSpec) -> Tuple[str, ...]:
     return (spec,) if isinstance(spec, str) else tuple(spec)
 
+
 def _all_present(data: Dict[str, Any], fields: Sequence[str]) -> bool:
     return all(f in data for f in fields)
+
 
 def _nice_label(fields: Sequence[str], data: Dict[str, Any]) -> str:
     if len(fields) == 1:
@@ -22,15 +26,16 @@ def _nice_label(fields: Sequence[str], data: Dict[str, Any]) -> str:
         return f"{f}={data.get(f)!r}"
     return "(" + ", ".join(f"{f}={data.get(f)!r}" for f in fields) + ")"
 
+
 def dedupe_sql_service(
-        repo: SqlRepository,
-        *,
-        unique_cs: Iterable[ColumnSpec] = (),
-        unique_ci: Iterable[ColumnSpec] = (),
-        tenant_field: Optional[str] = None,
-        messages: Optional[dict[Tuple[str, ...], str]] = None,
-        pre_create: Optional[Callable[[dict], dict]] = None,  # NEW
-        pre_update: Optional[Callable[[dict], dict]] = None,  # NEW
+    repo: SqlRepository,
+    *,
+    unique_cs: Iterable[ColumnSpec] = (),
+    unique_ci: Iterable[ColumnSpec] = (),
+    tenant_field: Optional[str] = None,
+    messages: Optional[dict[Tuple[str, ...], str]] = None,
+    pre_create: Optional[Callable[[dict], dict]] = None,  # NEW
+    pre_update: Optional[Callable[[dict], dict]] = None,  # NEW
 ):
     """
     Build a Service subclass with uniqueness pre-checks:
@@ -67,7 +72,10 @@ def dedupe_sql_service(
                     continue
                 where = _build_where(fields, data, ci=ci, exclude_id=exclude_id)
                 if await repo.exists(session, where=where):
-                    msg = messages.get(fields) or f"Record with {_nice_label(fields, data)} already exists."
+                    msg = (
+                        messages.get(fields)
+                        or f"Record with {_nice_label(fields, data)} already exists."
+                    )
                     raise HTTPException(status_code=409, detail=msg)
 
     class _Svc(SqlServiceWithHooks):

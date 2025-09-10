@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from typing import Any, Sequence
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .repository import SqlRepository
+from svc_infra.db.sql.repository import SqlRepository
+
 
 class SqlService:
     """
@@ -42,8 +44,19 @@ class SqlService:
     async def delete(self, session: AsyncSession, id_value: Any) -> bool:
         return await self.repo.delete(session, id_value)
 
-    async def search(self, session: AsyncSession, *, q: str, fields: Sequence[str], limit: int, offset: int, order_by=None):
-        return await self.repo.search(session, q=q, fields=fields, limit=limit, offset=offset, order_by=order_by)
+    async def search(
+        self,
+        session: AsyncSession,
+        *,
+        q: str,
+        fields: Sequence[str],
+        limit: int,
+        offset: int,
+        order_by=None,
+    ):
+        return await self.repo.search(
+            session, q=q, fields=fields, limit=limit, offset=offset, order_by=order_by
+        )
 
     async def count_filtered(self, session: AsyncSession, *, q: str, fields: Sequence[str]) -> int:
         return await self.repo.count_filtered(session, q=q, fields=fields)

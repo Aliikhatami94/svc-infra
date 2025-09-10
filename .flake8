@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 120
+exclude = .venv,venv,build,dist,node_modules,.git
+
+# Let Black handle long lines and the E203/W503 conflicts if you later widen select
+extend-ignore = E203, W503, E501
+
+per-file-ignores =
+    tests/**/*.py:F401,F841,F811

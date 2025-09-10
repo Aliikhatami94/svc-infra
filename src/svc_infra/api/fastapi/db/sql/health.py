@@ -5,10 +5,11 @@ from sqlalchemy import text
 
 from .session import SqlSessionDep
 
+
 def _make_db_health_router(
-        *,
-        prefix: str = "/_db/health",
-        include_in_schema: bool = False,
+    *,
+    prefix: str = "/_db/health",
+    include_in_schema: bool = False,
 ) -> APIRouter:
     """Internal factory for the DB health router."""
     r = APIRouter(prefix=prefix, tags=["health"], include_in_schema=include_in_schema)

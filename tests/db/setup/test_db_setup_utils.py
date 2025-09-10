@@ -1,15 +1,15 @@
-from sqlalchemy import text, inspect
 from alembic.config import Config
+from sqlalchemy import inspect, text
 
 from svc_infra.db.sql import utils
 from svc_infra.db.sql.utils import (
-    with_database,
-    _pg_quote_ident,
     _mysql_quote_ident,
-    render_env_py,
+    _pg_quote_ident,
     build_alembic_config,
-    repair_alembic_state_if_needed,
     get_database_url_from_env,
+    render_env_py,
+    repair_alembic_state_if_needed,
+    with_database,
 )
 
 
@@ -44,7 +44,7 @@ def test_with_database_replaces_database_name():
 
 def test_quote_identifiers_escape():
     assert _pg_quote_ident('weird"name') == 'weird""name'
-    assert _mysql_quote_ident('bad`name') == 'bad``name'
+    assert _mysql_quote_ident("bad`name") == "bad``name"
 
 
 def test_render_env_py_injects_packages_and_templates(tmp_path):
@@ -91,7 +91,10 @@ def test_repair_alembic_state_if_needed_drops_missing_revision(tmp_path):
     try:
         with eng.begin() as conn:
             conn.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32))"))
-            conn.execute(text("INSERT INTO alembic_version (version_num) VALUES (:v)"), {"v": "remote_rev_999"})
+            conn.execute(
+                text("INSERT INTO alembic_version (version_num) VALUES (:v)"),
+                {"v": "remote_rev_999"},
+            )
     finally:
         eng.dispose()
 
@@ -109,4 +112,3 @@ def test_repair_alembic_state_if_needed_drops_missing_revision(tmp_path):
         assert not insp.has_table("alembic_version")
     finally:
         eng2.dispose()
-

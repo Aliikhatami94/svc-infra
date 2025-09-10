@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Iterable, Optional
 import importlib
+from typing import Iterable, Optional
 
 
 class _MissingPrometheus(Exception):
@@ -42,7 +42,13 @@ def registry():
     return REGISTRY
 
 
-def _mk_metric(ctor_name: str, name: str, doc: str, labels: Optional[Iterable[str]] = None, **kwargs):
+def _mk_metric(
+    ctor_name: str,
+    name: str,
+    doc: str,
+    labels: Optional[Iterable[str]] = None,
+    **kwargs,
+):
     prom = _prom_mod()
     Counter = getattr(prom, "Counter")
     Gauge = getattr(prom, "Gauge")

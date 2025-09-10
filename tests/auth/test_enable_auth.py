@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 
 from svc_infra.auth import integration
 
@@ -18,7 +18,13 @@ def test_add_auth_without_providers(monkeypatch):
     auth_router = _make_router("/auth_foo")
     users_router = _make_router("/user_me")
 
-    def fake_get_fastapi_users(user_model, user_schema_read, user_schema_create, user_schema_update, auth_prefix):
+    def fake_get_fastapi_users(
+        user_model,
+        user_schema_read,
+        user_schema_create,
+        user_schema_update,
+        auth_prefix,
+    ):
         return ("FAKE_FASTAPI_USERS", "FAKE_BACKEND", auth_router, users_router, None)
 
     monkeypatch.setattr(integration, "get_fastapi_users", fake_get_fastapi_users)
@@ -48,10 +54,18 @@ def test_add_auth_with_providers(monkeypatch):
     auth_router = _make_router("/auth_foo")
     users_router = _make_router("/user_me")
 
-    def fake_get_fastapi_users(user_model, user_schema_read, user_schema_create, user_schema_update, auth_prefix):
+    def fake_get_fastapi_users(
+        user_model,
+        user_schema_read,
+        user_schema_create,
+        user_schema_update,
+        auth_prefix,
+    ):
         return ("FAKE_FASTAPI_USERS", "FAKE_BACKEND", auth_router, users_router, None)
 
-    def fake_oauth_router_with_backend(*, user_model, auth_backend, providers, post_login_redirect, prefix):
+    def fake_oauth_router_with_backend(
+        *, user_model, auth_backend, providers, post_login_redirect, prefix
+    ):
         # ensure the auth_backend from get_fastapi_users is passed through
         assert auth_backend == "FAKE_BACKEND"
         router = APIRouter(prefix=prefix)
@@ -79,4 +93,3 @@ def test_add_auth_with_providers(monkeypatch):
 
     # oauth router should be registered with the prefix passed through (/_db + default oauth_prefix)
     assert "/_db/auth/oauth/callback" in paths
-

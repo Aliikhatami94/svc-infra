@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import uuid as _uuid
-from sqlalchemy.types import TypeDecorator, CHAR
+
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.types import CHAR, TypeDecorator
+
 
 class GUID(TypeDecorator):
     """Portable UUID.
@@ -9,6 +12,7 @@ class GUID(TypeDecorator):
     PG -> UUID(as_uuid=True)
     Others -> CHAR(36)
     """
+
     impl = CHAR
     cache_ok = True
 

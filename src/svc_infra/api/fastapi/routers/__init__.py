@@ -5,9 +5,10 @@ import logging
 import pkgutil
 from types import ModuleType
 from typing import Optional
+
 from fastapi import FastAPI
 
-from svc_infra.app.env import get_current_environment, Environment, ALL_ENVIRONMENTS
+from svc_infra.app.env import ALL_ENVIRONMENTS, Environment, get_current_environment
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +24,11 @@ def _should_skip_module(module_name: str) -> bool:
 
 
 def register_all_routers(
-        app: FastAPI,
-        *,
-        base_package: Optional[str] = None,
-        prefix: str = "",
-        environment: Optional[Environment | str] = None,
+    app: FastAPI,
+    *,
+    base_package: Optional[str] = None,
+    prefix: str = "",
+    environment: Optional[Environment | str] = None,
 ) -> None:
     """
     Recursively discover and register all FastAPI routers under a routers package.
@@ -58,12 +59,18 @@ def register_all_routers(
         raise RuntimeError(f"Could not import base_package '{base_package}': {exc}") from exc
 
     if not hasattr(package_module, "__path__"):
-        raise RuntimeError(f"Provided base_package '{base_package}' is not a package (no __path__).")
+        raise RuntimeError(
+            f"Provided base_package '{base_package}' is not a package (no __path__)."
+        )
 
-    environment = get_current_environment() if environment is None else (Environment(environment) if not isinstance(environment, Environment) else environment)
+    environment = (
+        get_current_environment()
+        if environment is None
+        else (Environment(environment) if not isinstance(environment, Environment) else environment)
+    )
 
     for _, module_name, _ in pkgutil.walk_packages(
-            package_module.__path__, prefix=f"{base_package}."
+        package_module.__path__, prefix=f"{base_package}."
     ):
         if _should_skip_module(module_name):
             logger.debug("Skipping router module due to exclusion/private: %s", module_name)
@@ -80,22 +87,34 @@ def register_all_routers(
             if router_excluded_envs is not None:
                 # Support ALL_ENVIRONMENTS as a special value
                 if router_excluded_envs is ALL_ENVIRONMENTS or (
-                    isinstance(router_excluded_envs, set) and router_excluded_envs == ALL_ENVIRONMENTS
+                    isinstance(router_excluded_envs, set)
+                    and router_excluded_envs == ALL_ENVIRONMENTS
                 ):
-                    logger.debug(f"Skipping router module {module_name} due to ALL_ENVIRONMENTS exclusion.")
+                    logger.debug(
+                        f"Skipping router module {module_name} due to ALL_ENVIRONMENTS exclusion."
+                    )
                     continue
                 # Normalize to set of Environment or str
                 if not isinstance(router_excluded_envs, (set, list, tuple)):
-                    logger.warning(f"ROUTER_EXCLUDED_ENVIRONMENTS in {module_name} must be a set/list/tuple, got {type(router_excluded_envs)}")
+                    logger.warning(
+                        f"ROUTER_EXCLUDED_ENVIRONMENTS in {module_name} must be a set/list/tuple, got {type(router_excluded_envs)}"
+                    )
                     continue
                 normalized_excluded_envs = set()
                 for e in router_excluded_envs:
                     try:
-                        normalized_excluded_envs.add(Environment(e) if not isinstance(e, Environment) else e)
+                        normalized_excluded_envs.add(
+                            Environment(e) if not isinstance(e, Environment) else e
+                        )
                     except Exception:
                         normalized_excluded_envs.add(str(e))
-                if environment in normalized_excluded_envs or str(environment) in normalized_excluded_envs:
-                    logger.debug(f"Skipping router module {module_name} due to ROUTER_EXCLUDED_ENVIRONMENTS restriction: {router_excluded_envs}")
+                if (
+                    environment in normalized_excluded_envs
+                    or str(environment) in normalized_excluded_envs
+                ):
+                    logger.debug(
+                        f"Skipping router module {module_name} due to ROUTER_EXCLUDED_ENVIRONMENTS restriction: {router_excluded_envs}"
+                    )
                     continue
             # Pick up ROUTER_PREFIX, ROUTER_TAG, and INCLUDE_ROUTER_IN_SCHEMA if present
             router_prefix = getattr(module, "ROUTER_PREFIX", None)
@@ -110,5 +129,8 @@ def register_all_routers(
             app.include_router(router, **include_kwargs)
             logger.debug(
                 "Included router from module: %s (prefix=%s, tag=%s, include_in_schema=%s)",
-                module_name, include_kwargs.get("prefix"), router_tag, include_kwargs.get("include_in_schema")
+                module_name,
+                include_kwargs.get("prefix"),
+                router_tag,
+                include_kwargs.get("include_in_schema"),
             )

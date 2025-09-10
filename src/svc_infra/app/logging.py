@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import logging
 import os
-from logging.config import dictConfig
-from pydantic import BaseModel
 from enum import StrEnum
+from logging.config import dictConfig
 
-from svc_infra.app import IS_PROD
+from pydantic import BaseModel
+
+from svc_infra.app.env import IS_PROD
+
 
 # --- Log Format and Level Options ---
 class LogFormatOptions(StrEnum):
     PLAIN = "plain"
     JSON = "json"
+
 
 class LogLevelOptions(StrEnum):
     CRITICAL = "CRITICAL"
@@ -20,6 +23,7 @@ class LogLevelOptions(StrEnum):
     INFO = "INFO"
     DEBUG = "DEBUG"
     NOTSET = "NOTSET"
+
 
 # --- Pydantic Logging Config Model ---
 class LoggingConfig(BaseModel):
@@ -30,10 +34,11 @@ class LoggingConfig(BaseModel):
 # --- JSON Formatter for Structured Logs ---
 class JsonFormatter(logging.Formatter):
     """Structured JSON formatter for prod and CI logs."""
+
     def format(self, record: logging.LogRecord) -> str:  # type: ignore[override]
         import json
-        from traceback import format_exception
         import os as _os  # avoid shadowing
+        from traceback import format_exception
 
         payload: dict[str, object] = {
             "time": self.formatTime(record, self.datefmt),
@@ -50,13 +55,15 @@ class JsonFormatter(logging.Formatter):
 
         # HTTP context (only when present)
         http_ctx = {
-            k: v for k, v in {
+            k: v
+            for k, v in {
                 "method": getattr(record, "http_method", None),
                 "path": getattr(record, "path", None),
                 "status": getattr(record, "status_code", None),
                 "client_ip": getattr(record, "client_ip", None),
                 "user_agent": getattr(record, "user_agent", None),
-            }.items() if v is not None
+            }.items()
+            if v is not None
         }
         if http_ctx:
             payload["http"] = http_ctx
@@ -75,11 +82,14 @@ class JsonFormatter(logging.Formatter):
 
             # Truncate very long stacks to keep lines readable in hosted logs.
             max_stack = int(_os.getenv("LOG_STACK_LIMIT", "4000"))
-            err_obj["stack"] = stack[:max_stack] + ("...(truncated)" if len(stack) > max_stack else "")
+            err_obj["stack"] = stack[:max_stack] + (
+                "...(truncated)" if len(stack) > max_stack else ""
+            )
 
             payload["error"] = err_obj
 
         return json.dumps(payload, ensure_ascii=False)
+
 
 # --- Helpers to Read Level/Format ---
 def _read_level() -> str:
@@ -87,19 +97,16 @@ def _read_level() -> str:
     if explicit:
         return explicit.upper()
     from svc_infra.app.env import pick
-    return pick(
-        prod="INFO",
-        nonprod="DEBUG",
-        dev="DEBUG",
-        test="DEBUG",
-        local="DEBUG"
-    ).upper()
+
+    return pick(prod="INFO", nonprod="DEBUG", dev="DEBUG", test="DEBUG", local="DEBUG").upper()
+
 
 def _read_format() -> str:
     fmt = os.getenv("LOG_FORMAT")
     if fmt:
         return fmt.lower()
     return "json" if IS_PROD else "plain"
+
 
 # --- Main Logging Setup Function ---
 def setup_logging(level: str | None = None, fmt: str | None = None) -> None:

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
 from typing import Any, Sequence
+
+import pytest
 
 from svc_infra.api.fastapi.db.sql import SqlService
 
@@ -10,8 +11,16 @@ class DummyRepo:
     def __init__(self):
         self.calls: list[tuple[str, tuple, dict]] = []
 
-    async def list(self, session, *, limit: int, offset: int, order_by: Sequence[Any] | None = None):
-        self.calls.append(("list", (session,), {"limit": limit, "offset": offset, "order_by": order_by}))
+    async def list(
+        self, session, *, limit: int, offset: int, order_by: Sequence[Any] | None = None
+    ):
+        self.calls.append(
+            (
+                "list",
+                (session,),
+                {"limit": limit, "offset": offset, "order_by": order_by},
+            )
+        )
         return [
             {"id": 1, "name": "a"},
             {"id": 2, "name": "b"},
@@ -37,8 +46,29 @@ class DummyRepo:
         self.calls.append(("delete", (session, id_value), {}))
         return True
 
-    async def search(self, session, *, q: str, fields: Sequence[str], limit: int, offset: int, order_by: Sequence[Any] | None = None):
-        self.calls.append(("search", (session,), {"q": q, "fields": fields, "limit": limit, "offset": offset, "order_by": order_by}))
+    async def search(
+        self,
+        session,
+        *,
+        q: str,
+        fields: Sequence[str],
+        limit: int,
+        offset: int,
+        order_by: Sequence[Any] | None = None,
+    ):
+        self.calls.append(
+            (
+                "search",
+                (session,),
+                {
+                    "q": q,
+                    "fields": fields,
+                    "limit": limit,
+                    "offset": offset,
+                    "order_by": order_by,
+                },
+            )
+        )
         return []
 
     async def count_filtered(self, session, *, q: str, fields: Sequence[str]):
@@ -96,5 +126,14 @@ async def test_service_pass_through_and_hooks():
 
     # sanity: all repo methods were invoked at least once
     invoked = {name for (name, *_rest) in repo.calls}
-    assert {"list", "count", "get", "create", "update", "delete", "search", "count_filtered", "exists"} <= invoked
-
+    assert {
+        "list",
+        "count",
+        "get",
+        "create",
+        "update",
+        "delete",
+        "search",
+        "count_filtered",
+        "exists",
+    } <= invoked

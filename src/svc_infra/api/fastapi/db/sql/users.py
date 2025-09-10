@@ -1,13 +1,15 @@
 from __future__ import annotations
-from typing import AsyncIterator, Any, Callable
+
+from typing import Any, AsyncIterator, Callable
 from uuid import UUID
 
-from fastapi import Depends, APIRouter
+from fastapi import APIRouter, Depends
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
 from svc_infra.auth.settings import get_auth_settings
+
 
 def get_fastapi_users(
     user_model: Any,
@@ -49,6 +51,8 @@ def get_fastapi_users(
 
     fastapi_users = FastAPIUsers(get_user_manager, [auth_backend])
     auth_router = fastapi_users.get_auth_router(auth_backend, requires_verification=False)
-    users_router = fastapi_users.get_users_router(user_schema_read, user_schema_create, user_schema_update)
+    users_router = fastapi_users.get_users_router(
+        user_schema_read, user_schema_create, user_schema_update
+    )
 
     return fastapi_users, auth_backend, auth_router, users_router, get_jwt_strategy

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import pytest
-import pytest_asyncio
 from datetime import datetime
 
-from sqlalchemy import String, Boolean, DateTime, func, select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+import pytest
+import pytest_asyncio
+from sqlalchemy import Boolean, DateTime, String, func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
 
-from svc_infra.api.fastapi.db.sql import SqlRepository
-import svc_infra.api.fastapi.db.sql.repository as repo_mod
+import svc_infra.db.sql.repository as repo_mod
+from svc_infra.db.sql import SqlRepository
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +28,9 @@ class Item(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
 
 
 class SoftItem(Base):
@@ -144,7 +146,9 @@ async def test_repository_search_and_count_filtered(session: AsyncSession):
     _ = await repo.create(session, {"name": "beta"})
     _ = await repo.create(session, {"name": "ALP"})
 
-    rows = await repo.search(session, q="al", fields=["name"], limit=10, offset=0, order_by=[Item.name.asc()])
+    rows = await repo.search(
+        session, q="al", fields=["name"], limit=10, offset=0, order_by=[Item.name.asc()]
+    )
     assert [r.name for r in rows] == ["ALP", "Alpha"]
 
     total = await repo.count_filtered(session, q="AL", fields=["name"])

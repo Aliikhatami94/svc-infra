@@ -1,23 +1,39 @@
 from __future__ import annotations
-from typing import Any, Optional, Mapping
+
+from typing import Any, Mapping, Optional
 
 from sqlalchemy.engine import Engine
+
 try:
     from sqlalchemy.ext.asyncio import AsyncEngine
 except Exception:  # optional
     AsyncEngine = None  # type: ignore
 
-from .base import gauge, counter
+from .base import counter, gauge
 
-_pool_in_use = gauge("db_pool_in_use", "Checked-out connections", labels=["db"], multiprocess_mode="livesum")
-_pool_available = gauge("db_pool_available", "Available idle connections", labels=["db"], multiprocess_mode="livesum")
+_pool_in_use = gauge(
+    "db_pool_in_use",
+    "Checked-out connections",
+    labels=["db"],
+    multiprocess_mode="livesum",
+)
+_pool_available = gauge(
+    "db_pool_available",
+    "Available idle connections",
+    labels=["db"],
+    multiprocess_mode="livesum",
+)
 _pool_checked_out_total = counter("db_pool_checkedout_total", "Total checkouts", labels=["db"])
 _pool_checked_in_total = counter("db_pool_checkedin_total", "Total checkins", labels=["db"])
+
 
 def _label(labels: Optional[Mapping[str, str]]) -> str:
     return (labels or {}).get("db", "default")
 
-def bind_sqlalchemy_pool_metrics(engine: Engine | Any, labels: Optional[Mapping[str, str]] = None) -> None:
+
+def bind_sqlalchemy_pool_metrics(
+    engine: Engine | Any, labels: Optional[Mapping[str, str]] = None
+) -> None:
     """Bind event listeners for pool metrics. Works for sync Engine.
     For AsyncEngine pass engine.sync_engine."""
     label = _label(labels)

@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-from typing import Iterable, Optional, Any, Callable
+from typing import Any, Callable, Iterable, Optional
 
-from .settings import ObservabilitySettings
 from .metrics.asgi import add_prometheus
-from .metrics.http import instrument_requests, instrument_httpx
-from ..observability.metrics.base import counter, histogram
+from .metrics.http import instrument_httpx, instrument_requests
 from .metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
+from .settings import ObservabilitySettings
 from .tracing.setup import setup_tracing
 
+
 def add_observability(
-        app: Any | None = None,
-        *,
-        service_version: str | None = None,
-        deployment_env: str | None = None,
-        db_engines: Optional[Iterable[Any]] = None,
-        metrics_path: str | None = None,
-        skip_metric_paths: Optional[Iterable[str]] = None,
-        otlp_headers: Optional[dict[str, str]] = None,
-        auto_wire_shutdown: bool = True,
+    app: Any | None = None,
+    *,
+    service_version: str | None = None,
+    deployment_env: str | None = None,
+    db_engines: Optional[Iterable[Any]] = None,
+    metrics_path: str | None = None,
+    skip_metric_paths: Optional[Iterable[str]] = None,
+    otlp_headers: Optional[dict[str, str]] = None,
+    auto_wire_shutdown: bool = True,
 ) -> Callable[[], None]:
     """
     Turn on metrics + tracing + client/DB instrumentation in one call.
@@ -47,7 +47,7 @@ def add_observability(
                 pass
 
     # --- Tracing (OpenTelemetry)
-    shutdown_tracing: Callable[[], None] = (lambda: None)
+    shutdown_tracing: Callable[[], None] = lambda: None
     if cfg.OTEL_ENABLED:
         shutdown_tracing = setup_tracing(
             service_name=cfg.OTEL_SERVICE_NAME,

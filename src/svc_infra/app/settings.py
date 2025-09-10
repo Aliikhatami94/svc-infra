@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,9 +9,10 @@ class AppSettings(BaseSettings):
     version: str = "0.0.1"
 
     model_config = SettingsConfigDict(
-        env_prefix="APP_",            # APP_NAME, APP_VERSION
+        env_prefix="APP_",  # APP_NAME, APP_VERSION
         extra="ignore",
     )
+
 
 @lru_cache
 def get_app_settings(**kwargs) -> AppSettings:

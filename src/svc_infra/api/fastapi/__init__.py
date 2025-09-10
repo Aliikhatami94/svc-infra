@@ -1,3 +1,4 @@
+import logging
 import os
 from collections import defaultdict
 
@@ -5,16 +6,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
-import logging
 
-from svc_infra.api.fastapi.routers import register_all_routers
-from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
+from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
+from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.api.fastapi.settings import ApiConfig
-from svc_infra.app.settings import get_app_settings, AppSettings
-from svc_infra.app import CURRENT_ENVIRONMENT
+from svc_infra.app.env import CURRENT_ENVIRONMENT
+from svc_infra.app.settings import AppSettings, get_app_settings
 
 logger = logging.getLogger(__name__)
+
 
 def _gen_operation_id_factory():
     used: dict[str, int] = defaultdict(int)
@@ -27,7 +28,7 @@ def _gen_operation_id_factory():
         base = _normalize(base)
 
         tag = _normalize(route.tags[0]) if route.tags else ""
-        method = next(iter(route.methods or ["GET"])) .lower()
+        method = next(iter(route.methods or ["GET"])).lower()
 
         # Prefer the base alone if unique
         candidate = base
@@ -50,9 +51,10 @@ def _gen_operation_id_factory():
 
     return _gen
 
+
 def _build_child_api(
-        app_config: AppSettings | None,
-        api_config: ApiConfig | None,
+    app_config: AppSettings | None,
+    api_config: ApiConfig | None,
 ) -> FastAPI:
     app_settings = get_app_settings(
         name=app_config.name if app_config else None,
@@ -90,18 +92,24 @@ def _build_child_api(
             prefix="",  # <-- key change
         )
 
-    logger.info(f"{app_settings.version} version of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]")
+    logger.info(
+        f"{app_settings.version} version of {app_settings.name} initialized [env: {CURRENT_ENVIRONMENT}]"
+    )
     return child
+
 
 def set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
     # mount_path should be like "/v0" or "/v1"
     base = mount_path if not public_base_url else f"{public_base_url.rstrip('/')}{mount_path}"
+
     def custom_openapi():
         schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
         schema["servers"] = [{"url": base}]
         app.openapi_schema = schema
         return schema
+
     app.openapi = custom_openapi
+
 
 def _setup_cors(app, public_cors_origins: list[str] | str | None = None):
     """
@@ -134,11 +142,12 @@ def _setup_cors(app, public_cors_origins: list[str] | str | None = None):
 
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
+
 def create_and_register_api(
-        versions: list[tuple[AppSettings, ApiConfig]],
-        *,
-        public_title: str = "Service Shell",
-        public_cors_origins: list[str] | str | None = None,
+    versions: list[tuple[AppSettings, ApiConfig]],
+    *,
+    public_title: str = "Service Shell",
+    public_cors_origins: list[str] | str | None = None,
 ) -> FastAPI:
     parent = FastAPI(
         title=public_title,

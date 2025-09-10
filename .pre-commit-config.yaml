@@ -1,0 +1,68 @@
+minimum_pre_commit_version: "3.5.0"
+
+default_language_version:
+  python: python3.13
+
+# Global file ignore patterns (adjust as needed)
+exclude: |
+  (?x)(
+    ^.venv/|
+    ^venv/|
+    ^.mypy_cache/|
+    ^.pytest_cache/|
+    ^.ruff_cache/|
+    ^dist/|
+    ^build/|
+    ^node_modules/|
+    ^.git/
+  )
+
+repos:
+  # --- Basic hygiene ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: debug-statements
+      - id: detect-private-key
+      - id: fix-byte-order-marker
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+
+  # --- Formatting ---
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        args: ["--line-length", "100"]
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--line-length", "100"]
+
+  # --- Linting ---
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        args: ["--select=E,F", "--exclude=.venv,venv,build,dist,node_modules,.git"]
+        # additional_dependencies: [flake8-bugbear]
+
+  # --- Tests (opt-in/manual only) ---
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (manual)
+        entry: pytest -q -W ignore --maxfail=1
+        language: system
+        types: [python]
+        stages: [manual]

@@ -1,10 +1,6 @@
 from pathlib import Path
 
-from svc_infra.db.sql.scaffold import (
-    scaffold_core,
-    scaffold_models_core,
-    scaffold_schemas_core,
-)
+from svc_infra.db.sql.scaffold import scaffold_core, scaffold_models_core, scaffold_schemas_core
 
 
 def read(p: Path) -> str:
@@ -12,6 +8,7 @@ def read(p: Path) -> str:
 
 
 # ---------- scafold_core (same_dir) ----------
+
 
 def test_scaffold_core_same_dir_creates_paired_files_and_init(tmp_path: Path):
     pkg = tmp_path / "pkg"
@@ -35,7 +32,7 @@ def test_scaffold_core_same_dir_creates_paired_files_and_init(tmp_path: Path):
     # __init__ should be paired exports
     init_txt = read(init_path)
     assert "from . import models, schemas" in init_txt
-    assert "__all__ = [\"models\", \"schemas\"]" in init_txt
+    assert '__all__ = ["models", "schemas"]' in init_txt
 
     # Content sanity checks
     m = read(models_path)
@@ -60,11 +57,12 @@ def test_scaffold_core_same_dir_creates_paired_files_and_init(tmp_path: Path):
 
 # ---------- scaffold_core (separate dirs + custom filenames) ----------
 
+
 def test_scaffold_core_separate_dirs_custom_filenames_no_tenant(tmp_path: Path):
     models_dir = tmp_path / "models"
     schemas_dir = tmp_path / "schemas"
 
-    res = scaffold_core(
+    scaffold_core(
         models_dir=models_dir,
         schemas_dir=schemas_dir,
         same_dir=False,
@@ -101,6 +99,7 @@ def test_scaffold_core_separate_dirs_custom_filenames_no_tenant(tmp_path: Path):
 
 # ---------- scaffold_models_core / scaffold_schemas_core (overwrite + toggles) ----------
 
+
 def test_scaffold_models_core_overwrite_and_soft_delete_toggle(tmp_path: Path):
     dest = tmp_path / "models_only"
 
@@ -113,12 +112,16 @@ def test_scaffold_models_core_overwrite_and_soft_delete_toggle(tmp_path: Path):
     assert "deleted_at:" in txt1  # soft delete present
 
     # Second write without overwrite -> should skip and keep original content
-    r2 = scaffold_models_core(dest_dir=dest, entity_name="FooBar", include_soft_delete=False, overwrite=False)
+    r2 = scaffold_models_core(
+        dest_dir=dest, entity_name="FooBar", include_soft_delete=False, overwrite=False
+    )
     assert r2["result"]["action"] == "skipped"
     assert read(file_path) == txt1
 
     # Overwrite True -> should rewrite without deleted_at
-    r3 = scaffold_models_core(dest_dir=dest, entity_name="FooBar", include_soft_delete=False, overwrite=True)
+    r3 = scaffold_models_core(
+        dest_dir=dest, entity_name="FooBar", include_soft_delete=False, overwrite=True
+    )
     assert r3["result"]["action"] == "wrote"
     txt3 = read(file_path)
     assert "deleted_at:" not in txt3
@@ -141,12 +144,16 @@ def test_scaffold_schemas_core_overwrite_and_tenant_toggle(tmp_path: Path):
     assert "tenant_id:" in txt1
 
     # Second write without overwrite -> should skip
-    r2 = scaffold_schemas_core(dest_dir=dest, entity_name="FooBar", include_tenant=False, overwrite=False)
+    r2 = scaffold_schemas_core(
+        dest_dir=dest, entity_name="FooBar", include_tenant=False, overwrite=False
+    )
     assert r2["result"]["action"] == "skipped"
     assert read(file_path) == txt1
 
     # Overwrite True -> tenant removed
-    r3 = scaffold_schemas_core(dest_dir=dest, entity_name="FooBar", include_tenant=False, overwrite=True)
+    r3 = scaffold_schemas_core(
+        dest_dir=dest, entity_name="FooBar", include_tenant=False, overwrite=True
+    )
     assert r3["result"]["action"] == "wrote"
     txt3 = read(file_path)
     assert "tenant_id:" not in txt3
@@ -154,4 +161,3 @@ def test_scaffold_schemas_core_overwrite_and_tenant_toggle(tmp_path: Path):
     # __init__.py minimal exists
     init_txt = read(dest / "__init__.py")
     assert init_txt.startswith("# package marker")
-

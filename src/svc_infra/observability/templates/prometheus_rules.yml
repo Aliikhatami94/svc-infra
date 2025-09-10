@@ -27,4 +27,3 @@ groups:
         annotations:
           summary: DB pool saturation
           description: DB connection pool > 90% utilized for 10m.
-

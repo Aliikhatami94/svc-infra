@@ -1,11 +1,12 @@
+import contextlib
 import sys
 import types
-import contextlib
 from typing import Callable
 
 import pytest
 
 # ---- Helpers (fake metrics for when we want to test middleware logic) ----
+
 
 class _FakeMetric:
     def __init__(self):
@@ -34,6 +35,7 @@ class _FakeMetric:
 # Settings
 # ------------------------------------------------------------------------------
 
+
 def test_observability_settings_defaults():
     from svc_infra.observability.settings import ObservabilitySettings
 
@@ -50,6 +52,7 @@ def test_observability_settings_defaults():
 # add_observability (no prometheus installed)
 # ------------------------------------------------------------------------------
 
+
 @pytest.fixture
 def starlette_app():
     from starlette.applications import Starlette
@@ -58,6 +61,7 @@ def starlette_app():
     app = Starlette()
 
     from starlette.responses import PlainTextResponse
+
     app.add_route("/health", lambda _: PlainTextResponse("ok"))
 
     return app
@@ -66,6 +70,7 @@ def starlette_app():
 @contextlib.contextmanager
 def _purged_module(name: str):
     import importlib
+
     existed = name in sys.modules
     saved = sys.modules.pop(name, None)
     orig_import_module = importlib.import_module
@@ -86,6 +91,7 @@ def _purged_module(name: str):
 
 def test_add_observability_without_prometheus_exposes_501(starlette_app):
     import os
+
     os.environ["SVC_INFRA_DISABLE_PROMETHEUS"] = "1"
     # Ensure prometheus-client cannot import
     with _purged_module("prometheus_client"):
@@ -124,6 +130,7 @@ def test_add_observability_auto_shutdown_hook(starlette_app, monkeypatch):
 # ------------------------------------------------------------------------------
 # metrics.asgi — lazy init + inflight stability (no prometheus required)
 # ------------------------------------------------------------------------------
+
 
 def test_prometheus_middleware_inflight_uses_raw_path_and_decrements(monkeypatch):
     # Wire fake metrics into the asgi module by stubbing _init_metrics()
@@ -172,6 +179,7 @@ def test_metrics_endpoint_returns_501_without_prometheus(monkeypatch):
     with _purged_module("prometheus_client"):
         from starlette.applications import Starlette
         from starlette.testclient import TestClient
+
         import svc_infra.observability.metrics.asgi as asgi_mod
 
         app = Starlette()
@@ -187,10 +195,11 @@ def test_metrics_endpoint_returns_501_without_prometheus(monkeypatch):
 # tracing.setup + log_trace_context
 # ------------------------------------------------------------------------------
 
+
 def test_tracing_setup_and_log_trace_context():
     from opentelemetry import trace
-    from svc_infra.observability.tracing.setup import setup_tracing
-    from svc_infra.observability.tracing.setup import log_trace_context
+
+    from svc_infra.observability.tracing.setup import log_trace_context, setup_tracing
 
     shutdown = setup_tracing(
         service_name="test-svc",
@@ -219,10 +228,15 @@ def test_tracing_setup_and_log_trace_context():
 # metrics.http — only run if optional deps present
 # ------------------------------------------------------------------------------
 
-@pytest.mark.skipif("requests" not in sys.modules and not pytest.importorskip("importlib").util.find_spec("requests"),
-                    reason="requests not installed")
+
+@pytest.mark.skipif(
+    "requests" not in sys.modules
+    and not pytest.importorskip("importlib").util.find_spec("requests"),
+    reason="requests not installed",
+)
 def test_instrument_requests_monkeypatches_request(monkeypatch):
     import requests
+
     from svc_infra.observability.metrics.http import instrument_requests
 
     # Ensure original is restored by our test if something blows up
@@ -234,10 +248,13 @@ def test_instrument_requests_monkeypatches_request(monkeypatch):
         requests.sessions.Session.request = orig
 
 
-@pytest.mark.skipif("httpx" not in sys.modules and not pytest.importorskip("importlib").util.find_spec("httpx"),
-                    reason="httpx not installed")
+@pytest.mark.skipif(
+    "httpx" not in sys.modules and not pytest.importorskip("importlib").util.find_spec("httpx"),
+    reason="httpx not installed",
+)
 def test_instrument_httpx_monkeypatches_send(monkeypatch):
     import httpx
+
     from svc_infra.observability.metrics.http import instrument_httpx
 
     orig_sync = httpx.Client.send
@@ -255,7 +272,10 @@ def test_instrument_httpx_monkeypatches_send(monkeypatch):
 # metrics.sqlalchemy — do not require SQLAlchemy; fake the module surface
 # ------------------------------------------------------------------------------
 
-def test_bind_sqlalchemy_pool_metrics_registers_listeners_without_sqlalchemy(monkeypatch):
+
+def test_bind_sqlalchemy_pool_metrics_registers_listeners_without_sqlalchemy(
+    monkeypatch,
+):
     """
     We emulate sqlalchemy.event.listens_for decorator and validate that our
     function registers three listeners and that calling them doesn't crash
@@ -268,11 +288,10 @@ def test_bind_sqlalchemy_pool_metrics_registers_listeners_without_sqlalchemy(mon
         def deco(fn):
             listener_registry[name].append(fn)
             return fn
+
         return deco
 
-    fake_sqlalchemy = types.SimpleNamespace(
-        event=types.SimpleNamespace(listens_for=listens_for)
-    )
+    fake_sqlalchemy = types.SimpleNamespace(event=types.SimpleNamespace(listens_for=listens_for))
     monkeypatch.setitem(sys.modules, "sqlalchemy", fake_sqlalchemy)
 
     # Import module under test
@@ -289,11 +308,16 @@ def test_bind_sqlalchemy_pool_metrics_registers_listeners_without_sqlalchemy(mon
         def __init__(self, size=10, checkedout=0):
             self._size = size
             self._checkedout = checkedout
-        def size(self): return self._size
-        def checkedout(self): return self._checkedout
+
+        def size(self):
+            return self._size
+
+        def checkedout(self):
+            return self._checkedout
 
     class _Engine:
-        def __init__(self): self.pool = _Pool()
+        def __init__(self):
+            self.pool = _Pool()
 
     engine = _Engine()
 
@@ -308,7 +332,7 @@ def test_bind_sqlalchemy_pool_metrics_registers_listeners_without_sqlalchemy(mon
     # Simulate events:
     listener_registry["engine_connect"][0](None, None)  # should set gauges
     listener_registry["checkout"][0](None, None, None)  # inc + set gauges
-    listener_registry["checkin"][0](None, None)         # inc + set gauges
+    listener_registry["checkin"][0](None, None)  # inc + set gauges
 
     # Verify some calls landed (we don't assert exact values)
     assert sa_metrics._pool_in_use.calls

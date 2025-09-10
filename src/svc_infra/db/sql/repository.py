@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Sequence, Iterable, Set
+from typing import Any, Iterable, Optional, Sequence, Set
 
-from sqlalchemy import Select, and_, func, select, or_, String
+from sqlalchemy import Select, String, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import InstrumentedAttribute
-from sqlalchemy.orm import class_mapper
+from sqlalchemy.orm import InstrumentedAttribute, class_mapper
+
 
 class SqlRepository:
     """
@@ -27,7 +27,9 @@ class SqlRepository:
         self.soft_delete = soft_delete
         self.soft_delete_field = soft_delete_field
         self.soft_delete_flag_field = soft_delete_flag_field
-        self.immutable_fields: Set[str] = set(immutable_fields or {"id", "created_at", "updated_at"})
+        self.immutable_fields: Set[str] = set(
+            immutable_fields or {"id", "created_at", "updated_at"}
+        )
 
     def _model_columns(self) -> set[str]:
         return {c.key for c in class_mapper(self.model).columns}
@@ -47,7 +49,14 @@ class SqlRepository:
 
     # basic ops
 
-    async def list(self, session: AsyncSession, *, limit: int, offset: int, order_by: Optional[Sequence[Any]] = None) -> Sequence[Any]:
+    async def list(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int,
+        offset: int,
+        order_by: Optional[Sequence[Any]] = None,
+    ) -> Sequence[Any]:
         stmt = self._base_select().limit(limit).offset(offset)
         if order_by:
             stmt = stmt.order_by(*order_by)
@@ -71,7 +80,9 @@ class SqlRepository:
         await session.flush()
         return obj
 
-    async def update(self, session: AsyncSession, id_value: Any, data: dict[str, Any]) -> Any | None:
+    async def update(
+        self, session: AsyncSession, id_value: Any, data: dict[str, Any]
+    ) -> Any | None:
         obj = await self.get(session, id_value)
         if not obj:
             return None
@@ -99,14 +110,14 @@ class SqlRepository:
         return True
 
     async def search(
-            self,
-            session: AsyncSession,
-            *,
-            q: str,
-            fields: Sequence[str],
-            limit: int,
-            offset: int,
-            order_by: Optional[Sequence[Any]] = None,
+        self,
+        session: AsyncSession,
+        *,
+        q: str,
+        fields: Sequence[str],
+        limit: int,
+        offset: int,
+        order_by: Optional[Sequence[Any]] = None,
     ) -> Sequence[Any]:
         ilike = f"%{q}%"
         conditions = []
@@ -126,13 +137,7 @@ class SqlRepository:
             stmt = stmt.order_by(*order_by)
         return (await session.execute(stmt)).scalars().all()
 
-    async def count_filtered(
-            self,
-            session: AsyncSession,
-            *,
-            q: str,
-            fields: Sequence[str]
-    ) -> int:
+    async def count_filtered(self, session: AsyncSession, *, q: str, fields: Sequence[str]) -> int:
         ilike = f"%{q}%"
         conditions = []
         for f in fields:
@@ -146,7 +151,9 @@ class SqlRepository:
         if conditions:
             stmt = stmt.where(or_(*conditions))
         # SELECT COUNT(*) FROM (<stmt>) as t
-        return (await session.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+        return (
+            await session.execute(select(func.count()).select_from(stmt.subquery()))
+        ).scalar_one()
 
     async def exists(self, session: AsyncSession, *, where: Iterable[Any]) -> bool:
         stmt = self._base_select().where(and_(*where)).limit(1)

@@ -1,20 +1,23 @@
 from __future__ import annotations
-from typing import Dict, Any
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import RedirectResponse
+
+from typing import Any, Dict
+
 from authlib.integrations.starlette_client import OAuth
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
+from sqlalchemy import select
 
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
+
 def oauth_router_with_backend(
-        user_model: type,
-        auth_backend: AuthenticationBackend,
-        providers: Dict[str, Dict[str, Any]],
-        post_login_redirect: str = "/",
-        prefix: str = "/auth/oauth",
+    user_model: type,
+    auth_backend: AuthenticationBackend,
+    providers: Dict[str, Dict[str, Any]],
+    post_login_redirect: str = "/",
+    prefix: str = "/auth/oauth",
 ) -> APIRouter:
     oauth = OAuth()
 
@@ -83,10 +86,12 @@ def oauth_router_with_backend(
             # profile
             me = (await client.get("me", token=token)).json()
             # email
-            em = (await client.get(
-                "emailAddress?q=members&projection=(elements*(handle~))",
-                token=token
-            )).json()
+            em = (
+                await client.get(
+                    "emailAddress?q=members&projection=(elements*(handle~))",
+                    token=token,
+                )
+            ).json()
             elements = em.get("elements") or []
             if elements and "handle~" in elements[0]:
                 email = elements[0]["handle~"].get("emailAddress")
@@ -102,7 +107,9 @@ def oauth_router_with_backend(
             raise HTTPException(400, "No email from provider")
 
         # Upsert user
-        existing = (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
+        existing = (
+            (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
+        )
         if existing:
             user = existing
         else:

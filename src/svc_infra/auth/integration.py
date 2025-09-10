@@ -3,22 +3,23 @@ from __future__ import annotations
 from fastapi import FastAPI
 from pydantic import ValidationError
 
-from svc_infra.api.fastapi.db.sql import get_fastapi_users
+from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 
 from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings
 from .settings import get_auth_settings
 
+
 def add_auth(
-        app: FastAPI,
-        *,
-        user_model,
-        schema_read,
-        schema_create,
-        schema_update,
-        post_login_redirect: str = "/",
-        auth_prefix: str = "/auth",
-        oauth_prefix: str = "/auth/oauth",
+    app: FastAPI,
+    *,
+    user_model,
+    schema_read,
+    schema_create,
+    schema_update,
+    post_login_redirect: str = "/",
+    auth_prefix: str = "/auth",
+    oauth_prefix: str = "/auth/oauth",
 ) -> None:
     fastapi_users, auth_backend, auth_router, users_router, _ = get_fastapi_users(
         user_model=user_model,
@@ -35,8 +36,10 @@ def add_auth(
     try:
         settings_obj = get_auth_settings()
     except ValidationError:
+
         class _Dummy:
             pass
+
         settings_obj = _Dummy()
 
     providers = providers_from_settings(settings_obj)

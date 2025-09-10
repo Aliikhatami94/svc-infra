@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from dotenv import load_dotenv
-import os, asyncio
-from sqlalchemy import inspect
+import asyncio
+import os
 from pathlib import Path
-from typing import Any, Optional, Sequence, Union, TYPE_CHECKING, Set
-from alembic.config import Config
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Set, Union
 
-from sqlalchemy import text
+from alembic.config import Config
+from dotenv import load_dotenv
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.exc import OperationalError, DBAPIError
+from sqlalchemy.exc import DBAPIError, OperationalError
 
 from .constants import ASYNC_DRIVER_HINT, DEFAULT_DB_ENV_VARS
 
@@ -33,8 +33,8 @@ except Exception:  # pragma: no cover - optional env
 
 
 def prepare_process_env(
-        project_root: Path | str,
-        discover_packages: Optional[Sequence[str]] = None,
+    project_root: Path | str,
+    discover_packages: Optional[Sequence[str]] = None,
 ) -> None:
     """
     Prepare process environment so Alembic can import the project cleanly.
@@ -59,6 +59,7 @@ def prepare_process_env(
     if discover_packages:
         os.environ["ALEMBIC_DISCOVER_PACKAGES"] = ",".join(discover_packages)
 
+
 def _read_secret_from_file(path: str) -> Optional[str]:
     """Return file contents if path exists, else None."""
     try:
@@ -68,6 +69,7 @@ def _read_secret_from_file(path: str) -> Optional[str]:
     except Exception:
         pass
     return None
+
 
 def _compose_url_from_parts() -> Optional[str]:
     """
@@ -81,13 +83,13 @@ def _compose_url_from_parts() -> Optional[str]:
       DB_PARAMS (raw query string like 'sslmode=require&connect_timeout=5')
     """
     dialect = os.getenv("DB_DIALECT", "").strip() or "postgresql"
-    driver  = os.getenv("DB_DRIVER", "").strip()      # e.g. asyncpg, psycopg, pymysql, aiosqlite
-    host    = os.getenv("DB_HOST", "").strip() or None
-    port    = os.getenv("DB_PORT", "").strip() or None
-    db      = os.getenv("DB_NAME", "").strip() or None
-    user    = os.getenv("DB_USER", "").strip() or None
-    pwd     = os.getenv("DB_PASSWORD", "").strip() or None
-    params  = os.getenv("DB_PARAMS", "").strip() or ""
+    driver = os.getenv("DB_DRIVER", "").strip()  # e.g. asyncpg, psycopg, pymysql, aiosqlite
+    host = os.getenv("DB_HOST", "").strip() or None
+    port = os.getenv("DB_PORT", "").strip() or None
+    db = os.getenv("DB_NAME", "").strip() or None
+    user = os.getenv("DB_USER", "").strip() or None
+    pwd = os.getenv("DB_PASSWORD", "").strip() or None
+    params = os.getenv("DB_PARAMS", "").strip() or ""
 
     if not (host and db):
         return None
@@ -121,9 +123,10 @@ def _compose_url_from_parts() -> Optional[str]:
 
 # ---------- Environment helpers ----------
 
+
 def get_database_url_from_env(
-        required: bool = True,
-        env_vars: Sequence[str] = DEFAULT_DB_ENV_VARS,
+    required: bool = True,
+    env_vars: Sequence[str] = DEFAULT_DB_ENV_VARS,
 ) -> Optional[str]:
     """
     Resolve the database connection string, with support for:
@@ -188,6 +191,7 @@ def get_database_url_from_env(
         )
     return None
 
+
 def _ensure_timeout_default(u: URL) -> URL:
     """
     Ensure a conservative connection timeout is present for libpq-based drivers.
@@ -202,7 +206,9 @@ def _ensure_timeout_default(u: URL) -> URL:
     t = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
     return u.set(query={**u.query, "connect_timeout": str(t)})
 
+
 # ---------- URL utilities ----------
+
 
 def is_async_url(url: URL | str) -> bool:
     u = make_url(url) if isinstance(url, str) else url
@@ -220,6 +226,7 @@ def with_database(url: URL | str, database: Optional[str]) -> URL:
 
 
 # ---------- Engine creation ----------
+
 
 def _coerce_to_async_url(url: str) -> str:
     """Coerce common sync driver URLs to async-capable URLs.
@@ -247,12 +254,14 @@ def _coerce_to_async_url(url: str) -> str:
         return "sqlite+aiosqlite://" + url.split("://", 1)[1]
     return url
 
+
 def _is_mod_available(name: str) -> bool:
     try:
         __import__(name)
         return True
     except Exception:
         return False
+
 
 def _coerce_sync_driver(u: URL) -> URL:
     """
@@ -311,6 +320,7 @@ def _coerce_pg_maintenance_driver(u: URL) -> URL:
             return u.set(drivername="postgresql+psycopg2")
     return u
 
+
 def _ensure_ssl_default(u: URL) -> URL:
     backend = (u.get_backend_name() or "").lower()
     if backend not in ("postgresql", "postgres"):
@@ -336,6 +346,7 @@ def _ensure_ssl_default(u: URL) -> URL:
         mode = mode or "require"
         return u.set(query={**u.query, "sslmode": mode})
 
+
 def _ensure_ssl_default_async(u: URL) -> URL:
     backend = (u.get_backend_name() or "").lower()
     if backend in ("postgresql", "postgres"):
@@ -345,16 +356,19 @@ def _ensure_ssl_default_async(u: URL) -> URL:
         return u.set(query={**u.query, "ssl": "true"})
     return u
 
+
 def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
     u = _ensure_ssl_default(u)
-    u = _ensure_timeout_default(u)   # <-- ADD THIS
+    u = _ensure_timeout_default(u)  # <-- ADD THIS
 
     # Async
     if is_async_url(u):
         create_async = _create_async_engine
         if create_async is None:
-            raise RuntimeError("Async driver URL provided but SQLAlchemy async extras are not available.")
+            raise RuntimeError(
+                "Async driver URL provided but SQLAlchemy async extras are not available."
+            )
 
         connect_args: dict[str, Any] = {}
         # asyncpg honors a top-level 'timeout' connect kwarg
@@ -371,7 +385,6 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
 
-    connect_args: dict[str, Any] = {}
     dn = (u.drivername or "").lower()
     if dn.startswith("postgresql+psycopg") and u.password:
         connect_args["password"] = u.password
@@ -384,6 +397,7 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
 
 
 # ---------- Identifier quoting helpers ----------
+
 
 def _pg_quote_ident(name: str) -> str:
     """
@@ -402,10 +416,11 @@ def _mysql_quote_ident(name: str) -> str:
     """
     if name is None:
         raise ValueError("Identifier cannot be None")
-    return name.replace('`', '``')
+    return name.replace("`", "``")
 
 
 # ---------- Database bootstrap (per-dialect) ----------
+
 
 async def _pg_create_database_async(url: URL) -> None:
     assert is_async_url(url)
@@ -458,7 +473,10 @@ def _pg_create_database_sync(url: URL) -> None:
 
     try:
         with engine.begin() as conn:
-            exists = conn.scalar(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": target_db})
+            exists = conn.scalar(
+                text("SELECT 1 FROM pg_database WHERE datname = :name"),
+                {"name": target_db},
+            )
             if not exists:
                 quoted = _pg_quote_ident(target_db)
                 conn.execution_options(isolation_level="AUTOCOMMIT").execute(
@@ -571,7 +589,10 @@ def _mssql_create_database_sync(url: URL) -> None:
     eng: SyncEngine = build_engine(master_url)  # type: ignore[assignment]
     try:
         with eng.begin() as conn:
-            exists = conn.scalar(text("SELECT 1 AS one FROM sys.databases WHERE name = :name"), {"name": target_db})
+            exists = conn.scalar(
+                text("SELECT 1 AS one FROM sys.databases WHERE name = :name"),
+                {"name": target_db},
+            )
             if not exists:
                 conn.execute(text(f"CREATE DATABASE [{target_db}]"))
     finally:
@@ -586,7 +607,10 @@ async def _mssql_create_database_async(url: URL) -> None:
     engine: AsyncEngineType = build_engine(master_url)  # type: ignore[assignment]
     try:
         async with engine.begin() as conn:
-            exists = await conn.scalar(text("SELECT 1 AS one FROM sys.databases WHERE name = :name"), {"name": target_db})
+            exists = await conn.scalar(
+                text("SELECT 1 AS one FROM sys.databases WHERE name = :name"),
+                {"name": target_db},
+            )
             if not exists:
                 await conn.execute(text(f"CREATE DATABASE [{target_db}]"))
     finally:
@@ -663,9 +687,12 @@ async def _redshift_create_database_async(url: URL) -> None:
 
 # ---------- Entry: ensure database ----------
 
+
 def ensure_database_exists(url: URL | str) -> None:
     if url is None:
-        raise RuntimeError("ensure_database_exists: database URL is required but None was provided.")
+        raise RuntimeError(
+            "ensure_database_exists: database URL is required but None was provided."
+        )
     u = make_url(url) if isinstance(url, str) else url
     backend = (u.get_backend_name() or "").lower()
 
@@ -677,26 +704,52 @@ def ensure_database_exists(url: URL | str) -> None:
         return
 
     if backend.startswith(("postgresql", "postgres")):
-        return asyncio.run(_pg_create_database_async(u)) if is_async_url(u) else _pg_create_database_sync(u)
+        return (
+            asyncio.run(_pg_create_database_async(u))
+            if is_async_url(u)
+            else _pg_create_database_sync(u)
+        )
     if backend.startswith(("mysql", "mariadb")):
-        return asyncio.run(_mysql_create_database_async(u)) if is_async_url(u) else _mysql_create_database_sync(u)
+        return (
+            asyncio.run(_mysql_create_database_async(u))
+            if is_async_url(u)
+            else _mysql_create_database_sync(u)
+        )
     if backend.startswith(("cockroach", "cockroachdb")):
-        return asyncio.run(_cockroach_create_database_async(u)) if is_async_url(u) else _cockroach_create_database_sync(u)
+        return (
+            asyncio.run(_cockroach_create_database_async(u))
+            if is_async_url(u)
+            else _cockroach_create_database_sync(u)
+        )
     if backend.startswith("mssql"):
-        return asyncio.run(_mssql_create_database_async(u)) if is_async_url(u) else _mssql_create_database_sync(u)
+        return (
+            asyncio.run(_mssql_create_database_async(u))
+            if is_async_url(u)
+            else _mssql_create_database_sync(u)
+        )
     if backend.startswith("snowflake"):
-        return asyncio.run(_snowflake_create_database_async(u)) if is_async_url(u) else _snowflake_create_database_sync(u)
+        return (
+            asyncio.run(_snowflake_create_database_async(u))
+            if is_async_url(u)
+            else _snowflake_create_database_sync(u)
+        )
     if backend.startswith("redshift"):
-        return asyncio.run(_redshift_create_database_async(u)) if is_async_url(u) else _redshift_create_database_sync(u)
+        return (
+            asyncio.run(_redshift_create_database_async(u))
+            if is_async_url(u)
+            else _redshift_create_database_sync(u)
+        )
 
     # Fallback: just ping
     try:
         eng = build_engine(u)
         if is_async_url(u):
+
             async def _ping_and_dispose():
                 async with eng.begin() as conn:  # type: ignore[call-arg]
                     await conn.execute(text("SELECT 1"))
                 await eng.dispose()  # type: ignore[attr-defined]
+
             asyncio.run(_ping_and_dispose())
         else:
             with eng.begin() as conn:  # type: ignore[call-arg]
@@ -704,6 +757,7 @@ def ensure_database_exists(url: URL | str) -> None:
             eng.dispose()  # type: ignore[attr-defined]
     except OperationalError as exc:  # pragma: no cover (depends on env)
         raise RuntimeError(f"Failed to connect to database: {exc}") from exc
+
 
 def repair_alembic_state_if_needed(cfg: Config) -> None:
     """If DB points to a non-existent local revision, reset to base (drop alembic_version)."""
@@ -730,6 +784,7 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
 
     url_obj = make_url(db_url)
     if is_async_url(url_obj):
+
         async def _run() -> None:
             eng = build_engine(url_obj)  # AsyncEngine
             try:
@@ -739,13 +794,19 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
                         insp = inspect(sync_conn)
                         if not insp.has_table("alembic_version"):
                             return
-                        rows = list(sync_conn.execute(text("SELECT version_num FROM alembic_version")).fetchall())
+                        rows = list(
+                            sync_conn.execute(
+                                text("SELECT version_num FROM alembic_version")
+                            ).fetchall()
+                        )
                         missing = any((ver not in local_ids) for (ver,) in rows)
                         if missing:
                             sync_conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+
                     await conn.run_sync(_check_and_maybe_drop)
             finally:
                 await eng.dispose()
+
         asyncio.run(_run())
     else:
         eng = build_engine(url_obj)  # sync Engine
@@ -761,12 +822,14 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
         finally:
             eng.dispose()
 
+
 def render_env_py(packages: Sequence[str], *, async_db: bool | None = None) -> str:
     """Render Alembic env.py content from packaged templates.
 
     - If async_db is None, detect from DATABASE_URL; default to sync if unknown.
     """
     import importlib.resources as pkg
+
     from sqlalchemy.engine import make_url as _make_url
 
     if async_db is None:
@@ -783,8 +846,11 @@ def render_env_py(packages: Sequence[str], *, async_db: bool | None = None) -> s
     return txt.replace("__PACKAGES_LIST__", pkg_list)
 
 
-def build_alembic_config(project_root: Path | str, *, script_location: str = "migrations") -> Config:
+def build_alembic_config(
+    project_root: Path | str, *, script_location: str = "migrations"
+) -> Config:
     from alembic.config import Config as _Config
+
     root = Path(project_root).resolve()
     cfg_path = root / "alembic.ini"
     cfg = _Config(str(cfg_path)) if cfg_path.exists() else _Config()
@@ -813,6 +879,7 @@ def build_alembic_config(project_root: Path | str, *, script_location: str = "mi
 def ensure_db_at_head(cfg: Config) -> None:
     """Idempotently bring the database to head; safe if already current."""
     from alembic import command as _command
+
     _command.upgrade(cfg, "head")
 
 

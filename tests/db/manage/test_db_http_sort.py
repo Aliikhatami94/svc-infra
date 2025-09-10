@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from svc_infra.api.fastapi.db.sql import build_order_by
 
 
@@ -23,4 +24,3 @@ def test_build_order_by_basic():
     result = build_order_by(_Model, sort)
     # should ignore unknown, produce tuples in order
     assert result == [("created_at", "desc"), ("name", "asc")]
-

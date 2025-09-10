@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import date, datetime
 
 import pytest
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import String, Text, Boolean, DateTime, Date, JSON, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from svc_infra.api.fastapi.db.sql.management import make_crud_schemas
@@ -25,9 +25,13 @@ class Thing(Base):
     # python default -> excluded from Create by heuristic
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # server default -> excluded from Create
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
     # onupdate and well-known name -> excluded from Create
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, onupdate=func.now(), nullable=True
+    )
     # other types
     event_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -189,4 +193,3 @@ def test_make_crud_schemas_exclude_params():
         assert fname in _field_names(Create)
     for fname in ("name", "description", "created_at"):
         assert fname in _field_names(Update)
-

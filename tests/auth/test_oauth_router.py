@@ -1,13 +1,14 @@
 from __future__ import annotations
+
 from typing import Any, Dict, Optional
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from svc_infra.api.fastapi.db.sql.session import get_session
 from svc_infra.auth import oauth_router as oauth_router_module
 from svc_infra.auth.oauth_router import oauth_router_with_backend
-from svc_infra.api.fastapi.db.sql.session import get_session
 
 
 class FakeAuthStrategy:
@@ -99,8 +100,13 @@ class FakeResponse:
 
 
 class FakeClient:
-    def __init__(self, kind: str, profile: Dict[str, Any] | None = None, emails: list[Dict[str, Any]] | None = None,
-                 oidc_userinfo: Dict[str, Any] | None = None):
+    def __init__(
+        self,
+        kind: str,
+        profile: Dict[str, Any] | None = None,
+        emails: list[Dict[str, Any]] | None = None,
+        oidc_userinfo: Dict[str, Any] | None = None,
+    ):
         self.kind = kind
         self.profile = profile or {}
         self.emails = emails or []
@@ -109,7 +115,10 @@ class FakeClient:
     async def authorize_redirect(self, request, redirect_uri: str):
         # simulate redirect to provider auth endpoint
         from starlette.responses import RedirectResponse
-        return RedirectResponse(url=f"https://provider.example/authorize?redirect_uri={redirect_uri}")
+
+        return RedirectResponse(
+            url=f"https://provider.example/authorize?redirect_uri={redirect_uri}"
+        )
 
     async def authorize_access_token(self, request):
         # return a token object. For OIDC, embed userinfo if provided
@@ -191,7 +200,11 @@ def app_and_session(monkeypatch):
     return app, session
 
 
-def mount_router(app: FastAPI, providers: Dict[str, Dict[str, Any]], post_login_redirect: str = "/done"):
+def mount_router(
+    app: FastAPI,
+    providers: Dict[str, Dict[str, Any]],
+    post_login_redirect: str = "/done",
+):
     # expose test providers so FakeOAuth can build FakeClient with extra test data
     oauth_router_module._TEST_PROVIDERS = providers
     backend = FakeAuthBackend()
@@ -208,7 +221,14 @@ def mount_router(app: FastAPI, providers: Dict[str, Dict[str, Any]], post_login_
 def test_login_redirect_for_configured_provider(app_and_session):
     app, _ = app_and_session
     providers = {
-        "google": {"kind": "oidc", "client_id": "x", "client_secret": "y", "issuer": "https://accounts.example", "scope": "openid email profile", "_userinfo": {"email": "u@example.com", "name": "User"}},
+        "google": {
+            "kind": "oidc",
+            "client_id": "x",
+            "client_secret": "y",
+            "issuer": "https://accounts.example",
+            "scope": "openid email profile",
+            "_userinfo": {"email": "u@example.com", "name": "User"},
+        },
     }
     mount_router(app, providers)
 
@@ -221,7 +241,13 @@ def test_login_redirect_for_configured_provider(app_and_session):
 def test_callback_oidc_creates_user_and_redirects(app_and_session):
     app, session = app_and_session
     providers = {
-        "google": {"kind": "oidc", "client_id": "x", "client_secret": "y", "issuer": "https://accounts.example", "_userinfo": {"email": "oidc@example.com", "name": "OIDC User"}},
+        "google": {
+            "kind": "oidc",
+            "client_id": "x",
+            "client_secret": "y",
+            "issuer": "https://accounts.example",
+            "_userinfo": {"email": "oidc@example.com", "name": "OIDC User"},
+        },
     }
     mount_router(app, providers)
 
@@ -278,9 +304,7 @@ def test_callback_linkedin_extracts_email_and_name(app_and_session):
                 "firstName": {"localized": {"en_US": "Lin"}},
                 "lastName": {"localized": {"en_US": "KedIn"}},
             },
-            "_emails": [
-                {"handle~": {"emailAddress": "lin@example.com"}}
-            ],
+            "_emails": [{"handle~": {"emailAddress": "lin@example.com"}}],
         }
     }
     mount_router(app, providers)

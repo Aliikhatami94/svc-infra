@@ -1,6 +1,7 @@
 # svc_infra/auth/providers.py
 from typing import Any, Dict
 
+
 def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
     """
     Returns a registry of providers:
@@ -23,7 +24,9 @@ def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
     reg: Dict[str, Dict[str, Any]] = {}
 
     # Google (OIDC)
-    if getattr(settings, "google_client_id", None) and getattr(settings, "google_client_secret", None):
+    if getattr(settings, "google_client_id", None) and getattr(
+        settings, "google_client_secret", None
+    ):
         reg["google"] = {
             "kind": "oidc",
             "issuer": "https://accounts.google.com",
@@ -33,7 +36,9 @@ def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
         }
 
     # GitHub (non-OIDC)
-    if getattr(settings, "github_client_id", None) and getattr(settings, "github_client_secret", None):
+    if getattr(settings, "github_client_id", None) and getattr(
+        settings, "github_client_secret", None
+    ):
         reg["github"] = {
             "kind": "github",
             "authorize_url": "https://github.com/login/oauth/authorize",
@@ -45,7 +50,11 @@ def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
         }
 
     # Microsoft Entra ID (Azure AD) – OIDC via tenant
-    if getattr(settings, "ms_client_id", None) and getattr(settings, "ms_client_secret", None) and getattr(settings, "ms_tenant", None):
+    if (
+        getattr(settings, "ms_client_id", None)
+        and getattr(settings, "ms_client_secret", None)
+        and getattr(settings, "ms_tenant", None)
+    ):
         tenant = settings.ms_tenant
         reg["microsoft"] = {
             "kind": "oidc",

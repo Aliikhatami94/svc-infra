@@ -13,7 +13,7 @@ from fastapi_users.password import PasswordHelper
 from svc_infra.db.sql.base import ModelBase
 from svc_infra.db.sql.uniq import make_unique_sql_indexes
 from svc_infra.db.sql.uniq_hooks import dedupe_sql_service
-from svc_infra.api.fastapi.db.sql.repository import SqlRepository
+from svc_infra.api.fastapi.db.sql.base import SqlRepository
 
 # --- local password helper must be defined before class (used by property) ---
 _pwd = PasswordHelper()

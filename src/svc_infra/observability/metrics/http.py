@@ -3,8 +3,8 @@ from __future__ import annotations
 import time
 from urllib.parse import urlparse
 
-from .base import counter, histogram
 from ..settings import ObservabilitySettings
+from .base import counter, histogram
 
 _obs = ObservabilitySettings()
 
@@ -21,15 +21,18 @@ _http_client_duration = histogram(
     buckets=_obs.METRICS_DEFAULT_BUCKETS,
 )
 
+
 def _host(url: str) -> str:
     try:
         return urlparse(url).netloc or "unknown"
     except Exception:
         return "unknown"
 
+
 def instrument_requests():
     """Monkey-patch requests to capture counts/latency. Lightweight and safe."""
     import requests
+
     _orig = requests.sessions.Session.request
 
     def _wrapped(self, method, url, *a, **kw):
@@ -49,6 +52,7 @@ def instrument_requests():
             _http_client_duration.labels(host, method_u).observe(elapsed)
 
     requests.sessions.Session.request = _wrapped  # type: ignore[attr-defined]
+
 
 def instrument_httpx():
     import httpx
@@ -71,6 +75,7 @@ def instrument_httpx():
             finally:
                 _http_client_total.labels(host, method, code).inc()
                 _http_client_duration.labels(host, method).observe(time.perf_counter() - start)
+
         return _wrapped
 
     async def _wrapped_async(self, request, *a, **kw):
@@ -88,5 +93,5 @@ def instrument_httpx():
             _http_client_total.labels(host, method, code).inc()
             _http_client_duration.labels(host, method).observe(time.perf_counter() - start)
 
-    httpx.Client.send = _wrap_sync_send(_orig_sync)      # type: ignore[assignment]
-    httpx.AsyncClient.send = _wrapped_async              # type: ignore[assignment]
+    httpx.Client.send = _wrap_sync_send(_orig_sync)  # type: ignore[assignment]
+    httpx.AsyncClient.send = _wrapped_async  # type: ignore[assignment]

@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class CatchAllExceptionMiddleware:
     """ASGI middleware that logs exceptions without breaking streaming (SSE)."""
 
@@ -35,13 +36,17 @@ class CatchAllExceptionMiddleware:
                 except Exception:
                     pass
             else:
-                body = json.dumps({
-                    "error": type(exc).__name__,
-                    "detail": str(exc),
-                }).encode("utf-8")
-                await send({
-                    "type": "http.response.start",
-                    "status": 500,
-                    "headers": [(b"content-type", b"application/json")],
-                })
+                body = json.dumps(
+                    {
+                        "error": type(exc).__name__,
+                        "detail": str(exc),
+                    }
+                ).encode("utf-8")
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 500,
+                        "headers": [(b"content-type", b"application/json")],
+                    }
+                )
                 await send({"type": "http.response.body", "body": body, "more_body": False})

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 from typing import List
 
@@ -7,11 +8,11 @@ import pytest
 from pydantic import SecretStr
 
 from svc_infra.auth.settings import AuthSettings, OIDCProvider, get_auth_settings
-import importlib
 
 
 def _reset_settings_cache(monkeypatch):
     import svc_infra.auth.settings as settings_mod
+
     monkeypatch.setattr(settings_mod, "_settings", None, raising=False)
 
 
@@ -122,6 +123,7 @@ def test_get_auth_settings_singleton_and_env_cache(monkeypatch):
     # Reset cache and re-import to simulate fresh process
     _reset_settings_cache(monkeypatch)
     import svc_infra.auth.settings as settings_mod
+
     importlib.reload(settings_mod)
 
     # Now get fresh settings; should reflect new env

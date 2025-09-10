@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from enum import Enum
 
-from ai_infra.mcp.server.tools import mcp_from_functions
 from ai_infra.llm.tools.custom.cli import cli_cmd_help, cli_subcmd_help
+from ai_infra.mcp.server.tools import mcp_from_functions
 
 CLI_PROG = "svc-infra"
+
 
 async def svc_infra_cmd_help() -> dict:
     """
@@ -14,6 +15,7 @@ async def svc_infra_cmd_help() -> dict:
     - Tries poetry → console script → python -m svc_infra.cli_shim.
     """
     return await cli_cmd_help(CLI_PROG)
+
 
 class Subcommand(str, Enum):
     init = "init"
@@ -29,12 +31,14 @@ class Subcommand(str, Enum):
     scaffold_models = "scaffold-models"
     scaffold_schemas = "scaffold-schemas"
 
+
 async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict:
     """
     Get help text for a specific subcommand of svc-infra CLI.
     (Enum keeps a tight schema; function signature remains simple.)
     """
     return await cli_subcmd_help(CLI_PROG, subcommand)
+
 
 mcp = mcp_from_functions(
     name="svc-infra-cli-mcp",

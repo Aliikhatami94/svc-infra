@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import shutil
 from pathlib import Path
 from typing import List, Optional
-import asyncio, shutil
+
 
 def _has_poetry(root: Path) -> bool:
     return (root / "pyproject.toml").exists() and bool(shutil.which("poetry"))
+
 
 def candidate_cmds(root: Path, prog: str, argv: List[str]) -> List[List[str]]:
     """
@@ -27,6 +30,7 @@ def candidate_cmds(root: Path, prog: str, argv: List[str]) -> List[List[str]]:
 
     return cmds
 
+
 async def run_from_root(root: Path, prog: str, argv: List[str]) -> str:
     """
     cd to project root and run the first working candidate command.
@@ -44,7 +48,9 @@ async def run_from_root(root: Path, prog: str, argv: List[str]) -> str:
             out, _ = await proc.communicate()
             if proc.returncode == 0:
                 return out.decode(errors="replace")
-            last_exc = RuntimeError(f"Exit {proc.returncode}: {' '.join(cmd)}\n{out.decode(errors='replace')}")
+            last_exc = RuntimeError(
+                f"Exit {proc.returncode}: {' '.join(cmd)}\n{out.decode(errors='replace')}"
+            )
         except Exception as e:
             last_exc = e
             continue

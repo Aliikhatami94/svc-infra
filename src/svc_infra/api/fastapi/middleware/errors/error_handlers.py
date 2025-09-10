@@ -1,40 +1,42 @@
 import logging
 import traceback
+
 from fastapi import Request
+from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from svc_infra.app import IS_PROD
 from svc_infra.api.fastapi.middleware.errors.exceptions import FastApiException
+from svc_infra.app.env import IS_PROD
 
 logger = logging.getLogger(__name__)
 
+
 def get_error_type(exc: Exception) -> str:
-    return getattr(exc, 'error', None) or type(exc).__name__
+    return getattr(exc, "error", None) or type(exc).__name__
+
 
 def log_exception(level: int, exc: Exception, request: Request, status_code: int) -> None:
     logger.log(
         level,
         f"{request.method} {request.url.path} [{status_code}] {type(exc).__name__}: {exc}",
-        exc_info=True
+        exc_info=True,
     )
 
+
 def format_error_response(
-    exc: Exception,
-    request: Request,
-    status_code: int,
-    detail: str | dict | list
+    exc: Exception, request: Request, status_code: int, detail: str | dict | list
 ) -> JSONResponse:
     error_type = get_error_type(exc)
     log_exception(logging.ERROR, exc, request, status_code)
 
     response_content = {
         "error": error_type,
-        "detail": detail if not IS_PROD else (
-            "Something went wrong. Please contact support."
-            if status_code == 500 else detail
+        "detail": (
+            detail
+            if not IS_PROD
+            else ("Something went wrong. Please contact support." if status_code == 500 else detail)
         ),
     }
 
@@ -42,6 +44,7 @@ def format_error_response(
         response_content["trace"] = traceback.format_exc()
 
     return JSONResponse(status_code=status_code, content=response_content)
+
 
 def register_error_handlers(app):
     @app.exception_handler(FastApiException)

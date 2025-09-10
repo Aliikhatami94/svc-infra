@@ -1,9 +1,13 @@
-from .sql import SqlSessionDep, add_sql_db, add_sql_resources, add_sql_health, SqlResource
+from .nosql import add_mongo_database, add_mongo_health, add_mongo_resources
+from .sql import add_sql_db, add_sql_health, add_sql_resources
 
 __all__ = [
-    "SqlSessionDep",
-    "SqlResource",
+    # SQL
     "add_sql_health",
     "add_sql_db",
     "add_sql_resources",
+    # NoSQL
+    "add_mongo_resources",
+    "add_mongo_database",
+    "add_mongo_health",
 ]

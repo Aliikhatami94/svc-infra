@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from typing import Any, Sequence
+
 import pytest
 import pytest_asyncio
-from typing import Any, Sequence
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.exc import IntegrityError
+from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from svc_infra.api.fastapi.db.sql import make_crud_router_plus
 
@@ -55,8 +56,28 @@ class StubService:
         self.calls.append(("count", {}))
         return len(self.store)
 
-    async def search(self, session, *, q: str, fields: Sequence[str], limit: int, offset: int, order_by=None):
-        self.calls.append(("search", {"q": q, "fields": list(fields), "limit": limit, "offset": offset, "order_by": order_by}))
+    async def search(
+        self,
+        session,
+        *,
+        q: str,
+        fields: Sequence[str],
+        limit: int,
+        offset: int,
+        order_by=None,
+    ):
+        self.calls.append(
+            (
+                "search",
+                {
+                    "q": q,
+                    "fields": list(fields),
+                    "limit": limit,
+                    "offset": offset,
+                    "order_by": order_by,
+                },
+            )
+        )
         return [v for v in self.store.values() if q.lower() in v["name"].lower()]
 
     async def count_filtered(self, session, *, q: str, fields: Sequence[str]) -> int:
@@ -147,7 +168,9 @@ async def test_search_with_and_without_fields_param(app: FastAPI):
         assert data["total"] == 1 and data["items"][0]["name"] == "a"
 
         # explicit fields override defaults
-        r = await client.get("/items/", params={"limit": 10, "offset": 0, "q": "a", "fields": "name"})
+        r = await client.get(
+            "/items/", params={"limit": 10, "offset": 0, "q": "a", "fields": "name"}
+        )
         assert r.status_code == 200
 
 
