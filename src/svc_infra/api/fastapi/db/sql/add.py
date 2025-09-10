@@ -48,7 +48,7 @@ def add_resources(app: FastAPI, resources: Sequence[Resource]) -> None:
         )
         app.include_router(router)
 
-def add_database(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DATABASE_URL") -> None:
+def add_sql(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DATABASE_URL") -> None:
     """Configure DB lifecycle for the app (either explicit URL or from env)."""
     if url:
         @asynccontextmanager
@@ -75,4 +75,4 @@ def add_database(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DAT
 def add_db_health(app: FastAPI, *, prefix: str = "/_db/health", include_in_schema: bool = False) -> None:
     app.include_router(_make_db_health_router(prefix=prefix, include_in_schema=include_in_schema))
 
-__all__ = ["add_resources", "add_database", "add_db_health"]
+__all__ = ["add_resources", "add_sql", "add_db_health"]

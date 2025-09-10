@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
 
-from svc_infra.api.fastapi.db.repository import Repository
-import svc_infra.api.fastapi.db.repository as repo_mod
+from svc_infra.api.fastapi.db import Repository
+import svc_infra.api.fastapi.db.sql.repository as repo_mod
 
 
 @pytest.fixture(autouse=True)

@@ -34,7 +34,7 @@ async def dispose_session() -> None:
 
 async def get_session() -> AsyncIterator[AsyncSession]:
     if _SessionLocal is None:
-        raise RuntimeError("Database not initialized. Call add_database(app, ...) first.")
+        raise RuntimeError("Database not initialized. Call add_sql(app, ...) first.")
     async with _SessionLocal() as session:
         try:
             yield session

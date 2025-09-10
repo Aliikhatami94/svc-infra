@@ -1,5 +1,5 @@
 from __future__ import annotations
-from svc_infra.api.fastapi.db.http import build_order_by
+from svc_infra.api.fastapi.db import build_order_by
 
 
 class _Col:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from typing import Any, Sequence
 
-from svc_infra.api.fastapi.db.service import Service
+from svc_infra.api.fastapi.db import Service
 
 
 class DummyRepo:
