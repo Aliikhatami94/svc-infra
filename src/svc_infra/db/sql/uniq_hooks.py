@@ -9,11 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from svc_infra.db.sql.repository import SqlRepository
 from svc_infra.db.sql.service_with_hooks import SqlServiceWithHooks
 
+from .uniq import _as_tuple
+
 ColumnSpec = Union[str, Sequence[str]]
-
-
-def _as_tuple(spec: ColumnSpec) -> Tuple[str, ...]:
-    return (spec,) if isinstance(spec, str) else tuple(spec)
 
 
 def _all_present(data: Dict[str, Any], fields: Sequence[str]) -> bool:
@@ -34,8 +32,8 @@ def dedupe_sql_service(
     unique_ci: Iterable[ColumnSpec] = (),
     tenant_field: Optional[str] = None,
     messages: Optional[dict[Tuple[str, ...], str]] = None,
-    pre_create: Optional[Callable[[dict], dict]] = None,  # NEW
-    pre_update: Optional[Callable[[dict], dict]] = None,  # NEW
+    pre_create: Optional[Callable[[dict], dict]] = None,
+    pre_update: Optional[Callable[[dict], dict]] = None,
 ):
     """
     Build a Service subclass with uniqueness pre-checks:
@@ -44,26 +42,39 @@ def dedupe_sql_service(
       • Developer can override per-spec messages with `messages`.
     """
     Model = repo.model
+    pk_attr = repo.id_attr or "id"
     messages = messages or {}
 
-    def _build_where(spec: Tuple[str, ...], data: Dict[str, Any], ci: bool, exclude_id: Any | None):
+    def _build_where(
+        spec: Tuple[str, ...], data: Dict[str, Any], *, ci: bool, exclude_id: Any | None
+    ):
         clauses: List[Any] = []
         for col_name in spec:
             col = getattr(Model, col_name)
             val = data.get(col_name)
-            clauses.append(func.lower(col) == func.lower(val) if ci else col == val)
+
+            # Handle NULLs explicitly; LOWER(NULL) is NULL and breaks equality semantics.
+            if val is None:
+                clauses.append(col.is_(None))
+                continue
+
+            if ci and isinstance(val, str):
+                clauses.append(func.lower(col) == func.lower(val))
+            else:
+                clauses.append(col == val)
 
         if tenant_field and hasattr(Model, tenant_field):
             tcol = getattr(Model, tenant_field)
             tval = data.get(tenant_field)
             clauses.append(tcol.is_(None) if tval is None else tcol == tval)
 
-        if exclude_id is not None and hasattr(Model, "id"):
-            clauses.append(getattr(Model, "id") != exclude_id)
+        if exclude_id is not None and hasattr(Model, pk_attr):
+            clauses.append(getattr(Model, pk_attr) != exclude_id)
 
         return clauses
 
     async def _precheck(session, data: Dict[str, Any], *, exclude_id: Any | None) -> None:
+        # Check CI specs first to catch the broadest conflicts, then CS.
         for ci, spec_list in ((True, unique_ci), (False, unique_cs)):
             for spec in spec_list:
                 fields = _as_tuple(spec)
@@ -85,7 +96,7 @@ def dedupe_sql_service(
             try:
                 return await self.repo.create(session, data)
             except IntegrityError as e:
-                # DB race fallback; keep message generic (or inspect constraint if you prefer)
+                # Race fallback: let DB constraint be the last line of defense.
                 raise HTTPException(status_code=409, detail="Record already exists.") from e
 
         async def update(self, session, id_value, data):
