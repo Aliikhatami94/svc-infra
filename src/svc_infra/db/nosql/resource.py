@@ -36,11 +36,9 @@ class NoSqlResource:
     """
 
     # API mounting
-    prefix: str
-    document_model: Type[Any]
-
-    # optional overrides / compatibility
     collection: Optional[str] = None
+    prefix: str = ""
+    document_model: Optional[Type[Any]] = None
 
     # optional Pydantic schemas (auto-derived if omitted)
     read_schema: Optional[Type[Any]] = None
@@ -68,4 +66,11 @@ class NoSqlResource:
 
     # --- derived ---
     def resolved_collection(self) -> str:
-        return self.collection or get_collection_name(self.document_model)
+        if self.collection:
+            return self.collection
+        if self.document_model and hasattr(self.document_model, "__collection__"):
+            return getattr(self.document_model, "__collection__")
+        raise ValueError(
+            "No collection name resolved. Set `collection=` or define "
+            "`__collection__` on the document_model."
+        )
