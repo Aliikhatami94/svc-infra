@@ -1,8 +1,8 @@
-from svc_infra.db.nosql.resource import MongoResource
+from svc_infra.db.nosql.resource import NoSqlResource
 
 from .repository import NoSqlRepository
 
 __all__ = [
-    "MongoResource",
+    "NoSqlResource",
     "NoSqlRepository",
 ]
