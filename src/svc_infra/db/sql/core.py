@@ -36,7 +36,7 @@ def init_alembic(
     """
     Initialize alembic.ini + migrations/ scaffold.
 
-    Auto-detects async vs. sync from DATABASE_URL; defaults to sync if the URL
+    Auto-detects async vs. sync from SQL_URL; defaults to sync if the URL
     can't be resolved at init time.
 
     Returns:
@@ -49,7 +49,7 @@ def init_alembic(
     versions_dir = migrations_dir / "versions"
 
     alembic_ini = root / "alembic.ini"
-    sqlalchemy_url = os.getenv("DATABASE_URL", "")
+    sqlalchemy_url = os.getenv("SQL_URL", "")
     dialect_name = make_url(sqlalchemy_url).get_backend_name() if sqlalchemy_url else ""
     ini_contents = ALEMBIC_INI_TEMPLATE.format(
         script_location=script_location,
@@ -79,7 +79,7 @@ def init_alembic(
 
     pkgs = list(discover_packages or [])
 
-    # ---- Auto-detect async from DATABASE_URL (falls back to sync if unknown)
+    # ---- Auto-detect async from SQL_URL (falls back to sync if unknown)
     try:
         from sqlalchemy.engine import make_url as _make_url
 
@@ -124,7 +124,7 @@ def revision(
         >>> revision("..", "add orders", autogenerate=True)
 
     Requirements:
-        - DATABASE_URL must be set in the environment.
+        - SQL_URL must be set in the environment.
         - Model discovery is automatic (prefers ModelBase.metadata).
     """
     root = prepare_env()
@@ -132,8 +132,8 @@ def revision(
     repair_alembic_state_if_needed(cfg)
 
     if autogenerate and ensure_head_before_autogenerate:
-        if not (cfg.get_main_option("sqlalchemy.url") or os.getenv("DATABASE_URL")):
-            raise RuntimeError("DATABASE_URL is not set.")
+        if not (cfg.get_main_option("sqlalchemy.url") or os.getenv("SQL_URL")):
+            raise RuntimeError("SQL_URL is not set.")
         _ensure_db_at_head(cfg)
 
     command.revision(

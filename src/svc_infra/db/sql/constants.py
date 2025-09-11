@@ -5,7 +5,7 @@ from typing import Sequence
 
 # Environment variable names to look up for DB URL
 DEFAULT_DB_ENV_VARS: Sequence[str] = (
-    "DATABASE_URL",
+    "SQL_URL",
     "DB_URL",
 )
 

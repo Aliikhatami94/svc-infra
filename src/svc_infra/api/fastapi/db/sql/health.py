@@ -8,7 +8,7 @@ from .session import SqlSessionDep
 
 def _make_db_health_router(
     *,
-    prefix: str = "/_db/health",
+    prefix: str = "/_sql/health",
     include_in_schema: bool = False,
 ) -> APIRouter:
     """Internal factory for the DB health router."""

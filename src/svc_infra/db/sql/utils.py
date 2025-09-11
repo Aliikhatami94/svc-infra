@@ -40,7 +40,7 @@ def prepare_process_env(
     Prepare process environment so Alembic can import the project cleanly.
 
     Notes:
-        - Does NOT set DATABASE_URL (expect it to be set in your .env / environment).
+        - Does NOT set SQL_URL (expect it to be set in your .env / environment).
         - Discovery is automatic via env.py. 'discover_packages' is kept for
           backward-compat only; prefer leaving it None.
     """
@@ -130,11 +130,11 @@ def get_database_url_from_env(
 ) -> Optional[str]:
     """
     Resolve the database connection string, with support for:
-      - Primary env vars (in order): DEFAULT_DB_ENV_VARS (e.g. DATABASE_URL, PRIVATE_DATABASE_URL, DB_URL).
+      - Primary env vars (in order): DEFAULT_DB_ENV_VARS (e.g. SQL_URL, PRIVATE_SQL_URL, DB_URL).
       - Secret file pointers: <NAME>_FILE (reads file contents).
-      - Well-known locations: DATABASE_URL_FILE, /run/secrets/database_url.
+      - Well-known locations: SQL_URL_FILE, /run/secrets/database_url.
       - Composed from parts: DB_* (host, port, name, user, password, params).
-    When a value is found, it is also written back into os.environ["DATABASE_URL"] for downstream code.
+    When a value is found, it is also written back into os.environ["SQL_URL"] for downstream code.
     """
     # Load .env without clobbering existing process env
     load_dotenv(override=False)
@@ -150,7 +150,7 @@ def get_database_url_from_env(
             if os.path.isabs(s) and Path(s).exists():
                 file_val = _read_secret_from_file(s)
                 if file_val:
-                    os.environ["DATABASE_URL"] = file_val
+                    os.environ["SQL_URL"] = file_val
                     return file_val
             os.environ["DATABASE_URL"] = s
             return s

@@ -72,7 +72,7 @@ def _x_args_dict() -> dict:
 # --- Resolve effective DB URL (priority: -x -> env -> helper -> ini) ---
 _x = _x_args_dict()
 cli_dburl = _x.get("dburl", "").strip()
-env_dburl = os.getenv("DATABASE_URL", "").strip()
+env_dburl = os.getenv("SQL_URL", "").strip()
 try:
     helper_dburl = get_database_url_from_env(required=False) or ""
 except Exception:
@@ -83,7 +83,7 @@ effective_url = cli_dburl or env_dburl or helper_dburl or ini_dburl
 if not effective_url:
     raise RuntimeError(
         "No database URL found. Provide via:\n"
-        "  • env: DATABASE_URL=...\n"
+        "  • env: SQL_URL=...\n"
         "  • or CLI: alembic -x dburl=...\n"
         "  • or alembic.ini [sqlalchemy.url]\n"
     )

@@ -20,13 +20,13 @@ python -m svc_infra.db --help
 ## Database URL Handling
 
 - By design, `alembic.ini` has `sqlalchemy.url` blank. The runtime url comes from the environment.
-- Primary source is the `DATABASE_URL` env var.
-- You can override it per command with `--database-url`, which sets `DATABASE_URL` for that process only.
+- Primary source is the `SQL_URL` env var.
+- You can override it per command with `--database-url`, which sets `SQL_URL` for that process only.
 
 ### Examples:
 
 ```bash
-export DATABASE_URL="postgresql://user:pass@host:5432/dbname"
+export SQL_URL="postgresql://user:pass@host:5432/dbname"
 poetry run python -m svc_infra.db upgrade --project-root .
 ```
 
@@ -152,7 +152,7 @@ End-to-end helper: ensure DB exists, create Alembic scaffold if missing, create 
 ### Common runs:
 
 ```bash
-# Minimal (relies on DATABASE_URL in env)
+# Minimal (relies on SQL_URL in env)
 poetry run python -m svc_infra.db setup-and-migrate --project-root .
 ```
 
@@ -179,7 +179,7 @@ poetry run python -m svc_infra.db setup-and-migrate \
   --create-followup-revision false
 ```
 
-You can also pass `--database-url` to this command to avoid exporting `DATABASE_URL` globally.
+You can also pass `--database-url` to this command to avoid exporting `SQL_URL` globally.
 
 ---
 
@@ -296,12 +296,12 @@ poetry run python -m svc_infra.db scaffold \
 ### Path doesn't exist: …/migrations
 Run `init` (or `setup-and-migrate`) for that `--project-root`.
 
-### DATABASE_URL not set / could not parse URL
-Export `DATABASE_URL` or pass `--database-url` to the command.
+### SQL_URL not set / could not parse URL
+Export `SQL_URL` or pass `--database-url` to the command.
 
 **Example:**
 ```bash
-export DATABASE_URL="postgresql://user:pass@host:5432/db"
+export SQL_URL="postgresql://user:pass@host:5432/db"
 ```
 or
 ```bash

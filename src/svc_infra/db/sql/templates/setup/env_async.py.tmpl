@@ -67,7 +67,7 @@ def _x_args_dict() -> dict:
 # --- Resolve effective DB URL (priority: -x -> env -> helper -> ini) ---
 _x = _x_args_dict()
 cli_dburl = _x.get("dburl", "").strip()
-env_dburl = os.getenv("DATABASE_URL", "").strip()
+env_dburl = os.getenv("SQL_URL", "").strip()
 try:
     helper_dburl = get_database_url_from_env(required=False) or ""
 except Exception:

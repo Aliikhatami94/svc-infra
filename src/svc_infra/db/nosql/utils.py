@@ -12,7 +12,7 @@ from .constants import DEFAULT_MONGO_DB_ENV_VARS, DEFAULT_MONGO_ENV_VARS
 def prepare_process_env(project_root: Path | str) -> Path:
     """
     Prepare process environment (dotenv + PYTHONPATH) for code generation/tasks.
-    Mirrors the SQL helper but does not touch DATABASE_URL.
+    Mirrors the SQL helper but does not touch SQL_URL.
     """
     root = Path(project_root).resolve()
     load_dotenv(dotenv_path=root / ".env", override=False)

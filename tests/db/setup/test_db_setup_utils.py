@@ -14,8 +14,8 @@ from svc_infra.db.sql.utils import (
 
 
 def test_compose_url_from_parts_with_unix_socket(monkeypatch):
-    # Ensure DATABASE_URL / DB_URL absent so composition is used
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    # Ensure SQL_URL / DB_URL absent so composition is used
+    monkeypatch.delenv("SQL_URL", raising=False)
     monkeypatch.delenv("DB_URL", raising=False)
 
     monkeypatch.setenv("DB_DIALECT", "postgresql")
@@ -65,7 +65,7 @@ def test_build_alembic_config_uses_env_and_paths(tmp_path, monkeypatch):
     ini = project / "alembic.ini"
     ini.write_text("[alembic]\n")
 
-    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SQL_URL", "sqlite:///:memory:")
 
     cfg = build_alembic_config(project, script_location="migrations")
     assert cfg.get_main_option("script_location")

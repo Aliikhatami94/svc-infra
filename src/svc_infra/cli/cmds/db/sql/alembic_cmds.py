@@ -17,15 +17,15 @@ from svc_infra.db.sql.core import upgrade as core_upgrade
 
 
 def apply_database_url(database_url: Optional[str]) -> None:
-    """If provided, set DATABASE_URL for the current process."""
+    """If provided, set SQL_URL for the current process."""
     if database_url:
-        os.environ["DATABASE_URL"] = database_url
+        os.environ["SQL_URL"] = database_url
 
 
 def cmd_init(
     database_url: Optional[str] = typer.Option(
         None,
-        help="Database URL; overrides env DATABASE_URL for this command. "
+        help="Database URL; overrides env SQL_URL for this command. "
         "Async vs sync is auto-detected from the URL.",
     ),
     discover_packages: Optional[List[str]] = typer.Option(
@@ -37,7 +37,7 @@ def cmd_init(
 ):
     """
     Initialize Alembic scaffold. The env.py variant (async vs. sync) is
-    auto-detected from DATABASE_URL (if available at init time).
+    auto-detected from SQL_URL (if available at init time).
     """
     apply_database_url(database_url)
     core_init_alembic(

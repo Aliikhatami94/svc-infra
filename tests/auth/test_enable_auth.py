@@ -46,7 +46,7 @@ def test_add_auth_without_providers(monkeypatch):
     assert "/auth/user_me" in paths
 
     # no oauth routes should be registered
-    assert not any(p.startswith("/_db/auth/oauth") for p in paths)
+    assert not any(p.startswith("/_sql/auth/oauth") for p in paths)
 
 
 def test_add_auth_with_providers(monkeypatch):
@@ -92,4 +92,4 @@ def test_add_auth_with_providers(monkeypatch):
     paths = {r.path for r in app.routes if hasattr(r, "path")}
 
     # oauth router should be registered with the prefix passed through (/_db + default oauth_prefix)
-    assert "/_db/auth/oauth/callback" in paths
+    assert "/_sql/auth/oauth/callback" in paths

@@ -16,24 +16,24 @@ def runner():
 
 @pytest.fixture
 def mock_env():
-    original_db_url = os.environ.get("DATABASE_URL")
+    original_db_url = os.environ.get("SQL_URL")
     yield
     if original_db_url:
-        os.environ["DATABASE_URL"] = original_db_url
-    elif "DATABASE_URL" in os.environ:
-        del os.environ["DATABASE_URL"]
+        os.environ["SQL_URL"] = original_db_url
+    elif "SQL_URL" in os.environ:
+        del os.environ["SQL_URL"]
 
 
 class TestApplyDatabaseUrl:
     def testapply_database_url_sets_env(self, mock_env):
         test_url = "postgresql://test:test@localhost/testdb"
         apply_database_url(test_url)
-        assert os.environ["DATABASE_URL"] == test_url
+        assert os.environ["SQL_URL"] == test_url
 
     def testapply_database_url_none_does_nothing(self, mock_env):
-        original = os.environ.get("DATABASE_URL")
+        original = os.environ.get("SQL_URL")
         apply_database_url(None)
-        assert os.environ.get("DATABASE_URL") == original
+        assert os.environ.get("SQL_URL") == original
 
 
 class TestInitCommand:
@@ -68,7 +68,7 @@ class TestInitCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "postgresql://test:test@localhost/testdb"
+        assert os.environ["SQL_URL"] == "postgresql://test:test@localhost/testdb"
         mock_init.assert_called_once()
         args, kwargs = mock_init.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()
@@ -116,7 +116,7 @@ class TestRevisionCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "sqlite:///test.db"
+        assert os.environ["SQL_URL"] == "sqlite:///test.db"
         mock_revision.assert_called_once()
         args, kwargs = mock_revision.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()
@@ -157,7 +157,7 @@ class TestUpgradeCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "postgresql://test@localhost/db"
+        assert os.environ["SQL_URL"] == "postgresql://test@localhost/db"
         mock_upgrade.assert_called_once()
         args, kwargs = mock_upgrade.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()
@@ -189,7 +189,7 @@ class TestDowngradeCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "sqlite:///test.db"
+        assert os.environ["SQL_URL"] == "sqlite:///test.db"
         mock_downgrade.assert_called_once()
         args, kwargs = mock_downgrade.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()
@@ -221,7 +221,7 @@ class TestCurrentCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "postgresql://localhost/db"
+        assert os.environ["SQL_URL"] == "postgresql://localhost/db"
         mock_current.assert_called_once()
         args, kwargs = mock_current.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()
@@ -253,7 +253,7 @@ class TestHistoryCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "mysql://user@localhost/db"
+        assert os.environ["SQL_URL"] == "mysql://user@localhost/db"
         mock_history.assert_called_once()
         args, kwargs = mock_history.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()
@@ -285,7 +285,7 @@ class TestStampCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "sqlite:///test.db"
+        assert os.environ["SQL_URL"] == "sqlite:///test.db"
         mock_stamp.assert_called_once()
         args, kwargs = mock_stamp.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()
@@ -318,7 +318,7 @@ class TestMergeHeadsCommand:
         )
 
         assert result.exit_code == 0
-        assert os.environ["DATABASE_URL"] == "postgresql://localhost/db"
+        assert os.environ["SQL_URL"] == "postgresql://localhost/db"
         mock_merge.assert_called_once()
         args, kwargs = mock_merge.call_args
         assert kwargs["project_root"] == Path("/tmp/test").resolve()

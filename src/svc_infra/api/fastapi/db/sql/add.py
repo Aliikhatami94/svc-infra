@@ -52,7 +52,7 @@ def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
         app.include_router(router)
 
 
-def add_sql_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DATABASE_URL") -> None:
+def add_sql_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "SQL_URL") -> None:
     """Configure DB lifecycle for the app (either explicit URL or from env)."""
     if url:
 
@@ -80,7 +80,7 @@ def add_sql_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "DATAB
 
 
 def add_sql_health(
-    app: FastAPI, *, prefix: str = "/_db/health", include_in_schema: bool = False
+    app: FastAPI, *, prefix: str = "/_sql/health", include_in_schema: bool = False
 ) -> None:
     app.include_router(_make_db_health_router(prefix=prefix, include_in_schema=include_in_schema))
 

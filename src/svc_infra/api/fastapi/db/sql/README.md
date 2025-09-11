@@ -66,12 +66,12 @@ include_resources(
 uvicorn app:app --reload
 ```
 
-Now you have endpoints under `/_db/projects`:
-- `GET /_db/projects` – list with pagination, search, ordering
-- `POST /_db/projects` – create
-- `GET /_db/projects/{id}` – retrieve
-- `PATCH /_db/projects/{id}` – update
-- `DELETE /_db/projects/{id}` – delete (soft-delete if enabled)
+Now you have endpoints under `/_sql/projects`:
+- `GET /_sql/projects` – list with pagination, search, ordering
+- `POST /_sql/projects` – create
+- `GET /_sql/projects/{id}` – retrieve
+- `PATCH /_sql/projects/{id}` – update
+- `DELETE /_sql/projects/{id}` – delete (soft-delete if enabled)
 
 ---
 
@@ -108,7 +108,7 @@ include_resources(app, [
 
 ## Notes
 
-- Routers mount under `/_db` by default (e.g., `/_db/projects`)
+- Routers mount under `/_db` by default (e.g., `/_sql/projects`)
 - Searching and ordering work automatically if you configure `search_fields`, `ordering_default`, and `allowed_order_fields`
 - Soft delete requires a `deleted_at` column in your model
 
