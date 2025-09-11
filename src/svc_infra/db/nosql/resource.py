@@ -13,17 +13,17 @@ def _snake(name: str) -> str:
 
 
 def _default_collection_for(model: type) -> str:
-    # pluralize a bit naively; good enough for defaults
     base = _snake(getattr(model, "__name__", "item"))
     return base if base.endswith("s") else base + "s"
 
 
 def get_collection_name(document_model: type) -> str:
-    # prefer explicit __collection__
     name = getattr(document_model, "__collection__", None)
-    if isinstance(name, str) and name.strip():
-        return name.strip()
-    return _default_collection_for(document_model)
+    return (
+        name.strip()
+        if isinstance(name, str) and name.strip()
+        else _default_collection_for(document_model)
+    )
 
 
 @dataclass
@@ -64,13 +64,15 @@ class NoSqlResource:
     read_exclude: tuple[str, ...] = ()
     update_exclude: tuple[str, ...] = ()
 
-    # --- derived ---
+    def __post_init__(self):
+        if not self.collection and self.document_model:
+            self.collection = get_collection_name(self.document_model)
+
     def resolved_collection(self) -> str:
         if self.collection:
             return self.collection
-        if self.document_model and hasattr(self.document_model, "__collection__"):
-            return getattr(self.document_model, "__collection__")
+        if self.document_model:
+            return get_collection_name(self.document_model)
         raise ValueError(
-            "No collection name resolved. Set `collection=` or define "
-            "`__collection__` on the document_model."
+            "No collection name resolved. Set `collection=` or define a document_model with __collection__."
         )

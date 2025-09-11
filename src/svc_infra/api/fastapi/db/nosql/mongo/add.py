@@ -52,7 +52,7 @@ def add_mongo_health(
 def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> None:
     for r in resources:
         repo = NoSqlRepository(
-            collection_name=r.collection,
+            collection_name=r.resolved_collection(),
             id_field=r.id_field,
             soft_delete=r.soft_delete,
             soft_delete_field=r.soft_delete_field,
