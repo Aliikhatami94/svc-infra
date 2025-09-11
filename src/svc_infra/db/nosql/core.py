@@ -23,12 +23,12 @@ async def _ping(db: AsyncIOMotorDatabase) -> None:
 
 
 async def _ensure_collections(db: AsyncIOMotorDatabase, names: Iterable[str]) -> None:
-    existing = {c["name"] async for c in db.list_collections()}
+    # Motor: returns list[str], must be awaited
+    existing = set(await db.list_collection_names())
     for name in names:
         if name not in existing:
-            await db.create_collection(
-                name
-            )  # created lazily in Mongo only on first insert, force it
+            # Mongo only creates a collection on first insert; we force creation
+            await db.create_collection(name)
 
 
 async def _apply_indexes(
