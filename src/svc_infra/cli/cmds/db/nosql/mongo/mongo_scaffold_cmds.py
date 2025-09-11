@@ -8,6 +8,7 @@ import typer
 from svc_infra.db.nosql.scaffold import (
     scaffold_core,
     scaffold_documents_core,
+    scaffold_resources_core,
     scaffold_schemas_core,
 )
 
@@ -88,6 +89,30 @@ def cmd_scaffold_schemas(
     typer.echo(res)
 
 
+def cmd_scaffold_resources(
+    dest_dir: Path = typer.Option(..., "--dest-dir", resolve_path=True),
+    entity_name: str = typer.Option(
+        "Item",
+        "--entity-name",
+        help="Used only to prefill example placeholders.",
+    ),
+    filename: Optional[str] = typer.Option(
+        None,
+        "--filename",
+        help='Output filename (default: "resources.py")',
+    ),
+    overwrite: bool = typer.Option(False, "--overwrite/--no-overwrite"),
+):
+    """Scaffold a starter resources.py (empty RESOURCES + index_builders())."""
+    res = scaffold_resources_core(
+        dest_dir=dest_dir,
+        entity_name=entity_name,
+        filename=filename,
+        overwrite=overwrite,
+    )
+    typer.echo(res)
+
+
 def register(app: typer.Typer) -> None:
     """
     Register Mongo scaffold commands on the given Typer app.
@@ -99,3 +124,4 @@ def register(app: typer.Typer) -> None:
     app.command("mongo-scaffold")(cmd_scaffold)
     app.command("mongo-scaffold-documents")(cmd_scaffold_documents)
     app.command("mongo-scaffold-schemas")(cmd_scaffold_schemas)
+    app.command("mongo-scaffold-resources")(cmd_scaffold_resources)

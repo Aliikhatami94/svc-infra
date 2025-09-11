@@ -1,0 +1,25 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Optional, Any, Dict
+
+from pydantic import BaseModel, Field
+from svc_infra.db.nosql.types import PyObjectId
+
+
+class ${Entity}Doc(BaseModel):
+    __collection__ = "${collection_name}"
+
+    _id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    name: str
+    is_active: bool = True
+    tenant_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True,
+        "from_attributes": True,
+        "json_encoders": {PyObjectId: str},
+    }

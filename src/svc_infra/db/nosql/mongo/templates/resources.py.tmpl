@@ -1,0 +1,28 @@
+from __future__ import annotations
+from typing import List, Dict
+from pymongo import IndexModel
+
+from svc_infra.db.nosql.resource import NoSqlResource
+# from svc_infra.db.nosql.uniq import make_mongo_unique_indexes
+# from yourpackage.yourmodule.documents import ${Entity}Doc  # import your docs
+
+# Expand this list as you add collections
+RESOURCES: List[NoSqlResource] = [
+    # Example:
+    # NoSqlResource(
+    #     prefix="/${collection_name}",
+    #     document_model=${Entity}Doc,
+    #     search_fields=["name"],
+    # ),
+]
+
+def index_builders() -> Dict[str, List[IndexModel]]:
+    """Map collection name -> list[IndexModel]. Optional but recommended."""
+    return {
+        # Example:
+        # "${collection_name}": make_mongo_unique_indexes(
+        #     collection_name="${collection_name}",
+        #     unique_ci=["name"],
+        #     tenant_field="tenant_id",
+        # ),
+    }

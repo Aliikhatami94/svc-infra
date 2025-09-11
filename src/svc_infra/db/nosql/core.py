@@ -63,19 +63,20 @@ async def prepare_mongo(
     await _ping(db)
 
     # 1) collections
-    colls = [r.collection for r in resources]
+    colls = [r.resolved_collection() for r in resources]
     await _ensure_collections(db, colls)
     created_colls = colls  # create_collection is idempotent; we treat as ensured
 
     # 2) indexes
     created_idx: dict[str, list[str]] = {}
     for r in resources:
+        coll = r.resolved_collection()
         idx_models = None
-        if index_builders and r.collection in index_builders:
-            idx_models = index_builders[r.collection]
+        if index_builders and coll in index_builders:
+            idx_models = index_builders[coll]
         if idx_models:
-            names = await _apply_indexes(db, collection=r.collection, indexes=idx_models)
-            created_idx[r.collection] = names
+            names = await _apply_indexes(db, collection=coll, indexes=idx_models)
+            created_idx[coll] = names
 
     return PrepareResult(ok=True, created_collections=created_colls, created_indexes=created_idx)
 

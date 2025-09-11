@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel
+from svc_infra.db.nosql.types import PyObjectId
+
+
+class ${Entity}Read(BaseModel):
+    _id: Optional[PyObjectId] = None
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+    tenant_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ${Entity}Create(BaseModel):
+    name: str
+    tenant_id: Optional[str] = None
+    is_active: Optional[bool] = True
+
+
+class ${Entity}Update(BaseModel):
+    name: Optional[str] = None
+    tenant_id: Optional[str] = None
+    is_active: Optional[bool] = None
