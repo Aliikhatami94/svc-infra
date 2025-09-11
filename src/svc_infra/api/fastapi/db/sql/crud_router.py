@@ -13,8 +13,8 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
+from svc_infra.db.sql.service import SqlService
 
-from .service import SqlService
 from .session import SqlSessionDep
 
 CreateModel = TypeVar("CreateModel", bound=BaseModel)

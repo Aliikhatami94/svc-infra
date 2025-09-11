@@ -6,17 +6,20 @@ from typing import Optional, Sequence
 
 from fastapi import FastAPI
 
-from svc_infra.db.nosql.mongo.resource import MongoResource
+from svc_infra.db.nosql.management import make_document_crud_schemas
+from svc_infra.db.nosql.mongo.client import close_mongo, init_mongo
 from svc_infra.db.nosql.repository import NoSqlRepository
+from svc_infra.db.nosql.resource import NoSqlResource
+from svc_infra.db.nosql.service import NoSqlService
 
-from .client import close_mongo, init_mongo
-from .crud_router import make_mongo_crud_router
+from .crud_router import make_crud_router_plus_mongo
 from .health import make_mongo_health_router
 
+# --- lifecycle ---------------------------------------------------------------
 
-def add_mongo_database(
-    app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "MONGO_URL"
-) -> None:
+
+def add_mongo_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "MONGO_URL") -> None:
+    """Configure Mongo lifecycle for the app (either explicit URL or env)."""
     if url:
 
         @asynccontextmanager
@@ -31,14 +34,14 @@ def add_mongo_database(
         return
 
     @app.on_event("startup")
-    async def _startup():
+    async def _startup() -> None:  # noqa: ANN202
         env_url = os.getenv(dsn_env)
         if not env_url:
             raise RuntimeError(f"Missing environment variable {dsn_env} for Mongo URL")
         await init_mongo()
 
     @app.on_event("shutdown")
-    async def _shutdown():
+    async def _shutdown() -> None:  # noqa: ANN202
         await close_mongo()
 
 
@@ -48,17 +51,57 @@ def add_mongo_health(
     app.include_router(make_mongo_health_router(prefix=prefix, include_in_schema=include_in_schema))
 
 
-def add_mongo_resources(app: FastAPI, resources: Sequence[MongoResource]) -> None:
+# --- resources ---------------------------------------------------------------
+
+
+def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> None:
     for r in resources:
-        repo = NoSqlRepository(collection_name=r.collection)
-        router = make_mongo_crud_router(
+        repo = NoSqlRepository(
+            collection_name=r.collection,
+            id_field=r.id_field,
+            soft_delete=r.soft_delete,
+            soft_delete_field=r.soft_delete_field,
+            soft_delete_flag_field=r.soft_delete_flag_field,
+        )
+
+        # 1) explicit app-provided factory wins
+        if r.service_factory:
+            svc = r.service_factory(repo)
+        # 2) else, generic service
+        else:
+            svc = NoSqlService(repo)
+
+        # schemas: explicit or auto from document_model
+        if r.read_schema and r.create_schema and r.update_schema:
+            Read, Create, Update = r.read_schema, r.create_schema, r.update_schema
+        elif r.document_model is not None:
+            Read, Create, Update = make_document_crud_schemas(
+                r.document_model,
+                create_exclude=r.create_exclude,
+                read_name=r.read_name,
+                create_name=r.create_name,
+                update_name=r.update_name,
+                read_exclude=r.read_exclude,
+                update_exclude=r.update_exclude,
+            )
+        else:
+            raise RuntimeError(
+                f"Resource for collection '{r.collection}' requires either explicit schemas "
+                f"(read/create/update) or a 'document_model' to derive them."
+            )
+
+        router = make_crud_router_plus_mongo(
             collection=r.collection,
             repo=repo,
-            read_schema=r.read_schema,
-            create_schema=r.create_schema,
-            update_schema=r.update_schema,
+            service=svc,
+            read_schema=Read,
+            create_schema=Create,
+            update_schema=Update,
             prefix=r.prefix,
             tags=r.tags,
             search_fields=r.search_fields,
+            # you can wire these later on a per-resource basis:
+            default_ordering=None,
+            allowed_order_fields=None,
         )
         app.include_router(router)

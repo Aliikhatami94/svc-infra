@@ -6,12 +6,12 @@ from typing import Optional, Sequence
 
 from fastapi import FastAPI
 
+from svc_infra.db.sql.management import make_crud_schemas
 from svc_infra.db.sql.repository import SqlRepository
 from svc_infra.db.sql.resource import SqlResource
 
 from .crud_router import make_crud_router_plus_sql
 from .health import _make_db_health_router
-from .management import make_crud_schemas
 from .session import dispose_session, initialize_session
 
 
@@ -22,7 +22,7 @@ def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
         if r.service_factory:
             svc = r.service_factory(repo)
         else:
-            from .service import SqlService
+            from svc_infra.db.sql.service import SqlService
 
             svc = SqlService(repo)
 

@@ -1,4 +1,5 @@
-from .mongo.resource import MongoResource
+from svc_infra.db.nosql.resource import MongoResource
+
 from .repository import NoSqlRepository
 
 __all__ = [

@@ -1,6 +1,6 @@
 from typing import Any, Callable, Optional
 
-from .service import SqlService
+from svc_infra.db.sql.service import SqlService
 
 PreHook = Callable[[dict[str, Any]], dict[str, Any]]
 

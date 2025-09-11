@@ -22,8 +22,6 @@ class SqlService:
     async def pre_update(self, data: dict[str, Any]) -> dict[str, Any]:
         return data
 
-    # pass-through ops
-
     async def list(self, session: AsyncSession, *, limit: int, offset: int, order_by=None):
         return await self.repo.list(session, limit=limit, offset=offset, order_by=order_by)
 

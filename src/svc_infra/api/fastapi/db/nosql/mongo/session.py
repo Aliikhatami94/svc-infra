@@ -4,7 +4,7 @@ from typing import AsyncGenerator, Optional
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
-from .settings import MongoSettings
+from svc_infra.db.nosql.mongo.settings import MongoSettings
 
 _client: Optional[AsyncIOMotorClient] = None
 _db: Optional[AsyncIOMotorDatabase] = None

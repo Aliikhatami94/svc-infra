@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .client import get_db
+from svc_infra.db.nosql.mongo.client import get_db
 
 
 async def _ping():

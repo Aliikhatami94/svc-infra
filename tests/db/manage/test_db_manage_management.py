@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import JSON, Boolean, Date, DateTime, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from svc_infra.api.fastapi.db.sql.management import make_crud_schemas
+from svc_infra.db.sql.management import make_crud_schemas
 
 
 class Base(DeclarativeBase):

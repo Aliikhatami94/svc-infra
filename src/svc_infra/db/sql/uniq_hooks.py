@@ -6,8 +6,8 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from svc_infra.api.fastapi.db.sql.service_hooks import SqlServiceWithHooks
 from svc_infra.db.sql.repository import SqlRepository
+from svc_infra.db.sql.service_with_hooks import SqlServiceWithHooks
 
 ColumnSpec = Union[str, Sequence[str]]
 

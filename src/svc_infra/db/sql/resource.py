@@ -7,7 +7,7 @@ from svc_infra.db.sql.repository import SqlRepository
 
 if TYPE_CHECKING:
     # TYPE_CHECKING prevents a runtime import; only used by type checkers
-    from svc_infra.api.fastapi.db.sql.service import SqlService
+    from svc_infra.db.sql.service import SqlService
 
 
 @dataclass
