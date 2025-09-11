@@ -10,7 +10,7 @@ from svc_infra.db.nosql.types import PyObjectId
 class ${Entity}Doc(BaseModel):
     __collection__ = "${collection_name}"
 
-    _id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
     name: str
     is_active: bool = True
     tenant_id: Optional[str] = None

@@ -8,8 +8,8 @@ Generate both document + CRUD schemas.
 ```bash
 svc-infra mongo-scaffold \
   --entity-name Product \
-  --documents-dir src/apiframeworks_api/mongo/products \
-  --schemas-dir src/apiframeworks_api/mongo/products \
+  --documents-dir app/db/mongo/documents \
+  --schemas-dir app/db/mongo/documents  \
   --same-dir
 ```
 
@@ -58,8 +58,8 @@ End-to-end: resolve env, init client, ensure collections & indexes, close client
 
 ```bash
 svc-infra mongo-setup-and-prepare \
-  --resources app.db.mongo.resources:RESOURCES \
-  --index-builders app.db.mongo.resources:index_builders
+  --resources src.apiframeworks_api.mongo.resources:RESOURCES \
+  --index-builders src.apiframeworks_api.mongo.resources:index_builders
 ```
 
 ### 7. `mongo-ping`
@@ -84,7 +84,3 @@ In total you have **7 CLI commands**:
 - `mongo-ping`
 
 ---
-
-## 💡 Future Enhancement
-
-Do you want me to also mirror the SQL setup-and-migrate style convenience command (single end-to-end entrypoint) for Mongo, so that you don't even need to pass `--resources`/`--index-builders`?
