@@ -43,13 +43,17 @@ def scaffold_core(
     schemas_dir = normalize_dir(documents_dir if same_dir else schemas_dir)
 
     ent = pascal(entity_name)
+    coll = plural_snake(ent)
+
     documents_txt = render_template(
         tmpl_dir="svc_infra.db.nosql.mongo.templates",
         name="documents.py.tmpl",
-        subs={"Entity": ent},
+        subs={"Entity": ent, "collection_name": coll},
     )
     schemas_txt = render_template(
-        tmpl_dir="svc_infra.db.nosql.mongo.templates", name="schemas.py.tmpl", subs={"Entity": ent}
+        tmpl_dir="svc_infra.db.nosql.mongo.templates",
+        name="schemas.py.tmpl",
+        subs={"Entity": ent},  # (only if your schemas.tmpl doesn't need collection_name)
     )
 
     if same_dir:
@@ -83,10 +87,12 @@ def scaffold_documents_core(
 ) -> Dict[str, Any]:
     dest = normalize_dir(dest_dir)
     ent = pascal(entity_name)
+    coll = plural_snake(ent)
+
     txt = render_template(
         tmpl_dir="svc_infra.db.nosql.mongo.templates",
         name="documents.py.tmpl",
-        subs={"Entity": ent},
+        subs={"Entity": ent, "collection_name": coll},
     )
     filename = documents_filename or f"{snake(entity_name)}.py"
     res = write(dest / filename, txt, overwrite)
