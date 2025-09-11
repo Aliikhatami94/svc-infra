@@ -1,7 +1,13 @@
 import importlib.resources as pkg
 from pathlib import Path
 from string import Template as _T
-from typing import Any, Dict
+from typing import Any, Dict, Sequence, Tuple, Union
+
+KeySpec = Union[str, Sequence[str]]
+
+
+def as_tuple(spec: KeySpec) -> Tuple[str, ...]:
+    return (spec,) if isinstance(spec, str) else tuple(spec)
 
 
 def normalize_dir(p: Path | str) -> Path:

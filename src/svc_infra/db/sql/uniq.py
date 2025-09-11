@@ -1,21 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Iterable, List, Optional, Tuple, Type
 
 from sqlalchemy import Index, func
 
-ColumnSpec = Union[str, Sequence[str]]
-
-
-def _as_tuple(spec: ColumnSpec) -> Tuple[str, ...]:
-    return (spec,) if isinstance(spec, str) else tuple(spec)
+from svc_infra.db.utils import KeySpec
+from svc_infra.db.utils import as_tuple as _as_tuple
 
 
 def make_unique_sql_indexes(
     model: Type[Any],
     *,
-    unique_cs: Iterable[ColumnSpec] = (),
-    unique_ci: Iterable[ColumnSpec] = (),
+    unique_cs: Iterable[KeySpec] = (),
+    unique_ci: Iterable[KeySpec] = (),
     tenant_field: Optional[str] = None,
     name_prefix: str = "uq",
 ) -> List[Index]:

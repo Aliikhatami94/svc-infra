@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple
 
 from fastapi import HTTPException
 
+from svc_infra.db.utils import KeySpec
+from svc_infra.db.utils import as_tuple as _as_tuple
+
 from .repository import NoSqlRepository
 from .service_with_hooks import NoSqlServiceWithHooks
-
-FieldSpec = Union[str, Sequence[str]]
-
-
-def _as_tuple(spec: FieldSpec) -> Tuple[str, ...]:
-    return (spec,) if isinstance(spec, str) else tuple(spec)
 
 
 def _all_present(data: Dict[str, Any], fields: Sequence[str]) -> bool:
@@ -56,8 +53,8 @@ def _build_where(
 def dedupe_nosql_service(
     repo: NoSqlRepository,
     *,
-    unique_cs: Iterable[FieldSpec] = (),
-    unique_ci: Iterable[FieldSpec] = (),
+    unique_cs: Iterable[KeySpec] = (),
+    unique_ci: Iterable[KeySpec] = (),
     tenant_field: Optional[str] = None,
     messages: Optional[dict[Tuple[str, ...], str]] = None,
     pre_create: Optional[Callable[[dict], dict]] = None,
