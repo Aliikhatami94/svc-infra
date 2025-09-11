@@ -15,8 +15,6 @@ from svc_infra.db.nosql.service import NoSqlService
 from .crud_router import make_crud_router_plus_mongo
 from .health import make_mongo_health_router
 
-# --- lifecycle ---------------------------------------------------------------
-
 
 def add_mongo_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "MONGO_URL") -> None:
     """Configure Mongo lifecycle for the app (either explicit URL or env)."""
@@ -49,9 +47,6 @@ def add_mongo_health(
     app: FastAPI, *, prefix: str = "/_mongo/health", include_in_schema: bool = False
 ) -> None:
     app.include_router(make_mongo_health_router(prefix=prefix, include_in_schema=include_in_schema))
-
-
-# --- resources ---------------------------------------------------------------
 
 
 def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> None:
@@ -100,7 +95,6 @@ def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> Non
             prefix=r.prefix,
             tags=r.tags,
             search_fields=r.search_fields,
-            # you can wire these later on a per-resource basis:
             default_ordering=None,
             allowed_order_fields=None,
         )

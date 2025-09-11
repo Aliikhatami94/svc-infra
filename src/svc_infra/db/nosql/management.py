@@ -9,7 +9,9 @@ _TS_FIELDS = {"created_at", "updated_at"}
 
 
 def _is_optional(annotation: Any) -> bool:
-    return get_origin(annotation) is Optional or (get_origin(annotation) is Union and type(None) in get_args(annotation))  # type: ignore[name-defined]
+    return get_origin(annotation) is Optional or (
+        get_origin(annotation) is Union and type(None) in get_args(annotation)
+    )
 
 
 def make_document_crud_schemas(
@@ -38,7 +40,7 @@ def make_document_crud_schemas(
     update_ex = set(update_exclude)
 
     for name, field in annotations.items():
-        T = field.annotation or Any  # type: ignore[name-defined]
+        T = field.annotation or Any
         required = field.is_required()
 
         # Read: include unless excluded; make Optional
