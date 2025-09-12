@@ -86,6 +86,14 @@ def cmd_prepare(
     mongo_db: Optional[str] = typer.Option(
         None, "--mongo-db", help="Overrides env MONGO_DB for this command."
     ),
+    service_id: Optional[str] = typer.Option(
+        None,
+        "--service-id",
+        help="Stable ID for this service/app. Defaults to top-level module name.",
+    ),
+    allow_rebind: bool = typer.Option(
+        False, "--allow-rebind", help="Permit moving to a different DB."
+    ),
 ):
     """
     Ensure Mongo is reachable, collections exist, and indexes are applied.
@@ -94,14 +102,10 @@ def cmd_prepare(
     open the client, then delegate all validation/locking to core.prepare_mongo().
     """
     _apply_mongo_env(mongo_url, mongo_db)
-
-    # Bootstrap .env and PYTHONPATH; leave *validation* to core.
     prepare_process_env("..")
-
     resources = _normalize_resources(_load_obj(resources_path))
-    index_builders = None
-    if indexes_path:
-        index_builders = _normalize_index_builders(_load_obj(indexes_path))
+    index_builders = _normalize_index_builders(_load_obj(indexes_path)) if indexes_path else None
+    sid = service_id or _default_service_id_from_resources_path(resources_path)
 
     import asyncio
 
@@ -111,6 +115,8 @@ def cmd_prepare(
             result = await core_prepare_mongo(
                 resources=resources,
                 index_builders=index_builders,
+                service_id=sid,
+                allow_rebind=allow_rebind,
             )
             return {
                 "ok": result.ok,
@@ -122,6 +128,13 @@ def cmd_prepare(
 
     res = asyncio.run(_run())
     typer.echo(res)
+
+
+def _default_service_id_from_resources_path(resources_path: str) -> str:
+    # e.g. "apiframeworks_api.mongo.resources:RESOURCES" -> "apiframeworks_api"
+    mod = resources_path.split(":", 1)[0]
+    top = mod.split(".", 1)[0]
+    return top or "service"
 
 
 def cmd_setup_and_prepare(
@@ -141,21 +154,29 @@ def cmd_setup_and_prepare(
     mongo_db: Optional[str] = typer.Option(
         None, "--mongo-db", help="Overrides env MONGO_DB for this command."
     ),
+    service_id: Optional[str] = typer.Option(
+        None,
+        "--service-id",
+        help="Stable ID for this service/app. Defaults to top-level module name.",
+    ),
+    allow_rebind: bool = typer.Option(
+        False, "--allow-rebind", help="Permit moving to a different DB."
+    ),
 ):
     """
     Synchronous, end-to-end helper that delegates entirely to core.setup_and_prepare().
     All env resolution, validation, and DB locking are handled in core.
     """
     _apply_mongo_env(mongo_url, mongo_db)
-
     resources = _normalize_resources(_load_obj(resources_path))
-    index_builders = None
-    if indexes_path:
-        index_builders = _normalize_index_builders(_load_obj(indexes_path))
+    index_builders = _normalize_index_builders(_load_obj(indexes_path)) if indexes_path else None
+    sid = service_id or _default_service_id_from_resources_path(resources_path)
 
     res = core_setup_and_prepare(
         resources=resources,
         index_builders=index_builders,
+        service_id=sid,
+        allow_rebind=allow_rebind,
     )
     typer.echo(res)
 

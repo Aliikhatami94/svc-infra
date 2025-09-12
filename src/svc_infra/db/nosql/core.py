@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence
 
@@ -40,20 +39,40 @@ async def _apply_indexes(
 
 
 # collection + doc used to "lock" the chosen DB name for this app
-_META_COLL = "__infra_meta"
-_DB_LOCK_ID = "db_lock"
+_REG_DB = "__infra_registry__"
+_REG_COLL = "db_locks"
 
 
-async def assert_db_locked(db, expected_db_name: str, *, allow_rebind: bool = False):
-    doc = await db[_META_COLL].find_one({"_id": _DB_LOCK_ID}, projection={"db_name": 1})
+async def assert_db_locked(
+    db, expected_db_name: str, *, service_id: str, allow_rebind: bool = False
+):
+    """
+    Enforce one-DB-per-service lock across the cluster by storing the lock
+    in a fixed registry database, not the app database.
+    """
+    registry = db.client.get_database(_REG_DB)
+    # make sure we can upsert safely
+    await registry[_REG_COLL].create_index("service_id", unique=True)
+
+    doc = await registry[_REG_COLL].find_one({"service_id": service_id}, projection={"db_name": 1})
     if doc is None:
-        await db[_META_COLL].insert_one({"_id": _DB_LOCK_ID, "db_name": expected_db_name})
+        await registry[_REG_COLL].insert_one(
+            {"service_id": service_id, "db_name": expected_db_name}
+        )
         return
+
     locked = doc.get("db_name")
     if locked != expected_db_name and not allow_rebind:
         raise RuntimeError(
-            f"Service locked to Mongo DB '{locked}', but current target is '{expected_db_name}'. "
-            "Use an explicit rebind override if you intend to migrate."
+            f"Service '{service_id}' locked to Mongo DB '{locked}', "
+            f"but current target is '{expected_db_name}'. "
+            f"Use allow_rebind=True (or CLI flag) if you intend to move."
+        )
+
+    if allow_rebind and locked != expected_db_name:
+        await registry[_REG_COLL].update_one(
+            {"service_id": service_id},
+            {"$set": {"db_name": expected_db_name}},
         )
 
 
@@ -68,6 +87,8 @@ async def prepare_mongo(
     *,
     resources: Sequence[NoSqlResource],
     index_builders: Optional[dict[str, Sequence[IndexModel]]] = None,
+    service_id: str,
+    allow_rebind: bool = False,
 ) -> PrepareResult:
     """
     Ensure Mongo is reachable, collections exist, and indexes are applied.
@@ -80,14 +101,12 @@ async def prepare_mongo(
     db = await get_db()
     await _ping(db)
 
-    # --- enforce one-db-per-service guardrail ---
     expected_db = get_mongo_dbname_from_env(required=True)
-    # db.name is the actual database we’re connected to
     if db.name != expected_db:
-        # This catches mis-wiring of client construction vs env, before the lock
         raise RuntimeError(f"Connected to Mongo DB '{db.name}', but env says '{expected_db}'.")
 
-    await assert_db_locked(db, expected_db)
+    # cluster-scope lock (in __infra_registry__)
+    await assert_db_locked(db, expected_db, service_id=service_id, allow_rebind=allow_rebind)
 
     # 1) collections
     colls = [r.resolved_collection() for r in resources]
@@ -110,6 +129,8 @@ def setup_and_prepare(
     *,
     resources: Sequence[NoSqlResource],
     index_builders: Optional[dict[str, Sequence[IndexModel]]] = None,
+    service_id: str,
+    allow_rebind: bool = False,
 ) -> dict:
     """
     Synchronous entrypoint to:
@@ -125,7 +146,12 @@ def setup_and_prepare(
     async def _run():
         await init_mongo()
         try:
-            result = await prepare_mongo(resources=resources, index_builders=index_builders)
+            result = await prepare_mongo(
+                resources=resources,
+                index_builders=index_builders,
+                service_id=service_id,
+                allow_rebind=allow_rebind,
+            )
             return {
                 "ok": result.ok,
                 "project_root": str(root),
@@ -134,5 +160,7 @@ def setup_and_prepare(
             }
         finally:
             await close_mongo()
+
+    import asyncio
 
     return asyncio.run(_run())
