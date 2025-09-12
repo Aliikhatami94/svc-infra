@@ -92,11 +92,8 @@ async def prepare_mongo(
 ) -> PrepareResult:
     """
     Ensure Mongo is reachable, collections exist, and indexes are applied.
-
-    Args:
-        resources: your NoSqlResource definitions.
-        index_builders: optional precomputed IndexModel sequences keyed by collection name
-                        (e.g., from make_mongo_unique_indexes).
+    This is the async entrypoint, assuming env is resolved and client is init.
+    We also enforce a cluster-wide lock on the chosen DB name for this service.
     """
     db = await get_db()
     await _ping(db)

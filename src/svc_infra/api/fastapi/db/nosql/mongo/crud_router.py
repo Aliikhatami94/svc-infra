@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Annotated, Any, Optional, Sequence, Type, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
