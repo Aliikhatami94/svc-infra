@@ -41,30 +41,19 @@ async def _apply_indexes(
 
 # collection + doc used to "lock" the chosen DB name for this app
 _META_COLL = "__infra_meta"
-_DB_LOCK_ID = "db_lock"  # stable _id
+_DB_LOCK_ID = "db_lock"
 
 
-async def assert_db_locked(
-    db: AsyncIOMotorDatabase, expected_db_name: str, *, allow_rebind: bool = False
-) -> None:
-    """
-    Ensure this app only uses a single Mongo database.
-    On first run: write the lock doc.
-    Thereafter: if the existing lock's db_name != expected_db_name, raise.
-    Set allow_rebind=True only in a controlled migration.
-    """
-    current = await db[_META_COLL].find_one({"_id": _DB_LOCK_ID}, projection={"db_name": 1})
-    if current is None:
-        # first run in this database — write the lock
+async def assert_db_locked(db, expected_db_name: str, *, allow_rebind: bool = False):
+    doc = await db[_META_COLL].find_one({"_id": _DB_LOCK_ID}, projection={"db_name": 1})
+    if doc is None:
         await db[_META_COLL].insert_one({"_id": _DB_LOCK_ID, "db_name": expected_db_name})
         return
-
-    locked = current.get("db_name")
+    locked = doc.get("db_name")
     if locked != expected_db_name and not allow_rebind:
         raise RuntimeError(
-            f"This service is locked to Mongo DB '{locked}', but your env points to '{expected_db_name}'. "
-            "If you truly need to switch databases, run setup with an explicit override (allow_rebind=True) "
-            "and perform a data migration, or start a separate service instance."
+            f"Service locked to Mongo DB '{locked}', but current target is '{expected_db_name}'. "
+            "Use an explicit rebind override if you intend to migrate."
         )
 
 
@@ -92,7 +81,7 @@ async def prepare_mongo(
     await _ping(db)
 
     # --- enforce one-db-per-service guardrail ---
-    expected_db = get_mongo_dbname_from_env(required=True)  # <— now required
+    expected_db = get_mongo_dbname_from_env(required=True)
     # db.name is the actual database we’re connected to
     if db.name != expected_db:
         # This catches mis-wiring of client construction vs env, before the lock

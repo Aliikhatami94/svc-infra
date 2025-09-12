@@ -7,15 +7,14 @@ from typing import Any, Mapping, Optional, Sequence
 import typer
 from pymongo import IndexModel
 
+# Reuse core logic (all validation/locking happens there)
 from svc_infra.db.nosql.core import prepare_mongo as core_prepare_mongo
 from svc_infra.db.nosql.core import setup_and_prepare as core_setup_and_prepare
-from svc_infra.db.nosql.mongo.client import close_mongo, get_db, init_mongo
+
+# Client lifecycle for the async command
+from svc_infra.db.nosql.mongo.client import close_mongo, init_mongo
 from svc_infra.db.nosql.resource import NoSqlResource
-from svc_infra.db.nosql.utils import (
-    get_mongo_dbname_from_env,
-    get_mongo_url_from_env,
-    prepare_process_env,
-)
+from svc_infra.db.nosql.utils import prepare_process_env
 
 # -------------------- helpers --------------------
 
@@ -30,12 +29,13 @@ def _apply_mongo_env(mongo_url: Optional[str], mongo_db: Optional[str]) -> None:
 
 def _load_obj(dotted: str) -> Any:
     """
-    Load an object from a dotted path like 'pkg.mod:NAME' or 'pkg.mod.attr'.
+    Load an object from a dotted path like:
+      - 'pkg.mod:NAME'  (preferred)
+      - 'pkg.mod.NAME'  (also accepted)
     """
     if ":" in dotted:
         mod_path, attr = dotted.split(":", 1)
     else:
-        # allow pkg.mod.NAME as well
         mod_path, _, attr = dotted.rpartition(".")
         if not mod_path:
             raise ValueError(f"Invalid dotted path: {dotted}")
@@ -47,23 +47,16 @@ def _load_obj(dotted: str) -> Any:
 
 
 def _normalize_resources(obj: Any) -> Sequence[NoSqlResource]:
-    """
-    Accept a single NoSqlResource or a sequence, return a sequence.
-    """
     if obj is None:
         raise ValueError("No resources provided.")
     if isinstance(obj, NoSqlResource):
         return [obj]
     if isinstance(obj, (list, tuple)):
-        # best-effort runtime check
-        return obj  # type: ignore[return-value]
+        return obj  # best-effort
     raise TypeError("resources must be a NoSqlResource or a sequence of them")
 
 
 def _normalize_index_builders(obj: Any) -> dict[str, Sequence[IndexModel]]:
-    """
-    Accept a mapping {collection_name: [IndexModel, ...]} or a callable returning it.
-    """
     if obj is None:
         return {}
     if callable(obj):
@@ -80,7 +73,7 @@ def cmd_prepare(
     resources_path: str = typer.Option(
         ...,
         "--resources",
-        help="Dotted path to NoSqlResource(s). e.g. 'app.db.mongo:RESOURCES' or 'app.db.mongo:USER_RESOURCE'",
+        help="Dotted path to NoSqlResource(s). e.g. 'app.db.mongo:RESOURCES'",
     ),
     indexes_path: Optional[str] = typer.Option(
         None,
@@ -96,28 +89,29 @@ def cmd_prepare(
 ):
     """
     Ensure Mongo is reachable, collections exist, and indexes are applied.
+
+    This command is async (uses Motor). We set env overrides and bootstrap .env,
+    open the client, then delegate all validation/locking to core.prepare_mongo().
     """
     _apply_mongo_env(mongo_url, mongo_db)
 
-    # Resolve env (dotenv, PYTHONPATH bootstrap)
+    # Bootstrap .env and PYTHONPATH; leave *validation* to core.
     prepare_process_env("..")
-    # Validate we can resolve URL/DB (optional DB name)
-    get_mongo_url_from_env(required=True)
-    get_mongo_dbname_from_env(required=False)
 
-    resources_obj = _load_obj(resources_path)
-    resources = _normalize_resources(resources_obj)
-
+    resources = _normalize_resources(_load_obj(resources_path))
     index_builders = None
     if indexes_path:
-        index_builders_obj = _load_obj(indexes_path)
-        index_builders = _normalize_index_builders(index_builders_obj)
+        index_builders = _normalize_index_builders(_load_obj(indexes_path))
 
-    # Run fully async but keep this command async-friendly
+    import asyncio
+
     async def _run():
         await init_mongo()
         try:
-            result = await core_prepare_mongo(resources=resources, index_builders=index_builders)
+            result = await core_prepare_mongo(
+                resources=resources,
+                index_builders=index_builders,
+            )
             return {
                 "ok": result.ok,
                 "created_collections": result.created_collections,
@@ -125,8 +119,6 @@ def cmd_prepare(
             }
         finally:
             await close_mongo()
-
-    import asyncio
 
     res = asyncio.run(_run())
     typer.echo(res)
@@ -151,19 +143,20 @@ def cmd_setup_and_prepare(
     ),
 ):
     """
-    Synchronous end-to-end helper:
-      • resolve env
-      • init client
-      • ensure collections and indexes
-      • close client
+    Synchronous, end-to-end helper that delegates entirely to core.setup_and_prepare().
+    All env resolution, validation, and DB locking are handled in core.
     """
     _apply_mongo_env(mongo_url, mongo_db)
+
     resources = _normalize_resources(_load_obj(resources_path))
     index_builders = None
     if indexes_path:
         index_builders = _normalize_index_builders(_load_obj(indexes_path))
 
-    res = core_setup_and_prepare(resources=resources, index_builders=index_builders)
+    res = core_setup_and_prepare(
+        resources=resources,
+        index_builders=index_builders,
+    )
     typer.echo(res)
 
 
@@ -176,12 +169,16 @@ def cmd_ping(
     ),
 ):
     """
-    Simple connectivity check to Mongo (runs db.command('ping')).
+    Simple connectivity check (db.command('ping')).
     """
     _apply_mongo_env(mongo_url, mongo_db)
+
+    # Keep ping lightweight; just ensure .env is loaded so MONGO_URL is available.
     prepare_process_env("..")
-    get_mongo_url_from_env(required=True)
-    get_mongo_dbname_from_env(required=False)
+
+    import asyncio
+
+    from svc_infra.db.nosql.mongo.client import get_db  # local import to avoid side effects
 
     async def _run():
         await init_mongo()
@@ -192,20 +189,11 @@ def cmd_ping(
         finally:
             await close_mongo()
 
-    import asyncio
-
     res = asyncio.run(_run())
     typer.echo(res)
 
 
 def register(app: typer.Typer) -> None:
-    """
-    Register Mongo CLI commands on the given Typer app.
-    Commands:
-      • mongo-prepare
-      • mongo-setup-and-prepare
-      • mongo-ping
-    """
     app.command("mongo-prepare")(cmd_prepare)
     app.command("mongo-setup-and-prepare")(cmd_setup_and_prepare)
     app.command("mongo-ping")(cmd_ping)
