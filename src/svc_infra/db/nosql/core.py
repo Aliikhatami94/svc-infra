@@ -6,7 +6,7 @@ from typing import Iterable, Optional, Sequence
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import IndexModel
 
-from svc_infra.db.nosql.mongo.client import close_mongo, get_db, init_mongo
+from svc_infra.db.nosql.mongo.client import acquire_db, close_mongo, init_mongo
 from svc_infra.db.nosql.resource import NoSqlResource
 from svc_infra.db.nosql.utils import (
     get_mongo_dbname_from_env,
@@ -95,7 +95,7 @@ async def prepare_mongo(
     This is the async entrypoint, assuming env is resolved and client is init.
     We also enforce a cluster-wide lock on the chosen DB name for this service.
     """
-    db = await anext(get_db())
+    db = await acquire_db()
     await _ping(db)
 
     expected_db = get_mongo_dbname_from_env(required=True)

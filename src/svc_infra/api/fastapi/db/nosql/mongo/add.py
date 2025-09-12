@@ -7,7 +7,7 @@ from typing import Optional, Sequence
 from fastapi import FastAPI
 
 from svc_infra.db.nosql.management import make_document_crud_schemas
-from svc_infra.db.nosql.mongo.client import close_mongo, get_db, init_mongo
+from svc_infra.db.nosql.mongo.client import acquire_db, close_mongo, init_mongo
 from svc_infra.db.nosql.repository import NoSqlRepository
 from svc_infra.db.nosql.resource import NoSqlResource
 from svc_infra.db.nosql.service import NoSqlService
@@ -23,30 +23,23 @@ def add_mongo_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "MON
 
         @asynccontextmanager
         async def lifespan(_app: FastAPI):
-            await init_mongo(url=url)  # explicit URL path
+            await init_mongo()
             try:
-                # assert after init
                 expected = get_mongo_dbname_from_env(required=False)
-                db = await anext(get_db())
+                db = await acquire_db()
                 if expected and db.name != expected:
                     raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
                 yield
             finally:
                 await close_mongo()
 
-        app.router.lifespan_context = lifespan
-        return
-
     @app.on_event("startup")
-    async def _startup() -> None:  # noqa: ANN202
-        env_url = os.getenv(dsn_env)
-        if not env_url:
+    async def _startup():
+        if not os.getenv(dsn_env):
             raise RuntimeError(f"Missing environment variable {dsn_env} for Mongo URL")
-        await init_mongo()  # uses env-driven MongoSettings
-
-        # assert AFTER init — prevents silent writes to the wrong DB
+        await init_mongo()
         expected = get_mongo_dbname_from_env(required=False)
-        db = await anext(get_db())
+        db = await acquire_db()
         if expected and db.name != expected:
             raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
 

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from svc_infra.db.nosql.mongo.client import get_db
+from svc_infra.db.nosql.mongo.client import acquire_db
 
 
 async def _ping():
-    db = await anext(get_db())
+    db = await acquire_db()
     res = await db.command("ping")
     return {"ok": res.get("ok", 0) == 1}
 

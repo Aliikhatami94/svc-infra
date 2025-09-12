@@ -108,5 +108,5 @@ def get_mongo_dbname_from_env(
             os.environ["MONGO_DB"] = val.strip()
             return val.strip()
     if required:
-        return default
+        raise RuntimeError("Mongo DB name not set. Set MONGO_DB.")
     return os.getenv("MONGO_DB") or None

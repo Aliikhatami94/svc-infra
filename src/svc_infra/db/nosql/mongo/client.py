@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from typing import Optional
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from .settings import MongoSettings
 
-_client: AsyncIOMotorClient | None = None
-_db: AsyncIOMotorDatabase | None = None
+_client: Optional[AsyncIOMotorClient] = None
+_db: Optional[AsyncIOMotorDatabase] = None
 
 
 def _client_opts(cfg: MongoSettings) -> dict:
@@ -23,17 +23,20 @@ async def init_mongo(cfg: MongoSettings | None = None) -> AsyncIOMotorDatabase:
     global _client, _db
     cfg = cfg or MongoSettings()
     if _client is None:
+        if not cfg.db_name:
+            raise RuntimeError("MONGO_DB must be set.")
         _client = AsyncIOMotorClient(str(cfg.url), **_client_opts(cfg))
-        _db = _client[cfg.db_name]  # prefer explicit db name from settings
+        _db = _client[cfg.db_name]
+    assert _db is not None
     return _db
 
 
-async def get_db() -> AsyncGenerator[AsyncIOMotorDatabase, None]:
+async def acquire_db() -> AsyncIOMotorDatabase:
+    global _db
     if _db is None:
-        # call our own init (no FastAPI import)
         await init_mongo()
     assert _db is not None
-    yield _db
+    return _db
 
 
 async def close_mongo() -> None:

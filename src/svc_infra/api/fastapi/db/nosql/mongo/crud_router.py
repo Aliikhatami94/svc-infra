@@ -1,6 +1,7 @@
 from typing import Annotated, Any, Optional, Sequence, Type, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,
@@ -11,9 +12,11 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
-from svc_infra.db.nosql.mongo.client import get_db
+from svc_infra.db.nosql.mongo.client import acquire_db
 from svc_infra.db.nosql.repository import NoSqlRepository
 from svc_infra.db.nosql.service import NoSqlService
+
+DBDep = Annotated[AsyncIOMotorDatabase, Depends(acquire_db)]
 
 
 def _parse_sort(
@@ -58,11 +61,11 @@ def make_crud_router_plus_mongo(
     @r.get("", response_model=cast(Any, Page[read_schema]))
     @r.get("/", response_model=cast(Any, Page[read_schema]))
     async def list_items(
+        db: DBDep,
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
         sp: Annotated[SearchParams, Depends(dep_search)],
     ):
-        db = await anext(get_db())
         order_spec = op.order_by or default_ordering
         sort = _parse_sort(order_spec, allowed_order_fields)
 
@@ -85,8 +88,7 @@ def make_crud_router_plus_mongo(
         )
 
     @r.get("/{item_id}", response_model=cast(Any, read_schema))
-    async def get_item(item_id: Any):
-        db = await anext(get_db())
+    async def get_item(db: DBDep, item_id: Any):
         row = await service.get(db, item_id)
         if not row:
             raise HTTPException(404, "Not found")
@@ -94,14 +96,12 @@ def make_crud_router_plus_mongo(
 
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
     @r.post("/", response_model=cast(Any, read_schema), status_code=201)
-    async def create_item(payload: create_schema = Body(...)):
-        db = await anext(get_db())
+    async def create_item(db: DBDep, payload: create_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
         return await service.create(db, data)
 
     @r.patch("/{item_id}", response_model=cast(Any, read_schema))
-    async def update_item(item_id: Any, payload: update_schema = Body(...)):
-        db = await anext(get_db())
+    async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
         row = await service.update(db, item_id, data)
         if not row:
@@ -109,8 +109,7 @@ def make_crud_router_plus_mongo(
         return row
 
     @r.delete("/{item_id}", status_code=204)
-    async def delete_item(item_id: Any):
-        db = await anext(get_db())
+    async def delete_item(db: DBDep, item_id: Any):
         ok = await service.delete(db, item_id)
         if not ok:
             raise HTTPException(404, "Not found")
