@@ -95,7 +95,7 @@ async def prepare_mongo(
     This is the async entrypoint, assuming env is resolved and client is init.
     We also enforce a cluster-wide lock on the chosen DB name for this service.
     """
-    db = await get_db()
+    db = await anext(get_db())
     await _ping(db)
 
     expected_db = get_mongo_dbname_from_env(required=True)

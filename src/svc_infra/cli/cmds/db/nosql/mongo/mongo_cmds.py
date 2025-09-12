@@ -204,7 +204,7 @@ def cmd_ping(
     async def _run():
         await init_mongo()
         try:
-            db = await get_db()
+            db = await anext(get_db())
             res = await db.command("ping")
             return {"ok": (res or {}).get("ok") == 1}
         finally:

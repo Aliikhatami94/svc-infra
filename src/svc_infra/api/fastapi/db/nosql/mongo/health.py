@@ -6,7 +6,7 @@ from svc_infra.db.nosql.mongo.client import get_db
 
 
 async def _ping():
-    db = await get_db()
+    db = await anext(get_db())
     res = await db.command("ping")
     return {"ok": res.get("ok", 0) == 1}
 

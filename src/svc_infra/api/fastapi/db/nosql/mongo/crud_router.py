@@ -62,7 +62,7 @@ def make_crud_router_plus_mongo(
         op: Annotated[OrderParams, Depends(dep_order)],
         sp: Annotated[SearchParams, Depends(dep_search)],
     ):
-        db = await get_db()
+        db = await anext(get_db())
         order_spec = op.order_by or default_ordering
         sort = _parse_sort(order_spec, allowed_order_fields)
 
@@ -86,7 +86,7 @@ def make_crud_router_plus_mongo(
 
     @r.get("/{item_id}", response_model=cast(Any, read_schema))
     async def get_item(item_id: Any):
-        db = await get_db()
+        db = await anext(get_db())
         row = await service.get(db, item_id)
         if not row:
             raise HTTPException(404, "Not found")
@@ -95,13 +95,13 @@ def make_crud_router_plus_mongo(
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
     @r.post("/", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(payload: create_schema = Body(...)):
-        db = await get_db()
+        db = await anext(get_db())
         data = payload.model_dump(exclude_unset=True)
         return await service.create(db, data)
 
     @r.patch("/{item_id}", response_model=cast(Any, read_schema))
     async def update_item(item_id: Any, payload: update_schema = Body(...)):
-        db = await get_db()
+        db = await anext(get_db())
         data = payload.model_dump(exclude_unset=True)
         row = await service.update(db, item_id, data)
         if not row:
@@ -110,7 +110,7 @@ def make_crud_router_plus_mongo(
 
     @r.delete("/{item_id}", status_code=204)
     async def delete_item(item_id: Any):
-        db = await get_db()
+        db = await anext(get_db())
         ok = await service.delete(db, item_id)
         if not ok:
             raise HTTPException(404, "Not found")
