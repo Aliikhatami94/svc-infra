@@ -4,8 +4,6 @@ from typing import AsyncGenerator
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
-from svc_infra.api.fastapi.db.nosql.mongo.session import initialize_mongo
-
 from .settings import MongoSettings
 
 _client: AsyncIOMotorClient | None = None
@@ -26,18 +24,19 @@ async def init_mongo(cfg: MongoSettings | None = None) -> AsyncIOMotorDatabase:
     cfg = cfg or MongoSettings()
     if _client is None:
         _client = AsyncIOMotorClient(str(cfg.url), **_client_opts(cfg))
-        _db = _client[cfg.db_name]
+        _db = _client[cfg.db_name]  # prefer explicit db name from settings
     return _db
 
 
 async def get_db() -> AsyncGenerator[AsyncIOMotorDatabase, None]:
     if _db is None:
-        await initialize_mongo()
+        # call our own init (no FastAPI import)
+        await init_mongo()
     assert _db is not None
-    yield _db  # type: ignore[return-value]
+    yield _db
 
 
-async def close_mongo():
+async def close_mongo() -> None:
     global _client, _db
     if _client is not None:
         _client.close()

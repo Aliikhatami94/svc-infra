@@ -42,9 +42,9 @@ def add_mongo_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "MON
         env_url = os.getenv(dsn_env)
         if not env_url:
             raise RuntimeError(f"Missing environment variable {dsn_env} for Mongo URL")
-        await init_mongo()  # uses envs
+        await init_mongo()  # uses env-driven MongoSettings
 
-        # assert AFTER init
+        # assert AFTER init — prevents silent writes to the wrong DB
         expected = get_mongo_dbname_from_env(required=False)
         db = await anext(get_db())
         if expected and db.name != expected:
