@@ -39,6 +39,35 @@ async def _apply_indexes(
     return await db[collection].create_indexes(list(indexes))
 
 
+# collection + doc used to "lock" the chosen DB name for this app
+_META_COLL = "__infra_meta"
+_DB_LOCK_ID = "db_lock"  # stable _id
+
+
+async def assert_db_locked(
+    db: AsyncIOMotorDatabase, expected_db_name: str, *, allow_rebind: bool = False
+) -> None:
+    """
+    Ensure this app only uses a single Mongo database.
+    On first run: write the lock doc.
+    Thereafter: if the existing lock's db_name != expected_db_name, raise.
+    Set allow_rebind=True only in a controlled migration.
+    """
+    current = await db[_META_COLL].find_one({"_id": _DB_LOCK_ID}, projection={"db_name": 1})
+    if current is None:
+        # first run in this database — write the lock
+        await db[_META_COLL].insert_one({"_id": _DB_LOCK_ID, "db_name": expected_db_name})
+        return
+
+    locked = current.get("db_name")
+    if locked != expected_db_name and not allow_rebind:
+        raise RuntimeError(
+            f"This service is locked to Mongo DB '{locked}', but your env points to '{expected_db_name}'. "
+            "If you truly need to switch databases, run setup with an explicit override (allow_rebind=True) "
+            "and perform a data migration, or start a separate service instance."
+        )
+
+
 @dataclass(frozen=True)
 class PrepareResult:
     ok: bool
@@ -62,26 +91,30 @@ async def prepare_mongo(
     db = await get_db()
     await _ping(db)
 
+    # --- enforce one-db-per-service guardrail ---
+    expected_db = get_mongo_dbname_from_env(required=True)  # <— now required
+    # db.name is the actual database we’re connected to
+    if db.name != expected_db:
+        # This catches mis-wiring of client construction vs env, before the lock
+        raise RuntimeError(f"Connected to Mongo DB '{db.name}', but env says '{expected_db}'.")
+
+    await assert_db_locked(db, expected_db)
+
     # 1) collections
     colls = [r.resolved_collection() for r in resources]
     await _ensure_collections(db, colls)
-    created_colls = colls  # create_collection is idempotent; we treat as ensured
+    created_colls = colls
 
     # 2) indexes
     created_idx: dict[str, list[str]] = {}
     for r in resources:
         coll = r.resolved_collection()
-        idx_models = None
-        if index_builders and coll in index_builders:
-            idx_models = index_builders[coll]
+        idx_models = index_builders.get(coll) if index_builders else None
         if idx_models:
             names = await _apply_indexes(db, collection=coll, indexes=idx_models)
             created_idx[coll] = names
 
     return PrepareResult(ok=True, created_collections=created_colls, created_indexes=created_idx)
-
-
-# -------- high-level convenience (parity with SQL "setup_and_migrate") --------
 
 
 def setup_and_prepare(
@@ -98,8 +131,7 @@ def setup_and_prepare(
     """
     root = prepare_process_env(".")
     get_mongo_url_from_env(required=True)
-    # optional db name consumption (init_mongo reads it from settings internally)
-    get_mongo_dbname_from_env(required=False)
+    get_mongo_dbname_from_env(required=True)
 
     async def _run():
         await init_mongo()
