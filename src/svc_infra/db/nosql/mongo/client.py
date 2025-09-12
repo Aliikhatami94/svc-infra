@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import AsyncGenerator
+
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+
+from svc_infra.api.fastapi.db.nosql.mongo.session import initialize_mongo
 
 from .settings import MongoSettings
 
@@ -26,10 +30,11 @@ async def init_mongo(cfg: MongoSettings | None = None) -> AsyncIOMotorDatabase:
     return _db
 
 
-async def get_db() -> AsyncIOMotorDatabase:
+async def get_db() -> AsyncGenerator[AsyncIOMotorDatabase, None]:
     if _db is None:
-        await init_mongo()
-    return _db  # type: ignore[return-value]
+        await initialize_mongo()
+    assert _db is not None
+    yield _db  # type: ignore[return-value]
 
 
 async def close_mongo():

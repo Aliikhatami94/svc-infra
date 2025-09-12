@@ -17,6 +17,7 @@ async def initialize_mongo(url: Optional[str] = None, db_name: Optional[str] = N
         cfg.url = url
     if db_name:
         cfg.db_name = db_name
+
     _client = AsyncIOMotorClient(
         cfg.url,
         appname=cfg.appname,
@@ -24,7 +25,16 @@ async def initialize_mongo(url: Optional[str] = None, db_name: Optional[str] = N
         maxPoolSize=cfg.max_pool_size,
         uuidRepresentation="standard",
     )
-    _db = _client.get_default_database() if _client.get_default_database() else _client[cfg.db_name]
+
+    # Prefer explicit db_name; only fall back to URL default if db_name is absent
+    if cfg.db_name:
+        _db = _client[cfg.db_name]
+    else:
+        _db = _client.get_default_database()
+        if _db is None:
+            raise RuntimeError(
+                "No Mongo DB selected: set MONGO_DB or include a database in MONGO_URL."
+            )
 
 
 async def dispose_mongo() -> None:
