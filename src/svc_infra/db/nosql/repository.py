@@ -33,19 +33,43 @@ class NoSqlRepository:
             immutable_fields or {self.id_field, "created_at", "updated_at"}
         )
 
-    # --- filters ---------------------------------------------------------------
-
     def _alive_filter(self) -> Dict[str, Any]:
+        """
+        Build a filter that returns 'alive' docs when soft_delete is enabled.
+        - deleted_at is either null or absent
+        - optional boolean flag is either True or absent
+        """
         if not self.soft_delete:
             return {}
-        filt: Dict[str, Any] = {}
-        # exclude docs where deleted_at is set
+
+        clauses: list[dict] = []
+
         if self.soft_delete_field:
-            filt[self.soft_delete_field] = {"$in": [None, {"$exists": False}]}
-        # optional boolean flag must be True (or missing)
+            # keep docs where deleted_at is None OR does not exist
+            clauses.append(
+                {
+                    "$or": [
+                        {self.soft_delete_field: None},
+                        {self.soft_delete_field: {"$exists": False}},
+                    ]
+                }
+            )
+
         if self.soft_delete_flag_field:
-            filt[self.soft_delete_flag_field] = {"$in": [True, {"$exists": False}]}
-        return filt
+            # keep docs where flag is True OR does not exist
+            clauses.append(
+                {
+                    "$or": [
+                        {self.soft_delete_flag_field: True},
+                        {self.soft_delete_flag_field: {"$exists": False}},
+                    ]
+                }
+            )
+
+        if not clauses:
+            return {}
+
+        return clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
     def _merge_and(self, *filters: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         parts = [f for f in filters if f]
