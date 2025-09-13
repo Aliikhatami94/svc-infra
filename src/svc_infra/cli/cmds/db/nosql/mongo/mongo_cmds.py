@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import importlib
 import os
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import typer
-from pymongo import IndexModel
 
 # Reuse core logic (all validation/locking happens there)
-from svc_infra.db.nosql.core import prepare_mongo as core_prepare_mongo
-from svc_infra.db.nosql.core import setup_and_prepare as core_setup_and_prepare
+from svc_infra.db.nosql.core import prepare_mongo, setup_and_prepare
 
 # Client lifecycle for the async command
 from svc_infra.db.nosql.mongo.client import close_mongo, init_mongo
@@ -56,16 +54,6 @@ def _normalize_resources(obj: Any) -> Sequence[NoSqlResource]:
     raise TypeError("resources must be a NoSqlResource or a sequence of them")
 
 
-def _normalize_index_builders(obj: Any) -> dict[str, Sequence[IndexModel]]:
-    if obj is None:
-        return {}
-    if callable(obj):
-        obj = obj()
-    if isinstance(obj, Mapping):
-        return dict(obj)  # type: ignore[return-value]
-    raise TypeError("index_builders must be a mapping or a zero-arg callable returning a mapping")
-
-
 # -------------------- commands --------------------
 
 
@@ -74,11 +62,6 @@ def cmd_prepare(
         ...,
         "--resources",
         help="Dotted path to NoSqlResource(s). e.g. 'app.db.mongo:RESOURCES'",
-    ),
-    indexes_path: Optional[str] = typer.Option(
-        None,
-        "--index-builders",
-        help="Dotted path to a dict[str, list[IndexModel]] or a zero-arg callable returning it.",
     ),
     mongo_url: Optional[str] = typer.Option(
         None, "--mongo-url", help="Overrides env MONGO_URL for this command."
@@ -96,15 +79,15 @@ def cmd_prepare(
     ),
 ):
     """
-    Ensure Mongo is reachable, collections exist, and indexes are applied.
+    Ensure Mongo is reachable, collections exist, and indexes (from each NoSqlResource.indexes)
+    are applied.
 
     This command is async (uses Motor). We set env overrides and bootstrap .env,
-    open the client, then delegate all validation/locking to core.prepare_mongo().
+    open the client, then delegate validation/locking to core.prepare_mongo().
     """
     _apply_mongo_env(mongo_url, mongo_db)
-    prepare_process_env("..")
+    prepare_process_env(".")
     resources = _normalize_resources(_load_obj(resources_path))
-    index_builders = _normalize_index_builders(_load_obj(indexes_path)) if indexes_path else None
     sid = service_id or _default_service_id_from_resources_path(resources_path)
 
     import asyncio
@@ -112,9 +95,8 @@ def cmd_prepare(
     async def _run():
         await init_mongo()
         try:
-            result = await core_prepare_mongo(
+            result = await prepare_mongo(
                 resources=resources,
-                index_builders=index_builders,
                 service_id=sid,
                 allow_rebind=allow_rebind,
             )
@@ -143,11 +125,6 @@ def cmd_setup_and_prepare(
         "--resources",
         help="Dotted path to NoSqlResource(s). e.g. 'app.db.mongo:RESOURCES'",
     ),
-    indexes_path: Optional[str] = typer.Option(
-        None,
-        "--index-builders",
-        help="Dotted path to a dict[str, list[IndexModel]] or a zero-arg callable returning it.",
-    ),
     mongo_url: Optional[str] = typer.Option(
         None, "--mongo-url", help="Overrides env MONGO_URL for this command."
     ),
@@ -169,12 +146,10 @@ def cmd_setup_and_prepare(
     """
     _apply_mongo_env(mongo_url, mongo_db)
     resources = _normalize_resources(_load_obj(resources_path))
-    index_builders = _normalize_index_builders(_load_obj(indexes_path)) if indexes_path else None
     sid = service_id or _default_service_id_from_resources_path(resources_path)
 
-    res = core_setup_and_prepare(
+    res = setup_and_prepare(
         resources=resources,
-        index_builders=index_builders,
         service_id=sid,
         allow_rebind=allow_rebind,
     )
@@ -193,18 +168,16 @@ def cmd_ping(
     Simple connectivity check (db.command('ping')).
     """
     _apply_mongo_env(mongo_url, mongo_db)
-
-    # Keep ping lightweight; just ensure .env is loaded so MONGO_URL is available.
-    prepare_process_env("..")
+    prepare_process_env(".")
 
     import asyncio
 
-    from svc_infra.db.nosql.mongo.client import get_db  # local import to avoid side effects
+    from svc_infra.db.nosql.mongo.client import acquire_db  # local import to avoid side effects
 
     async def _run():
         await init_mongo()
         try:
-            db = await anext(get_db())
+            db = await acquire_db()
             res = await db.command("ping")
             return {"ok": (res or {}).get("ok") == 1}
         finally:

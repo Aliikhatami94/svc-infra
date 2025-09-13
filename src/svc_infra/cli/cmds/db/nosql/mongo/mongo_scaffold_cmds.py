@@ -103,7 +103,12 @@ def cmd_scaffold_resources(
     ),
     overwrite: bool = typer.Option(False, "--overwrite/--no-overwrite"),
 ):
-    """Scaffold a starter resources.py (empty RESOURCES + index_builders())."""
+    """
+    Scaffold a starter resources.py with an empty RESOURCES list.
+
+    NOTE: Indexes are now declared directly on each NoSqlResource via its `indexes`
+    attribute (e.g., `[IndexModel([...]), ...]`). There is no separate index-builders hook.
+    """
     res = scaffold_resources_core(
         dest_dir=dest_dir,
         entity_name=entity_name,
@@ -120,6 +125,7 @@ def register(app: typer.Typer) -> None:
       • mongo-scaffold
       • mongo-scaffold-documents
       • mongo-scaffold-schemas
+      • mongo-scaffold-resources
     """
     app.command("mongo-scaffold")(cmd_scaffold)
     app.command("mongo-scaffold-documents")(cmd_scaffold_documents)
