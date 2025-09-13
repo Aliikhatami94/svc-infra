@@ -2,13 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from svc_infra.db.nosql.mongo.client import acquire_db
-
-
-async def _ping():
-    db = await acquire_db()
-    res = await db.command("ping")
-    return {"ok": res.get("ok", 0) == 1}
+from svc_infra.db.nosql.mongo.client import ping_mongo
 
 
 def make_mongo_health_router(
@@ -18,6 +12,7 @@ def make_mongo_health_router(
 
     @router.get("")
     async def healthcheck():
-        return await _ping()
+        ok = await ping_mongo()
+        return {"ok": ok}
 
     return router

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Sequence, Type
+from typing import Any, Callable, Iterable, Optional, Sequence, Type, Union
+
+from pymongo import IndexModel
 
 
 def _snake(name: str) -> str:
@@ -26,13 +28,14 @@ def get_collection_name(document_model: type) -> str:
     )
 
 
+IndexAlias = dict[str, Any]  # dict alias normalized to IndexModel later
+
+
 @dataclass
 class NoSqlResource:
     """
     Mongo resource declaration used by API & CLI.
-    Prefer passing document_model and let collection auto-resolve from its
-    __collection__ (or plural snake fallback). Explicit 'collection' still
-    overrides for backward compatibility.
+    Define indexes here (either IndexModel or simple alias dicts).
     """
 
     # API mounting
@@ -63,6 +66,9 @@ class NoSqlResource:
     create_exclude: tuple[str, ...] = ("_id",)
     read_exclude: tuple[str, ...] = ()
     update_exclude: tuple[str, ...] = ()
+
+    # NEW: indexes defined per collection (normalized to IndexModel at prepare time)
+    indexes: Optional[Iterable[Union[IndexModel, IndexAlias]]] = None
 
     def __post_init__(self):
         if not self.collection and self.document_model:

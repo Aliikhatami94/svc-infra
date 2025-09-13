@@ -1,28 +1,26 @@
 from __future__ import annotations
-from typing import List, Dict
+from typing import List
 from pymongo import IndexModel
-
 from svc_infra.db.nosql.resource import NoSqlResource
-# from svc_infra.db.nosql.uniq import make_mongo_unique_indexes
 # from yourpackage.yourmodule.documents import ${Entity}Doc  # import your docs
 
-# Expand this list as you add collections
+# Example index aliases:
+# - simple unique: {"keys": ["name"], "unique": True, "name": "uq_name"}
+# - case-insensitive unique: {"keys": ["name"], "unique": True, "collation":{"locale":"en","strength":2}}
+# - compound: {"keys": ["tenant_id", "name"], "unique": True}
+# - TTL: {"keys": ["updated_at"], "expireAfterSeconds": 86400}
+# - partial: {"keys": ["email"], "unique": True, "partialFilterExpression": {"email":{"$exists":True}}}
+
 RESOURCES: List[NoSqlResource] = [
     # Example:
     # NoSqlResource(
     #     prefix="/${collection_name}",
     #     document_model=${Entity}Doc,
     #     search_fields=["name"],
+    #     indexes=[
+    #         {"keys": ["name"], "unique": True, "name": "uq_${collection_name}_name",
+    #          "collation": {"locale":"en","strength":2}},
+    #         {"keys": ["updated_at"], "expireAfterSeconds": 86400},
+    #     ],
     # ),
 ]
-
-def index_builders() -> Dict[str, List[IndexModel]]:
-    """Map collection name -> list[IndexModel]. Optional but recommended."""
-    return {
-        # Example:
-        # "${collection_name}": make_mongo_unique_indexes(
-        #     collection_name="${collection_name}",
-        #     unique_ci=["name"],
-        #     tenant_field="tenant_id",
-        # ),
-    }

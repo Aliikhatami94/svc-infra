@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from typing import Optional, Sequence
+from typing import Sequence
 
 from fastapi import FastAPI
 
 from svc_infra.db.nosql.management import make_document_crud_schemas
 from svc_infra.db.nosql.mongo.client import acquire_db, close_mongo, init_mongo
+from svc_infra.db.nosql.mongo.settings import MongoSettings
 from svc_infra.db.nosql.repository import NoSqlRepository
 from svc_infra.db.nosql.resource import NoSqlResource
 from svc_infra.db.nosql.service import NoSqlService
@@ -17,24 +18,27 @@ from .crud_router import make_crud_router_plus_mongo
 from .health import make_mongo_health_router
 
 
-def add_mongo_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "MONGO_URL") -> None:
-    """Configure Mongo lifecycle for the app (either explicit URL or env)."""
-    if url:
+def add_mongo_db_with_url(app: FastAPI, url: str, db_name: str) -> None:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        await init_mongo(MongoSettings(url=url, db_name=db_name))
+        try:
+            expected = get_mongo_dbname_from_env(required=False)
+            db = await acquire_db()
+            if expected and db.name != expected:
+                raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
+            yield
+        finally:
+            await close_mongo()
 
-        @asynccontextmanager
-        async def lifespan(_app: FastAPI):
-            await init_mongo()
-            try:
-                expected = get_mongo_dbname_from_env(required=False)
-                db = await acquire_db()
-                if expected and db.name != expected:
-                    raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
-                yield
-            finally:
-                await close_mongo()
+    app.router.lifespan_context = lifespan
+
+
+def add_mongo_db(app: FastAPI, *, dsn_env: str = "MONGO_URL") -> None:
+    """Configure Mongo lifecycle for the app using environment variables."""
 
     @app.on_event("startup")
-    async def _startup():
+    async def _startup() -> None:
         if not os.getenv(dsn_env):
             raise RuntimeError(f"Missing environment variable {dsn_env} for Mongo URL")
         await init_mongo()
@@ -44,7 +48,7 @@ def add_mongo_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "MON
             raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
 
     @app.on_event("shutdown")
-    async def _shutdown() -> None:  # noqa: ANN202
+    async def _shutdown() -> None:
         await close_mongo()
 
 
@@ -63,13 +67,7 @@ def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> Non
             soft_delete_field=r.soft_delete_field,
             soft_delete_flag_field=r.soft_delete_flag_field,
         )
-
-        # 1) explicit app-provided factory wins
-        if r.service_factory:
-            svc = r.service_factory(repo)
-        # 2) else, generic service
-        else:
-            svc = NoSqlService(repo)
+        svc = r.service_factory(repo) if r.service_factory else NoSqlService(repo)
 
         # schemas: explicit or auto from document_model
         if r.read_schema and r.create_schema and r.update_schema:
@@ -91,7 +89,7 @@ def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> Non
             )
 
         router = make_crud_router_plus_mongo(
-            collection=r.collection,
+            collection=r.resolved_collection(),
             repo=repo,
             service=svc,
             read_schema=Read,

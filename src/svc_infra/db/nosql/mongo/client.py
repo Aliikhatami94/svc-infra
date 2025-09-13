@@ -39,6 +39,12 @@ async def acquire_db() -> AsyncIOMotorDatabase:
     return _db
 
 
+async def ping_mongo() -> bool:
+    db = await acquire_db()
+    res = await db.command("ping")
+    return bool(res and res.get("ok") == 1)
+
+
 async def close_mongo() -> None:
     global _client, _db
     if _client is not None:
