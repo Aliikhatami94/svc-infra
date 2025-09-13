@@ -69,10 +69,10 @@ def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> Non
         )
         svc = r.service_factory(repo) if r.service_factory else NoSqlService(repo)
 
-        # schemas: explicit or auto from document_model
         if r.read_schema and r.create_schema and r.update_schema:
             Read, Create, Update = r.read_schema, r.create_schema, r.update_schema
         elif r.document_model is not None:
+            # CRITICAL: teach Pydantic to dump ObjectId/PyObjectId
             Read, Create, Update = make_document_crud_schemas(
                 r.document_model,
                 create_exclude=r.create_exclude,

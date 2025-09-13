@@ -6,6 +6,8 @@ from typing import Optional
 from pydantic import BaseModel
 from svc_infra.db.nosql.types import PyObjectId
 
+from svc_infra.db.nosql.types import PyObjectId
+
 
 class ${Entity}Read(BaseModel):
     id: Optional[PyObjectId] = None
@@ -14,6 +16,11 @@ class ${Entity}Read(BaseModel):
     tenant_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    model_config = {
+        "from_attributes": True,
+        "json_encoders": {ObjectId: str, PyObjectId: str},
+    }
 
 
 class ${Entity}Create(BaseModel):
