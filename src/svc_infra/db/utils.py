@@ -17,7 +17,7 @@ def normalize_dir(p: Path | str) -> Path:
 
 def render_template(tmpl_dir: str, name: str, subs: dict[str, Any]) -> str:
     txt = pkg.files(tmpl_dir).joinpath(name).read_text(encoding="utf-8")
-    return _T(txt).substitute(subs)
+    return _T(txt).safe_substitute(subs)
 
 
 def snake(name: str) -> str:
