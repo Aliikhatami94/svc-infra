@@ -4,6 +4,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import Sequence
 
+from bson import ObjectId
 from fastapi import FastAPI
 
 from svc_infra.db.nosql.management import make_document_crud_schemas
@@ -12,6 +13,7 @@ from svc_infra.db.nosql.mongo.settings import MongoSettings
 from svc_infra.db.nosql.repository import NoSqlRepository
 from svc_infra.db.nosql.resource import NoSqlResource
 from svc_infra.db.nosql.service import NoSqlService
+from svc_infra.db.nosql.types import PyObjectId
 from svc_infra.db.nosql.utils import get_mongo_dbname_from_env
 
 from .crud_router import make_crud_router_plus_mongo
@@ -81,6 +83,7 @@ def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> Non
                 update_name=r.update_name,
                 read_exclude=r.read_exclude,
                 update_exclude=r.update_exclude,
+                json_encoders={ObjectId: str, PyObjectId: str},
             )
         else:
             raise RuntimeError(

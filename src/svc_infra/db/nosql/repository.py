@@ -90,14 +90,16 @@ class NoSqlRepository:
                 return val
         return val
 
-    def _public_doc(self, doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """Return API-friendly dict: rename _id -> id and drop _id."""
+    @staticmethod
+    def _public_doc(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Return API-friendly dict: rename _id -> id and drop _id, coercing to str."""
         if not doc:
             return doc
         d = dict(doc)
         if "_id" in d and "id" not in d:
-            d["id"] = d["_id"]
-            d.pop("_id", None)
+            _id = d.pop("_id", None)
+            # always stringify ObjectId so JSON serialization is trivial
+            d["id"] = str(_id) if isinstance(_id, ObjectId) else _id
         return d
 
     async def list(
