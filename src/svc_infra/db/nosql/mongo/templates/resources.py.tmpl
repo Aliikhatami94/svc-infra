@@ -1,15 +1,17 @@
 from __future__ import annotations
 from typing import List
-from pymongo import IndexModel
+from pymongo import ASCENDING, IndexModel
+from pymongo.collation import Collation
 from svc_infra.db.nosql.resource import NoSqlResource
+
 # from yourpackage.yourmodule.documents import ${Entity}Doc  # import your docs
 
-# Example index aliases:
-# - simple unique: {"keys": ["name"], "unique": True, "name": "uq_name"}
-# - case-insensitive unique: {"keys": ["name"], "unique": True, "collation":{"locale":"en","strength":2}}
-# - compound: {"keys": ["tenant_id", "name"], "unique": True}
-# - TTL: {"keys": ["updated_at"], "expireAfterSeconds": 86400}
-# - partial: {"keys": ["email"], "unique": True, "partialFilterExpression": {"email":{"$exists":True}}}
+# Example index patterns:
+# - simple unique: IndexModel([("name", ASCENDING)], unique=True, name="uq_name")
+# - case-insensitive unique: IndexModel([("name", ASCENDING)], unique=True, collation=Collation(locale="en", strength=2))
+# - compound: IndexModel([("tenant_id", ASCENDING), ("name", ASCENDING)], unique=True)
+# - TTL: IndexModel([("updated_at", ASCENDING)], expireAfterSeconds=86400)
+# - partial: IndexModel([("email", ASCENDING)], unique=True, partialFilterExpression={"email": {"$exists": True}})
 
 RESOURCES: List[NoSqlResource] = [
     # Example:
@@ -18,9 +20,16 @@ RESOURCES: List[NoSqlResource] = [
     #     document_model=${Entity}Doc,
     #     search_fields=["name"],
     #     indexes=[
-    #         {"keys": ["name"], "unique": True, "name": "uq_${collection_name}_name",
-    #          "collation": {"locale":"en","strength":2}},
-    #         {"keys": ["updated_at"], "expireAfterSeconds": 86400},
+    #         IndexModel(
+    #             [("tenant_id", ASCENDING), ("name", ASCENDING)],
+    #             name="uq_${collection_name}_tenant_name_ci",
+    #             unique=True,
+    #             collation=Collation(locale="en", strength=2),
+    #         ),
+    #         IndexModel(
+    #             [("tenant_id", ASCENDING), ("created_at", ASCENDING)],
+    #             name="ix_${collection_name}_tenant_created_at",
+    #         ),
     #     ],
     # ),
 ]
