@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Optional
-
-from pydantic import BaseModel, ConfigDict, create_model
+from pydantic import BaseModel
 from sqlalchemy import Column
 from sqlalchemy.orm import Mapper, class_mapper
+
+from svc_infra.db.crud_schema import FieldSpec, make_crud_schemas_from_specs
 
 
 def _sa_columns(model: type[object]) -> list[Column]:
@@ -17,7 +17,6 @@ def _py_type(col: Column) -> type:
     if getattr(col.type, "python_type", None):
         return col.type.python_type  # type: ignore[no-any-return]
 
-    # Fallback mappings for common types
     from datetime import date, datetime
     from typing import Any as _Any
     from uuid import UUID
@@ -27,7 +26,7 @@ def _py_type(col: Column) -> type:
     try:
         from sqlalchemy.dialects.postgresql import JSONB
         from sqlalchemy.dialects.postgresql import UUID as PG_UUID  # type: ignore
-    except Exception:  # pragma: no cover - optional import
+    except Exception:  # pragma: no cover
         PG_UUID = None  # type: ignore
         JSONB = None  # type: ignore
 
@@ -52,18 +51,11 @@ def _py_type(col: Column) -> type:
 
 
 def _exclude_from_create(col: Column) -> bool:
-    """Heuristics for excluding columns from Create schema.
-
-    - primary keys
-    - server defaults
-    - SQL/DB-generated values (onupdate)
-    - obvious timestamp names (created_at/updated_at)
-    """
+    """Heuristics for excluding columns from Create schema."""
     if col.primary_key:
         return True
     if col.server_default is not None:
         return True
-    # default can be a SQLAlchemy DefaultClause or a Python callable/arg
     default = getattr(col, "default", None)
     if getattr(default, "is_sequence", False):
         return True
@@ -87,11 +79,8 @@ def make_crud_schemas(
     update_exclude: tuple[str, ...] = (),
 ) -> tuple[type[BaseModel], type[BaseModel], type[BaseModel]]:
     cols = _sa_columns(model)
-    ann_read: dict[str, tuple[type, object]] = {}
-    ann_create: dict[str, tuple[type, object]] = {}
-    ann_update: dict[str, tuple[type, object]] = {}
 
-    # Combine explicit excludes with heuristic excludes
+    specs: list[FieldSpec] = []
     explicit_excludes = set(create_exclude)
     read_ex = set(read_exclude)
     update_ex = set(update_exclude)
@@ -99,6 +88,7 @@ def make_crud_schemas(
     for col in cols:
         name = col.name
         T = _py_type(col)
+
         is_required = (
             not col.nullable
             and col.default is None
@@ -106,24 +96,22 @@ def make_crud_schemas(
             and not col.primary_key
         )
 
-        if name not in read_ex:
-            ann_read[name] = (T | None if col.nullable else T, None)
-
-        if name not in explicit_excludes and not _exclude_from_create(col):
-            ann_create[name] = (
-                (T | None) if not is_required else T,
-                None if not is_required else ...,
+        specs.append(
+            FieldSpec(
+                name=name,
+                typ=T,
+                required_for_create=bool(
+                    is_required and name not in explicit_excludes and not _exclude_from_create(col)
+                ),
+                exclude_from_create=bool(name in explicit_excludes or _exclude_from_create(col)),
+                exclude_from_read=bool(name in read_ex),
+                exclude_from_update=bool(name in update_ex),
             )
+        )
 
-        if name not in update_ex:
-            ann_update[name] = (Optional[T], None)
-
-    Read = create_model(read_name or f"{model.__name__}Read", **ann_read)  # type: ignore[arg-type]
-    Create = create_model(create_name or f"{model.__name__}Create", **ann_create)  # type: ignore[arg-type]
-    Update = create_model(update_name or f"{model.__name__}Update", **ann_update)  # type: ignore[arg-type]
-
-    for M in (Read, Create, Update):
-        M.model_config = ConfigDict(from_attributes=True)
-        M.model_rebuild()
-
-    return Read, Create, Update
+    return make_crud_schemas_from_specs(
+        specs=specs,
+        read_name=read_name or f"{model.__name__}Read",
+        create_name=create_name or f"{model.__name__}Create",
+        update_name=update_name or f"{model.__name__}Update",
+    )

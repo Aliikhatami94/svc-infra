@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Optional, Type, Union, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, create_model
+from pydantic import BaseModel
+
+from svc_infra.db.crud_schema import FieldSpec, make_crud_schemas_from_specs
 
 _MUTABLE_ID_FIELDS = {"id", "_id"}
 _TS_FIELDS = {"created_at", "updated_at"}
@@ -23,45 +25,40 @@ def make_document_crud_schemas(
     update_name: str | None = None,
     read_exclude: tuple[str, ...] = (),
     update_exclude: tuple[str, ...] = (),
-) -> tuple[Type[BaseModel], Type[BaseModel], Type[BaseModel]]:
+    json_encoders: dict[type, Any] | None = None,  # allow ObjectId encoder if desired
+) -> tuple[type[BaseModel], type[BaseModel], type[BaseModel]]:
     """
-    Build (Read, Create, Update) from a Pydantic BaseModel that models a Mongo document.
-    - Read: all fields optional in output (consistent with SQL Read leniency)
-    - Create: exclude create_exclude + timestamps; requiredness mirrors model (if not optional)
-    - Update: all Optional
+    Derive (Read, Create, Update) from a Pydantic document model (Mongo).
+    - Read: all fields optional (unless excluded)
+    - Create: exclude ID/timestamps and any in create_exclude; required mirrors document "required"
+    - Update: all optional (unless excluded)
     """
     annotations = document_model.model_fields  # Pydantic v2
-    ann_read: dict[str, tuple[type, object]] = {}
-    ann_create: dict[str, tuple[type, object]] = {}
-    ann_update: dict[str, tuple[type, object]] = {}
-
     explicit_create_ex = set(create_exclude) | _MUTABLE_ID_FIELDS | _TS_FIELDS
     read_ex = set(read_exclude)
     update_ex = set(update_exclude)
 
+    specs: list[FieldSpec] = []
     for name, field in annotations.items():
         T = field.annotation or Any
         required = field.is_required()
+        specs.append(
+            FieldSpec(
+                name=name,
+                typ=T,
+                required_for_create=bool(
+                    required and not _is_optional(T) and name not in explicit_create_ex
+                ),
+                exclude_from_create=(name in explicit_create_ex),
+                exclude_from_read=(name in read_ex),
+                exclude_from_update=(name in update_ex),
+            )
+        )
 
-        # Read: include unless excluded; make Optional
-        if name not in read_ex:
-            ann_read[name] = ((T | None), None)  # type: ignore[operator]
-
-        # Create: skip excluded list; make required if model required & not excluded
-        if name not in explicit_create_ex:
-            is_required = required and not _is_optional(T)
-            ann_create[name] = (T, ... if is_required else None)
-
-        # Update: include unless excluded; always Optional
-        if name not in update_ex:
-            ann_update[name] = ((T | None), None)  # type: ignore[operator]
-
-    Read = create_model(read_name or f"{document_model.__name__}Read", **ann_read)  # type: ignore[arg-type]
-    Create = create_model(create_name or f"{document_model.__name__}Create", **ann_create)  # type: ignore[arg-type]
-    Update = create_model(update_name or f"{document_model.__name__}Update", **ann_update)  # type: ignore[arg-type]
-
-    for M in (Read, Create, Update):
-        M.model_config = ConfigDict(from_attributes=True)
-        M.model_rebuild()
-
-    return Read, Create, Update
+    return make_crud_schemas_from_specs(
+        specs=specs,
+        read_name=read_name or f"{document_model.__name__}Read",
+        create_name=create_name or f"{document_model.__name__}Create",
+        update_name=update_name or f"{document_model.__name__}Update",
+        json_encoders=json_encoders,
+    )
