@@ -37,8 +37,6 @@ def add_mongo_db_with_url(app: FastAPI, url: str, db_name: str) -> None:
 
 
 def add_mongo_db(app: FastAPI, *, dsn_env: str = "MONGO_URL") -> None:
-    """Configure Mongo lifecycle for the app using environment variables."""
-
     @app.on_event("startup")
     async def _startup() -> None:
         if not os.getenv(dsn_env):
