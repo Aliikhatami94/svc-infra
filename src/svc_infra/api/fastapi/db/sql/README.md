@@ -108,7 +108,7 @@ include_resources(app, [
 
 ## Notes
 
-- Routers mount under `/_db` by default (e.g., `/_sql/projects`)
+- Routers mount under `/_sql` by default (e.g., `/_sql/projects`)
 - Searching and ordering work automatically if you configure `search_fields`, `ordering_default`, and `allowed_order_fields`
 - Soft delete requires a `deleted_at` column in your model
 

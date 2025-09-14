@@ -4,7 +4,7 @@ import traceback
 from fastapi import Request
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from svc_infra.api.fastapi.middleware.errors.exceptions import FastApiException
@@ -71,3 +71,12 @@ def register_error_handlers(app):
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception):
         return format_error_response(exc, request, 500, str(exc))
+
+    @app.exception_handler(IntegrityError)
+    async def handle_integrity_error(_: Request, exc: IntegrityError):
+        msg = str(getattr(exc, "orig", exc))
+        if "duplicate key value" in msg or "UniqueViolation" in msg:
+            return JSONResponse(status_code=409, content={"detail": "Record already exists."})
+        if "not-null" in msg or "NotNullViolation" in msg:
+            return JSONResponse(status_code=400, content={"detail": "Missing required field."})
+        return JSONResponse(status_code=500, content={"detail": "Database error."})

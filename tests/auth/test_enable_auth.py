@@ -91,5 +91,5 @@ def test_add_auth_with_providers(monkeypatch):
 
     paths = {r.path for r in app.routes if hasattr(r, "path")}
 
-    # oauth router should be registered with the prefix passed through (/_db + default oauth_prefix)
+    # oauth router should be registered with the prefix passed through (/_sql + default oauth_prefix)
     assert "/_sql/auth/oauth/callback" in paths

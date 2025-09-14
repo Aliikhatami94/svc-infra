@@ -36,7 +36,7 @@ def make_crud_router_plus_sql(
     allowed_order_fields: Optional[list[str]] = None,
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
-    router_prefix = ("/_db" + prefix) if mount_under_db_prefix else prefix
+    router_prefix = ("/_sql" + prefix) if mount_under_db_prefix else prefix
     r = APIRouter(
         prefix=router_prefix,
         tags=tags or [prefix.strip("/")],
