@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, Any, Dict
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
+from uuid import UUID
 
 class Timestamped(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -18,7 +19,7 @@ ${tenant_field}    is_active: bool = True
 
 
 class ${Entity}Read(${Entity}Base, Timestamped):
-    id: str
+    id: UUID
 
 
 class ${Entity}Create(BaseModel):
