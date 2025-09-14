@@ -1,6 +1,6 @@
 # models/${table_name}.py
 from __future__ import annotations
-from datetime import datetime
+
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union, TYPE_CHECKING
 import uuid
 
@@ -15,7 +15,7 @@ from svc_infra.db.sql.uniq_hooks import dedupe_sql_service
 
 if TYPE_CHECKING:
     # only for type hints; avoids importing at runtime
-    from svc_infra.api.fastapi.db.sql.base import SqlRepository
+    from svc_infra.db.sql.repository import SqlRepository
 
 # ------------------------------ Model ------------------------------
 
