@@ -1,8 +1,10 @@
 import logging
 
-from fastapi import APIRouter, Response, status
+from fastapi import Response, status
 
-router = APIRouter()
+from svc_infra.api.fastapi import DualAPIRouter
+
+router = DualAPIRouter()
 
 
 @router.get("/ping", status_code=status.HTTP_200_OK)
