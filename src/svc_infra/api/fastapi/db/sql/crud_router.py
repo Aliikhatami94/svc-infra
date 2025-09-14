@@ -13,6 +13,7 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 from svc_infra.db.sql.service import SqlService
 
 from .session import SqlSessionDep
@@ -37,10 +38,10 @@ def make_crud_router_plus_sql(
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
     router_prefix = ("/_sql" + prefix) if mount_under_db_prefix else prefix
-    r = APIRouter(
+    r = DualAPIRouter(
         prefix=router_prefix,
         tags=tags or [prefix.strip("/")],
-        redirect_slashes=False,  # avoid 307 that can drop body in some clients
+        redirect_slashes=False,
     )
 
     def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:
@@ -55,8 +56,8 @@ def make_crud_router_plus_sql(
             fields.append(p)
         return fields
 
-    @r.get("", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
-    @r.get("/", response_model=cast(Any, Page[read_schema]))  # type: ignore[valid-type]
+    # -------- LIST --------
+    @r.get("", response_model=cast(Any, Page[read_schema]))
     async def list_items(
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
@@ -74,43 +75,34 @@ def make_crud_router_plus_sql(
                 if f.strip()
             ]
             items = await service.search(
-                session,
-                q=sp.q,
-                fields=fields,
-                limit=lp.limit,
-                offset=lp.offset,
-                order_by=order_by,
+                session, q=sp.q, fields=fields, limit=lp.limit, offset=lp.offset, order_by=order_by
             )
             total = await service.count_filtered(session, q=sp.q, fields=fields)
         else:
             items = await service.list(session, limit=lp.limit, offset=lp.offset, order_by=order_by)
             total = await service.count(session)
-
-        return Page[read_schema].from_items(  # type: ignore[valid-type]
+        return Page[read_schema].from_items(
             total=total, items=items, limit=lp.limit, offset=lp.offset
         )
 
+    # -------- GET by id --------
     @r.get("/{item_id}", response_model=cast(Any, read_schema))
-    async def get_item(
-        item_id: Any,
-        session: SqlSessionDep,  # type: ignore[name-defined]
-    ):
+    async def get_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
         row = await service.get(session, item_id)
         if not row:
             raise HTTPException(404, "Not found")
         return row
 
-    # CREATE — body is explicit, and non-default (session) comes before default (payload=Body(...))
+    # -------- CREATE --------
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
-    @r.post("/", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(
         session: SqlSessionDep,  # type: ignore[name-defined]
-        payload: create_schema = Body(...),  # mypy: variable-as-type -> OK at runtime
+        payload: create_schema = Body(...),
     ):
         data = cast(BaseModel, payload).model_dump(exclude_unset=True)
         return await service.create(session, data)
 
-    # UPDATE
+    # -------- UPDATE --------
     @r.patch("/{item_id}", response_model=cast(Any, read_schema))
     async def update_item(
         item_id: Any,
@@ -123,11 +115,9 @@ def make_crud_router_plus_sql(
             raise HTTPException(404, "Not found")
         return row
 
+    # -------- DELETE --------
     @r.delete("/{item_id}", status_code=204)
-    async def delete_item(
-        item_id: Any,
-        session: SqlSessionDep,  # type: ignore[name-defined]
-    ):
+    async def delete_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
         ok = await service.delete(session, item_id)
         if not ok:
             raise HTTPException(404, "Not found")

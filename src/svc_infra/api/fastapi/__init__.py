@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.routers import register_all_routers
@@ -183,3 +184,10 @@ def create_and_register_api(
             return HTMLResponse(f"<h1>Docs</h1><ul>{links}</ul>")
 
     return parent
+
+
+__all__ = [
+    "DualAPIRouter",
+    "create_and_register_api",
+    "ApiConfig",
+]

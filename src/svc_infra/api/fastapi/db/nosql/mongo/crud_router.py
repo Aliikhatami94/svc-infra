@@ -12,8 +12,8 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 from svc_infra.db.nosql.mongo.client import acquire_db
-from svc_infra.db.nosql.repository import NoSqlRepository
 from svc_infra.db.nosql.service import NoSqlService
 
 DBDep = Annotated[AsyncIOMotorDatabase, Depends(acquire_db)]
@@ -22,9 +22,6 @@ DBDep = Annotated[AsyncIOMotorDatabase, Depends(acquire_db)]
 def _parse_sort(
     order_spec: Optional[str], allowed_order_fields: Optional[list[str]]
 ) -> list[tuple[str, int]]:
-    """
-    Translate "name,-created_at" -> [("name", 1), ("created_at", -1)] and honor allowed fields.
-    """
     if not order_spec:
         return []
     out: list[tuple[str, int]] = []
@@ -38,8 +35,6 @@ def _parse_sort(
 
 def make_crud_router_plus_mongo(
     *,
-    collection: str,
-    repo: NoSqlRepository,
     service: NoSqlService,
     read_schema: Type[Any],
     create_schema: Type[Any],
@@ -52,41 +47,34 @@ def make_crud_router_plus_mongo(
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
     router_prefix = ("/_mongo" + prefix) if mount_under_db_prefix else prefix
-    r = APIRouter(
+    r = DualAPIRouter(
         prefix=router_prefix,
         tags=tags or [prefix.strip("/")],
         redirect_slashes=False,
     )
 
+    # LIST
     @r.get("", response_model=cast(Any, Page[read_schema]))
-    @r.get("/", response_model=cast(Any, Page[read_schema]))
     async def list_items(
         db: DBDep,
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
         sp: Annotated[SearchParams, Depends(dep_search)],
     ):
-        order_spec = op.order_by or default_ordering
-        sort = _parse_sort(order_spec, allowed_order_fields)
-
+        sort = _parse_sort(op.order_by or default_ordering, allowed_order_fields)
         if sp.q and search_fields:
             items = await service.search(
-                db,
-                q=sp.q,
-                fields=search_fields,
-                limit=lp.limit,
-                offset=lp.offset,
-                sort=sort,
+                db, q=sp.q, fields=search_fields, limit=lp.limit, offset=lp.offset, sort=sort
             )
             total = await service.count_filtered(db, q=sp.q, fields=search_fields)
         else:
             items = await service.list(db, limit=lp.limit, offset=lp.offset, sort=sort)
             total = await service.count(db)
-
         return Page[read_schema].from_items(
             total=total, items=items, limit=lp.limit, offset=lp.offset
         )
 
+    # GET by id
     @r.get("/{item_id}", response_model=cast(Any, read_schema))
     async def get_item(db: DBDep, item_id: Any):
         row = await service.get(db, item_id)
@@ -94,12 +82,13 @@ def make_crud_router_plus_mongo(
             raise HTTPException(404, "Not found")
         return row
 
+    # CREATE
     @r.post("", response_model=cast(Any, read_schema), status_code=201)
-    @r.post("/", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(db: DBDep, payload: create_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
         return await service.create(db, data)
 
+    # UPDATE
     @r.patch("/{item_id}", response_model=cast(Any, read_schema))
     async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
@@ -108,6 +97,7 @@ def make_crud_router_plus_mongo(
             raise HTTPException(404, "Not found")
         return row
 
+    # DELETE
     @r.delete("/{item_id}", status_code=204)
     async def delete_item(db: DBDep, item_id: Any):
         ok = await service.delete(db, item_id)
