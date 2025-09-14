@@ -357,40 +357,83 @@ def _ensure_ssl_default_async(u: URL) -> URL:
     return u
 
 
+def _certifi_ca() -> str | None:
+    try:
+        import certifi
+
+        return certifi.where()
+    except Exception:
+        return None
+
+
 def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
+
+    # Keep your existing PG helpers
     u = _ensure_ssl_default(u)
     u = _ensure_timeout_default(u)
 
     connect_args: dict[str, Any] = {}
 
-    # ---- Async branch ----
+    # ----------------- ASYNC -----------------
     if is_async_url(u):
-        create_async = _create_async_engine
-        if create_async is None:
+        if _create_async_engine is None:
             raise RuntimeError(
                 "Async driver URL provided but SQLAlchemy async extras are not available."
             )
 
-        connect_args: dict[str, Any] = {}
-        # asyncpg honors a top-level 'timeout' connect kwarg
+        # asyncpg: honor connection timeout
         if "+asyncpg" in (u.drivername or ""):
             connect_args["timeout"] = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
+
+        # NEW: aiomysql SSL default
+        if "+aiomysql" in (u.drivername or "") and not any(
+            k in u.query for k in ("ssl", "ssl_ca", "sslmode")
+        ):
+            # aiomysql accepts an ssl.SSLContext or True
+            try:
+                import ssl
+
+                ca = _certifi_ca()
+                ctx = ssl.create_default_context(cafile=ca) if ca else ssl.create_default_context()
+                # if your host uses a public CA, verification works;
+                # if not, you can relax verification (not recommended):
+                #   ctx.check_hostname = False
+                #   ctx.verify_mode = ssl.CERT_NONE
+                connect_args["ssl"] = ctx
+            except Exception:
+                connect_args["ssl"] = True  # minimal hint to enable TLS
 
         kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
         if connect_args:
             kwargs["connect_args"] = connect_args
-        return create_async(u, **kwargs)
+        return _create_async_engine(u, **kwargs)
 
-    # ---- Sync branch ----
+    # ----------------- SYNC -----------------
     u = _coerce_sync_driver(u)
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
 
     dn = (u.drivername or "").lower()
-    # (Optional) psycopg v3 quirk — not strictly needed; URL already carries the password.
+
+    # psycopg v3 quirk (optional)
     if dn.startswith("postgresql+psycopg") and u.password:
         connect_args["password"] = u.password
+
+    # NEW: pymysql SSL default
+    if dn.startswith("mysql+pymysql") and not any(
+        k in u.query for k in ("ssl", "ssl_ca", "sslmode")
+    ):
+        ca = _certifi_ca()
+        if ca:
+            # PyMySQL expects a dict of SSL args; 'ca' is the common one
+            connect_args["ssl"] = {"ca": ca}
+        else:
+            # Fallback: empty dict enables TLS without CA pinning (works on many hosts)
+            connect_args["ssl"] = {}
+
+        # Optional: if your provider requires it, you can also add:
+        # connect_args.setdefault("client_flag", 0)
 
     kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
     if connect_args:
