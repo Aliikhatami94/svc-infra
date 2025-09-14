@@ -29,6 +29,7 @@ def register_all_routers(
     base_package: Optional[str] = None,
     prefix: str = "",
     environment: Optional[Environment | str] = None,
+    force_include_in_schema: Optional[bool] = None,
 ) -> None:
     """
     Recursively discover and register all FastAPI routers under a routers package.
@@ -68,6 +69,9 @@ def register_all_routers(
         if environment is None
         else (Environment(environment) if not isinstance(environment, Environment) else environment)
     )
+
+    if force_include_in_schema is None:
+        force_include_in_schema = environment == Environment.LOCAL
 
     for _, module_name, _ in pkgutil.walk_packages(
         package_module.__path__, prefix=f"{base_package}."
@@ -116,16 +120,25 @@ def register_all_routers(
                         f"Skipping router module {module_name} due to ROUTER_EXCLUDED_ENVIRONMENTS restriction: {router_excluded_envs}"
                     )
                     continue
-            # Pick up ROUTER_PREFIX, ROUTER_TAG, and INCLUDE_ROUTER_IN_SCHEMA if present
+            # module-level opt-out that still works even in LOCAL (rare but handy)
+            if getattr(module, "ROUTER_NEVER_IN_SCHEMA", False) is True:
+                continue
+
             router_prefix = getattr(module, "ROUTER_PREFIX", None)
             router_tag = getattr(module, "ROUTER_TAG", None)
             include_in_schema = getattr(module, "INCLUDE_ROUTER_IN_SCHEMA", True)
+
             include_kwargs = {"prefix": prefix}
             if router_prefix:
                 include_kwargs["prefix"] = prefix.rstrip("/") + router_prefix
             if router_tag:
                 include_kwargs["tags"] = [router_tag]
-            include_kwargs["include_in_schema"] = include_in_schema
+
+            # the key line: force in LOCAL, otherwise respect the module
+            include_kwargs["include_in_schema"] = (
+                True if force_include_in_schema else include_in_schema
+            )
+
             app.include_router(router, **include_kwargs)
             logger.debug(
                 "Included router from module: %s (prefix=%s, tag=%s, include_in_schema=%s)",

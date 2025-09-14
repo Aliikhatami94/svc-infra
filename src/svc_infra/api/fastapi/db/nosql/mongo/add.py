@@ -7,6 +7,7 @@ from typing import Sequence
 from bson import ObjectId
 from fastapi import FastAPI
 
+from svc_infra.app.env import CURRENT_ENVIRONMENT, Environment
 from svc_infra.db.nosql.management import make_document_crud_schemas
 from svc_infra.db.nosql.mongo.client import acquire_db, close_mongo, init_mongo
 from svc_infra.db.nosql.mongo.settings import MongoSettings
@@ -55,6 +56,8 @@ def add_mongo_db(app: FastAPI, *, dsn_env: str = "MONGO_URL") -> None:
 def add_mongo_health(
     app: FastAPI, *, prefix: str = "/_mongo/health", include_in_schema: bool = False
 ) -> None:
+    if include_in_schema is None:
+        include_in_schema = CURRENT_ENVIRONMENT == Environment.LOCAL
     app.include_router(make_mongo_health_router(prefix=prefix, include_in_schema=include_in_schema))
 
 

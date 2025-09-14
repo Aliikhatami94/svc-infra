@@ -11,7 +11,7 @@ from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMi
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.api.fastapi.settings import ApiConfig
-from svc_infra.app.env import CURRENT_ENVIRONMENT
+from svc_infra.app.env import CURRENT_ENVIRONMENT, Environment
 from svc_infra.app.settings import AppSettings, get_app_settings
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,9 @@ def _build_child_api(
     register_all_routers(
         child,
         base_package="svc_infra.api.fastapi.routers",
-        prefix="",  # <-- key change
+        prefix="",
+        environment=CURRENT_ENVIRONMENT,
+        # force_include_in_schema defaults to True in LOCAL via the helper itself
     )
 
     # Optional custom routers
@@ -89,7 +91,8 @@ def _build_child_api(
         register_all_routers(
             child,
             base_package=api_config.routers_path,
-            prefix="",  # <-- key change
+            prefix="",
+            environment=CURRENT_ENVIRONMENT,
         )
 
     logger.info(
@@ -151,9 +154,9 @@ def create_and_register_api(
 ) -> FastAPI:
     parent = FastAPI(
         title=public_title,
-        docs_url=None,
-        redoc_url=None,
-        openapi_url=None,
+        docs_url="/docs" if CURRENT_ENVIRONMENT == Environment.LOCAL else None,
+        redoc_url="/redoc" if CURRENT_ENVIRONMENT == Environment.LOCAL else None,
+        openapi_url="/openapi.json" if CURRENT_ENVIRONMENT == Environment.LOCAL else None,
     )
 
     # Apply CORS on parent only
@@ -167,5 +170,16 @@ def create_and_register_api(
         mount_path = f"/{api_cfg.version.strip('/')}"  # e.g. "/v0"
         parent.mount(mount_path, child, name=api_cfg.version.strip("/"))
         set_servers(child, api_cfg.public_base_url, mount_path)
+
+    if CURRENT_ENVIRONMENT == Environment.LOCAL:
+        from fastapi.responses import HTMLResponse
+
+        @parent.get("/", include_in_schema=False)
+        def index():
+            links = "".join(
+                f'<li><a href="/{api_cfg.version.strip("/")}/docs">/{api_cfg.version.strip("/")}/docs</a></li>'
+                for _, api_cfg in versions
+            )
+            return HTMLResponse(f"<h1>Docs</h1><ul>{links}</ul>")
 
     return parent
