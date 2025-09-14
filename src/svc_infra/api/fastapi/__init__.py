@@ -147,7 +147,7 @@ def _setup_cors(app, public_cors_origins: list[str] | str | None = None):
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
-def create_and_register_api(
+def setup_fastapi(
     versions: list[tuple[AppSettings, ApiConfig]],
     *,
     public_title: str = "Service Shell",
@@ -188,6 +188,6 @@ def create_and_register_api(
 
 __all__ = [
     "DualAPIRouter",
-    "create_and_register_api",
+    "setup_fastapi",
     "ApiConfig",
 ]
