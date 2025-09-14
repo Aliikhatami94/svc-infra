@@ -360,9 +360,11 @@ def _ensure_ssl_default_async(u: URL) -> URL:
 def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
     u = _ensure_ssl_default(u)
-    u = _ensure_timeout_default(u)  # <-- ADD THIS
+    u = _ensure_timeout_default(u)
 
-    # Async
+    connect_args: dict[str, Any] = {}
+
+    # ---- Async branch ----
     if is_async_url(u):
         create_async = _create_async_engine
         if create_async is None:
@@ -380,19 +382,19 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
             kwargs["connect_args"] = connect_args
         return create_async(u, **kwargs)
 
-    # Sync
+    # ---- Sync branch ----
     u = _coerce_sync_driver(u)
     if _create_engine is None:
         raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
 
     dn = (u.drivername or "").lower()
+    # (Optional) psycopg v3 quirk — not strictly needed; URL already carries the password.
     if dn.startswith("postgresql+psycopg") and u.password:
         connect_args["password"] = u.password
 
     kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
     if connect_args:
         kwargs["connect_args"] = connect_args
-
     return _create_engine(u, **kwargs)
 
 
