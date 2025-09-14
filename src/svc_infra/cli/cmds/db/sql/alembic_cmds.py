@@ -150,7 +150,7 @@ def cmd_setup_and_migrate(
 ):
     """
     End-to-end: ensure DB exists, scaffold Alembic, create/upgrade revisions.
-    Async vs. sync is inferred from DATABASE_URL.
+    Async vs. sync is inferred from SQL_URL.
     """
     apply_database_url(database_url)
     core_setup_and_migrate(

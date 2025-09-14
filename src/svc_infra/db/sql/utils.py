@@ -152,41 +152,41 @@ def get_database_url_from_env(
                 if file_val:
                     os.environ["SQL_URL"] = file_val
                     return file_val
-            os.environ["DATABASE_URL"] = s
+            os.environ["SQL_URL"] = s
             return s
 
-        # Companion NAME_FILE secret path (e.g., DATABASE_URL_FILE)
+        # Companion NAME_FILE secret path (e.g., SQL_URL_FILE)
         file_key = f"{key}_FILE"
         file_path = os.getenv(file_key)
         if file_path:
             file_val = _read_secret_from_file(file_path)
             if file_val:
-                os.environ["DATABASE_URL"] = file_val
+                os.environ["SQL_URL"] = file_val
                 return file_val
 
     # 2) Conventional secret envs
-    file_path = os.getenv("DATABASE_URL_FILE")
+    file_path = os.getenv("SQL_URL_FILE")
     if file_path:
         file_val = _read_secret_from_file(file_path)
         if file_val:
-            os.environ["DATABASE_URL"] = file_val
+            os.environ["SQL_URL"] = file_val
             return file_val
 
     # 3) Docker/K8s default secret mount
     file_val = _read_secret_from_file("/run/secrets/database_url")
     if file_val:
-        os.environ["DATABASE_URL"] = file_val
+        os.environ["SQL_URL"] = file_val
         return file_val
 
     # 4) Compose from parts (DB_DIALECT/DB_DRIVER/DB_HOST/.../DB_PARAMS)
     composed = _compose_url_from_parts()
     if composed:
-        os.environ["DATABASE_URL"] = composed
+        os.environ["SQL_URL"] = composed
         return composed
 
     if required:
         raise RuntimeError(
-            "Database URL not set. Set DATABASE_URL (or PRIVATE_DATABASE_URL / DB_URL), "
+            "Database URL not set. Set SQL_URL (or PRIVATE_SQL_URL / DB_URL), "
             "or provide DB_* parts (DB_HOST, DB_NAME, etc.), or a *_FILE secret."
         )
     return None
@@ -806,7 +806,7 @@ def ensure_database_exists(url: URL | str) -> None:
 
 def repair_alembic_state_if_needed(cfg: Config) -> None:
     """If DB points to a non-existent local revision, reset to base (drop alembic_version)."""
-    db_url = cfg.get_main_option("sqlalchemy.url") or os.getenv("DATABASE_URL")
+    db_url = cfg.get_main_option("sqlalchemy.url") or os.getenv("SQL_URL")
     if not db_url:
         return
 
@@ -871,7 +871,7 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
 def render_env_py(packages: Sequence[str], *, async_db: bool | None = None) -> str:
     """Render Alembic env.py content from packaged templates.
 
-    - If async_db is None, detect from DATABASE_URL; default to sync if unknown.
+    - If async_db is None, detect from SQL_URL; default to sync if unknown.
     """
     import importlib.resources as pkg
 
@@ -901,7 +901,7 @@ def build_alembic_config(
     cfg = _Config(str(cfg_path)) if cfg_path.exists() else _Config()
     cfg.set_main_option("script_location", str((root / script_location).resolve()))
 
-    env_db_url = os.getenv("DATABASE_URL", "").strip()
+    env_db_url = os.getenv("SQL_URL", "").strip()
     if env_db_url:
         u = make_url(env_db_url)
         u = _ensure_ssl_default(u)
@@ -913,7 +913,7 @@ def build_alembic_config(
     if not cfg.get_main_option("sqlalchemy.url"):
         raise RuntimeError(
             "No SQLAlchemy URL resolved. Pass `database_url` to the calling function "
-            "or set DATABASE_URL in the environment."
+            "or set SQL_URL in the environment."
         )
 
     cfg.set_main_option("path_separator", "os")

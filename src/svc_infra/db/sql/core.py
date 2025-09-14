@@ -314,7 +314,7 @@ def setup_and_migrate(
     """
     Ensure DB + Alembic are ready and up-to-date.
 
-    Auto-detects async vs. sync from DATABASE_URL.
+    Auto-detects async vs. sync from SQL_URL.
     """
     resolved_url = database_url or get_database_url_from_env(required=True)
     root = prepare_env()
