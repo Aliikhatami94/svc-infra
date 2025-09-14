@@ -85,4 +85,39 @@ def add_sql_health(
     app.include_router(_make_db_health_router(prefix=prefix, include_in_schema=include_in_schema))
 
 
+def setup_sql(
+    app: FastAPI,
+    resources: Sequence[SqlResource],
+    *,
+    url: Optional[str] = None,
+    dsn_env: str = "SQL_URL",
+    include_health: bool = True,
+    health_prefix: str = "/_sql/health",
+) -> None:
+    """
+    Convenience one-liner: configure DB lifecycle, mount CRUD routers, and (optionally) health.
+
+    Internally calls:
+      - add_sql_db(app, url=url, dsn_env=dsn_env)
+      - add_sql_resources(app, resources)
+      - add_sql_health(app, prefix=health_prefix)  [if include_health]
+
+    Idempotent guard: ensures we don't re-run DB init if setup_sql() is called twice.
+    """
+    # ---- idempotency guard (play nice with tests / multiple imports) ----
+    if getattr(app.state, "_sql_setup_done", False):
+        # Already wired; you may still add more resources explicitly if needed.
+        # But we avoid re-configuring lifecycle & health.
+        add_sql_resources(app, resources)
+        return
+
+    add_sql_db(app, url=url, dsn_env=dsn_env)
+    add_sql_resources(app, resources)
+
+    if include_health:
+        add_sql_health(app, prefix=health_prefix, include_in_schema=False)
+
+    app.state._sql_setup_done = True
+
+
 __all__ = ["add_sql_resources", "add_sql_db", "add_sql_health"]
