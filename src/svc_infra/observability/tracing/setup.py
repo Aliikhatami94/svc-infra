@@ -7,9 +7,7 @@ from typing import Any, Callable, Dict, List
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as OTLPgExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-    OTLPSpanExporter as OTLPhttpExporter,
-)
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as OTLPExporter
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.sdk.resources import Resource
@@ -93,7 +91,7 @@ def setup_tracing(
         exporter = OTLPgExporter(endpoint=endpoint, insecure=True, headers=headers)
     else:
         http_endpoint = endpoint.replace(":4317", ":4318")
-        exporter = OTLPhttpExporter(endpoint=http_endpoint, headers=headers)
+        exporter = OTLPExporter(endpoint=http_endpoint, headers=headers)
 
     processor = BatchSpanProcessor(exporter)
     provider.add_span_processor(processor)
