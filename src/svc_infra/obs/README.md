@@ -2,7 +2,7 @@
 
 Production-ready observability with one-call setup for FastAPI applications.
 
-`svc_infra.observability` provides:
+`svc_infra.obs` provides:
 - Prometheus metrics (ASGI middleware + `/metrics` route)
 - OpenTelemetry tracing (OTLP gRPC/HTTP, FastAPI/SQLAlchemy/requests/httpx auto-instrumentation)
 - DB pool metrics for SQLAlchemy
@@ -12,8 +12,8 @@ Production-ready observability with one-call setup for FastAPI applications.
 
 ```python
 from fastapi import FastAPI
-from svc_infra.observability import ObservabilitySettings, add_prometheus, setup_tracing
-from svc_infra.observability import bind_sqlalchemy_pool_metrics
+from svc_infra.obs import ObservabilitySettings, add_prometheus, setup_tracing
+from svc_infra.obs import bind_sqlalchemy_pool_metrics
 from svc_infra.db.sql.manage import make_crud_router_plus
 
 app = FastAPI()
@@ -103,10 +103,11 @@ export PROMETHEUS_MULTIPROC_DIR=/var/run/prom-mp
 ### Custom metrics
 
 ```python
-from svc_infra.observability import counter, histogram
+from svc_infra.obs import counter, histogram
 
 jobs_total = counter("jobs_total", "Total jobs processed", ["status"])
-job_latency = histogram("job_duration_seconds", "Job duration", buckets=[0.1,0.5,1,2,5])
+job_latency = histogram("job_duration_seconds", "Job duration", buckets=[0.1, 0.5, 1, 2, 5])
+
 
 def handle_job(job):
     with job_latency.time():
@@ -121,11 +122,11 @@ def handle_job(job):
 ### HTTP client instrumentation
 
 ```python
-from svc_infra.observability import instrument_requests, instrument_httpx
+from svc_infra.obs import instrument_requests, instrument_httpx
 
 # Automatically add metrics for all HTTP requests
-instrument_requests()   # for requests library
-instrument_httpx()      # for httpx library
+instrument_requests()  # for requests library
+instrument_httpx()  # for httpx library
 ```
 
 ### Histogram bucket tuning
@@ -133,7 +134,7 @@ instrument_httpx()      # for httpx library
 Aim buckets around SLOs; e.g., 5–50–250–1000ms for latency SLO=300ms:
 
 ```python
-from svc_infra.observability import ObservabilitySettings
+from svc_infra.obs import ObservabilitySettings
 
 # Override via environment
 # METRICS_DEFAULT_BUCKETS="0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0"

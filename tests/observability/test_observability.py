@@ -37,7 +37,7 @@ class _FakeMetric:
 
 
 def test_observability_settings_defaults():
-    from svc_infra.observability.settings import ObservabilitySettings
+    from svc_infra.obs.settings import ObservabilitySettings
 
     cfg = ObservabilitySettings()
     assert cfg.METRICS_ENABLED is True
@@ -97,7 +97,7 @@ def test_add_observability_without_prometheus_exposes_501(starlette_app):
     with _purged_module("prometheus_client"):
         from starlette.testclient import TestClient
 
-        from svc_infra.observability import add_observability
+        from svc_infra.obs import add_observability
 
         # should not raise even without prometheus installed
         shutdown = add_observability(starlette_app)
@@ -119,7 +119,7 @@ def test_add_observability_auto_shutdown_hook(starlette_app, monkeypatch):
 
     monkeypatch.setattr(starlette_app, "add_event_handler", fake_add_event_handler)
 
-    from svc_infra.observability import add_observability
+    from svc_infra.obs import add_observability
 
     shutdown = add_observability(starlette_app)
     assert callable(shutdown)
@@ -140,7 +140,7 @@ def test_prometheus_middleware_inflight_uses_raw_path_and_decrements(monkeypatch
     app = Starlette()
 
     # Import module under test
-    import svc_infra.observability.metrics.asgi as asgi_mod
+    import svc_infra.obs.metrics.asgi as asgi_mod
 
     inflight = _FakeMetric()
     total = _FakeMetric()
@@ -180,7 +180,7 @@ def test_metrics_endpoint_returns_501_without_prometheus(monkeypatch):
         from starlette.applications import Starlette
         from starlette.testclient import TestClient
 
-        import svc_infra.observability.metrics.asgi as asgi_mod
+        import svc_infra.obs.metrics.asgi as asgi_mod
 
         app = Starlette()
         app.add_route("/metrics", asgi_mod.metrics_endpoint())
@@ -199,7 +199,7 @@ def test_metrics_endpoint_returns_501_without_prometheus(monkeypatch):
 def test_tracing_setup_and_log_trace_context():
     from opentelemetry import trace
 
-    from svc_infra.observability.tracing.setup import log_trace_context, setup_tracing
+    from svc_infra.obs.tracing.setup import log_trace_context, setup_tracing
 
     shutdown = setup_tracing(
         service_name="test-svc",
@@ -237,7 +237,7 @@ def test_tracing_setup_and_log_trace_context():
 def test_instrument_requests_monkeypatches_request(monkeypatch):
     import requests
 
-    from svc_infra.observability.metrics.http import instrument_requests
+    from svc_infra.obs.metrics.http import instrument_requests
 
     # Ensure original is restored by our test if something blows up
     orig = requests.sessions.Session.request
@@ -255,7 +255,7 @@ def test_instrument_requests_monkeypatches_request(monkeypatch):
 def test_instrument_httpx_monkeypatches_send(monkeypatch):
     import httpx
 
-    from svc_infra.observability.metrics.http import instrument_httpx
+    from svc_infra.obs.metrics.http import instrument_httpx
 
     orig_sync = httpx.Client.send
     orig_async = httpx.AsyncClient.send
@@ -295,7 +295,7 @@ def test_bind_sqlalchemy_pool_metrics_registers_listeners_without_sqlalchemy(
     monkeypatch.setitem(sys.modules, "sqlalchemy", fake_sqlalchemy)
 
     # Import module under test
-    import svc_infra.observability.metrics.sqlalchemy as sa_metrics
+    import svc_infra.obs.metrics.sqlalchemy as sa_metrics
 
     # Patch the metric objects with fakes
     sa_metrics._pool_in_use = _FakeMetric()
