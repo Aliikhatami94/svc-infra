@@ -5,11 +5,12 @@ import typer
 from svc_infra.cli.cmds import (
     _HELP,
     register_alembic,
+    register_grafana,
     register_mongo,
     register_mongo_scaffold,
-    register_obs,
     register_redis,
     register_sql_scaffold,
+    register_uptrace,
 )
 from svc_infra.cli.foundation.typer_bootstrap import pre_cli
 
@@ -28,7 +29,8 @@ register_mongo_scaffold(app)
 register_redis(app)
 
 # observability commands
-register_obs(app)
+register_grafana(app)
+register_uptrace(app)
 
 
 def main():
