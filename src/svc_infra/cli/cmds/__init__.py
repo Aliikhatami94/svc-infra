@@ -1,5 +1,4 @@
 from svc_infra.cli.cmds.cache.redis.redis_cmds import register as register_redis
-from svc_infra.cli.cmds.cache.redis.redis_scaffold_cmds import register as register_redis_scaffold
 from svc_infra.cli.cmds.db.nosql.mongo.mongo_cmds import register as register_mongo
 from svc_infra.cli.cmds.db.nosql.mongo.mongo_scaffold_cmds import (
     register as register_mongo_scaffold,
@@ -17,6 +16,5 @@ __all__ = [
     "register_mongo",
     "register_mongo_scaffold",
     "register_redis",
-    "register_redis_scaffold",
     "_HELP",
 ]
