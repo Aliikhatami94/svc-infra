@@ -1,7 +1,5 @@
-import importlib.resources as pkg
 from pathlib import Path
-from string import Template as _T
-from typing import Any, Dict, Sequence, Tuple, Union
+from typing import Sequence, Tuple, Union
 
 KeySpec = Union[str, Sequence[str]]
 
@@ -13,11 +11,6 @@ def as_tuple(spec: KeySpec) -> Tuple[str, ...]:
 def normalize_dir(p: Path | str) -> Path:
     p = Path(p)
     return p if p.is_absolute() else (Path.cwd() / p).resolve()
-
-
-def render_template(tmpl_dir: str, name: str, subs: dict[str, Any] = None) -> str:
-    txt = pkg.files(tmpl_dir).joinpath(name).read_text(encoding="utf-8")
-    return _T(txt).safe_substitute(subs)
 
 
 def snake(name: str) -> str:
@@ -35,17 +28,3 @@ def pascal(name: str) -> str:
 def plural_snake(entity_pascal: str) -> str:
     base = snake(entity_pascal)
     return base if base.endswith("s") else base + "s"
-
-
-def write(dest: Path, content: str, overwrite: bool) -> Dict[str, Any]:
-    dest = dest.resolve()
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists() and not overwrite:
-        return {"path": str(dest), "action": "skipped", "reason": "exists"}
-    dest.write_text(content, encoding="utf-8")
-    return {"path": str(dest), "action": "wrote"}
-
-
-def ensure_init_py(dir_path: Path, overwrite: bool, paired: bool, content: str) -> Dict[str, Any]:
-    """Create __init__.py; paired=True writes models/schemas re-exports, otherwise minimal."""
-    return write(dir_path / "__init__.py", content, overwrite)

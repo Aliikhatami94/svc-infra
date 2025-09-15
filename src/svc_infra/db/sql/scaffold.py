@@ -3,15 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 
-from svc_infra.db.utils import (
-    ensure_init_py,
-    normalize_dir,
-    pascal,
-    plural_snake,
-    render_template,
-    snake,
-    write,
-)
+from svc_infra.db.utils import normalize_dir, pascal, plural_snake, snake
+from svc_infra.utils import ensure_init_py, render_template, write
 
 # ---------------- helpers ----------------
 
