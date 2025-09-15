@@ -1,10 +1,11 @@
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 
+from svc_infra.api.fastapi import DualAPIRouter
 from svc_infra.auth import integration
 
 
-def _make_router(path: str) -> APIRouter:
-    router = APIRouter()
+def _make_router(path: str) -> DualAPIRouter:
+    router = DualAPIRouter()
 
     @router.get(path)
     async def _handler():
@@ -68,7 +69,7 @@ def test_add_auth_with_providers(monkeypatch):
     ):
         # ensure the auth_backend from get_fastapi_users is passed through
         assert auth_backend == "FAKE_BACKEND"
-        router = APIRouter(prefix=prefix)
+        router = DualAPIRouter(prefix=prefix)
 
         @router.get("/callback")
         async def _cb():

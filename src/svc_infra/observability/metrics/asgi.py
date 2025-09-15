@@ -182,9 +182,9 @@ def add_prometheus(app, *, path: str = "/metrics", skip_paths: Optional[Iterable
     )
     # Add route
     try:
-        from fastapi import APIRouter
+        from svc_infra.api.fastapi import DualAPIRouter
 
-        router = APIRouter()
+        router = DualAPIRouter()
         router.add_api_route(path, endpoint=metrics_endpoint(), include_in_schema=False)
         app.include_router(router)
     except Exception:

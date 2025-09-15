@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Optional, Sequence, Type, cast
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import Body, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from svc_infra.api.fastapi.db.http import (
@@ -45,16 +45,16 @@ def make_crud_router_plus_mongo(
     default_ordering: Optional[str] = None,
     allowed_order_fields: Optional[list[str]] = None,
     mount_under_db_prefix: bool = True,
-) -> APIRouter:
+) -> DualAPIRouter:
     router_prefix = ("/_mongo" + prefix) if mount_under_db_prefix else prefix
-    r = DualAPIRouter(
+    router = DualAPIRouter(
         prefix=router_prefix,
         tags=tags or [prefix.strip("/")],
         redirect_slashes=False,
     )
 
     # LIST
-    @r.get("", response_model=cast(Any, Page[read_schema]))
+    @router.get("", response_model=cast(Any, Page[read_schema]))
     async def list_items(
         db: DBDep,
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
@@ -75,7 +75,7 @@ def make_crud_router_plus_mongo(
         )
 
     # GET by id
-    @r.get("/{item_id}", response_model=cast(Any, read_schema))
+    @router.get("/{item_id}", response_model=cast(Any, read_schema))
     async def get_item(db: DBDep, item_id: Any):
         row = await service.get(db, item_id)
         if not row:
@@ -83,13 +83,13 @@ def make_crud_router_plus_mongo(
         return row
 
     # CREATE
-    @r.post("", response_model=cast(Any, read_schema), status_code=201)
+    @router.post("", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(db: DBDep, payload: create_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
         return await service.create(db, data)
 
     # UPDATE
-    @r.patch("/{item_id}", response_model=cast(Any, read_schema))
+    @router.patch("/{item_id}", response_model=cast(Any, read_schema))
     async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
         row = await service.update(db, item_id, data)
@@ -98,11 +98,11 @@ def make_crud_router_plus_mongo(
         return row
 
     # DELETE
-    @r.delete("/{item_id}", status_code=204)
+    @router.delete("/{item_id}", status_code=204)
     async def delete_item(db: DBDep, item_id: Any):
         ok = await service.delete(db, item_id)
         if not ok:
             raise HTTPException(404, "Not found")
         return
 
-    return r
+    return router

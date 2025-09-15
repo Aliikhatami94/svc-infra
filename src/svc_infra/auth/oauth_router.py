@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
 from sqlalchemy import select
 
+from svc_infra.api.fastapi import DualAPIRouter
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
 
@@ -18,7 +19,7 @@ def oauth_router_with_backend(
     providers: Dict[str, Dict[str, Any]],
     post_login_redirect: str = "/",
     prefix: str = "/auth/oauth",
-) -> APIRouter:
+) -> DualAPIRouter:
     oauth = OAuth()
 
     # Register all providers
@@ -46,9 +47,9 @@ def oauth_router_with_backend(
             # you can add more branches (facebook, apple*) as needed
             pass
 
-    r = APIRouter(prefix=prefix, tags=["auth:oauth"])
+    router = DualAPIRouter(prefix=prefix, tags=["auth:oauth"])
 
-    @r.get("/{provider}/login")
+    @router.get("/{provider}/login")
     async def oauth_login(request: Request, provider: str):
         client = oauth.create_client(provider)
         if not client:
@@ -56,7 +57,7 @@ def oauth_router_with_backend(
         redirect_uri = request.url_for("oauth_callback", provider=provider)
         return await client.authorize_redirect(request, str(redirect_uri))
 
-    @r.get("/{provider}/callback", name="oauth_callback")
+    @router.get("/{provider}/callback", name="oauth_callback")
     async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
         client = oauth.create_client(provider)
         if not client:
@@ -123,4 +124,4 @@ def oauth_router_with_backend(
         jwt = (auth_backend.get_strategy)().write_token(user)
         return RedirectResponse(url=f"{post_login_redirect}?token={jwt}")
 
-    return r
+    return router

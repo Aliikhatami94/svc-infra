@@ -5,10 +5,10 @@ import types
 from uuid import UUID
 
 import pytest
-from fastapi import APIRouter
 from pydantic import BaseModel, SecretStr
 
 import svc_infra.api.fastapi.db.sql.users as users_mod
+from svc_infra.api.fastapi import DualAPIRouter
 
 
 # -----------------------------
@@ -31,13 +31,13 @@ class FakeFastAPIUsers:
         self._get_user_manager = get_user_manager
         self._backends = backends
 
-    def get_auth_router(self, backend, requires_verification: bool = False) -> APIRouter:
-        router = APIRouter()
+    def get_auth_router(self, backend, requires_verification: bool = False) -> DualAPIRouter:
+        router = DualAPIRouter()
         router.prefix = "/__fake_auth_router__"
         return router
 
-    def get_users_router(self, read, create, update) -> APIRouter:
-        router = APIRouter()
+    def get_users_router(self, read, create, update) -> DualAPIRouter:
+        router = DualAPIRouter()
         router.prefix = "/__fake_users_router__"
         return router
 
@@ -107,8 +107,8 @@ def test_factory_returns_objects_and_respects_prefix(monkeypatch):
         auth_prefix=auth_prefix,
     )
 
-    assert isinstance(auth_router, APIRouter)
-    assert isinstance(users_router, APIRouter)
+    assert isinstance(auth_router, DualAPIRouter)
+    assert isinstance(users_router, DualAPIRouter)
     assert callable(get_strategy)
 
     assert getattr(auth_router, "prefix", "") == "/__fake_auth_router__"

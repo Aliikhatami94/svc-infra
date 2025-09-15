@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 
-from svc_infra.api.fastapi.dual_router import DualAPIRouter
+from svc_infra.api.fastapi.dual_router import DualAPIRouter, dualize_router
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.routers import register_all_routers
@@ -188,6 +188,7 @@ def setup_fastapi(
 
 __all__ = [
     "DualAPIRouter",
+    "dualize_router",
     "setup_fastapi",
     "ApiConfig",
 ]

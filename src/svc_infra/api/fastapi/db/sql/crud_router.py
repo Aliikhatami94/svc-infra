@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Optional, Sequence, Type, TypeVar, cast
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import Body, Depends, HTTPException
 from pydantic import BaseModel
 
 from svc_infra.api.fastapi.db.http import (
@@ -36,9 +36,9 @@ def make_crud_router_plus_sql(
     default_ordering: Optional[str] = None,
     allowed_order_fields: Optional[list[str]] = None,
     mount_under_db_prefix: bool = True,
-) -> APIRouter:
+) -> DualAPIRouter:
     router_prefix = ("/_sql" + prefix) if mount_under_db_prefix else prefix
-    r = DualAPIRouter(
+    router = DualAPIRouter(
         prefix=router_prefix,
         tags=tags or [prefix.strip("/")],
         redirect_slashes=False,
@@ -57,7 +57,7 @@ def make_crud_router_plus_sql(
         return fields
 
     # -------- LIST --------
-    @r.get("", response_model=cast(Any, Page[read_schema]))
+    @router.get("", response_model=cast(Any, Page[read_schema]))
     async def list_items(
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
@@ -86,7 +86,7 @@ def make_crud_router_plus_sql(
         )
 
     # -------- GET by id --------
-    @r.get("/{item_id}", response_model=cast(Any, read_schema))
+    @router.get("/{item_id}", response_model=cast(Any, read_schema))
     async def get_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
         row = await service.get(session, item_id)
         if not row:
@@ -94,7 +94,7 @@ def make_crud_router_plus_sql(
         return row
 
     # -------- CREATE --------
-    @r.post("", response_model=cast(Any, read_schema), status_code=201)
+    @router.post("", response_model=cast(Any, read_schema), status_code=201)
     async def create_item(
         session: SqlSessionDep,  # type: ignore[name-defined]
         payload: create_schema = Body(...),
@@ -103,7 +103,7 @@ def make_crud_router_plus_sql(
         return await service.create(session, data)
 
     # -------- UPDATE --------
-    @r.patch("/{item_id}", response_model=cast(Any, read_schema))
+    @router.patch("/{item_id}", response_model=cast(Any, read_schema))
     async def update_item(
         item_id: Any,
         session: SqlSessionDep,  # type: ignore[name-defined]
@@ -116,14 +116,14 @@ def make_crud_router_plus_sql(
         return row
 
     # -------- DELETE --------
-    @r.delete("/{item_id}", status_code=204)
+    @router.delete("/{item_id}", status_code=204)
     async def delete_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
         ok = await service.delete(session, item_id)
         if not ok:
             raise HTTPException(404, "Not found")
         return
 
-    return r
+    return router
 
 
 __all__ = ["make_crud_router_plus_sql"]
