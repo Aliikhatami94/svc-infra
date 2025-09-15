@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Optional
 
-from svc_infra.obs.metrics.asgi import add_prometheus
-from svc_infra.obs.metrics.http import instrument_httpx, instrument_requests
-from svc_infra.obs.metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
 from svc_infra.obs.settings import ObservabilitySettings
 from svc_infra.obs.tracing.setup import setup_tracing
 
@@ -30,38 +27,42 @@ def add_observability(
     otlp_headers: Optional[dict[str, str]] = None,
     auto_wire_shutdown: bool = True,
 ) -> Callable[[], None]:
-    """
-    Turn on metrics + tracing + client/DB instrumentation in one call.
-
-    - Safe no-ops if optional deps aren't installed.
-    - Returns shutdown() you can call on process/app exit to flush spans.
-    - If app supports Starlette/FastAPI event hooks, we auto-register shutdown.
-    """
     cfg = ObservabilitySettings()
 
-    # --- Metrics (Prometheus)
+    # --- Metrics (Prometheus) — import lazily so MCP/CLI doesn’t require prometheus_client
     if app is not None and _want_metrics(cfg):
-        path = metrics_path or cfg.METRICS_PATH
-        add_prometheus(
-            app,
-            path=path,
-            skip_paths=tuple(skip_metric_paths or (path, "/health", "/healthz")),
-        )
+        try:
+            from svc_infra.obs.metrics.asgi import add_prometheus  # lazy
 
-    # --- DB pool metrics (best effort)
+            path = metrics_path or cfg.METRICS_PATH
+            add_prometheus(
+                app,
+                path=path,
+                skip_paths=tuple(skip_metric_paths or (path, "/health", "/healthz")),
+            )
+        except Exception:
+            pass
+
+    # --- DB pool metrics (best effort) — also lazy
     if db_engines:
-        for eng in db_engines:
-            try:
-                bind_sqlalchemy_pool_metrics(eng)
-            except Exception:
-                pass
+        try:
+            from svc_infra.obs.metrics.sqlalchemy import bind_sqlalchemy_pool_metrics  # lazy
+
+            for eng in db_engines:
+                try:
+                    bind_sqlalchemy_pool_metrics(eng)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     # --- Tracing (OpenTelemetry)
     shutdown_tracing: Callable[[], None] = lambda: None
     if _want_tracing(cfg):
         headers = dict(otlp_headers or {})
-        # If UPTRACE_DSN is present, inject it as OTLP header for Uptrace
-        if cfg.UPTRACE_DSN and "uptrace-dsn" not in {k.lower(): v for k, v in headers.items()}:
+        if getattr(cfg, "UPTRACE_DSN", None) and "uptrace-dsn" not in {
+            k.lower(): v for k, v in headers.items()
+        }:
             headers["uptrace-dsn"] = cfg.UPTRACE_DSN
 
         shutdown_tracing = setup_tracing(
@@ -78,17 +79,22 @@ def add_observability(
             instrument_httpx=True,
         )
 
-    # --- HTTP client metrics (best effort)
+    # --- HTTP client metrics (best effort) — import lazily
     try:
-        instrument_requests()
-    except Exception:
-        pass
-    try:
-        instrument_httpx()
+        from svc_infra.obs.metrics.http import instrument_httpx, instrument_requests  # lazy
+
+        try:
+            instrument_requests()
+        except Exception:
+            pass
+        try:
+            instrument_httpx()
+        except Exception:
+            pass
     except Exception:
         pass
 
-    # --- Auto-wire shutdown to app if possible
+    # --- Auto-wire shutdown
     if auto_wire_shutdown and app is not None:
         try:
             if hasattr(app, "add_event_handler"):
