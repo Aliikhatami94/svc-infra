@@ -10,9 +10,9 @@ keywords = ["fastapi", "sqlalchemy", "alembic", "auth", "infra", "async", "pydan
 include = [
     "src/svc_infra/py.typed",
     "src/svc_infra/db/templates/**/*",
-    "src/svc_infra/observability/templates/**/*",
-    "src/svc_infra/observability/grafana/templates/**/*",
-    "src/svc_infra/observability/grafana/dashboards/**/*"
+    "src/svc_infra/obs/templates/**/*",
+    "src/svc_infra/obs/grafana/templates/**/*",
+    "src/svc_infra/obs/grafana/dashboards/**/*"
 ]
 
 classifiers = [

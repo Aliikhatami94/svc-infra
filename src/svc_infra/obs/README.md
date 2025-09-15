@@ -73,7 +73,7 @@ bind_sqlalchemy_pool_metrics(engine, labels={"db": "primary"})
 Install optional dependencies via extras:
 
 ```bash
-pip install "svc-infra[observability]"        # prometheus-client + opentelemetry deps
+pip install "svc-infra[obs]"        # prometheus-client + opentelemetry deps
 # or split if you prefer:
 pip install "svc-infra[metrics]"
 pip install "svc-infra[tracing]"
@@ -81,7 +81,7 @@ pip install "svc-infra[tracing]"
 
 ## Templates
 
-We ship ready-to-use templates under `svc_infra/observability/templates/`:
+We ship ready-to-use templates under `svc_infra/obs/templates/`:
 
 - `grafana_dashboard.json` - RED metrics for API, USE metrics for DB pools
 - `prometheus_rules.yml` - HighErrorRate, HighLatencyP95, DBPoolSaturation alerts

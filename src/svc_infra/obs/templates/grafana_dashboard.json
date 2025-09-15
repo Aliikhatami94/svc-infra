@@ -2,7 +2,7 @@
   "$schema": "https://grafana.com/schemas/dashboard/v1.json",
   "title": "Service Observability (RED & USE)",
   "editable": true,
-  "tags": ["svc-infra", "observability"],
+  "tags": ["svc-infra", "obs"],
   "panels": [
     {"type": "row", "title": "API (RED)"},
     {

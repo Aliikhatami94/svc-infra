@@ -16,7 +16,7 @@ from urllib.request import urlretrieve
 
 import typer
 
-PKG_TPL_ROOT = "svc_infra.observability.grafana"
+PKG_TPL_ROOT = "svc_infra.obs.grafana"
 
 # ------------------------- small utils -------------------------
 
