@@ -51,31 +51,27 @@ class DualAPIRouter(APIRouter):
         show_in_schema: bool = True,
         **kwargs: Any,
     ):
-        """
-        Register both primary (visible) and alt (hidden) routes
-        for the given handler function.
-        """
+        # Special-case the router root: "", "/" → register both "" and "/"
+        is_rootish = path in {"", "/"}
         primary = _norm_primary(path or "")
         alt = _alt_with_slash(path or "")
 
         def decorator(func: Callable[..., Any]):
-            # Visible primary
-            self.add_api_route(
-                primary,
-                func,
-                methods=methods,
-                include_in_schema=show_in_schema,
-                **kwargs,
-            )
-            # Hidden twin (skip if it would be identical to primary, e.g., "/")
-            if alt != primary:
+            if is_rootish:
+                # /prefix  (no trailing slash)
                 self.add_api_route(
-                    alt,
-                    func,
-                    methods=methods,
-                    include_in_schema=False,
-                    **kwargs,
+                    "", func, methods=methods, include_in_schema=show_in_schema, **kwargs
                 )
+                # /prefix/ (with trailing slash; hidden)
+                self.add_api_route("/", func, methods=methods, include_in_schema=False, **kwargs)
+                return func
+
+            # Normal case: visible primary (no slash in docs) + hidden twin (with slash)
+            self.add_api_route(
+                primary, func, methods=methods, include_in_schema=show_in_schema, **kwargs
+            )
+            if alt != primary:
+                self.add_api_route(alt, func, methods=methods, include_in_schema=False, **kwargs)
             return func
 
         return decorator

@@ -3,11 +3,12 @@ from __future__ import annotations
 import atexit
 import os
 import uuid
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from typing import Any, Callable, Dict, List
 
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as OTLPgExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-    OTLPSpanExporter as OTLPHTTPExporter,
+    OTLPSpanExporter as OTLPhttpExporter,
 )
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.composite import CompositePropagator
@@ -16,12 +17,11 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
-# -------------------- propagators (best-effort) --------------------
-
+# Try to load propagators defensively; not all installs ship all extras.
 _available_propagators: List[object] = []
 try:
-    from opentelemetry.propagators.tracecontext import (
-        TraceContextTextMapPropagator,  # type: ignore[attr-defined]
+    from opentelemetry.propagators.tracecontext import (  # type: ignore[attr-defined]
+        TraceContextTextMapPropagator,
     )
 
     _available_propagators.append(TraceContextTextMapPropagator())
@@ -34,100 +34,30 @@ try:
 except Exception:
     pass
 try:
+    # B3 is in a separate package in many installs; guard it.
     from opentelemetry.propagators.b3 import B3MultiFormat
 
     _available_propagators.append(B3MultiFormat())
 except Exception:
     pass
 
+# Fallback: if nothing loaded, at least keep W3C tracecontext via API default.
 if not _available_propagators:
     try:
-        from opentelemetry.propagators.tracecontext import (
-            TraceContextTextMapPropagator,  # type: ignore[attr-defined]
+        from opentelemetry.propagators.tracecontext import (  # type: ignore[attr-defined]
+            TraceContextTextMapPropagator,
         )
 
         _available_propagators.append(TraceContextTextMapPropagator())
     except Exception:
-        _available_propagators = []
-
-
-# -------------------- helpers --------------------
-
-
-def _env_protocol() -> str:
-    """
-    Resolve OTLP protocol. Prefer function arg; otherwise env var; default to HTTP.
-    Accepts values like "http", "http/protobuf", "grpc".
-    """
-    raw = (os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL") or "").strip().lower()
-    if raw in {"http", "http/protobuf", "http_json"}:
-        return "http/protobuf"  # we standardize on http/protobuf
-    if raw == "grpc":
-        return "grpc"
-    return "http/protobuf"
-
-
-def _normalize_protocol(protocol: Optional[str]) -> str:
-    if protocol:
-        p = protocol.strip().lower()
-        if p in {"http", "http/protobuf"}:
-            return "http/protobuf"
-        if p == "grpc":
-            return "grpc"
-    return _env_protocol()
-
-
-def _guess_endpoint(endpoint: Optional[str], protocol: str) -> str:
-    """
-    Pick/adjust endpoint to the conventional port:
-      - http → 4318
-      - grpc → 4317
-    If you pass one explicitly, we keep your scheme/host and only swap the port when it
-    looks like the other protocol's default.
-    """
-    default_http = "http://localhost:4318"
-    default_grpc = "http://localhost:4317"
-
-    ep = (endpoint or "").strip()
-    if not ep:
-        return default_http if protocol == "http/protobuf" else default_grpc
-
-    # Quick, safe port swap heuristics:
-    if protocol == "http/protobuf" and ep.endswith(":4317"):
-        return ep[:-5] + "4318"
-    if protocol == "grpc" and ep.endswith(":4318"):
-        return ep[:-5] + "4317"
-    return ep
-
-
-def _parse_headers(hdrs: Optional[Mapping[str, str] | Dict[str, str]]) -> Dict[str, str]:
-    """
-    Accept a mapping or fall back to OTEL_EXPORTER_OTLP_HEADERS env:
-      e.g. "api-key=xxx,env=dev"
-    """
-    if hdrs:
-        return dict(hdrs)
-    env_raw = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "").strip()
-    if not env_raw:
-        return {}
-    out: Dict[str, str] = {}
-    for pair in env_raw.split(","):
-        if "=" in pair:
-            k, v = pair.split("=", 1)
-            k, v = k.strip(), v.strip()
-            if k:
-                out[k] = v
-    return out
-
-
-# -------------------- public API --------------------
+        _available_propagators = []  # let OpenTelemetry’s default remain in place
 
 
 def setup_tracing(
     *,
     service_name: str,
-    endpoint: str | None = None,  # if None → sensible default per protocol
-    protocol: str | None = None,  # "http/protobuf" (default) or "grpc"
+    endpoint: str = "http://localhost:4317",
+    protocol: str = "grpc",  # or "http/protobuf"
     sample_ratio: float = 0.1,
     instrument_fastapi: bool = True,
     instrument_sqlalchemy: bool = True,
@@ -135,18 +65,15 @@ def setup_tracing(
     instrument_httpx: bool = True,
     service_version: str | None = None,
     deployment_env: str | None = None,
-    headers: Mapping[str, str] | None = None,
+    headers: Dict[str, str] | None = None,
 ) -> Callable[..., Any]:
     """
     Initialize OpenTelemetry tracing + common instrumentations.
 
-    Defaults to OTLP over HTTP (no grpcio native deps).
-    Honors OTEL_EXPORTER_OTLP_PROTOCOL and OTEL_EXPORTER_OTLP_HEADERS if provided.
-
     Returns:
-        shutdown() -> None : flushes spans/exporters; call on app shutdown.
+        shutdown() -> None : flushes spans/exporters; call this on app shutdown.
     """
-    # --- Resource attributes
+    # --- Resource attributes (semantic conventions)
     attrs = {
         "service.name": service_name,
         "service.version": service_version or os.getenv("SERVICE_VERSION") or "unknown",
@@ -161,38 +88,21 @@ def setup_tracing(
     )
     trace.set_tracer_provider(provider)
 
-    # --- Exporter selection (HTTP default; gRPC only if requested)
-    proto = _normalize_protocol(protocol)
-    ep = _guess_endpoint(endpoint, proto)
-    hdrs = _parse_headers(headers)
-
-    if proto == "grpc":
-        # Lazily import gRPC exporter so environments without grpcio don't crash at import time
-        try:
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-                OTLPSpanExporter as OTLPGRPCExporter,  # type: ignore
-            )
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError(
-                "Requested protocol='grpc' but the gRPC exporter (grpcio) is unavailable. "
-                "Switch to protocol='http/protobuf' or install grpc extras."
-            ) from e
-
-        # If your endpoint is plain http://, most collectors expect insecure=True.
-        insecure = ep.startswith("http://")
-        exporter = OTLPGRPCExporter(endpoint=ep, insecure=insecure, headers=hdrs or None)
+    # --- Exporter
+    if protocol == "grpc":
+        exporter = OTLPgExporter(endpoint=endpoint, insecure=True, headers=headers)
     else:
-        # HTTP exporter is pure-Python; safest in slim containers (e.g., Railway/Nixpacks).
-        exporter = OTLPHTTPExporter(endpoint=ep, headers=hdrs or None)
+        http_endpoint = endpoint.replace(":4317", ":4318")
+        exporter = OTLPhttpExporter(endpoint=http_endpoint, headers=headers)
 
     processor = BatchSpanProcessor(exporter)
     provider.add_span_processor(processor)
 
-    # --- Propagators
+    # --- Propagators (use whatever we could import)
     if _available_propagators:
         set_global_textmap(CompositePropagator(_available_propagators))
 
-    # --- Auto-instrumentation (best-effort)
+    # --- Auto-instrumentation (best-effort, never fail boot)
     try:
         if instrument_fastapi:
             from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -225,7 +135,7 @@ def setup_tracing(
     except Exception:
         pass
 
-    # --- Shutdown hook
+    # --- Shutdown hook (flush on exit)
     def shutdown() -> None:
         try:
             provider.shutdown()
