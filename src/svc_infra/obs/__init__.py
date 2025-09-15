@@ -9,6 +9,16 @@ from .settings import ObservabilitySettings
 from .tracing.setup import setup_tracing
 
 
+def _want_metrics(cfg: ObservabilitySettings) -> bool:
+    mode = (cfg.OBS_MODE or "both").lower()
+    return cfg.METRICS_ENABLED and mode in {"both", "grafana", "uptrace"}
+
+
+def _want_tracing(cfg: ObservabilitySettings) -> bool:
+    mode = (cfg.OBS_MODE or "both").lower()
+    return cfg.OTEL_ENABLED and mode in {"both", "uptrace"}
+
+
 def add_observability(
     app: Any | None = None,
     *,
@@ -30,7 +40,7 @@ def add_observability(
     cfg = ObservabilitySettings()
 
     # --- Metrics (Prometheus)
-    if cfg.METRICS_ENABLED and app is not None:
+    if app is not None and _want_metrics(cfg):
         path = metrics_path or cfg.METRICS_PATH
         add_prometheus(
             app,
@@ -48,7 +58,12 @@ def add_observability(
 
     # --- Tracing (OpenTelemetry)
     shutdown_tracing: Callable[[], None] = lambda: None
-    if cfg.OTEL_ENABLED:
+    if _want_tracing(cfg):
+        headers = dict(otlp_headers or {})
+        # If UPTRACE_DSN is present, inject it as OTLP header for Uptrace
+        if cfg.UPTRACE_DSN and "uptrace-dsn" not in {k.lower(): v for k, v in headers.items()}:
+            headers["uptrace-dsn"] = cfg.UPTRACE_DSN
+
         shutdown_tracing = setup_tracing(
             service_name=cfg.OTEL_SERVICE_NAME,
             endpoint=cfg.OTEL_EXPORTER_OTLP_ENDPOINT,
@@ -56,7 +71,7 @@ def add_observability(
             sample_ratio=cfg.OTEL_SAMPLER_RATIO,
             service_version=service_version,
             deployment_env=deployment_env,
-            headers=otlp_headers,
+            headers=headers or None,
             instrument_fastapi=True,
             instrument_sqlalchemy=True,
             instrument_requests=True,

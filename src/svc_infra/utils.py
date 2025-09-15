@@ -9,7 +9,7 @@ def render_template(tmpl_dir: str, name: str, subs: dict[str, Any] = None) -> st
     return _T(txt).safe_substitute(subs)
 
 
-def write(dest: Path, content: str, overwrite: bool) -> Dict[str, Any]:
+def write(dest: Path, content: str, overwrite: bool = False) -> Dict[str, Any]:
     dest = dest.resolve()
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists() and not overwrite:

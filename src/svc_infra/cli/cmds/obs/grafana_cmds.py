@@ -10,26 +10,23 @@ import time
 import webbrowser
 import zipfile
 from pathlib import Path
-from string import Template
 from urllib.parse import urlparse
 from urllib.request import urlretrieve
 
 import typer
+
+from svc_infra.utils import render_template, write
 
 PKG_TPL_ROOT = "svc_infra.obs.providers.grafana"
 
 # ------------------------- small utils -------------------------
 
 
-def _pkg_file(*parts: str) -> str:
+def _pkg_read(rel_path: str) -> str:
+    # Convenience for non-templated static files
     import importlib.resources as pkg
 
-    return pkg.files(PKG_TPL_ROOT).joinpath(*parts).read_text(encoding="utf-8")
-
-
-def _write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    return pkg.files(PKG_TPL_ROOT).joinpath(rel_path).read_text(encoding="utf-8")
 
 
 def _patch_dashboard_datasource(dash_path: Path, prom_uid: str = "prom") -> None:
@@ -116,18 +113,9 @@ def _try_autostart_docker() -> None:
 # --------------------- native fallback bits --------------------
 
 NATIVE_GRAFANA_URLS = {
-    (
-        "Darwin",
-        "arm64",
-    ): "https://dl.grafana.com/oss/release/grafana-11.1.4.darwin-arm64.tar.gz",
-    (
-        "Darwin",
-        "x86_64",
-    ): "https://dl.grafana.com/oss/release/grafana-11.1.4.darwin-amd64.tar.gz",
-    (
-        "Linux",
-        "x86_64",
-    ): "https://dl.grafana.com/oss/release/grafana-11.1.4.linux-amd64.tar.gz",
+    ("Darwin", "arm64"): "https://dl.grafana.com/oss/release/grafana-11.1.4.darwin-arm64.tar.gz",
+    ("Darwin", "x86_64"): "https://dl.grafana.com/oss/release/grafana-11.1.4.darwin-amd64.tar.gz",
+    ("Linux", "x86_64"): "https://dl.grafana.com/oss/release/grafana-11.1.4.linux-amd64.tar.gz",
 }
 NATIVE_PROM_URLS = {
     (
@@ -194,7 +182,7 @@ def _native_up(root: Path, grafana_port: int, prom_port: int) -> None:
         f"--config={root / 'grafana.ini'}",
     ]
 
-    _write_text(
+    write(
         root / "grafana.ini",
         f"""
 [security]
@@ -217,8 +205,8 @@ http_addr =
     promp = subprocess.Popen(prom_cmd, cwd=p_dir)  # nosec
     grafp = subprocess.Popen(graf_cmd, cwd=g_dir)  # nosec
 
-    _write_text(root / "prometheus.pid", str(promp.pid))
-    _write_text(root / "grafana.pid", str(grafp.pid))
+    write(root / "prometheus.pid", str(promp.pid))
+    write(root / "grafana.pid", str(grafp.pid))
 
 
 def _native_down(root: Path) -> None:
@@ -239,11 +227,11 @@ def _native_down(root: Path) -> None:
 # -------------------- shared file emission --------------------
 
 _DASH_FILES = [
-    ("00_overview.json", "dashboards", "00_overview.json"),
-    ("10_http.json", "dashboards", "10_http.json"),
-    ("20_db.json", "dashboards", "20_db.json"),
-    ("30_runtime.json", "dashboards", "30_runtime.json"),
-    ("40_clients.json", "dashboards", "40_clients.json"),
+    ("00_overview.json", "dashboards/00_overview.json"),
+    ("10_http.json", "dashboards/10_http.json"),
+    ("20_db.json", "dashboards/20_db.json"),
+    ("30_runtime.json", "dashboards/30_runtime.json"),
+    ("40_clients.json", "dashboards/40_clients.json"),
 ]
 
 
@@ -255,32 +243,35 @@ def _emit_common_files(
     (root / "dashboards").mkdir(parents=True, exist_ok=True)
 
     # docker-compose.yml (for docker backend)
-    compose_tmpl = _pkg_file("templates", "docker-compose.yml.tmpl")
-    _write_text(root / "docker-compose.yml", compose_tmpl)
+    compose_tmpl = render_template(
+        "svc_infra.obs.providers.grafana.templates",
+        "docker-compose.yml.tmpl",
+        {},
+    )
+    write(root / "docker-compose.yml", compose_tmpl)
 
-    # provisioning (static): single folder "Service Infrastructure"
-    _write_text(
+    # provisioning (static)
+    write(
         root / "provisioning" / "datasources" / "datasource.yml",
-        _pkg_file("templates", "provisioning", "datasource.yml"),
+        _pkg_read("templates/provisioning/datasource.yml"),
     )
-    # dashboards provider — points to /var/lib/grafana/dashboards
-    _write_text(
+    write(
         root / "provisioning" / "dashboards" / "dashboards.yml",
-        _pkg_file("templates", "provisioning", "dashboards.yml"),
+        _pkg_read("templates/provisioning/dashboards.yml"),
     )
 
-    # prometheus.yml (render)
+    # prometheus.yml (rendered)
     parsed = urlparse(metrics_url)
     target = parsed.netloc or "host.docker.internal:8000"
     mpath = parsed.path or "/metrics"
-    prom_tmpl = Template(_pkg_file("templates", "prometheus.yml.tmpl")).substitute(
-        metrics_path=mpath,
-        target=target,
+    prom_tmpl = render_template(
+        "svc_infra.obs.providers.grafana.templates",
+        "prometheus.yml.tmpl",
+        {"metrics_path": mpath, "target": target},
     )
 
     # optional remote_write for Grafana Cloud / Thanos
     if remote_write and remote_write.get("url"):
-        # Append a simple remote_write block
         prom_tmpl += '\nremote_write:\n  - url: "{url}"\n'.format(url=remote_write["url"])
         if remote_write.get("user") or remote_write.get("password"):
             prom_tmpl += "    basic_auth:\n"
@@ -289,13 +280,12 @@ def _emit_common_files(
             if remote_write.get("password"):
                 prom_tmpl += f"      password: \"{remote_write['password']}\"\n"
 
-    _write_text(root / "prometheus.yml", prom_tmpl)
+    write(root / "prometheus.yml", prom_tmpl)
 
     # dashboards (packaged JSONs)
-    for dst_name, pkg_dir, pkg_name in _DASH_FILES:
+    for dst_name, pkg_rel in _DASH_FILES:
         out_path = root / "dashboards" / dst_name
-        _write_text(out_path, _pkg_file(pkg_dir, pkg_name))
-        # NEW: bind datasource & fix variable All handling
+        write(out_path, _pkg_read(pkg_rel))
         _patch_dashboard_datasource(out_path, prom_uid="prom")
 
 
@@ -319,10 +309,6 @@ def _choose_port(preferred: int, limit: int = 10) -> int:
 def _docker_compose_up(
     compose_file: Path, env: dict, grafana_port: int, prom_port: int
 ) -> tuple[bool, int, int]:
-    """
-    Try to bring up compose. If ports are busy, try next ports a few times.
-    Returns (ok, grafana_port, prom_port).
-    """
     attempts = 5
     gp, pp = grafana_port, prom_port
     for _ in range(attempts):
@@ -336,7 +322,6 @@ def _docker_compose_up(
             )
             return True, gp, pp
         except subprocess.CalledProcessError:
-            # bump ports and retry
             gp += 1
             pp += 1
     return False, grafana_port, prom_port
@@ -458,7 +443,7 @@ def open_ui(grafana_port: int = 3000):
 
 
 def register(app_: typer.Typer) -> None:
-    app_.command("obs-up")(up)
-    app_.command("obs-down")(down)
-    app_.command("obs-status")(status)
-    app_.command("obs-open")(open_ui)
+    app_.command("grafana-up")(up)
+    app_.command("grafana-down")(down)
+    app_.command("grafana-status")(status)
+    app_.command("grafana-open")(open_ui)

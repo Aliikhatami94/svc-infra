@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  uptrace:
+    image: uptrace/uptrace:latest
+    container_name: uptrace
+    restart: unless-stopped
+    ports:
+      - "14318:14318"  # Uptrace UI (HTTP)
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      # Optional basic auth for UI:
+      # - UPTRACE_BASICAUTH_USER=admin
+      # - UPTRACE_BASICAUTH_PASS=change-me
+      - TZ=UTC
+    volumes:
+      - uptrace-data:/var/lib/uptrace
+
+volumes:
+  uptrace-data:
