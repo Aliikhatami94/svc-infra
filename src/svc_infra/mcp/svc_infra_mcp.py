@@ -18,18 +18,46 @@ async def svc_infra_cmd_help() -> dict:
 
 
 class Subcommand(str, Enum):
-    init = "init"
-    revision = "revision"
-    upgrade = "upgrade"
-    downgrade = "downgrade"
-    current = "current"
-    history = "history"
-    stamp = "stamp"
-    merge_heads = "merge-heads"
-    setup_and_migrate = "setup-and-migrate"
-    scaffold = "scaffold"
-    scaffold_models = "scaffold-models"
-    scaffold_schemas = "scaffold-schemas"
+    # SQL commands
+    sql_init = "sql-init"
+    sql_revision = "sql-revision"
+    sql_upgrade = "sql-upgrade"
+    sql_downgrade = "sql-downgrade"
+    sql_current = "sql-current"
+    sql_history = "sql-history"
+    sql_stamp = "sql-stamp"
+    sql_merge_heads = "sql-merge-heads"
+    sql_setup_and_migrate = "sql-setup-and-migrate"
+    sql_scaffold = "sql-scaffold"
+    sql_scaffold_models = "sql-scaffold-models"
+    sql_scaffold_schemas = "sql-scaffold-schemas"
+
+    # Mongo commands
+    mongo_setup_and_prepare = "mongo-setup-and-prepare"
+    mongo_ping = "mongo-ping"
+    mongo_scaffold = "mongo-scaffold"
+    mongo_scaffold_documents = "mongo-scaffold-documents"
+    mongo_scaffold_schemas = "mongo-scaffold-schemas"
+    mongo_scaffold_resources = "mongo-scaffold-resources"
+
+    # Cache commands
+    cache_ping = "cache-ping"
+    cache_doctor = "cache-doctor"
+    cache_check = "cache-check"
+    cache_keys = "cache-keys"
+    cache_rm = "cache-rm"
+    cache_flush = "cache-flush"
+    cache_setup = "cache-setup"
+
+    # Grafana commands
+    grafana_up = "grafana-up"
+    grafana_down = "grafana-down"
+    grafana_status = "grafana-status"
+    grafana_open = "grafana-open"
+
+    # Uptrace commands
+    uptrace_init = "uptrace-init"
+    uptrace_deploy = "uptrace-deploy"
 
 
 async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict:

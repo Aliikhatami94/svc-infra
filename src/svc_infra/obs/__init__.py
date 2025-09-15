@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Optional
 
-from .metrics.asgi import add_prometheus
-from .metrics.http import instrument_httpx, instrument_requests
-from .metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
-from .settings import ObservabilitySettings
-from .tracing.setup import setup_tracing
+from svc_infra.obs.metrics.asgi import add_prometheus
+from svc_infra.obs.metrics.http import instrument_httpx, instrument_requests
+from svc_infra.obs.metrics.sqlalchemy import bind_sqlalchemy_pool_metrics
+from svc_infra.obs.settings import ObservabilitySettings
+from svc_infra.obs.tracing.setup import setup_tracing
 
 
 def _want_metrics(cfg: ObservabilitySettings) -> bool:
