@@ -6,10 +6,6 @@ import uuid
 from typing import Any, Callable, Dict, List
 
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as OTLPgExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-    OTLPSpanExporter as OTLPhttpExporter,
-)
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.sdk.resources import Resource
@@ -89,11 +85,31 @@ def setup_tracing(
     trace.set_tracer_provider(provider)
 
     # --- Exporter
+    exporter = None
     if protocol == "grpc":
-        exporter = OTLPgExporter(endpoint=endpoint, insecure=True, headers=headers)
+        try:
+            # Import only if actually needed
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                OTLPSpanExporter as _OTLPgExporter,
+            )
+
+            exporter = _OTLPgExporter(endpoint=endpoint, insecure=True, headers=headers)
+        except Exception:
+            # Fallback to HTTP if grpc not available (e.g., missing libstdc++)
+            # You can log/print here if you want a hint in logs.
+            http_endpoint = endpoint.replace(":4317", ":4318")
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter as _OTLPhttpExporter,
+            )
+
+            exporter = _OTLPhttpExporter(endpoint=http_endpoint, headers=headers)
     else:
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter as _OTLPhttpExporter,
+        )
+
         http_endpoint = endpoint.replace(":4317", ":4318")
-        exporter = OTLPhttpExporter(endpoint=http_endpoint, headers=headers)
+        exporter = _OTLPhttpExporter(endpoint=http_endpoint, headers=headers)
 
     processor = BatchSpanProcessor(exporter)
     provider.add_span_processor(processor)
