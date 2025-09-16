@@ -8,7 +8,7 @@ from svc_infra.obs.tracing.setup import setup_tracing
 
 def _want_metrics(cfg: ObservabilitySettings) -> bool:
     mode = (cfg.OBS_MODE or "both").lower()
-    return cfg.METRICS_ENABLED and mode in {"both", "grafana", "uptrace"}
+    return cfg.OTEL_ENABLED and mode in {"both", "uptrace"}
 
 
 def _want_tracing(cfg: ObservabilitySettings) -> bool:
