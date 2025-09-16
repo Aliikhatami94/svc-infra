@@ -8,6 +8,12 @@ from urllib.parse import urlparse
 
 import typer
 
+# --- NEW: load .env automatically (best-effort) ---
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+    load_dotenv = None
+
 from svc_infra.obs.cloud_dash import push_dashboards_from_pkg
 from svc_infra.utils import render_template, write
 
@@ -17,7 +23,6 @@ def _run(cmd: list[str], *, env: dict | None = None):
 
 
 def _emit_local_stack(root: Path, metrics_url: str):
-    # Templates you already ship under providers/grafana/templates
     write(
         root / "docker-compose.yml",
         render_template("svc_infra.obs.providers.grafana.templates", "docker-compose.yml.tmpl", {}),
@@ -55,7 +60,16 @@ def _emit_local_stack(root: Path, metrics_url: str):
 
 
 def _emit_local_agent(root: Path, metrics_url: str):
+    """
+    Emit the exact compose/agent.yaml that worked for you:
+      - mount agent.yaml at /etc/agent.yaml
+      - use grafana/agent v0.38.1
+      - pass RW token var name GRAFANA_CLOUD_RW_TOKEN
+      - add host.docker.internal mapping
+    """
     p = urlparse(metrics_url)
+
+    # agent.yaml next to the compose file (root/.obs/agent.yaml)
     write(
         root / "agent.yaml",
         f"""metrics:
@@ -72,22 +86,31 @@ def _emit_local_agent(root: Path, metrics_url: str):
         - url: ${{GRAFANA_CLOUD_PROM_URL}}
           basic_auth:
             username: ${{GRAFANA_CLOUD_USERNAME}}
-            password: ${{GRAFANA_CLOUD_TOKEN}}
+            password: ${{GRAFANA_CLOUD_RW_TOKEN}}
 """,
     )
+
+    # docker-compose.cloud.yml aligned with your working setup
     write(
         root / "docker-compose.cloud.yml",
-        """version: "3.9"
-services:
+        """services:
   agent:
-    image: grafana/agent:latest
-    command: ["/bin/grafana-agent","--config.file=/etc/agent/agent.yaml","--config.expand-env"]
+    image: grafana/agent:v0.38.1
+    command:
+      - --config.file=/etc/agent.yaml
+      - --config.expand-env
     environment:
-      - GRAFANA_CLOUD_PROM_URL
-      - GRAFANA_CLOUD_USERNAME
-      - GRAFANA_CLOUD_TOKEN
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL}
+      GRAFANA_CLOUD_USERNAME: ${GRAFANA_CLOUD_USERNAME}
+      GRAFANA_CLOUD_RW_TOKEN: ${GRAFANA_CLOUD_RW_TOKEN}
     volumes:
-      - ./agent.yaml:/etc/agent/agent.yaml:ro
+      - type: bind
+        source: ./agent.yaml
+        target: /etc/agent.yaml
+        read_only: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 """,
     )
 
@@ -114,6 +137,13 @@ def up():
         If remote_write creds present → also run local Agent to push metrics.
       - Else → Local mode (Grafana + Prometheus).
     """
+    # NEW: load .env once, best-effort, without crashing if package missing
+    if load_dotenv:
+        try:
+            load_dotenv(dotenv_path=Path(".env"), override=False)
+        except Exception:
+            pass
+
     root = Path(".obs")
     root.mkdir(exist_ok=True)
     metrics_url = os.getenv("SVC_INFRA_METRICS_URL", "http://host.docker.internal:8000/metrics")
@@ -126,9 +156,10 @@ def up():
         push_dashboards_from_pkg(cloud_url, cloud_token, folder)
         typer.echo(f"[cloud] dashboards synced to '{folder}'")
 
+        # NOTE: look for RW token (not the Grafana API token)
         if all(
             os.getenv(k)
-            for k in ("GRAFANA_CLOUD_PROM_URL", "GRAFANA_CLOUD_USERNAME", "GRAFANA_CLOUD_TOKEN")
+            for k in ("GRAFANA_CLOUD_PROM_URL", "GRAFANA_CLOUD_USERNAME", "GRAFANA_CLOUD_RW_TOKEN")
         ):
             _emit_local_agent(root, metrics_url)
             _run(
@@ -166,9 +197,6 @@ def down():
 
 
 def scaffold(target: str = typer.Option(..., help="compose|railway|k8s|fly")):
-    """
-    Write a ready-to-deploy Grafana Agent sidecar template to ./obs-sidecar/<target>/
-    """
     from importlib.resources import files
 
     out = Path("obs-sidecar") / target

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-import urllib.error
+import re
 import urllib.request
 from importlib.resources import files
+
+# ---------------- helpers ----------------
 
 
 def _gapi(base, token, path, method="GET", body=None):
@@ -27,6 +29,7 @@ def _gapi(base, token, path, method="GET", body=None):
 
 def _find_prom_uid(base, token):
     dss = _gapi(base, token, "/api/datasources") or []
+    # prefer any grafana cloud/mimir url if present
     for ds in dss:
         if ds.get("type") == "prometheus" and "grafana.net" in (ds.get("url") or ""):
             return ds["uid"]
@@ -41,6 +44,22 @@ def _ensure_folder(base, token, title):
         if f.get("title") == title:
             return f
     return _gapi(base, token, "/api/folders", method="POST", body={"title": title})
+
+
+def _slug(s: str) -> str:
+    s = s.strip().lower()
+    s = re.sub(r"[^a-z0-9._-]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    return s or "dashboard"
+
+
+def _stable_uid(name: str) -> str:
+    """
+    Deterministic UID <= 40 chars, allowed charset [-._0-9a-zA-Z].
+    Use a short prefix so we don't collide with other projects.
+    """
+    base = f"svcinfra-{_slug(name)}"
+    return base[:40]
 
 
 def _patch_ds(d, prom_uid):
@@ -76,13 +95,22 @@ def push_dashboards_from_pkg(
     for res in dash_root.iterdir():
         if not res.name.endswith(".json"):
             continue
+
         d = json.loads(res.read_text(encoding="utf-8"))
-        d = _patch_ds(d, prom_uid)
+        # ensure title
         d.setdefault("title", res.name[:-5])
+
+        # --- make UID stable to avoid duplicates ---
+        d.setdefault("uid", _stable_uid(d["title"]))
+        # ensure Grafana treats this as upsert by uid
+        d["id"] = None
+
+        d = _patch_ds(d, prom_uid)
+
         payload = {
             "dashboard": d,
             "folderUid": fuid,
-            "overwrite": True,
+            "overwrite": True,  # upsert by UID
             "message": "svc-infra auto-sync",
         }
         _gapi(base_url, token, "/api/dashboards/db", method="POST", body=payload)
