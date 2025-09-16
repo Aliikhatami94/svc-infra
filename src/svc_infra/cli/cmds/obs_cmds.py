@@ -12,8 +12,8 @@ from svc_infra.obs.cloud_dash import push_dashboards_from_pkg
 from svc_infra.utils import render_template, write
 
 
-def _run(cmd: list[str]):
-    subprocess.run(cmd, check=True)
+def _run(cmd: list[str], *, env: dict | None = None):
+    subprocess.run(cmd, check=True, env=env)
 
 
 def _emit_local_stack(root: Path, metrics_url: str):
@@ -131,7 +131,10 @@ def up():
             for k in ("GRAFANA_CLOUD_PROM_URL", "GRAFANA_CLOUD_USERNAME", "GRAFANA_CLOUD_TOKEN")
         ):
             _emit_local_agent(root, metrics_url)
-            _run(["docker", "compose", "-f", str(root / "docker-compose.cloud.yml"), "up", "-d"])
+            _run(
+                ["docker", "compose", "-f", str(root / "docker-compose.cloud.yml"), "up", "-d"],
+                env=os.environ.copy(),
+            )
             typer.echo("[cloud] local Grafana Agent started (pushing metrics to Cloud)")
         else:
             typer.echo("[cloud] expecting Agent sidecar in deployment to push metrics")
@@ -144,9 +147,9 @@ def up():
     env["GRAFANA_PORT"] = str(local_graf)
     env["PROM_PORT"] = str(local_prom)
     _emit_local_stack(root, metrics_url)
-    _run(["docker", "compose", "-f", str(root / "docker-compose.yml"), "up", "-d"])
-    typer.echo("Local Grafana → http://localhost:3000  (admin/admin)")
-    typer.echo("Local Prometheus → http://localhost:9090")
+    _run(["docker", "compose", "-f", str(root / "docker-compose.yml"), "up", "-d"], env=env)
+    typer.echo(f"Local Grafana → http://localhost:{local_graf}  (admin/admin)")
+    typer.echo(f"Local Prometheus → http://localhost:{local_prom}")
 
 
 def down():
