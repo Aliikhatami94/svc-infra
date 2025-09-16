@@ -442,8 +442,8 @@ def open_ui(grafana_port: int = 3000):
     webbrowser.open_new_tab(f"http://localhost:{grafana_port}")
 
 
-def register(app_: typer.Typer) -> None:
-    app_.command("grafana-up")(up)
-    app_.command("grafana-down")(down)
-    app_.command("grafana-status")(status)
-    app_.command("grafana-open")(open_ui)
+def register(app: typer.Typer) -> None:
+    app.command("grafana-up")(up)
+    app.command("grafana-down")(down)
+    app.command("grafana-status")(status)
+    app.command("grafana-open")(open_ui)

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-infra-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-infra-app
+  template:
+    metadata:
+      labels:
+        app: svc-infra-app
+    spec:
+      containers:
+        - name: app
+          image: your/app:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: METRICS_ENABLED
+              value: "true"
+            - name: METRICS_PATH
+              value: "/metrics"
+        - name: grafana-agent
+          image: grafana/agent:latest
+          args: ["--config.file=/etc/agent/agent.yaml","--config.expand-env"]
+          env:
+            - name: GRAFANA_CLOUD_PROM_URL
+              value: "https://<stack>.grafana.net/api/prom/push"
+            - name: GRAFANA_CLOUD_USERNAME
+              value: "<stack_id>"
+            - name: GRAFANA_CLOUD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-cloud
+                  key: token
+          volumeMounts:
+            - name: agent-config
+              mountPath: /etc/agent
+      volumes:
+        - name: agent-config
+          configMap:
+            name: grafana-agent-config

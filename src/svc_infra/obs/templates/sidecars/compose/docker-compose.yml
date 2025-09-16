@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  app:
+    image: your/app:latest
+    ports: ["8000:8000"]
+    environment:
+      - METRICS_ENABLED=true
+      - METRICS_PATH=/metrics
+  grafana-agent:
+    image: grafana/agent:latest
+    command: ["/bin/grafana-agent","--config.file=/etc/agent/agent.yaml","--config.expand-env"]
+    environment:
+      - GRAFANA_CLOUD_PROM_URL=${GRAFANA_CLOUD_PROM_URL}
+      - GRAFANA_CLOUD_USERNAME=${GRAFANA_CLOUD_USERNAME}
+      - GRAFANA_CLOUD_TOKEN=${GRAFANA_CLOUD_TOKEN}
+      - APP_HOST=app:8000
+      - APP_SCHEME=http
+      - METRICS_PATH=/metrics
+    volumes:
+      - ./agent.yaml:/etc/agent/agent.yaml:ro
+    depends_on: [app]

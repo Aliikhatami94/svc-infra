@@ -5,9 +5,9 @@ import typer
 from svc_infra.cli.cmds import (
     _HELP,
     register_alembic,
-    register_grafana,
     register_mongo,
     register_mongo_scaffold,
+    register_obs,
     register_redis,
     register_sql_scaffold,
 )
@@ -16,19 +16,19 @@ from svc_infra.cli.foundation.typer_bootstrap import pre_cli
 app = typer.Typer(no_args_is_help=True, add_completion=False, help=_HELP)
 pre_cli(app)
 
-# sql commands
+# --- sql commands ---
 register_alembic(app)
 register_sql_scaffold(app)
 
-# nosql commands
+# --- nosql commands ---
 register_mongo(app)
 register_mongo_scaffold(app)
 
-# cache commands
+# --- cache commands ---
 register_redis(app)
 
-# observability commands
-register_grafana(app)
+# -- observability commands ---
+register_obs(app)
 
 
 def main():

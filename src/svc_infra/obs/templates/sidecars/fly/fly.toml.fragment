@@ -1,0 +1,11 @@
+[processes]
+app = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+agent = "/bin/grafana-agent --config.file=/etc/agent/agent.yaml --config.expand-env"
+
+[env]
+METRICS_ENABLED = "true"
+METRICS_PATH = "/metrics"
+GRAFANA_CLOUD_PROM_URL = "https://<stack>.grafana.net/api/prom/push"
+GRAFANA_CLOUD_USERNAME = "<stack_id>"
+
+# set GRAFANA_CLOUD_TOKEN via `fly secrets set GRAFANA_CLOUD_TOKEN=...`

@@ -1,0 +1,15 @@
+metrics:
+  wal_directory: /tmp/agent/wal
+  global: { scrape_interval: 5s }
+  configs:
+    - name: svc-infra
+      scrape_configs:
+        - job_name: svc-infra
+          scheme: ${APP_SCHEME:http}
+          metrics_path: ${METRICS_PATH:/metrics}
+          static_configs: [{ targets: ["${APP_HOST}"] }]
+      remote_write:
+        - url: ${GRAFANA_CLOUD_PROM_URL}
+          basic_auth:
+            username: ${GRAFANA_CLOUD_USERNAME}
+            password: ${GRAFANA_CLOUD_TOKEN}
