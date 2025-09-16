@@ -1,0 +1,23 @@
+services:
+  agent:
+    image: grafana/agent:v0.38.1
+    command:
+      - --config.file=/etc/agent.yaml
+      - --config.expand-env
+    environment:
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL}
+      GRAFANA_CLOUD_USERNAME: ${GRAFANA_CLOUD_USERNAME}
+      GRAFANA_CLOUD_RW_TOKEN: ${GRAFANA_CLOUD_RW_TOKEN}
+      # App scrape hints (can be overridden by .env)
+      APP_SCHEME: ${APP_SCHEME:-http}
+      METRICS_PATH: ${METRICS_PATH:-/metrics}
+      APP_HOST: ${APP_HOST:-host.docker.internal:8000}
+      SCRAPE_INTERVAL: ${SCRAPE_INTERVAL:-5s}
+    volumes:
+      - type: bind
+        source: ./agent.yaml
+        target: /etc/agent.yaml
+        read_only: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

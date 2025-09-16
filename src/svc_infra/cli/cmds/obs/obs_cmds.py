@@ -61,58 +61,22 @@ def _emit_local_stack(root: Path, metrics_url: str):
 
 def _emit_local_agent(root: Path, metrics_url: str):
     """
-    Emit the exact compose/agent.yaml that worked for you:
-      - mount agent.yaml at /etc/agent.yaml
-      - use grafana/agent v0.38.1
-      - pass RW token var name GRAFANA_CLOUD_RW_TOKEN
-      - add host.docker.internal mapping
+    Render the agent + compose from the dedicated compose_cloud templates.
     """
-    p = urlparse(metrics_url)
-
-    # agent.yaml next to the compose file (root/.obs/agent.yaml)
-    write(
-        root / "agent.yaml",
-        f"""metrics:
-  wal_directory: /tmp/agent/wal
-  global: {{ scrape_interval: 5s }}
-  configs:
-    - name: svc-infra
-      scrape_configs:
-        - job_name: svc-infra
-          scheme: {p.scheme or "http"}
-          metrics_path: {p.path or "/metrics"}
-          static_configs: [{{ targets: ["{p.netloc or "host.docker.internal:8000"}"] }}]
-      remote_write:
-        - url: ${{GRAFANA_CLOUD_PROM_URL}}
-          basic_auth:
-            username: ${{GRAFANA_CLOUD_USERNAME}}
-            password: ${{GRAFANA_CLOUD_RW_TOKEN}}
-""",
+    # Write agent.yaml from template (no hardcoded strings)
+    agent_text = render_template(
+        tmpl_dir="svc_infra.obs.providers.compose_cloud.templates",
+        name="agent.yaml.tmpl",
+        subs={},  # values come from env at runtime via ${...}
     )
+    write(root / "agent.yaml", agent_text, overwrite=True)
 
-    # docker-compose.cloud.yml aligned with your working setup
-    write(
-        root / "docker-compose.cloud.yml",
-        """services:
-  agent:
-    image: grafana/agent:v0.38.1
-    command:
-      - --config.file=/etc/agent.yaml
-      - --config.expand-env
-    environment:
-      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL}
-      GRAFANA_CLOUD_USERNAME: ${GRAFANA_CLOUD_USERNAME}
-      GRAFANA_CLOUD_RW_TOKEN: ${GRAFANA_CLOUD_RW_TOKEN}
-    volumes:
-      - type: bind
-        source: ./agent.yaml
-        target: /etc/agent.yaml
-        read_only: true
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-""",
+    compose_text = render_template(
+        tmpl_dir="svc_infra.obs.providers.compose_cloud.templates",
+        name="docker-compose.cloud.yml.tmpl",
+        subs={},  # all env-driven
     )
+    write(root / "docker-compose.cloud.yml", compose_text, overwrite=True)
 
 
 def _port_free(p: int) -> bool:
