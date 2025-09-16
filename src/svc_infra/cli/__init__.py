@@ -10,7 +10,6 @@ from svc_infra.cli.cmds import (
     register_mongo_scaffold,
     register_redis,
     register_sql_scaffold,
-    register_uptrace,
 )
 from svc_infra.cli.foundation.typer_bootstrap import pre_cli
 
@@ -30,7 +29,6 @@ register_redis(app)
 
 # observability commands
 register_grafana(app)
-register_uptrace(app)
 
 
 def main():
