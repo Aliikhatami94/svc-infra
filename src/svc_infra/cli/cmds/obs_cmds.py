@@ -1,17 +1,15 @@
-# svc_infra/obs/cli.py
 from __future__ import annotations
 
 import os
+import socket
 import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
 import typer
 
-from svc_infra.obs.cloud_dash import push_dashboards_from_pkg  # Step 2
+from svc_infra.obs.cloud_dash import push_dashboards_from_pkg
 from svc_infra.utils import render_template, write
-
-app = typer.Typer(help="Observability bootstrap (local or cloud)")
 
 
 def _run(cmd: list[str]):
@@ -94,6 +92,21 @@ services:
     )
 
 
+def _port_free(p: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.connect_ex(("127.0.0.1", p)) != 0
+
+
+def _choose_port(preferred: int, limit: int = 15) -> int:
+    p = preferred
+    for _ in range(limit):
+        if _port_free(p):
+            return p
+        p += 1
+    return preferred
+
+
 def up():
     """
     Auto-detect mode:
@@ -125,6 +138,11 @@ def up():
         return
 
     # Local mode
+    local_graf = _choose_port(int(os.getenv("GRAFANA_PORT", "3000")))
+    local_prom = _choose_port(int(os.getenv("PROM_PORT", "9090")))
+    env = os.environ.copy()
+    env["GRAFANA_PORT"] = str(local_graf)
+    env["PROM_PORT"] = str(local_prom)
     _emit_local_stack(root, metrics_url)
     _run(["docker", "compose", "-f", str(root / "docker-compose.yml"), "up", "-d"])
     typer.echo("Local Grafana → http://localhost:3000  (admin/admin)")
