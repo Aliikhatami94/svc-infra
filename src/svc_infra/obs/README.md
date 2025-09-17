@@ -1,4 +1,4 @@
-# Observability Quickstart (svc-infra)
+# Observability Quickstart
 
 This guide shows you how to turn on metrics + dashboards in three easy modes:
 
@@ -30,9 +30,13 @@ shutdown = add_observability(app, db_engines=[/* your_engine(s) */])
 Environment vars (defaults shown):
 
 ```bash
+# Core observability vars
 METRICS_ENABLED=true
 METRICS_PATH=/metrics
-# METRICS_DEFAULT_BUCKETS optional (csv seconds), e.g. "0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10"
+SCRAPE_INTERVAL=60s  # how often the agent scrapes (default 60s)
+
+# Prometheus histogram buckets (optional)
+# METRICS_DEFAULT_BUCKETS="0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10"
 ```
 
 Exposed metrics include:
@@ -89,15 +93,16 @@ Use this when you want Cloud dashboards while developing locally.
 ```bash
 # Dashboard sync (browseable Grafana API)
 GRAFANA_CLOUD_URL=https://your-stack.grafana.net
-GRAFANA_CLOUD_TOKEN=glsa_...
+GRAFANA_CLOUD_TOKEN=glsa_...   # dashboard sync
 
 # Remote write to Metrics
 GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
 GRAFANA_CLOUD_USERNAME=1234567
-GRAFANA_CLOUD_RW_TOKEN=glc_...
+GRAFANA_CLOUD_RW_TOKEN=glc_... # metrics write
 
 # Where your app's metrics live (scraped by the local Agent)
 SVC_INFRA_METRICS_URL=http://host.docker.internal:8000/metrics
+SCRAPE_INTERVAL=15s
 ```
 
 ### Steps
@@ -137,9 +142,16 @@ We ship a ready-made Railway sidecar:
 ```bash
 APP_HOST=<your-app>.up.railway.app
 METRICS_PATH=/metrics
+SCRAPE_INTERVAL=15s
+
+# Metrics remote_write creds
 GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
-GRAFANA_CLOUD_USERNAME=<your stack id>
-GRAFANA_CLOUD_TOKEN=<metrics_write_token>
+GRAFANA_CLOUD_USERNAME=<stack_id>
+GRAFANA_CLOUD_RW_TOKEN=glc_...
+
+# Optional (for dashboard sync)
+GRAFANA_CLOUD_URL=https://your-stack.grafana.net
+GRAFANA_CLOUD_TOKEN=glsa_...
 ```
 
 ### How to run it
@@ -219,7 +231,7 @@ svc-infra obs-scaffold --target railway
 
 ### Railway (Deployed) → Cloud
 
-- Set Railway variables (`APP_HOST`, `METRICS_PATH`, PROM URL, USERNAME, TOKEN)
+- Set Railway variables (`APP_HOST`, `METRICS_PATH`, `SCRAPE_INTERVAL`, PROM URL, USERNAME, RW_TOKEN)
 - Deploy agent sidecar from `obs/templates/sidecars/railway/`
 - Run `svc-infra obs-up` locally once to sync dashboards to Cloud
 
@@ -231,13 +243,14 @@ svc-infra obs-scaffold --target railway
 
 ```bash
 GRAFANA_CLOUD_URL=https://your-stack.grafana.net
-GRAFANA_CLOUD_TOKEN=glsa_...
+GRAFANA_CLOUD_TOKEN=glsa_...   # dashboard sync
 
 GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
 GRAFANA_CLOUD_USERNAME=1234567
-GRAFANA_CLOUD_RW_TOKEN=glc_...
+GRAFANA_CLOUD_RW_TOKEN=glc_... # metrics write
 
 SVC_INFRA_METRICS_URL=http://host.docker.internal:8000/metrics
+SCRAPE_INTERVAL=15s
 ```
 
 ### Local → Local (no Cloud keys)
@@ -245,6 +258,7 @@ SVC_INFRA_METRICS_URL=http://host.docker.internal:8000/metrics
 ```bash
 # leave Cloud values unset
 SVC_INFRA_METRICS_URL=http://localhost:8000/metrics
+SCRAPE_INTERVAL=30s
 ```
 
 ---
