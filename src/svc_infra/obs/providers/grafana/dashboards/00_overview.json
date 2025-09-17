@@ -4,7 +4,7 @@
   "schemaVersion": 38,
   "version": 2,
   "editable": true,
-  "refresh": "5s",
+  "refresh": "10s",
   "panels": [
     {
       "type": "stat",

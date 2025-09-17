@@ -7,7 +7,7 @@ data:
     metrics:
       wal_directory: /tmp/agent/wal
       global:
-        scrape_interval: 60s
+        scrape_interval: 10s
       configs:
         - name: svc-infra
           scrape_configs:

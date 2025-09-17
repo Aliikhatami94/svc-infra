@@ -3,7 +3,7 @@
   "timezone": "browser",
   "schemaVersion": 38,
   "version": 1,
-  "refresh": "5s",
+  "refresh": "10s",
   "panels": [
     {
       "type": "timeseries",
