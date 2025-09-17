@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 import os
 from enum import StrEnum
-from logging.config import dictConfig
+from typing import Sequence
 
 from pydantic import BaseModel
 
-from svc_infra.app.env import IS_PROD
+from svc_infra.app.env import IS_PROD, Environment
 
 
 # --- Log Format and Level Options ---
@@ -48,12 +48,12 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
-        # Correlation id if your middleware adds it
+        # Optional correlation id
         req_id = getattr(record, "request_id", None)
         if req_id is not None:
             payload["request_id"] = req_id
 
-        # HTTP context (only when present)
+        # Optional HTTP context
         http_ctx = {
             k: v
             for k, v in {
@@ -68,7 +68,7 @@ class JsonFormatter(logging.Formatter):
         if http_ctx:
             payload["http"] = http_ctx
 
-        # Exception context (only when present)
+        # Optional exception context
         if record.exc_info:
             exc_type = record.exc_info[0].__name__ if record.exc_info[0] else None
             exc_message = str(record.exc_info[1]) if record.exc_info[1] else None
@@ -80,7 +80,6 @@ class JsonFormatter(logging.Formatter):
             if exc_message:
                 err_obj["message"] = exc_message
 
-            # Truncate very long stacks to keep lines readable in hosted logs.
             max_stack = int(_os.getenv("LOG_STACK_LIMIT", "4000"))
             err_obj["stack"] = stack[:max_stack] + (
                 "...(truncated)" if len(stack) > max_stack else ""
@@ -108,64 +107,42 @@ def _read_format() -> str:
     return "json" if IS_PROD else "plain"
 
 
-# --- Main Logging Setup Function ---
-def setup_logging(level: str | None = None, fmt: str | None = None) -> None:
+def _parse_paths_csv(val: str | None) -> list[str]:
+    if not val:
+        return []
+    parts: list[str] = []
+    for part in val.replace(",", " ").split():
+        p = part.strip()
+        if p:
+            parts.append(p if p.startswith("/") else f"/{p}")
+    return parts
+
+
+def _env_name_list_to_enum_values(env_names: Sequence[str] | None) -> set[str]:
     """
-    Set up logging for the application.
-    Args:
-        level: Optional log level (e.g., "DEBUG", "INFO"). If not provided, uses environment-based default.
-            You can also use LoggingConfig(level=...) for validation and IDE support.
-        fmt: Optional log format ("json" or "plain"). If not provided, uses environment-based default.
-            You can also use LoggingConfig(fmt=...) for validation and IDE support.
+    Normalize a list like ["prod","test"] into the canonical Environment.value strings.
+    Accepts any case and synonyms handled upstream by Environment.
     """
-    # Validate fmt and level using Pydantic if provided
-    if fmt is not None or level is not None:
-        LoggingConfig(fmt=fmt, level=level)  # raises if invalid
-    if level is None:
-        level = _read_level()
-    if fmt is None:
-        fmt = _read_format()
-
-    formatter_name = "json" if fmt == "json" else "plain"
-
-    # Silence multipart parser logs in non-debug environments
-    if level.upper() != "DEBUG":
-        logging.getLogger("multipart.multipart").setLevel(logging.WARNING)
-
-    dictConfig(
-        {
-            "version": 1,
-            "disable_existing_loggers": False,  # keep uvicorn & friends
-            "formatters": {
-                "plain": {
-                    # To include optional HTTP context fields in plain text logs,
-                    # use extra={"http_method": ..., "path": ..., "status_code": ...} when logging.
-                    "format": "%(asctime)s %(levelname)-5s [pid:%(process)d] %(name)s: %(message)s",
-                    # ISO-like; hosting providers often add their own timestamp
-                    "datefmt": "%Y-%m-%dT%H:%M:%S",
-                },
-                "json": {
-                    "()": JsonFormatter,
-                    "datefmt": "%Y-%m-%dT%H:%M:%S",
-                },
-            },
-            "handlers": {
-                "stream": {
-                    "class": "logging.StreamHandler",
-                    "level": level,
-                    "formatter": formatter_name,
-                }
-            },
-            "root": {
-                "level": level,
-                "handlers": ["stream"],
-            },
-            # Let uvicorn loggers bubble up to root handler/format,
-            # but keep their level at INFO for sane noise in dev/test.
-            "loggers": {
-                "uvicorn": {"level": "INFO", "handlers": [], "propagate": True},
-                "uvicorn.error": {"level": "INFO", "handlers": [], "propagate": True},
-                "uvicorn.access": {"level": "INFO", "handlers": [], "propagate": True},
-            },
-        }
-    )
+    if not env_names:
+        return set()
+    normed: set[str] = set()
+    # Build a small lookup map {alias -> canonical value}
+    alias_map = {
+        "local": Environment.LOCAL.value,
+        "dev": Environment.DEV.value,
+        "development": Environment.DEV.value,
+        "test": Environment.TEST.value,
+        "preview": Environment.TEST.value,
+        "staging": Environment.TEST.value,
+        "prod": Environment.PROD.value,
+        "production": Environment.PROD.value,
+    }
+    for name in env_names:
+        key = (name or "").strip().lower()
+        if not key:
+            continue
+        if key in (e.value for e in Environment):
+            normed.add(key)
+        elif key in alias_map:
+            normed.add(alias_map[key])
+    return normed
