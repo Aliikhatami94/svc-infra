@@ -1,141 +1,260 @@
-# Observability (metrics + tracing)
+# Observability Quickstart (svc-infra)
 
-Production-ready observability with one-call setup for FastAPI applications.
+This guide shows you how to turn on metrics + dashboards in three easy modes:
 
-`svc_infra.obs` provides:
-- Prometheus metrics (ASGI middleware + `/metrics` route)
-- OpenTelemetry tracing (OTLP gRPC/HTTP, FastAPI/SQLAlchemy/requests/httpx auto-instrumentation)
-- DB pool metrics for SQLAlchemy
-- Graceful shutdown hook that flushes spans
+1. Local app → local Grafana + Prometheus (fully offline)
+2. Local app → Grafana Cloud (via local Grafana Agent)
+3. Deployed app → Grafana Cloud (Railway example)
 
-## Quick start (FastAPI)
+It's "one button": run `svc-infra obs-up` and you're good. The CLI will read your `.env` automatically and do the right thing.
+
+---
+
+## 0) Install & instrument your app (once)
+
+Add the middleware and (optionally) DB/HTTP client metrics:
 
 ```python
+# main.py (FastAPI / Starlette)
 from fastapi import FastAPI
-from svc_infra.obs import ObservabilitySettings, add_prometheus, setup_tracing
-from svc_infra.obs import bind_sqlalchemy_pool_metrics
-from svc_infra.db.sql.manage import make_crud_router_plus
+from svc_infra.obs.add import add_observability
 
 app = FastAPI()
-engine = make_crud_router_plus()  # optional
-obs = ObservabilitySettings()
 
-# Enable metrics
-if obs.METRICS_ENABLED:
-    add_prometheus(app, path=obs.METRICS_PATH)
+# optional: pass SQLAlchemy engines for pool metrics
+shutdown = add_observability(app, db_engines=[/* your_engine(s) */])
 
-# Enable tracing
-if obs.OTEL_ENABLED:
-    setup_tracing(
-        app=app,
-        service_name=obs.OTEL_SERVICE_NAME,
-        endpoint=obs.OTEL_EXPORTER_OTLP_ENDPOINT,
-        protocol=obs.OTEL_EXPORTER_PROTOCOL,
-        sample_ratio=obs.OTEL_SAMPLER_RATIO,
-    )
-
-# Optional: DB pool metrics
-bind_sqlalchemy_pool_metrics(engine, labels={"db": "primary"})
+# your routes here...
 ```
 
-## What you get
-
-### Metrics (/metrics)
-- `http_server_requests_total{method,route,code}`
-- `http_server_request_duration_seconds_bucket{route,method,le}`
-- `http_server_in_flight_requests{route}`
-- `db_pool_in_use{db}`, `db_pool_available{db}`
-- `db_pool_checkedout_total{db}`
-
-### Tracing (OpenTelemetry)
-- Resource attributes: `service.name`, `service.version`, `deployment.environment`, `service.instance.id`
-- Propagators: W3C TraceContext + B3 (multi), W3C baggage
-- Auto-instrumentation for FastAPI, SQLAlchemy, requests, httpx
-
-## Configuration (environment variables)
-
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `METRICS_ENABLED` | `true` | Set `false` to disable metrics |
-| `METRICS_PATH` | `/metrics` | Override metrics route |
-| `METRICS_DEFAULT_BUCKETS` | `(0.005,..,10.0)` | Histogram buckets (seconds) |
-| `OTEL_ENABLED` | `true` | Set `false` to disable tracing |
-| `OTEL_SERVICE_NAME` | `service` | Service name |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP collector endpoint |
-| `OTEL_EXPORTER_PROTOCOL` | `grpc` | `grpc` or `http/protobuf` |
-| `OTEL_SAMPLER_RATIO` | `0.1` | 0.0–1.0 |
-| `PROMETHEUS_MULTIPROC_DIR` | (unset) | Enable multi-process metrics in Gunicorn/Uvicorn workers |
-
-**Gunicorn note**: Set `PROMETHEUS_MULTIPROC_DIR` to a writable directory (tmpfs works) to aggregate metrics across workers.
-
-## Installation
-
-Install optional dependencies via extras:
+Environment vars (defaults shown):
 
 ```bash
-pip install "svc-infra[obs]"        # prometheus-client + opentelemetry deps
-# or split if you prefer:
-pip install "svc-infra[metrics]"
-pip install "svc-infra[tracing]"
+METRICS_ENABLED=true
+METRICS_PATH=/metrics
+# METRICS_DEFAULT_BUCKETS optional (csv seconds), e.g. "0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10"
 ```
 
-## Templates
+Exposed metrics include:
 
-We ship ready-to-use templates under `svc_infra/obs/templates/`:
+- `http_server_requests_total` (by method/route/code)
+- `http_server_request_duration_seconds` (histogram)
+- `http_server_inflight_requests`
+- `http_client_requests_total`, `http_client_request_duration_seconds`
+- `db_pool_in_use`, `db_pool_available`, `db_pool_checkedout_total`, `db_pool_checkedin_total`
 
-- `grafana_dashboard.json` - RED metrics for API, USE metrics for DB pools
-- `prometheus_rules.yml` - HighErrorRate, HighLatencyP95, DBPoolSaturation alerts
-- `otel-collector.yaml` - OTLP receiver, logging exporter; examples for Tempo/Prometheus remote write
+---
 
-## Production configuration
+## 1) Local → Local (Grafana + Prometheus on your laptop)
 
-Common production environment variables:
+Use this when you don't want Cloud during dev.
+
+### Steps
+
+1. Make sure your app is running and exposing `/metrics` (default: http://localhost:8000/metrics).
+2. Run:
 
 ```bash
-export OTEL_ENABLED=true
-export OTEL_SERVICE_NAME=payments
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-export PROMETHEUS_MULTIPROC_DIR=/var/run/prom-mp
+svc-infra obs-up
 ```
 
-## Advanced usage
+If you have nothing Cloud-related in `.env`, the CLI spins up local Grafana & Prometheus under `.obs/`.
 
-### Custom metrics
+3. Open:
+   - Grafana: http://localhost:3000 (admin / admin)
+   - Prometheus: http://localhost:9090
+4. Stop when done:
 
-```python
-from svc_infra.obs import counter, histogram
-
-jobs_total = counter("jobs_total", "Total jobs processed", ["status"])
-job_latency = histogram("job_duration_seconds", "Job duration", buckets=[0.1, 0.5, 1, 2, 5])
-
-
-def handle_job(job):
-    with job_latency.time():
-        try:
-            # do work...
-            jobs_total.labels("ok").inc()
-        except Exception:
-            jobs_total.labels("error").inc()
-            raise
+```bash
+svc-infra obs-down
 ```
 
-### HTTP client instrumentation
+The CLI provisions a Prometheus datasource and copies our default "Service Observability (RED & USE)" dashboard into local Grafana automatically.
 
-```python
-from svc_infra.obs import instrument_requests, instrument_httpx
+---
 
-# Automatically add metrics for all HTTP requests
-instrument_requests()  # for requests library
-instrument_httpx()  # for httpx library
+## 2) Local → Grafana Cloud (push from a local Agent)
+
+Use this when you want Cloud dashboards while developing locally.
+
+**What you need from Grafana Cloud (your Metrics Instance page):**
+
+- Remote write URL (looks like `https://prometheus-prod-XX.../api/prom/push`)
+- Username / Instance ID (an integer)
+- API token for metrics `remote_write` (we'll call it `GRAFANA_CLOUD_RW_TOKEN`)
+- Grafana URL + API token for dashboard sync (we'll call them `GRAFANA_CLOUD_URL` + `GRAFANA_CLOUD_TOKEN`)
+
+### .env example
+
+```bash
+# Dashboard sync (browseable Grafana API)
+GRAFANA_CLOUD_URL=https://your-stack.grafana.net
+GRAFANA_CLOUD_TOKEN=glsa_...
+
+# Remote write to Metrics
+GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
+GRAFANA_CLOUD_USERNAME=1234567
+GRAFANA_CLOUD_RW_TOKEN=glc_...
+
+# Where your app's metrics live (scraped by the local Agent)
+SVC_INFRA_METRICS_URL=http://host.docker.internal:8000/metrics
 ```
 
-### Histogram bucket tuning
+### Steps
 
-Aim buckets around SLOs; e.g., 5–50–250–1000ms for latency SLO=300ms:
+1. Start your app locally.
+2. Run:
 
-```python
-from svc_infra.obs import ObservabilitySettings
-
-# Override via environment
-# METRICS_DEFAULT_BUCKETS="0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0"
+```bash
+svc-infra obs-up
 ```
+
+The CLI will:
+- Push dashboards once to your Cloud folder "Service Infrastructure" (idempotent; no duplicates).
+- Start a local Grafana Agent container (under `.obs/`) that scrapes your app and remote_writes to Grafana Cloud.
+
+3. To stop the local Agent:
+
+```bash
+svc-infra obs-down
+```
+
+The CLI writes `.obs/agent.yaml` and `.obs/docker-compose.cloud.yml` for you and mounts the config at `/etc/agent.yaml` inside the container, using the exact layout we verified.
+
+---
+
+## 3) Deployed app → Grafana Cloud (Railway example)
+
+Use this when your app is deployed and you want Cloud dashboards + metrics.
+
+We ship a ready-made Railway sidecar:
+
+- Template files live under: `obs/templates/sidecars/railway/`
+  (You'll see a Dockerfile and agent.yaml that match the working config.)
+
+**Railway variables to set (Project Settings → Variables):**
+
+```bash
+APP_HOST=<your-app>.up.railway.app
+METRICS_PATH=/metrics
+GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
+GRAFANA_CLOUD_USERNAME=<your stack id>
+GRAFANA_CLOUD_TOKEN=<metrics_write_token>
+```
+
+### How to run it
+
+1. Deploy your app on Railway (ensure it serves `/metrics`).
+2. Add another service to the same project using the provided Dockerfile:
+   - Context: `obs/templates/sidecars/railway/`
+   - This builds grafana/agent with our agent.yaml and runs it as a sidecar service.
+3. The agent will scrape `https://${APP_HOST}${METRICS_PATH}` and remote_write to Cloud.
+
+### Dashboards in Cloud
+
+- From your laptop (once), run:
+
+```bash
+# uses your Grafana browser API token
+export GRAFANA_CLOUD_URL=https://your-stack.grafana.net
+export GRAFANA_CLOUD_TOKEN=glsa_...
+svc-infra obs-up
+```
+
+This syncs dashboards (idempotent) into the "Service Infrastructure" folder.
+You can also wire this into CI if you prefer.
+
+---
+
+## Commands recap
+
+```bash
+# Start local stack or local→cloud agent depending on your .env
+svc-infra obs-up
+
+# Stop whatever was started
+svc-infra obs-down
+
+# Generate sidecar templates for other targets (compose|railway|k8s|fly)
+svc-infra obs-scaffold --target railway
+```
+
+---
+
+## What the CLI does for you
+
+- Detects mode automatically based on your `.env`:
+  - If `GRAFANA_CLOUD_URL` + `GRAFANA_CLOUD_TOKEN` exist ⇒ sync dashboards to Cloud.
+  - If remote write creds (`GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_USERNAME`, `GRAFANA_CLOUD_RW_TOKEN`) exist ⇒ start local Grafana Agent to push metrics to Cloud.
+  - Otherwise ⇒ start local Grafana + Prometheus.
+- Loads `.env` automatically (using python-dotenv if available).
+- Avoids duplicate dashboards by using stable dashboard UIDs and `overwrite: true`.
+- Uses the exact Agent setup that works (mounting `/etc/agent.yaml`, `grafana/agent:v0.38.1`, `extra_hosts` mapping to reach your host app, etc.).
+
+---
+
+## Default dashboard & alerts
+
+- Dashboard: "Service Observability (RED & USE)"
+  (request rate, error ratio, p95 latency, DB pool usage)
+- Example Prometheus alert rules are provided in `obs/templates/prometheus_rules.yml` (optional for Cloud; useful if you run your own Prometheus).
+
+---
+
+## Minimal checklists
+
+### Local → Local
+
+- App running on http://localhost:8000
+- `svc-infra obs-up`
+- Grafana at http://localhost:3000
+
+### Local → Cloud
+
+- `.env` has `GRAFANA_CLOUD_URL` + `GRAFANA_CLOUD_TOKEN`
+- `.env` has `GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_USERNAME`, `GRAFANA_CLOUD_RW_TOKEN`
+- App running locally
+- `svc-infra obs-up`
+- Check Cloud dashboard folder "Service Infrastructure"
+
+### Railway (Deployed) → Cloud
+
+- Set Railway variables (`APP_HOST`, `METRICS_PATH`, PROM URL, USERNAME, TOKEN)
+- Deploy agent sidecar from `obs/templates/sidecars/railway/`
+- Run `svc-infra obs-up` locally once to sync dashboards to Cloud
+
+---
+
+## .env examples
+
+### Local → Cloud
+
+```bash
+GRAFANA_CLOUD_URL=https://your-stack.grafana.net
+GRAFANA_CLOUD_TOKEN=glsa_...
+
+GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
+GRAFANA_CLOUD_USERNAME=1234567
+GRAFANA_CLOUD_RW_TOKEN=glc_...
+
+SVC_INFRA_METRICS_URL=http://host.docker.internal:8000/metrics
+```
+
+### Local → Local (no Cloud keys)
+
+```bash
+# leave Cloud values unset
+SVC_INFRA_METRICS_URL=http://localhost:8000/metrics
+```
+
+---
+
+## Done!
+
+That's all most devs need:
+
+- Add `add_observability(app)`
+- Pick a mode with `.env`
+- Run `svc-infra obs-up`
+
+You'll get metrics scraped, dashboards populated, and (if configured) data flowing into Grafana Cloud with zero copy-paste or manual setup.
