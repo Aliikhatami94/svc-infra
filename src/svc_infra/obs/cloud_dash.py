@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import urllib.request
 from importlib.resources import files
@@ -54,10 +55,6 @@ def _slug(s: str) -> str:
 
 
 def _stable_uid(name: str) -> str:
-    """
-    Deterministic UID <= 40 chars, allowed charset [-._0-9a-zA-Z].
-    Use a short prefix so we don't collide with other projects.
-    """
     base = f"svcinfra-{_slug(name)}"
     return base[:40]
 
@@ -83,6 +80,22 @@ def _patch_ds(d, prom_uid):
     return dd
 
 
+def _rewrite_rate_windows(d: dict) -> dict:
+    """Optionally replace $__rate_interval with a fixed window from env."""
+    win = os.getenv("SVC_INFRA_RATE_WINDOW", "").strip()
+    if not win:
+        return d
+
+    dd = json.loads(json.dumps(d))
+    for p in dd.get("panels", []) or []:
+        targets = p.get("targets") or []
+        for t in targets:
+            expr = t.get("expr")
+            if isinstance(expr, str) and "$__rate_interval" in expr:
+                t["expr"] = expr.replace("$__rate_interval", win)
+    return dd
+
+
 def push_dashboards_from_pkg(
     base_url: str, token: str, folder_title: str = "Service Infrastructure"
 ):
@@ -90,27 +103,34 @@ def push_dashboards_from_pkg(
     folder = _ensure_folder(base_url, token, folder_title)
     fuid = folder["uid"]
 
-    # packaged dashboards live in providers/grafana/dashboards/*.json
+    # env-driven knobs
+    refresh = os.getenv("SVC_INFRA_DASHBOARD_REFRESH", "5s")
+    default_from = os.getenv("SVC_INFRA_DASHBOARD_RANGE", "now-6h")
+    default_to = "now"
+
     dash_root = files("svc_infra.obs.providers.grafana").joinpath("dashboards")
     for res in dash_root.iterdir():
         if not res.name.endswith(".json"):
             continue
 
         d = json.loads(res.read_text(encoding="utf-8"))
-        # ensure title
         d.setdefault("title", res.name[:-5])
-
-        # --- make UID stable to avoid duplicates ---
         d.setdefault("uid", _stable_uid(d["title"]))
-        # ensure Grafana treats this as upsert by uid
-        d["id"] = None
+        d["id"] = None  # upsert by uid
 
+        # apply datasource/templating patch
         d = _patch_ds(d, prom_uid)
+        # apply rate window rewrite if requested
+        d = _rewrite_rate_windows(d)
+
+        # env-driven dashboard refresh + default time range
+        d["refresh"] = refresh
+        d["time"] = {"from": default_from, "to": default_to}
 
         payload = {
             "dashboard": d,
             "folderUid": fuid,
-            "overwrite": True,  # upsert by UID
+            "overwrite": True,
             "message": "svc-infra auto-sync",
         }
         _gapi(base_url, token, "/api/dashboards/db", method="POST", body=payload)

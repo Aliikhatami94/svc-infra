@@ -22,6 +22,7 @@ spec:
               value: "true"
             - name: METRICS_PATH
               value: "/metrics"
+
         - name: grafana-agent
           image: grafana/agent:latest
           args: ["--config.file=/etc/agent/agent.yaml","--config.expand-env"]
@@ -35,6 +36,10 @@ spec:
                 secretKeyRef:
                   name: grafana-cloud
                   key: token
+
+            # NEW: make SCRAPE_INTERVAL available for ${...} expansion in ConfigMap
+            - name: SCRAPE_INTERVAL
+              value: "5s"
           volumeMounts:
             - name: agent-config
               mountPath: /etc/agent

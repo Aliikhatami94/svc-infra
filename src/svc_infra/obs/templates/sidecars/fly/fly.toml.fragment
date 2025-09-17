@@ -8,4 +8,8 @@ METRICS_PATH = "/metrics"
 GRAFANA_CLOUD_PROM_URL = "https://<stack>.grafana.net/api/prom/push"
 GRAFANA_CLOUD_USERNAME = "<stack_id>"
 
-# set GRAFANA_CLOUD_TOKEN via `fly secrets set GRAFANA_CLOUD_TOKEN=...`
+# NEW: scrape interval for the agent (defaults inside config to 5s if unset)
+SCRAPE_INTERVAL = "5s"
+
+# set GRAFANA_CLOUD_TOKEN via:
+# fly secrets set GRAFANA_CLOUD_TOKEN=...

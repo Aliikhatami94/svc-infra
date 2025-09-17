@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 5s
-  evaluation_interval: 5s
+  scrape_interval: ${PROM_SCRAPE_INTERVAL:5s}
+  evaluation_interval: ${PROM_EVAL_INTERVAL:5s}
 scrape_configs:
   - job_name: "svc-infra"
     metrics_path: "${metrics_path}"

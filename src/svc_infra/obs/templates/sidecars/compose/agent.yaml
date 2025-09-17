@@ -1,6 +1,7 @@
 metrics:
   wal_directory: /tmp/agent/wal
-  global: { scrape_interval: 5s }
+  global:
+    scrape_interval: "${SCRAPE_INTERVAL:60s}"
   configs:
     - name: svc-infra
       scrape_configs:
@@ -12,4 +13,4 @@ metrics:
         - url: ${GRAFANA_CLOUD_PROM_URL}
           basic_auth:
             username: ${GRAFANA_CLOUD_USERNAME}
-            password: ${GRAFANA_CLOUD_TOKEN}
+            password: ${GRAFANA_CLOUD_RW_TOKEN}
