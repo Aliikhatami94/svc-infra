@@ -17,10 +17,34 @@ _prom_ready: bool = False
 _http_requests_total = None
 _http_request_duration = None
 _http_inflight = None
+_http_response_size = None  # NEW
+_http_exceptions_total = None  # NEW
+_default_collectors_ready = False  # NEW
+
+
+def _register_default_collectors_once() -> None:
+    """
+    Ensure python_info, python_gc_* etc. are available by registering GC collector once.
+    Safe to call multiple times.
+    """
+    global _default_collectors_ready
+    if _default_collectors_ready:
+        return
+    try:
+        # These imports are no-ops if already registered by the client,
+        # but GCCollector typically needs explicit instantiation.
+        from prometheus_client import GCCollector  # type: ignore
+
+        GCCollector()  # registers GC metrics
+        _default_collectors_ready = True
+    except Exception:
+        # If prometheus_client is missing or GCCollector fails, just skip.
+        _default_collectors_ready = False
 
 
 def _init_metrics() -> None:
     global _prom_ready, _http_requests_total, _http_request_duration, _http_inflight
+    global _http_response_size, _http_exceptions_total  # NEW
     if os.getenv("SVC_INFRA_DISABLE_PROMETHEUS") == "1":
         _prom_ready = False
         return
@@ -28,6 +52,10 @@ def _init_metrics() -> None:
         return
     try:
         obs = ObservabilitySettings()
+
+        # Register default collectors (python_info, python_gc_*).
+        _register_default_collectors_once()
+
         _http_requests_total = counter(
             "http_server_requests_total",
             "Total HTTP requests",
@@ -45,6 +73,20 @@ def _init_metrics() -> None:
             labels=["route"],
             multiprocess_mode="livesum",
         )
+        # NEW: response size histogram (bytes)
+        _http_response_size = histogram(
+            "http_server_response_size_bytes",
+            "HTTP response size in bytes",
+            labels=["route", "method"],
+            buckets=(256, 512, 1024, 2048, 4096, 8192, 32768, 131072, 524288, 1048576),
+        )
+        # NEW: exceptions counter
+        _http_exceptions_total = counter(
+            "http_server_exceptions_total",
+            "Unhandled exceptions during request handling",
+            labels=["route", "method"],
+        )
+
         _prom_ready = True
     except Exception:
         # prometheus-client not installed (or unavailable) – keep as not ready
@@ -93,26 +135,42 @@ class PrometheusMiddleware:
         _init_metrics()
 
         request = Request(scope, receive=receive)
-        inflight_label = (self.route_resolver or _route_template)(request)
+        route_label = (self.route_resolver or _route_template)(request)
         method = scope.get("method", "GET")
         start = time.perf_counter()
 
         # If metrics are ready, record inflight
         if _prom_ready and _http_inflight:
             try:
-                _http_inflight.labels(inflight_label).inc()
+                _http_inflight.labels(route_label).inc()
             except Exception:
                 pass
 
         status_code_container: dict[str, Any] = {}
+        bytes_sent = 0  # NEW
 
         async def _send(message):
+            nonlocal bytes_sent
+            # capture status code
             if message["type"] == "http.response.start":
                 status_code_container["code"] = message["status"]
+            # accumulate bytes for response size (handles streaming)
+            if message["type"] == "http.response.body":
+                body = message.get("body") or b""
+                bytes_sent += len(body)
             await send(message)
 
         try:
             await self.app(scope, receive, _send)
+        except Exception:
+            # Count exceptions separately (and still observe duration below)
+            if _prom_ready and _http_exceptions_total:
+                try:
+                    _http_exceptions_total.labels(route_label, method).inc()
+                except Exception:
+                    pass
+            # Re-raise so normal error handling applies
+            raise
         finally:
             try:
                 route_for_stats = _route_template(request)
@@ -128,11 +186,13 @@ class PrometheusMiddleware:
                         _http_requests_total.labels(method, route_for_stats, code).inc()
                     if _http_request_duration:
                         _http_request_duration.labels(route_for_stats, method).observe(elapsed)
+                    if _http_response_size:
+                        _http_response_size.labels(route_for_stats, method).observe(bytes_sent)
                 except Exception:
                     pass
                 try:
                     if _http_inflight:
-                        _http_inflight.labels(inflight_label).dec()
+                        _http_inflight.labels(route_label).dec()
                 except Exception:
                     pass
 
@@ -154,6 +214,9 @@ def metrics_endpoint():
 
     try:
         from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+        # Make sure default collectors are present even if endpoint is hit before any requests
+        _register_default_collectors_once()
 
         reg = registry()
 

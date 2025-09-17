@@ -15,7 +15,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[30s]))",
+          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
           "legendFormat": "{{job}}"
         }
       ]
@@ -29,7 +29,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",code!~\"2..|3..\",method=~\"$method\",route=~\"$route\"}[30s]))",
+          "expr": "sum by (job) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",code!~\"2..|3..\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
           "legendFormat": "{{job}}"
         }
       ]
@@ -43,7 +43,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[30s])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval])))",
           "legendFormat": "p95"
         }
       ]
@@ -55,7 +55,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (code) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[30s]))",
+          "expr": "sum by (code) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route=~\"$route\"}[$__rate_interval]))",
           "legendFormat": "{{code}}"
         }
       ]
@@ -90,7 +90,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(10, sum by (route) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route!=\"\"}[30s])))",
+          "expr": "topk(10, sum by (route) (rate(http_server_requests_total{job=~\"$job\",instance=~\"$instance\",method=~\"$method\",route!=\"\"}[$__rate_interval])))",
           "legendFormat": "{{route}}"
         }
       ]
@@ -102,7 +102,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (job) (rate(http_client_requests_total{job=~\"$job\"}[30s]))",
+          "expr": "sum by (job) (rate(http_client_requests_total{job=~\"$job\"}[$__rate_interval]))",
           "legendFormat": "{{job}}"
         }
       ]
@@ -115,7 +115,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket{job=~\"$job\"}[30s])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
           "legendFormat": "p95"
         }
       ]
