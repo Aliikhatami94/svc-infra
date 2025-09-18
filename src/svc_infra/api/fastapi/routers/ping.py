@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from fastapi import Response, status
@@ -11,3 +13,7 @@ router = DualAPIRouter()
 def ping():
     logging.info("Health check: /ping endpoint accessed. Service is responsive.")
     return Response(status_code=status.HTTP_200_OK)
+
+
+# Optional: help discovery tooling
+ROUTER_TAG = "health"

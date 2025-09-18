@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import logging
 import os
 from collections import defaultdict
+from typing import Iterable
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,18 +34,13 @@ def _gen_operation_id_factory():
         tag = _normalize(route.tags[0]) if route.tags else ""
         method = next(iter(route.methods or ["GET"])).lower()
 
-        # Prefer the base alone if unique
         candidate = base
         if used[candidate]:
-            # Try tag + base if base already taken and tag adds value
             if tag and not base.startswith(tag):
                 candidate = f"{tag}_{base}"
-            # If still taken, append method
             if used[candidate]:
-                # avoid double method suffix if user already named it like ping_get
                 if not candidate.endswith(f"_{method}"):
                     candidate = f"{candidate}_{method}"
-                # If STILL taken, add a disambiguating counter
                 if used[candidate]:
                     counter = used[candidate] + 1
                     candidate = f"{candidate}_{counter}"
@@ -78,21 +76,14 @@ def _build_child_api(
     child.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(child)
 
-    # Register core routers (NO global version prefix here)
-    register_all_routers(
-        child,
-        base_package="svc_infra.api.fastapi.routers",
-        prefix="",
-        environment=CURRENT_ENVIRONMENT,
-        # force_include_in_schema defaults to True in LOCAL via the helper itself
-    )
+    # NOTE: do NOT register root routers here; this is versioned child only.
 
-    # Optional custom routers
+    # Optional per-version routers from the app:
     if api_config and api_config.routers_path:
         register_all_routers(
             child,
             base_package=api_config.routers_path,
-            prefix="",
+            prefix="",  # child is mounted at /vX later
             environment=CURRENT_ENVIRONMENT,
         )
 
@@ -103,7 +94,6 @@ def _build_child_api(
 
 
 def set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
-    # mount_path should be like "/v0" or "/v1"
     base = mount_path if not public_base_url else f"{public_base_url.rstrip('/')}{mount_path}"
 
     def custom_openapi():
@@ -116,13 +106,6 @@ def set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
 
 
 def _setup_cors(app, public_cors_origins: list[str] | str | None = None):
-    """
-    Attach CORS middleware to a FastAPI app.
-
-    - Accepts list or comma-separated str.
-    - Falls back to env var CORS_ALLOW_ORIGINS or http://localhost:3000.
-    - Handles "*" with allow_credentials=True by switching to regex.
-    """
     if isinstance(public_cors_origins, list):
         origins = [o.strip() for o in public_cors_origins if o and o.strip()]
     elif isinstance(public_cors_origins, str):
@@ -132,7 +115,7 @@ def _setup_cors(app, public_cors_origins: list[str] | str | None = None):
         origins = [o.strip() for o in fallback.split(",") if o and o.strip()]
 
     if not origins:
-        return  # nothing to do
+        return
 
     cors_kwargs = dict(
         allow_credentials=True,
@@ -147,12 +130,25 @@ def _setup_cors(app, public_cors_origins: list[str] | str | None = None):
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
+def _coerce_list(value: str | Iterable[str] | None) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    return [v for v in value if v]
+
+
 def setup_fastapi(
     versions: list[tuple[AppSettings, ApiConfig]],
     *,
     public_title: str = "Service Shell",
     public_cors_origins: list[str] | str | None = None,
+    root_routers_paths: list[str] | str | None = None,
 ) -> FastAPI:
+    """
+    - Registers *root* routers (once) on the parent app (e.g. /ping).
+    - Mounts each versioned child app at /vX, and registers version routers inside it.
+    """
     parent = FastAPI(
         title=public_title,
         docs_url="/docs" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
@@ -160,12 +156,30 @@ def setup_fastapi(
         openapi_url="/openapi.json" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
     )
 
-    # Apply CORS on parent only
     _setup_cors(parent, public_cors_origins)
 
     parent.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(parent)
 
+    # --- 1) Root routers on the parent app ---
+    # Always include svc-infra's root health router (adds /ping once at root).
+    register_all_routers(
+        parent,
+        base_package="svc_infra.api.fastapi.routers",
+        prefix="",
+        environment=CURRENT_ENVIRONMENT,
+    )
+
+    # Allow the *app* to also add its own root routers (e.g. your own health/metadata)
+    for pkg in _coerce_list(root_routers_paths):
+        register_all_routers(
+            parent,
+            base_package=pkg,
+            prefix="",  # root
+            environment=CURRENT_ENVIRONMENT,
+        )
+
+    # --- 2) Versioned children mounted under /vX ---
     for app_cfg, api_cfg in versions:
         child = _build_child_api(app_cfg, api_cfg)
         mount_path = f"/{api_cfg.version.strip('/')}"  # e.g. "/v0"
