@@ -9,6 +9,7 @@ from svc_infra.app.logging.filter import filter_logs_for_paths
 from .logging import (
     JsonFormatter,
     LoggingConfig,
+    LogLevelOptions,
     _env_name_list_to_enum_values,
     _parse_paths_csv,
     _read_format,
@@ -98,3 +99,6 @@ def setup_logging(
         paths = ["/metrics"] if filter_enabled else []
 
     filter_logs_for_paths(paths=paths, enabled=filter_enabled)
+
+
+__all__ = ["setup_logging", "LogLevelOptions"]
