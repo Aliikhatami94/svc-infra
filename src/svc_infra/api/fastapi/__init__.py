@@ -141,7 +141,7 @@ def _coerce_list(value: str | Iterable[str] | None) -> list[str]:
 def setup_fastapi(
     versions: list[tuple[AppSettings, ApiConfig]],
     *,
-    public_title: str = "Service Shell",
+    root_title: str = "Service Shell",
     public_cors_origins: list[str] | str | None = None,
     root_routers_paths: list[str] | str | None = None,
 ) -> FastAPI:
@@ -150,7 +150,7 @@ def setup_fastapi(
     - Mounts each versioned child app at /vX, and registers version routers inside it.
     """
     parent = FastAPI(
-        title=public_title,
+        title=root_title,
         docs_url="/docs" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
         redoc_url="/redoc" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
         openapi_url="/openapi.json" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
