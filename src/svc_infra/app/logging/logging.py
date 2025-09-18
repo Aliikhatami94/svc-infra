@@ -3,11 +3,20 @@ from __future__ import annotations
 import logging
 import os
 from enum import StrEnum
-from typing import Sequence
+from typing import Sequence, Union
 
 from pydantic import BaseModel
 
-from svc_infra.app.env import IS_PROD, Environment
+from svc_infra.app.env import (
+    DEV_ENV,
+    IS_PROD,
+    LOCAL_ENV,
+    PROD_ENV,
+    TEST_ENV,
+    Environment,
+    get_current_environment,
+)
+from svc_infra.app.logging.filter import filter_logs_for_paths
 
 
 # --- Log Format and Level Options ---
@@ -37,7 +46,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:  # type: ignore[override]
         import json
-        import os as _os  # avoid shadowing
+        import os as _os
         from traceback import format_exception
 
         payload: dict[str, object] = {
@@ -118,31 +127,133 @@ def _parse_paths_csv(val: str | None) -> list[str]:
     return parts
 
 
-def _env_name_list_to_enum_values(env_names: Sequence[str] | None) -> set[str]:
-    """
-    Normalize a list like ["prod","test"] into the canonical Environment.value strings.
-    Accepts any case and synonyms handled upstream by Environment.
-    """
-    if not env_names:
-        return set()
-    normed: set[str] = set()
-    # Build a small lookup map {alias -> canonical value}
+# --- Enum normalization (accept enums or strings) ---
+EnvLike = Union[Environment, str]
+
+
+def _normalize_env_token(token: EnvLike | None) -> Environment | None:
+    if token is None:
+        return None
+    if isinstance(token, Environment):
+        return token
+    # string fallback with synonyms handled by Environment via app.env
+    key = token.strip().lower()
     alias_map = {
-        "local": Environment.LOCAL.value,
-        "dev": Environment.DEV.value,
-        "development": Environment.DEV.value,
-        "test": Environment.TEST.value,
-        "preview": Environment.TEST.value,
-        "staging": Environment.TEST.value,
-        "prod": Environment.PROD.value,
-        "production": Environment.PROD.value,
+        "local": LOCAL_ENV,
+        "dev": DEV_ENV,
+        "development": DEV_ENV,
+        "test": TEST_ENV,
+        "preview": TEST_ENV,
+        "staging": TEST_ENV,
+        "prod": PROD_ENV,
+        "production": PROD_ENV,
     }
-    for name in env_names:
-        key = (name or "").strip().lower()
-        if not key:
-            continue
-        if key in (e.value for e in Environment):
-            normed.add(key)
-        elif key in alias_map:
-            normed.add(alias_map[key])
-    return normed
+    return alias_map.get(key)
+
+
+def _normalize_env_list(envs: Sequence[EnvLike] | None) -> set[Environment]:
+    if not envs:
+        return set()
+    out: set[Environment] = set()
+    for tok in envs:
+        norm = _normalize_env_token(tok)
+        if norm is not None:
+            out.add(norm)
+    return out
+
+
+# --- Main Logging Setup Function ---
+def setup_logging(
+    level: str | None = None,
+    fmt: str | None = None,
+    *,
+    drop_paths: Sequence[str] | None = None,
+    filter_envs: Sequence[EnvLike] | None = (
+        PROD_ENV,
+        TEST_ENV,
+        "prod",
+        "production",
+        "staging",
+        "test",
+        "preview",
+        "uat",
+    ),
+) -> None:
+    """
+    Set up logging for the application.
+
+    Args:
+        level: Optional log level (e.g., "DEBUG", "INFO"). If not provided, uses environment-based default.
+        fmt: Optional log format ("json" or "plain"). If not provided, uses environment-based default.
+        drop_paths: Optional list of URL paths to suppress in access logs (e.g., ["/metrics", "/health"]).
+                    If omitted, checks LOG_DROP_PATHS; if still empty and filter is enabled
+                    for the current env, defaults to ["/metrics"].
+        filter_envs: Environments for which the access-log path filter should be enabled.
+                     Accepts Environment enums (preferred) or strings ("prod", "staging", etc.).
+                     Default: (PROD_ENV, TEST_ENV).
+    """
+    # Validate fmt and level using Pydantic if provided
+    if fmt is not None or level is not None:
+        LoggingConfig(fmt=fmt, level=level)  # raises if invalid
+    if level is None:
+        level = _read_level()
+    if fmt is None:
+        fmt = _read_format()
+
+    formatter_name = "json" if fmt == "json" else "plain"
+
+    # Silence multipart parser logs in non-debug environments
+    if level.upper() != "DEBUG":
+        logging.getLogger("multipart.multipart").setLevel(logging.WARNING)
+
+    # Core logging config
+    from logging.config import dictConfig
+
+    dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "plain": {
+                    "format": "%(asctime)s %(levelname)-5s [pid:%(process)d] %(name)s: %(message)s",
+                    "datefmt": "%Y-%m-%dT%H:%M:%S",
+                },
+                "json": {
+                    "()": JsonFormatter,
+                    "datefmt": "%Y-%m-%dT%H:%M:%S",
+                },
+            },
+            "handlers": {
+                "stream": {
+                    "class": "logging.StreamHandler",
+                    "level": level,
+                    "formatter": formatter_name,
+                }
+            },
+            "root": {
+                "level": level,
+                "handlers": ["stream"],
+            },
+            "loggers": {
+                "uvicorn": {"level": "INFO", "handlers": [], "propagate": True},
+                "uvicorn.error": {"level": "INFO", "handlers": [], "propagate": True},
+                "uvicorn.access": {"level": "INFO", "handlers": [], "propagate": True},
+            },
+        }
+    )
+
+    # --- Install access-log path filter (after dictConfig) ---
+    current_env = get_current_environment()  # Environment
+    enabled_envs = _normalize_env_list(filter_envs)
+    filter_enabled = current_env in enabled_envs
+
+    # Paths precedence: arg > env > default (if enabled)
+    env_paths = _parse_paths_csv(os.getenv("LOG_DROP_PATHS"))
+    if drop_paths is not None:
+        paths = [p if p.startswith("/") else f"/{p}" for p in drop_paths]
+    elif env_paths:
+        paths = env_paths
+    else:
+        paths = ["/metrics"] if filter_enabled else []
+
+    filter_logs_for_paths(paths=paths, enabled=filter_enabled)

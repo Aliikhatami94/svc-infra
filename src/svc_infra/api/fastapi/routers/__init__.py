@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 
-from svc_infra.app.env import ALL_ENVIRONMENTS, Environment, get_current_environment
+from svc_infra.app.env import ALL_ENVIRONMENTS, LOCAL_ENV, Environment, get_current_environment
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def register_all_routers(
     )
 
     if force_include_in_schema is None:
-        force_include_in_schema = environment == Environment.LOCAL
+        force_include_in_schema = environment == LOCAL_ENV
 
     for _, module_name, _ in pkgutil.walk_packages(
         package_module.__path__, prefix=f"{base_package}."

@@ -12,7 +12,7 @@ from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMi
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.api.fastapi.settings import ApiConfig
-from svc_infra.app.env import CURRENT_ENVIRONMENT, Environment
+from svc_infra.app.env import CURRENT_ENVIRONMENT, LOCAL_ENV
 from svc_infra.app.settings import AppSettings, get_app_settings
 
 logger = logging.getLogger(__name__)
@@ -155,9 +155,9 @@ def setup_fastapi(
 ) -> FastAPI:
     parent = FastAPI(
         title=public_title,
-        docs_url="/docs" if CURRENT_ENVIRONMENT == Environment.LOCAL else None,
-        redoc_url="/redoc" if CURRENT_ENVIRONMENT == Environment.LOCAL else None,
-        openapi_url="/openapi.json" if CURRENT_ENVIRONMENT == Environment.LOCAL else None,
+        docs_url="/docs" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
+        redoc_url="/redoc" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
+        openapi_url="/openapi.json" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
     )
 
     # Apply CORS on parent only
@@ -172,7 +172,7 @@ def setup_fastapi(
         parent.mount(mount_path, child, name=api_cfg.version.strip("/"))
         set_servers(child, api_cfg.public_base_url, mount_path)
 
-    if CURRENT_ENVIRONMENT == Environment.LOCAL:
+    if CURRENT_ENVIRONMENT == LOCAL_ENV:
         from fastapi.responses import HTMLResponse
 
         @parent.get("/", include_in_schema=False)

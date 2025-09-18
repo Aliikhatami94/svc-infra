@@ -19,16 +19,24 @@ class Environment(StrEnum):
     PROD = "prod"
 
 
+# Handy aliases
+LOCAL_ENV = Environment.LOCAL
+DEV_ENV = Environment.DEV
+TEST_ENV = Environment.TEST
+PROD_ENV = Environment.PROD
+
+
 # Map common aliases -> canonical
 SYNONYMS: dict[str, Environment] = {
-    "development": Environment.DEV,
-    "dev": Environment.DEV,
-    "local": Environment.LOCAL,
-    "test": Environment.TEST,
-    "preview": Environment.TEST,
-    "prod": Environment.PROD,
-    "production": Environment.PROD,
-    "staging": Environment.TEST,  # Treat 'staging' as 'test' for environment purposes
+    "development": DEV_ENV,
+    "dev": DEV_ENV,
+    "local": LOCAL_ENV,
+    "uat": TEST_ENV,
+    "test": TEST_ENV,
+    "preview": TEST_ENV,
+    "staging": TEST_ENV,
+    "prod": PROD_ENV,
+    "production": PROD_ENV,
 }
 
 ALL_ENVIRONMENTS = {e for e in Environment}
@@ -69,7 +77,7 @@ def get_current_environment() -> Environment:
                 RuntimeWarning,
                 stacklevel=2,
             )
-        env = Environment.LOCAL
+        env = LOCAL_ENV
     return env
 
 
@@ -101,10 +109,6 @@ IS_LOCAL, IS_DEV, IS_TEST, IS_PROD = (
     ENV_FLAGS.is_test,
     ENV_FLAGS.is_prod,
 )
-LOCAL_ENV = Environment.LOCAL.value
-TEST_ENV = Environment.TEST.value
-DEV_ENV = Environment.DEV.value
-PROD_ENV = Environment.PROD.value
 
 
 def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
@@ -115,13 +119,13 @@ def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
         log_level = pick(prod="INFO", nonprod="DEBUG", dev="DEBUG")
     """
     e = get_current_environment()
-    if e is Environment.PROD:
+    if e is PROD_ENV:
         return prod
-    if e is Environment.DEV and dev is not None:
+    if e is DEV_ENV and dev is not None:
         return dev
-    if e is Environment.TEST and test is not None:
+    if e is TEST_ENV and test is not None:
         return test
-    if e is Environment.LOCAL and local is not None:
+    if e is LOCAL_ENV and local is not None:
         return local
     if nonprod is not None:
         return nonprod
