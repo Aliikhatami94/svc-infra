@@ -101,6 +101,10 @@ IS_LOCAL, IS_DEV, IS_TEST, IS_PROD = (
     ENV_FLAGS.is_test,
     ENV_FLAGS.is_prod,
 )
+LOCAL_ENV = Environment.LOCAL.value
+TEST_ENV = Environment.TEST.value
+DEV_ENV = Environment.DEV.value
+PROD_ENV = Environment.PROD.value
 
 
 def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
