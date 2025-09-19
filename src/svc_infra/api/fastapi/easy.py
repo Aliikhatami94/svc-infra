@@ -163,7 +163,7 @@ def quick_service_api(
     )
 
 
-def service_app(
+def easy_service_app(
     *,
     name: str,
     release: str,
