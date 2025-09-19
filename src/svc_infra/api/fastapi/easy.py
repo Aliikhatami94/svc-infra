@@ -7,10 +7,12 @@ from typing import Iterable, Sequence
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from svc_infra.api.fastapi import APIVersionSpec, ServiceInfo, setup_service_api
 from svc_infra.app.env import pick
 from svc_infra.app.logging import LogLevelOptions, setup_logging
 from svc_infra.obs import add_observability
+
+from .models import APIVersionSpec, ServiceInfo
+from .setup import setup_service_api
 
 # ---------- helpers ----------
 
