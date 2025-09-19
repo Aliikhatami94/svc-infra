@@ -1,6 +1,6 @@
 from .dual_router import DualAPIRouter, dualize_router
+from .easy import easy_service_app, quick_service_api
 from .setup import APIVersionSpec, ServiceInfo, setup_service_api
-from .sugar import easy_service_app, quick_service_api
 
 __all__ = [
     "DualAPIRouter",
