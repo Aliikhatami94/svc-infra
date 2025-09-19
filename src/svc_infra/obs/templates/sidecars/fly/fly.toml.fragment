@@ -6,7 +6,7 @@ agent = "/bin/grafana-agent --config.file=/etc/agent/agent.yaml --config.expand-
 METRICS_ENABLED = "true"
 METRICS_PATH = "/metrics"
 GRAFANA_CLOUD_PROM_URL = "https://<stack>.grafana.net/api/prom/push"
-GRAFANA_CLOUD_USERNAME = "<stack_id>"
+GRAFANA_CLOUD_PROM_USERNAME = "<stack_id>"
 
 # NEW: scrape interval for the agent (defaults inside config to 5s if unset)
 SCRAPE_INTERVAL = "5s"

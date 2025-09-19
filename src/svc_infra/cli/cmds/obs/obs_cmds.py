@@ -123,7 +123,11 @@ def up():
         # NOTE: look for RW token (not the Grafana API token)
         if all(
             os.getenv(k)
-            for k in ("GRAFANA_CLOUD_PROM_URL", "GRAFANA_CLOUD_USERNAME", "GRAFANA_CLOUD_RW_TOKEN")
+            for k in (
+                "GRAFANA_CLOUD_PROM_URL",
+                "GRAFANA_CLOUD_PROM_USERNAME",
+                "GRAFANA_CLOUD_RW_TOKEN",
+            )
         ):
             _emit_local_agent(root, metrics_url)
             _run(

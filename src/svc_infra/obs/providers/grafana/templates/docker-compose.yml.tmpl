@@ -6,7 +6,7 @@ services:
       - metrics_path=${METRICS_PATH:-/metrics}
       - target=${PROM_TARGET:-host.docker.internal:8000}
       - GRAFANA_CLOUD_PROM_URL=${GRAFANA_CLOUD_PROM_URL}
-      - GRAFANA_CLOUD_USERNAME=${GRAFANA_CLOUD_USERNAME}
+      - GRAFANA_CLOUD_PROM_USERNAME=${GRAFANA_CLOUD_PROM_USERNAME}
       - GRAFANA_CLOUD_TOKEN=${GRAFANA_CLOUD_TOKEN}
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro

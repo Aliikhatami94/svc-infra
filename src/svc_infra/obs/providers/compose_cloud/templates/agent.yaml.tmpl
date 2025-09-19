@@ -13,7 +13,7 @@ metrics:
       remote_write:
         - url: ${GRAFANA_CLOUD_PROM_URL}
           basic_auth:
-            username: ${GRAFANA_CLOUD_USERNAME}
+            username: ${GRAFANA_CLOUD_PROM_USERNAME}
             password: ${GRAFANA_CLOUD_RW_TOKEN}
 
 logs:
@@ -22,7 +22,7 @@ logs:
       clients:
         - url: ${GRAFANA_CLOUD_LOKI_URL}   # e.g. https://logs-prod-XX.grafana.net/loki/api/v1/push
           basic_auth:
-            username: ${GRAFANA_CLOUD_USERNAME}
+            username: ${GRAFANA_CLOUD_LOKI_USERNAME}
             password: ${GRAFANA_CLOUD_LOKI_TOKEN}
 
       # Prefer Docker autodiscovery of the app container's stdout

@@ -12,5 +12,5 @@ metrics:
       remote_write:
         - url: ${GRAFANA_CLOUD_PROM_URL}
           basic_auth:
-            username: ${GRAFANA_CLOUD_USERNAME}
+            username: ${GRAFANA_CLOUD_PROM_USERNAME}
             password: ${GRAFANA_CLOUD_RW_TOKEN}

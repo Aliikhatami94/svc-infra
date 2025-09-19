@@ -97,7 +97,7 @@ GRAFANA_CLOUD_TOKEN=glsa_...   # dashboard sync
 
 # Remote write to Metrics
 GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
-GRAFANA_CLOUD_USERNAME=1234567
+GRAFANA_CLOUD_PROM_USERNAME=1234567
 GRAFANA_CLOUD_RW_TOKEN=glc_... # metrics write
 
 # Where your app's metrics live (scraped by the local Agent)
@@ -146,7 +146,7 @@ SCRAPE_INTERVAL=15s
 
 # Metrics remote_write creds
 GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
-GRAFANA_CLOUD_USERNAME=<stack_id>
+GRAFANA_CLOUD_PROM_USERNAME=<stack_id>
 GRAFANA_CLOUD_RW_TOKEN=glc_...
 
 # Optional (for dashboard sync)
@@ -197,7 +197,7 @@ svc-infra obs-scaffold --target railway
 
 - Detects mode automatically based on your `.env`:
   - If `GRAFANA_CLOUD_URL` + `GRAFANA_CLOUD_TOKEN` exist ⇒ sync dashboards to Cloud.
-  - If remote write creds (`GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_USERNAME`, `GRAFANA_CLOUD_RW_TOKEN`) exist ⇒ start local Grafana Agent to push metrics to Cloud.
+  - If remote write creds (`GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_PROM_USERNAME`, `GRAFANA_CLOUD_RW_TOKEN`) exist ⇒ start local Grafana Agent to push metrics to Cloud.
   - Otherwise ⇒ start local Grafana + Prometheus.
 - Loads `.env` automatically (using python-dotenv if available).
 - Avoids duplicate dashboards by using stable dashboard UIDs and `overwrite: true`.
@@ -224,7 +224,7 @@ svc-infra obs-scaffold --target railway
 ### Local → Cloud
 
 - `.env` has `GRAFANA_CLOUD_URL` + `GRAFANA_CLOUD_TOKEN`
-- `.env` has `GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_USERNAME`, `GRAFANA_CLOUD_RW_TOKEN`
+- `.env` has `GRAFANA_CLOUD_PROM_URL`, `GRAFANA_CLOUD_PROM_USERNAME`, `GRAFANA_CLOUD_RW_TOKEN`
 - App running locally
 - `svc-infra obs-up`
 - Check Cloud dashboard folder "Service Infrastructure"
@@ -246,7 +246,7 @@ GRAFANA_CLOUD_URL=https://your-stack.grafana.net
 GRAFANA_CLOUD_TOKEN=glsa_...   # dashboard sync
 
 GRAFANA_CLOUD_PROM_URL=https://prometheus-prod-XX.grafana.net/api/prom/push
-GRAFANA_CLOUD_USERNAME=1234567
+GRAFANA_CLOUD_PROM_USERNAME=1234567
 GRAFANA_CLOUD_RW_TOKEN=glc_... # metrics write
 
 SVC_INFRA_METRICS_URL=http://host.docker.internal:8000/metrics
