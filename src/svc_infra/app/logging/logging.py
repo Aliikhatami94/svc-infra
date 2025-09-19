@@ -48,6 +48,12 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
+        # Add these two lines:
+        if getattr(record, "trace_id", None):
+            payload["trace_id"] = record.trace_id
+        if getattr(record, "span_id", None):
+            payload["span_id"] = record.span_id
+
         # Optional correlation id
         req_id = getattr(record, "request_id", None)
         if req_id is not None:

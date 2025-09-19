@@ -5,19 +5,35 @@ services:
       - --config.file=/etc/agent.yaml
       - --config.expand-env
     environment:
+      # --- Prometheus Remote Write (metrics) ---
       GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL}
       GRAFANA_CLOUD_USERNAME: ${GRAFANA_CLOUD_USERNAME}
       GRAFANA_CLOUD_RW_TOKEN: ${GRAFANA_CLOUD_RW_TOKEN}
-      # App scrape hints (can be overridden by .env)
+
+      # --- Loki (logs) ---
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL}
+      GRAFANA_CLOUD_LOKI_TOKEN: ${GRAFANA_CLOUD_LOKI_TOKEN}
+
+      # --- App scrape hints (override via .env as needed) ---
+      APP_NAME: ${APP_NAME:-svc-infra-app}
+      APP_ENV: ${APP_ENV:-local}
       APP_SCHEME: ${APP_SCHEME:-http}
       METRICS_PATH: ${METRICS_PATH:-/metrics}
       APP_HOST: ${APP_HOST:-host.docker.internal:8000}
       SCRAPE_INTERVAL: ${SCRAPE_INTERVAL:-5s}
+
+      # Optional: if you tail a file instead of docker_sd
+      # APP_LOG_FILE: /var/log/app.log
+
     volumes:
       - type: bind
         source: ./agent.yaml
         target: /etc/agent.yaml
         read_only: true
+      # Needed for docker_sd_configs (safe as read-only)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
     restart: unless-stopped
