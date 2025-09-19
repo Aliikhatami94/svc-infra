@@ -74,7 +74,7 @@ def render_index_html(
       --btn-hover-border: #2a3b54;
 
       --radius: 12px;
-      --shadow: 0 1px 0 rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.24);
+      --shadow: 0 1px 0 rgba(0,0,0,.15), 0 6px 16px rgba(0,0,0,.18);
     }}
     @media (prefers-color-scheme: light) {{
       :root {{
@@ -137,7 +137,7 @@ def render_index_html(
       font-weight: 600;
       color: var(--fg);
       background: #1c2736;
-      border: 1px solid var(--border-strong);
+      border: 1px solid var(--border); /* lighter border */
       border-radius: 999px;
       padding: 6px 14px;
       width: fit-content;
