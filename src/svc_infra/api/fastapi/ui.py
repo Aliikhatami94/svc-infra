@@ -1,33 +1,45 @@
-# svc_infra/api/fastapi/ui.py
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, List, Optional
 
 
 @dataclass(frozen=True)
-class VersionLink:
-    tag: str  # e.g. "v0"
-    docs_url: str  # e.g. "/v0/docs"
-    redoc_url: str | None  # e.g. "/v0/redoc" (if enabled)
-    openapi_url: str | None  # e.g. "/v0/openapi.json" (if enabled)
+class DocTargets:
+    swagger: Optional[str] = None  # e.g. "/docs" or "/v0/docs"
+    redoc: Optional[str] = None  # e.g. "/redoc" or "/v0/redoc"
+    openapi_json: Optional[str] = None  # e.g. "/openapi.json" or "/v0/openapi.json"
 
 
-def _card(v: VersionLink) -> str:
-    tag = v.tag.strip("/")
-    # We do NOT repeat the service name here — just the version tag.
-    # Primary CTA is Swagger; auxiliary links are tucked under the tag.
-    redoc = f'<a class="pill" href="{v.redoc_url}">ReDoc</a>' if v.redoc_url else ""
-    openapi = f'<a class="pill" href="{v.openapi_url}">OpenAPI JSON</a>' if v.openapi_url else ""
+@dataclass(frozen=True)
+class CardSpec:
+    tag: str  # "/", "v0", "v1" (no leading slash required)
+    docs: DocTargets  # which endpoints to show
+
+
+def _btn(label: str, href: str, *, kind: str = "solid") -> str:
+    # kind: "solid" | "outline"
+    base = "btn"
+    cls = f"{base} {'btn-outline' if kind == 'outline' else ''}"
+    return f'<a class="{cls}" href="{href}">{label}</a>'
+
+
+def _card(spec: CardSpec) -> str:
+    tag = "/" if spec.tag.strip("/") == "" else f"/{spec.tag.strip('/')}"
+    links: List[str] = []
+    if spec.docs.swagger:
+        links.append(_btn("Swagger", spec.docs.swagger, kind="solid"))
+    if spec.docs.redoc:
+        links.append(_btn("ReDoc", spec.docs.redoc, kind="outline"))
+    if spec.docs.openapi_json:
+        links.append(_btn("OpenAPI JSON", spec.docs.openapi_json, kind="outline"))
+    actions = "\n".join(links)
+
     return f"""
     <div class="card">
-      <div class="card-body">
-        <div class="tag">/{tag}</div>
-        <div class="actions">
-          <a class="cta" href="{v.docs_url}" aria-label="Open Swagger docs for {tag}">Swagger</a>
-          {redoc}
-          {openapi}
-        </div>
+      <div class="card__body">
+        <div class="chip">{tag}</div>
+        <div class="actions">{actions}</div>
       </div>
     </div>
     """.strip()
@@ -37,28 +49,12 @@ def render_index_html(
     *,
     service_name: str,
     release: str,
-    versions: Iterable[VersionLink],
-    root_docs_url: str | None,
-    root_redoc_url: str | None,
-    root_openapi_url: str | None,
+    cards: Iterable[CardSpec],
 ) -> str:
-    """
-    Nice landing page:
-      - Hero: service name + release + root docs buttons (if enabled)
-      - Grid of version cards: one card per version (no repeated service name)
-    """
-    # Root docs buttons (only if exposed)
-    root_btns = []
-    if root_docs_url:
-        root_btns.append(f'<a class="cta" href="{root_docs_url}">Root Swagger</a>')
-    if root_redoc_url:
-        root_btns.append(f'<a class="pill" href="{root_redoc_url}">Root ReDoc</a>')
-    if root_openapi_url:
-        root_btns.append(f'<a class="pill" href="{root_openapi_url}">Root OpenAPI JSON</a>')
-    root_buttons = " ".join(root_btns) if root_btns else ""
+    # Build card grid (Root first, then versions in caller order)
+    grid = "\n".join(_card(c) for c in cards)
 
-    cards = "\n".join(_card(v) for v in versions)
-
+    # Minimal, shadcn-ish design tokens
     return f"""
 <!doctype html>
 <html>
@@ -68,73 +64,125 @@ def render_index_html(
   <title>{service_name} • {release}</title>
   <style>
     :root {{
-      --bg:#0b0f14; --fg:#dbe3ec; --muted:#93a1b3; --card:#121821; --card2:#0f141c;
-      --accent:#4ea1ff; --border:#1e2633; --border2:#2b3a52;
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin:0; padding:28px; background:var(--bg); color:var(--fg);
-      font:500 16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";
-    }}
-    .hero {{
-      display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin-bottom:20px;
-    }}
-    h1 {{ margin:0; font-size:24px; letter-spacing:.2px; }}
-    .sub {{ color:var(--muted); }}
-    .hero .actions {{ display:flex; gap:10px; flex-wrap:wrap; }}
-    .cta {{
-      display:inline-block; padding:8px 14px; border-radius:10px; text-decoration:none; color:#0b0f14;
-      background:var(--accent); font-weight:600; transition:transform .06s ease;
-    }}
-    .cta:hover {{ transform:translateY(-1px); }}
-    .pill {{
-      display:inline-block; padding:6px 10px; border-radius:999px; text-decoration:none; color:#cfe3ff;
-      background:#142033; border:1px solid #20304a; font-size:13px;
-    }}
-    .grid {{
-      display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:16px;
-      margin-top:14px;
-    }}
-    .card {{
-      border:1px solid var(--border); border-radius:12px;
-      background:linear-gradient(180deg, var(--card), var(--card2));
-      transition: border-color .12s ease, transform .08s ease;
-    }}
-    .card:hover {{ border-color:var(--border2); transform: translateY(-1px); }}
-    .card-body {{ padding:16px; display:flex; flex-direction:column; gap:12px; }}
-    .tag {{
-      display:inline-block; font-size:13px; color:#b9c6d8; background:#1a2432; border:1px solid #223145;
-      padding:3px 10px; border-radius:999px;
-    }}
-    .actions {{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }}
-    footer {{
-      margin-top:28px; color:var(--muted); font-size:13px;
+      /* dark */
+      --bg: #0b0f14;
+      --fg: #e6edf3;
+      --muted: #9aa7b3;
+      --panel: #0f141b;
+      --panel-2: #0d1218;
+      --border: #1f2631;
+      --border-strong: #2b3546;
+      --brand: #4ea1ff;
+      --brand-ink: #0b0f14;
+
+      --radius: 12px;
+      --shadow: 0 1px 0 rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.24);
     }}
     @media (prefers-color-scheme: light) {{
       :root {{
-        --bg:#f7f9fc; --fg:#0b0f14; --muted:#516172; --card:#ffffff; --card2:#fbfbfb;
-        --border:#e1e7ef; --border2:#cfd8e4; --accent:#2563eb;
+        --bg: #f7f9fc;
+        --fg: #0b0f14;
+        --muted: #556171;
+        --panel: #ffffff;
+        --panel-2: #fafbfc;
+        --border: #e6ebf2;
+        --border-strong: #d7dfeb;
+        --brand: #2563eb;
+        --brand-ink: #ffffff;
       }}
-      .pill {{ color:#1b2b44; background:#eef2f9; border-color:#d9e3f2; }}
     }}
+
+    * {{ box-sizing: border-box; }}
+    html, body {{ height: 100%; }}
+    body {{
+      margin: 0;
+      padding: 28px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 500 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans";
+    }}
+
+    .container {{ max-width: 1100px; margin: 0 auto; }}
+
+    .header {{
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 18px;
+    }}
+    .title {{ margin: 0; font-size: 24px; letter-spacing: .2px; }}
+    .sub {{ color: var(--muted); font-size: 14px; }}
+
+    .grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }}
+
+    .card {{
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      transition: border-color .12s ease, transform .08s ease;
+    }}
+    .card:hover {{ border-color: var(--border-strong); transform: translateY(-1px); }}
+    .card__body {{ padding: 16px; display: grid; gap: 12px; }}
+
+    .chip {{
+      display: inline-block;
+      font-size: 12.5px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+    }}
+
+    .actions {{ display: flex; gap: 10px; flex-wrap: wrap; }}
+
+    .btn {{
+      display: inline-block;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--fg);
+      transition: transform .06s ease, border-color .12s ease, background .12s ease;
+    }}
+    .btn:hover {{ transform: translateY(-1px); border-color: var(--border-strong); }}
+    .btn.btn-outline {{ background: transparent; }}
+
+    /* “solid” look */
+    .btn:not(.btn-outline) {{
+      background: var(--brand);
+      color: var(--brand-ink);
+      border-color: transparent;
+    }}
+    .btn:not(.btn-outline):hover {{
+      filter: brightness(1.03);
+    }}
+
+    footer {{ margin-top: 22px; color: var(--muted); font-size: 13px; }}
   </style>
 </head>
 <body>
-  <header class="hero">
-    <div>
-      <h1>{service_name}</h1>
+  <div class="container">
+    <header class="header">
+      <h1 class="title">{service_name}</h1>
       <div class="sub">release {release}</div>
-    </div>
-    <div class="actions">{root_buttons}</div>
-  </header>
+    </header>
 
-  <section class="grid">
-    {cards}
-  </section>
+    <section class="grid">
+      {grid}
+    </section>
 
-  <footer>
-    Tip: each version card links to Swagger; ReDoc and raw OpenAPI are available as pills.
-  </footer>
+    <footer>
+      Tip: each card exposes Swagger, ReDoc, and OpenAPI JSON when available.
+    </footer>
+  </div>
 </body>
 </html>
     """.strip()

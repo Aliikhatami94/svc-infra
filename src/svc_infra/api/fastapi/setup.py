@@ -15,7 +15,7 @@ from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMi
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.routers import register_all_routers
-from svc_infra.api.fastapi.ui import VersionLink, render_index_html
+from svc_infra.api.fastapi.ui import CardSpec, DocTargets, render_index_html
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 logger = logging.getLogger(__name__)
@@ -166,31 +166,38 @@ def setup_service_api(
 
         @parent.get("/", include_in_schema=False)
         def index():
-            # Build per-version links (we know Swagger is at /{tag}/docs)
-            version_links: list[VersionLink] = []
+            cards: list[CardSpec] = []
+
+            # Root card first
+            cards.append(
+                CardSpec(
+                    tag="",  # renders as "/"
+                    docs=DocTargets(
+                        swagger="/docs",
+                        redoc="/redoc",
+                        openapi_json="/openapi.json",
+                    ),
+                )
+            )
+
+            # One card per version
             for spec in versions:
                 tag = spec.tag.strip("/")
-                version_links.append(
-                    VersionLink(
+                cards.append(
+                    CardSpec(
                         tag=tag,
-                        docs_url=f"/{tag}/docs",
-                        redoc_url=f"/{tag}/redoc",
-                        openapi_url=f"/{tag}/openapi.json",
+                        docs=DocTargets(
+                            swagger=f"/{tag}/docs",
+                            redoc=f"/{tag}/redoc",
+                            openapi_json=f"/{tag}/openapi.json",
+                        ),
                     )
                 )
-
-            # Root docs may be None outside local/dev, but we’re here only in local/dev
-            root_docs = "/docs"
-            root_redoc = "/redoc"
-            root_openapi = "/openapi.json"
 
             html = render_index_html(
                 service_name=service.name,
                 release=service.release,
-                versions=version_links,
-                root_docs_url=root_docs,
-                root_redoc_url=root_redoc,
-                root_openapi_url=root_openapi,
+                cards=cards,
             )
             return HTMLResponse(html)
 
