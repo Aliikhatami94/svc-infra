@@ -138,7 +138,7 @@ class EasyAppOptions(BaseModel):
 # ---------- Builders ----------
 
 
-def quick_service_api(
+def easy_service_api(
     *,
     name: str,
     release: str,
@@ -216,7 +216,7 @@ def easy_service_app(
         )
 
     # 4) App
-    app = quick_service_api(
+    app = easy_service_api(
         name=name,
         release=release,
         versions=versions,

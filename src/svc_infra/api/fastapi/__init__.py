@@ -1,6 +1,7 @@
 from .dual_router import DualAPIRouter, dualize_router
-from .easy import easy_service_app, quick_service_api
-from .setup import APIVersionSpec, ServiceInfo, setup_service_api
+from .easy import easy_service_api, easy_service_app
+from .models import APIVersionSpec, ServiceInfo
+from .setup import setup_service_api
 
 __all__ = [
     "DualAPIRouter",
@@ -8,6 +9,6 @@ __all__ = [
     "ServiceInfo",
     "APIVersionSpec",
     "setup_service_api",
-    "quick_service_api",
+    "easy_service_api",
     "easy_service_app",
 ]
