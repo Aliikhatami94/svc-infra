@@ -13,27 +13,25 @@ class DocTargets:
 
 @dataclass(frozen=True)
 class CardSpec:
-    tag: str  # "/", "v0", "v1" (no leading slash required)
+    tag: str  # "/", "v0", "v1" (pass "" for root)
     docs: DocTargets  # which endpoints to show
 
 
-def _btn(label: str, href: str, *, kind: str = "solid") -> str:
-    # kind: "solid" | "outline"
-    base = "btn"
-    cls = f"{base} {'btn-outline' if kind == 'outline' else ''}"
-    return f'<a class="{cls}" href="{href}">{label}</a>'
+def _btn(label: str, href: str) -> str:
+    # Uniform shadcn-ish button (all variants identical)
+    return f'<a class="btn" href="{href}">{label}</a>'
 
 
 def _card(spec: CardSpec) -> str:
     tag = "/" if spec.tag.strip("/") == "" else f"/{spec.tag.strip('/')}"
     links: List[str] = []
     if spec.docs.swagger:
-        links.append(_btn("Swagger", spec.docs.swagger, kind="solid"))
+        links.append(_btn("Swagger", spec.docs.swagger))
     if spec.docs.redoc:
-        links.append(_btn("ReDoc", spec.docs.redoc, kind="outline"))
+        links.append(_btn("ReDoc", spec.docs.redoc))
     if spec.docs.openapi_json:
-        links.append(_btn("OpenAPI JSON", spec.docs.openapi_json, kind="outline"))
-    actions = "\n".join(links)
+        links.append(_btn("OpenAPI JSON", spec.docs.openapi_json))
+    actions = "\n".join(links) if links else "<div class='muted'>No docs exposed</div>"
 
     return f"""
     <div class="card">
@@ -51,10 +49,8 @@ def render_index_html(
     release: str,
     cards: Iterable[CardSpec],
 ) -> str:
-    # Build card grid (Root first, then versions in caller order)
     grid = "\n".join(_card(c) for c in cards)
 
-    # Minimal, shadcn-ish design tokens
     return f"""
 <!doctype html>
 <html>
@@ -72,8 +68,12 @@ def render_index_html(
       --panel-2: #0d1218;
       --border: #1f2631;
       --border-strong: #2b3546;
-      --brand: #4ea1ff;
-      --brand-ink: #0b0f14;
+
+      --btn-bg: #121a24;
+      --btn-fg: #d7e2ee;
+      --btn-border: #223044;
+      --btn-hover-bg: #162130;
+      --btn-hover-border: #2a3b54;
 
       --radius: 12px;
       --shadow: 0 1px 0 rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.24);
@@ -87,8 +87,12 @@ def render_index_html(
         --panel-2: #fafbfc;
         --border: #e6ebf2;
         --border-strong: #d7dfeb;
-        --brand: #2563eb;
-        --brand-ink: #ffffff;
+
+        --btn-bg: #f6f8fc;
+        --btn-fg: #0b1220;
+        --btn-border: #dce5f2;
+        --btn-hover-bg: #eef3fb;
+        --btn-hover-border: #cfdbee;
       }}
     }}
 
@@ -99,7 +103,7 @@ def render_index_html(
       padding: 28px;
       background: var(--bg);
       color: var(--fg);
-      font: 500 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans";
+      font: 500 15px/1.5 system-ui, -apple-system, Segoe UI, Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans";
     }}
 
     .container {{ max-width: 1100px; margin: 0 auto; }}
@@ -137,33 +141,24 @@ def render_index_html(
       border: 1px solid var(--border);
       border-radius: 999px;
       padding: 6px 10px;
+      width: fit-content;
     }}
 
-    .actions {{ display: flex; gap: 10px; flex-wrap: wrap; }}
+    .actions {{ display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }}
+    .muted {{ color: var(--muted); font-size: 13px; }}
 
     .btn {{
       display: inline-block;
-      font-weight: 600;
       text-decoration: none;
+      font-weight: 600;
       border-radius: 10px;
       padding: 8px 12px;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      color: var(--fg);
+      border: 1px solid var(--btn-border);
+      background: var(--btn-bg);
+      color: var(--btn-fg);
       transition: transform .06s ease, border-color .12s ease, background .12s ease;
     }}
-    .btn:hover {{ transform: translateY(-1px); border-color: var(--border-strong); }}
-    .btn.btn-outline {{ background: transparent; }}
-
-    /* “solid” look */
-    .btn:not(.btn-outline) {{
-      background: var(--brand);
-      color: var(--brand-ink);
-      border-color: transparent;
-    }}
-    .btn:not(.btn-outline):hover {{
-      filter: brightness(1.03);
-    }}
+    .btn:hover {{ transform: translateY(-1px); background: var(--btn-hover-bg); border-color: var(--btn-hover-border); }}
 
     footer {{ margin-top: 22px; color: var(--muted); font-size: 13px; }}
   </style>

@@ -11,11 +11,11 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRoute
 
+from svc_infra.api.fastapi.landing import CardSpec, DocTargets, render_index_html
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.routers import register_all_routers
-from svc_infra.api.fastapi.ui import CardSpec, DocTargets, render_index_html
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 logger = logging.getLogger(__name__)
