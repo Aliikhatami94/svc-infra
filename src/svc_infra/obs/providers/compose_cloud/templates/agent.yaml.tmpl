@@ -15,34 +15,3 @@ metrics:
           basic_auth:
             username: ${GRAFANA_CLOUD_PROM_USERNAME}
             password: ${GRAFANA_CLOUD_RW_TOKEN}
-
-logs:
-  configs:
-    - name: svc-infra
-      clients:
-        - url: ${GRAFANA_CLOUD_LOKI_URL}   # e.g. https://logs-prod-XX.grafana.net/loki/api/v1/push
-          basic_auth:
-            username: ${GRAFANA_CLOUD_LOKI_USERNAME}
-            password: ${GRAFANA_CLOUD_LOKI_TOKEN}
-
-      # Prefer Docker autodiscovery of the app container's stdout
-      scrape_configs:
-        - job_name: app-stdout
-          docker_sd_configs:
-            - host: unix:///var/run/docker.sock
-          relabel_configs:
-            - source_labels: [__meta_docker_container_name]
-              target_label: container
-            - target_label: app
-              replacement: ${APP_NAME:svc-infra-app}
-            - target_label: environment
-              replacement: ${APP_ENV:local}
-
-        # Fallback: tail a file if you tee logs to disk
-        - job_name: app-file
-          static_configs:
-            - targets: [localhost]
-              labels:
-                __path__: ${APP_LOG_FILE:/var/log/app.log}
-                app: ${APP_NAME:svc-infra-app}
-                environment: ${APP_ENV:local}

@@ -1,28 +1,30 @@
-version: "3.9"
 services:
-  app:
-    image: your/app:latest
-    ports: ["8000:8000"]
+  agent:
+    image: grafana/agent:v0.38.1
+    command:
+      - --config.file=/etc/agent.yaml
+      - --config.expand-env
     environment:
-      - METRICS_ENABLED=true
-      - METRICS_PATH=/metrics
+      # --- Prometheus Remote Write (metrics) ---
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL}
+      GRAFANA_CLOUD_PROM_USERNAME: ${GRAFANA_CLOUD_PROM_USERNAME}
+      GRAFANA_CLOUD_RW_TOKEN: ${GRAFANA_CLOUD_RW_TOKEN}
 
-  grafana-agent:
-    image: grafana/agent:latest
-    command: ["/bin/grafana-agent","--config.file=/etc/agent/agent.yaml","--config.expand-env"]
-    environment:
-      # Grafana Cloud remote_write
-      - GRAFANA_CLOUD_PROM_URL=${GRAFANA_CLOUD_PROM_URL}
-      - GRAFANA_CLOUD_PROM_USERNAME=${GRAFANA_CLOUD_PROM_USERNAME}
-      - GRAFANA_CLOUD_TOKEN=${GRAFANA_CLOUD_TOKEN}
+      # --- App scrape hints (override via .env as needed) ---
+      APP_NAME: ${APP_NAME:-svc-infra-app}
+      APP_ENV: ${APP_ENV:-local}
+      APP_SCHEME: ${APP_SCHEME:-http}
+      METRICS_PATH: ${METRICS_PATH:-/metrics}
+      APP_HOST: ${APP_HOST:-host.docker.internal:8000}
+      SCRAPE_INTERVAL: ${SCRAPE_INTERVAL:-5s}
 
-      # Scrape target hints
-      - APP_HOST=${APP_HOST:-app:8000}
-      - APP_SCHEME=${APP_SCHEME:-http}
-      - METRICS_PATH=${METRICS_PATH:-/metrics}
-
-      # NEW: scrape interval for the agent (defaults to 5s)
-      - SCRAPE_INTERVAL=${SCRAPE_INTERVAL:-5s}
     volumes:
-      - ./agent.yaml:/etc/agent/agent.yaml:ro
-    depends_on: [app]
+      - type: bind
+        source: ./agent.yaml
+        target: /etc/agent.yaml
+        read_only: true
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    restart: unless-stopped

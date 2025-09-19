@@ -7,7 +7,6 @@ from typing import Sequence
 
 from svc_infra.app.env import CURRENT_ENVIRONMENT
 
-from .correlation import OTelTraceContextFilter
 from .filter import filter_logs_for_paths
 from .formats import (
     JsonFormatter,
@@ -70,9 +69,6 @@ def setup_logging(
             },
         }
     )
-
-    # Attach OTel correlation to root logger (after dictConfig)
-    logging.getLogger().addFilter(OTelTraceContextFilter())
 
     # Access-log path filter
     enabled_envs = _env_name_list_to_enum_values(filter_envs)
