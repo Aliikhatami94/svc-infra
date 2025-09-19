@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from ...app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from ..settings import ObservabilitySettings
 from .base import counter, gauge, histogram, registry
 
@@ -243,12 +244,16 @@ def add_prometheus(app, *, path: str = "/metrics", skip_paths: Optional[Iterable
         PrometheusMiddleware,
         skip_paths=skip_paths or (path, "/health", "/healthz"),
     )
-    # Add route
+
     try:
         from svc_infra.api.fastapi import DualAPIRouter
 
         router = DualAPIRouter()
-        router.add_api_route(path, endpoint=metrics_endpoint(), include_in_schema=False)
+        router.add_api_route(
+            path,
+            endpoint=metrics_endpoint(),
+            include_in_schema=CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV),
+        )
         app.include_router(router)
     except Exception:
         app.add_route(path, metrics_endpoint())
