@@ -8,12 +8,14 @@ from typing import Iterable, Sequence
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRoute
 
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.routers import register_all_routers
+from svc_infra.api.fastapi.ui import VersionLink, render_index_html
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 logger = logging.getLogger(__name__)
@@ -161,72 +163,35 @@ def setup_service_api(
         _set_servers(child, spec.public_base_url, mount_path)
 
     if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV):
-        from fastapi.responses import HTMLResponse
 
         @parent.get("/", include_in_schema=False)
         def index():
-            items = "\n".join(
-                f"""
-                <a class="card" href="/{spec.tag.strip('/')}/docs">
-                  <div class="card-body">
-                    <div class="tag">/{spec.tag.strip('/')}</div>
-                    <div class="title">{service.name}</div>
-                    <div class="meta">OpenAPI docs</div>
-                  </div>
-                </a>
-                """.strip()
-                for spec in versions
+            # Build per-version links (we know Swagger is at /{tag}/docs)
+            version_links: list[VersionLink] = []
+            for spec in versions:
+                tag = spec.tag.strip("/")
+                version_links.append(
+                    VersionLink(
+                        tag=tag,
+                        docs_url=f"/{tag}/docs",
+                        redoc_url=f"/{tag}/redoc",
+                        openapi_url=f"/{tag}/openapi.json",
+                    )
+                )
+
+            # Root docs may be None outside local/dev, but we’re here only in local/dev
+            root_docs = "/docs"
+            root_redoc = "/redoc"
+            root_openapi = "/openapi.json"
+
+            html = render_index_html(
+                service_name=service.name,
+                release=service.release,
+                versions=version_links,
+                root_docs_url=root_docs,
+                root_redoc_url=root_redoc,
+                root_openapi_url=root_openapi,
             )
-            html = f"""
-            <!doctype html>
-            <html>
-            <head>
-              <meta charset="utf-8"/>
-              <meta name="viewport" content="width=device-width, initial-scale=1"/>
-              <title>{service.name} • {service.release}</title>
-              <style>
-                :root {{
-                  --bg: #0b0f14; --fg: #dbe3ec; --muted: #93a1b3; --card:#121821; --card2:#0f141c; --accent:#4ea1ff;
-                }}
-                * {{ box-sizing: border-box; }}
-                body {{
-                  margin: 0; padding: 32px; background: var(--bg); color: var(--fg);
-                  font: 500 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
-                }}
-                h1 {{ margin: 0 0 8px; font-size: 24px; }}
-                .sub {{ color: var(--muted); margin-bottom: 24px; }}
-                .grid {{
-                  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;
-                }}
-                .card {{
-                  display: block; text-decoration: none; color: inherit; background: linear-gradient(180deg, var(--card), var(--card2));
-                  border: 1px solid #1e2633; border-radius: 12px; transition: transform .08s ease, border-color .12s ease;
-                }}
-                .card:hover {{ transform: translateY(-1px); border-color: #2b3a52; }}
-                .card-body {{ padding: 16px; }}
-                .tag {{
-                  display:inline-block; font-size:12px; color:#b9c6d8; background:#1a2432; border:1px solid #223145;
-                  padding:2px 8px; border-radius:8px; margin-bottom:10px;
-                }}
-                .title {{ font-size:16px; font-weight:600; margin-bottom:4px; }}
-                .meta {{ font-size:13px; color: var(--muted); }}
-                .row {{ display:flex; gap:16px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }}
-                .row a.link {{ color: var(--accent); text-decoration: none; border-bottom: 1px dashed transparent; }}
-                .row a.link:hover {{ border-bottom-color: var(--accent); }}
-              </style>
-            </head>
-            <body>
-              <div class="row">
-                <h1>{service.name}</h1>
-                <div class="sub">release {service.release}</div>
-                <a class="link" href="/docs">Root docs</a>
-              </div>
-              <div class="grid">
-                {items}
-              </div>
-            </body>
-            </html>
-            """
             return HTMLResponse(html)
 
     return parent

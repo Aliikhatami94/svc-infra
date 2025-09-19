@@ -253,6 +253,7 @@ def add_prometheus(app, *, path: str = "/metrics", skip_paths: Optional[Iterable
             path,
             endpoint=metrics_endpoint(),
             include_in_schema=CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV),
+            tags=["observability"],
         )
         app.include_router(router)
     except Exception:
