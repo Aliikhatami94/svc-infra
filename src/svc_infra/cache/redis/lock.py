@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from redis.asyncio import Redis
 
 
@@ -8,20 +10,19 @@ class RedisLock:
         self.redis = redis
         self.key = key
         self.ttl = ttl
-        self.token: bytes | None = None
+        self.acquired = False
 
     async def __aenter__(self):
-        # Spin a little; simple & good enough for stampede avoidance
         for _ in range(50):
             if await self.redis.set(self.key, b"1", nx=True, ex=self.ttl):
-                self.token = b"1"
+                self.acquired = True
                 return self
-            # brief backoff
-            await self.redis.wait(1, timeout=0.01)  # cheap yield
-        return self
+            await asyncio.sleep(0.02)  # tiny backoff
+        return self  # not acquired
 
     async def __aexit__(self, exc_type, exc, tb):
         try:
-            await self.redis.delete(self.key)
+            if self.acquired:
+                await self.redis.delete(self.key)
         except Exception:
             pass
