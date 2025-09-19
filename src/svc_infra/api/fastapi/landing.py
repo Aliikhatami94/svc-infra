@@ -6,19 +6,18 @@ from typing import Iterable, List, Optional
 
 @dataclass(frozen=True)
 class DocTargets:
-    swagger: Optional[str] = None  # e.g. "/docs" or "/v0/docs"
-    redoc: Optional[str] = None  # e.g. "/redoc" or "/v0/redoc"
-    openapi_json: Optional[str] = None  # e.g. "/openapi.json" or "/v0/openapi.json"
+    swagger: Optional[str] = None
+    redoc: Optional[str] = None
+    openapi_json: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class CardSpec:
-    tag: str  # "/", "v0", "v1" (pass "" for root)
-    docs: DocTargets  # which endpoints to show
+    tag: str
+    docs: DocTargets
 
 
 def _btn(label: str, href: str) -> str:
-    # Uniform shadcn-ish button (all variants identical)
     return f'<a class="btn" href="{href}">{label}</a>'
 
 
@@ -60,7 +59,6 @@ def render_index_html(
   <title>{service_name} • {release}</title>
   <style>
     :root {{
-      /* dark */
       --bg: #0b0f14;
       --fg: #e6edf3;
       --muted: #9aa7b3;
@@ -103,7 +101,7 @@ def render_index_html(
       padding: 28px;
       background: var(--bg);
       color: var(--fg);
-      font: 500 15px/1.5 system-ui, -apple-system, Segoe UI, Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+      font: 500 15px/1.5 system-ui,-apple-system,Segoe UI,Inter,Roboto,"Helvetica Neue",Arial,"Noto Sans";
     }}
 
     .container {{ max-width: 1100px; margin: 0 auto; }}
@@ -119,7 +117,7 @@ def render_index_html(
 
     .grid {{
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 14px;
     }}
 
@@ -135,24 +133,27 @@ def render_index_html(
 
     .chip {{
       display: inline-block;
-      font-size: 12.5px;
-      color: var(--muted);
-      background: transparent;
-      border: 1px solid var(--border);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--fg);
+      background: #1c2736;
+      border: 1px solid var(--border-strong);
       border-radius: 999px;
-      padding: 6px 10px;
+      padding: 6px 14px;
       width: fit-content;
+      letter-spacing: .3px;
     }}
 
-    .actions {{ display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }}
+    .actions {{ display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }}
     .muted {{ color: var(--muted); font-size: 13px; }}
 
     .btn {{
       display: inline-block;
       text-decoration: none;
-      font-weight: 600;
-      border-radius: 10px;
-      padding: 8px 12px;
+      font-weight: 500;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
       border: 1px solid var(--btn-border);
       background: var(--btn-bg);
       color: var(--btn-fg);
