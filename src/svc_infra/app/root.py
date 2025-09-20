@@ -15,7 +15,7 @@ DEFAULT_SENTRIES: tuple[str, ...] = (
     "migrations/script.py.mako",
     "pyproject.toml",
     "setup.cfg",
-    "setup.py",
+    "decorators.py",
     "Pipfile",
     "requirements.txt",
     "poetry.lock",

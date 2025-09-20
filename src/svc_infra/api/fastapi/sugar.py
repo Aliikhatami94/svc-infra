@@ -1,4 +1,3 @@
-# svc_infra/api/fastapi/sugar.py
 from __future__ import annotations
 
 import os
