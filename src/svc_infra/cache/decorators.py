@@ -1,3 +1,10 @@
+"""
+Cache decorators and utilities for read/write operations.
+
+This module provides high-level decorators for caching read operations,
+invalidating cache on write operations, and managing cache recaching strategies.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -13,27 +20,47 @@ from svc_infra.cache.backend import alias as _alias
 from svc_infra.cache.backend import setup_cache as _setup_cache
 from svc_infra.cache.backend import wait_ready as _wait_ready
 
-from . import backend
-from .ttl import TTL_DEFAULT
+from .ttl import validate_ttl
+from .utils import normalize_cache_key, validate_cache_key
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-# ---------- init ----------
+# ---------- Cache Initialization ----------
+
+
 def init_cache(
     *, url: str | None = None, prefix: str | None = None, version: str | None = None
 ) -> None:
+    """
+    Initialize cache synchronously.
+
+    Args:
+        url: Cache backend URL
+        prefix: Cache key prefix
+        version: Cache version
+    """
     _setup_cache(url=url, prefix=prefix, version=version)
 
 
 async def init_cache_async(
     *, url: str | None = None, prefix: str | None = None, version: str | None = None
 ) -> None:
+    """
+    Initialize cache asynchronously and wait for readiness.
+
+    Args:
+        url: Cache backend URL
+        prefix: Cache key prefix
+        version: Cache version
+    """
     _setup_cache(url=url, prefix=prefix, version=version)
     await _wait_ready()
 
 
-# ---------- cache_read (reads) ----------
+# ---------- Cache Read Operations ----------
+
+
 def cache_read(
     *,
     key: Union[str, tuple[str, ...]],
@@ -43,111 +70,175 @@ def cache_read(
     refresh: Optional[bool] = None,
 ):
     """
-    Version-resilient wrapper over cashews @cache:
-      - Tuple keys become a template string WITHOUT formatting placeholders.
-      - Prefer passing prefix=alias(); fall back to embedding alias in key.
-      - Pass (ttl, key) positionally; all else by keyword to avoid 'condition' arg.
-      - Publishes __svc_key_variants__(**kwargs) on the wrapped function so writers
-        can delete the exact physical key(s) before recaching.
-    """
-    ttl_val = TTL_DEFAULT if ttl is None else ttl
+    Cache decorator for read operations with version-resilient key handling.
 
-    def _base_template() -> str:
+    This decorator wraps functions to cache their results using the cashews library.
+    It handles tuple keys by converting them to template strings and applies
+    namespace prefixes automatically.
+
+    Args:
+        key: Cache key template (string or tuple of strings)
+        ttl: Time to live in seconds (defaults to TTL_DEFAULT)
+        tags: Cache tags for invalidation (static list or callable)
+        early_ttl: Early expiration time for cache warming
+        refresh: Whether to refresh cache on access
+
+    Returns:
+        Decorated function with caching capabilities
+
+    Example:
+        @cache_read(key="user:{user_id}:profile", ttl=300)
+        async def get_user_profile(user_id: int):
+            return await fetch_profile(user_id)
+    """
+    ttl_val = validate_ttl(ttl)
+
+    def _build_key_template() -> str:
+        """Convert key to template string."""
         if isinstance(key, tuple):
-            parts = [p for p in key if p]
-            return ":".join(p.strip(":") for p in parts)
+            parts = [part for part in key if part]
+            return ":".join(part.strip(":") for part in parts)
         return str(key)
 
-    def _make_tags_fn(tags_param):
+    def _create_tags_function(tags_param):
+        """Create a tags function that handles various tag input types."""
         if tags_param is None:
+            return lambda *_args, **_kwargs: []
 
-            def _no_tags(*_a, **_kw):
-                return []
-
-            return _no_tags
         if callable(tags_param):
 
-            def _call_tags(*args, **kwargs):
-                out = tags_param(*args, **kwargs)
-                return list(out) if out is not None else []
-
-            return _call_tags
-        static = list(tags_param)
-
-        def _static(*_a, **_kw):
-            return static
-
-        return _static
-
-    def _build_renderer(tmpl: str) -> Callable[..., list[str]]:
-        """
-        Build a function that, given getter kwargs, returns all plausible
-        physical keys for this entry (with and without alias prefix).
-        """
-        ns = _alias() or ""
-
-        def _variants(**kw) -> list[str]:
-            try:
-                rendered = tmpl.format(**kw)
-            except KeyError:
-                return []
-            with_ns = f"{ns}:{rendered}" if ns and not rendered.startswith(f"{ns}:") else rendered
-            without_ns = rendered if not rendered.startswith(f"{ns}:") else rendered[len(ns) + 1 :]
-            out: list[str] = []
-            for k in (with_ns, without_ns):
-                if k and k not in out:
-                    out.append(k)
-            return out
-
-        return _variants
-
-    def _decorator(fn: Callable[..., Awaitable[Any]]):
-        tmpl = _base_template()
-        ns = _alias() or ""
-        tags_fn = _make_tags_fn(tags)
-
-        # Prefer router-friendly call with prefix; fall back if unsupported.
-        try:
-            wrapped = _cache.cache(
-                ttl_val, tmpl, tags=tags_fn, prefix=ns, early_ttl=early_ttl, refresh=refresh
-            )(fn)
-        except TypeError:
-            try:
-                wrapped = _cache.cache(ttl_val, tmpl, tags=tags_fn, prefix=ns)(fn)
-            except TypeError:
-                key_with_ns = f"{ns}:{tmpl}" if ns and not tmpl.startswith(f"{ns}:") else tmpl
+            def _callable_tags(*args, **kwargs):
                 try:
-                    wrapped = _cache.cache(
-                        ttl_val, key_with_ns, tags=tags_fn, early_ttl=early_ttl, refresh=refresh
-                    )(fn)
-                except TypeError:
-                    try:
-                        wrapped = _cache.cache(ttl_val, key_with_ns, tags=tags_fn)(fn)
-                    except TypeError:
-                        wrapped = _cache.cache(ttl_val, key_with_ns)(fn)
+                    result = tags_param(*args, **kwargs)
+                    return list(result) if result is not None else []
+                except Exception as e:
+                    logger.warning(f"Tags function failed: {e}")
+                    return []
 
-        # 👉 Publish a renderer so writers can delete the exact key(s)
-        setattr(wrapped, "__svc_key_variants__", _build_renderer(tmpl))
+            return _callable_tags
+
+        # Static tags
+        static_tags = list(tags_param)
+        return lambda *_args, **_kwargs: static_tags
+
+    def _build_key_variants_renderer(template: str) -> Callable[..., list[str]]:
+        """
+        Build a function that generates all possible cache key variants.
+
+        This is used by cache writers to delete exact keys before recaching.
+        """
+        namespace = _alias() or ""
+
+        def _get_variants(**kwargs) -> list[str]:
+            try:
+                rendered_key = template.format(**kwargs)
+                rendered_key = validate_cache_key(rendered_key)
+            except (KeyError, ValueError) as e:
+                logger.warning(f"Failed to render cache key template '{template}': {e}")
+                return []
+
+            variants = []
+
+            # With namespace prefix
+            if namespace and not rendered_key.startswith(f"{namespace}:"):
+                with_namespace = f"{namespace}:{rendered_key}"
+                variants.append(with_namespace)
+
+            # Without namespace prefix (fallback)
+            if not namespace or not rendered_key.startswith(f"{namespace}:"):
+                variants.append(rendered_key)
+            elif namespace and rendered_key.startswith(f"{namespace}:"):
+                without_namespace = rendered_key[len(namespace) + 1 :]
+                if without_namespace:
+                    variants.append(without_namespace)
+
+            # Remove duplicates while preserving order
+            unique_variants = []
+            for variant in variants:
+                if variant and variant not in unique_variants:
+                    unique_variants.append(variant)
+
+            return unique_variants
+
+        return _get_variants
+
+    def _decorator(func: Callable[..., Awaitable[Any]]):
+        template = _build_key_template()
+        namespace = _alias() or ""
+        tags_func = _create_tags_function(tags)
+
+        # Try different cashews cache decorator signatures for compatibility
+        cache_kwargs = {"tags": tags_func}
+        if early_ttl is not None:
+            cache_kwargs["early_ttl"] = early_ttl
+        if refresh is not None:
+            cache_kwargs["refresh"] = refresh
+
+        wrapped = None
+        error_msgs = []
+
+        # Attempt 1: With prefix parameter (preferred)
+        if namespace:
+            try:
+                wrapped = _cache.cache(ttl_val, template, prefix=namespace, **cache_kwargs)(func)
+            except TypeError as e:
+                error_msgs.append(f"prefix parameter: {e}")
+
+        # Attempt 2: With embedded namespace in key
+        if wrapped is None:
+            try:
+                key_with_namespace = (
+                    f"{namespace}:{template}"
+                    if namespace and not template.startswith(f"{namespace}:")
+                    else template
+                )
+                wrapped = _cache.cache(ttl_val, key_with_namespace, **cache_kwargs)(func)
+            except TypeError as e:
+                error_msgs.append(f"embedded namespace: {e}")
+
+        # Attempt 3: Minimal fallback
+        if wrapped is None:
+            try:
+                key_with_namespace = f"{namespace}:{template}" if namespace else template
+                wrapped = _cache.cache(ttl_val, key_with_namespace)(func)
+            except Exception as e:
+                error_msgs.append(f"minimal fallback: {e}")
+                logger.error(f"All cache decorator attempts failed: {error_msgs}")
+                raise RuntimeError(f"Failed to apply cache decorator: {error_msgs[-1]}") from e
+
+        # Attach key variants renderer for cache writers
+        setattr(wrapped, "__svc_key_variants__", _build_key_variants_renderer(template))
 
         return wrapped
 
     return _decorator
 
 
-# Back-compat alias
+# Back-compatibility alias
 cached = cache_read
 
 
-# ---------- recache support ----------
+# ---------- Recache Support ----------
+
+
 @dataclass(frozen=True)
 class RecachePlan:
+    """
+    Configuration for recaching operations after cache invalidation.
+
+    Attributes:
+        getter: The async function to call for recaching
+        include: Parameter names to pass through from mutation
+        rename: Mapping of mutation parameter names to getter parameter names
+        extra: Additional fixed parameters for the getter
+        key: Optional cache key template for deletion before warming
+    """
+
     getter: Callable[..., Awaitable[Any]]
-    include: Optional[Iterable[str]] = None  # pass-through mutation kwarg names
-    rename: Optional[dict[str, str]] = None  # mutation_kw -> getter_kw
-    extra: Optional[dict[str, Any]] = None  # fixed kwargs
-    key: Optional[Union[str, tuple[str, ...]]] = (
-        None  # optional concrete key template for delete-before-warm
-    )
+    include: Optional[Iterable[str]] = None
+    rename: Optional[dict[str, str]] = None
+    extra: Optional[dict[str, Any]] = None
+    key: Optional[Union[str, tuple[str, ...]]] = None
 
 
 def recache(
@@ -158,80 +249,144 @@ def recache(
     extra: Optional[dict[str, Any]] = None,
     key: Optional[Union[str, tuple[str, ...]]] = None,
 ) -> RecachePlan:
+    """
+    Create a recache plan for cache warming after invalidation.
+
+    Args:
+        getter: Async function to call for recaching
+        include: Parameter names to include from mutation
+        rename: Parameter name mappings (mutation -> getter)
+        extra: Additional fixed parameters
+        key: Cache key template for precise deletion
+
+    Returns:
+        RecachePlan instance
+    """
     return RecachePlan(getter=getter, include=include, rename=rename, extra=extra, key=key)
 
 
 RecacheSpec = Union[
     Callable[..., Awaitable[Any]],
     RecachePlan,
-    tuple[Callable[..., Awaitable[Any]], Any],  # legacy (getter, mapping_or_builder)
+    tuple[Callable[..., Awaitable[Any]], Any],  # Legacy format
 ]
 
 
+# ---------- Tag Invalidation ----------
+
+
 async def invalidate_tags(*tags: str) -> int:
-    """Best-effort tag invalidation across cashews variants."""
+    """
+    Invalidate cache entries by tags with fallback strategies.
+
+    This function tries multiple approaches to invalidate cache tags,
+    providing compatibility across different cashews versions.
+
+    Args:
+        *tags: Cache tags to invalidate
+
+    Returns:
+        Number of invalidated entries (best effort)
+    """
     if not tags:
         return 0
-    # Newer: invalidate(tags=[...])
-    try:
-        res = await _cache.invalidate(tags=list(tags))  # type: ignore[call-arg]
-        return int(res) if isinstance(res, int) else 0
-    except TypeError:
-        pass
-    except Exception:
-        pass
-    # Older: invalidate(*tags)
-    try:
-        res = await _cache.invalidate(*tags)  # type: ignore[misc]
-        return int(res) if isinstance(res, int) else 0
-    except Exception:
-        pass
-    # Fallbacks
+
     count = 0
-    for t in tags:
-        for meth in ("delete_tag", "invalidate_tag", "tag_invalidate"):
-            if hasattr(_cache, meth):
+
+    # Strategy 1: Modern cashews invalidate with tags parameter
+    try:
+        result = await _cache.invalidate(tags=list(tags))
+        return int(result) if isinstance(result, int) else len(tags)
+    except (TypeError, AttributeError):
+        pass
+    except Exception as e:
+        logger.warning(f"Modern tag invalidation failed: {e}")
+
+    # Strategy 2: Legacy cashews invalidate with positional args
+    try:
+        result = await _cache.invalidate(*tags)
+        return int(result) if isinstance(result, int) else len(tags)
+    except (TypeError, AttributeError):
+        pass
+    except Exception as e:
+        logger.warning(f"Legacy tag invalidation failed: {e}")
+
+    # Strategy 3: Individual tag methods
+    for tag in tags:
+        for method_name in ("delete_tag", "invalidate_tag", "tag_invalidate"):
+            if hasattr(_cache, method_name):
                 try:
-                    res = await getattr(_cache, meth)(t)  # type: ignore[call-arg]
-                    count += int(res) if isinstance(res, int) else 1
+                    method = getattr(_cache, method_name)
+                    result = await method(tag)
+                    count += int(result) if isinstance(result, int) else 1
                     break
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Tag method {method_name} failed for tag {tag}: {e}")
                     continue
         else:
-            for meth in ("delete_match", "invalidate_match", "invalidate"):
-                if hasattr(_cache, meth):
+            # Strategy 4: Pattern matching fallback
+            for method_name in ("delete_match", "invalidate_match", "invalidate"):
+                if hasattr(_cache, method_name):
                     try:
-                        res = await getattr(_cache, meth)(f"*{t}*")  # type: ignore[call-arg]
-                        count += int(res) if isinstance(res, int) else 1
+                        method = getattr(_cache, method_name)
+                        pattern = f"*{tag}*"
+                        result = await method(pattern)
+                        count += int(result) if isinstance(result, int) else 1
                         break
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Pattern method {method_name} failed for tag {tag}: {e}")
                         continue
+
     return count
 
 
-def _key_variants(tmpl: Union[str, tuple[str, ...]], params: dict[str, Any]) -> list[str]:
-    # 1) join tuple without formatting at decoration-time, but DO render now:
-    if isinstance(tmpl, tuple):
-        parts = [p for p in tmpl if p]
-        template = ":".join(p.strip(":") for p in parts)
-    else:
-        template = str(tmpl)
+def _generate_key_variants(
+    template: Union[str, tuple[str, ...]], params: dict[str, Any]
+) -> list[str]:
+    """
+    Generate all possible cache key variants for deletion.
+
+    Args:
+        template: Key template (string or tuple)
+        params: Template parameters
+
+    Returns:
+        List of possible cache key variants
+    """
     try:
-        concrete = template.format(**params)  # render placeholders now
-    except KeyError:
+        normalized_key = normalize_cache_key(template, **params)
+        validated_key = validate_cache_key(normalized_key)
+    except (KeyError, ValueError) as e:
+        logger.warning(f"Failed to generate key variants: {e}")
         return []
-    ns = _alias() or ""
-    with_ns = f"{ns}:{concrete}" if ns and not concrete.startswith(f"{ns}:") else concrete
-    without_ns = concrete if not concrete.startswith(f"{ns}:") else concrete[len(ns) + 1 :]
-    # return unique, keep order
-    out = []
-    for k in (with_ns, without_ns):
-        if k and k not in out:
-            out.append(k)
-    return out
+
+    namespace = _alias() or ""
+    variants = []
+
+    # Add namespaced version
+    if namespace and not validated_key.startswith(f"{namespace}:"):
+        variants.append(f"{namespace}:{validated_key}")
+
+    # Add non-namespaced version
+    if not namespace or not validated_key.startswith(f"{namespace}:"):
+        variants.append(validated_key)
+    elif namespace and validated_key.startswith(f"{namespace}:"):
+        without_namespace = validated_key[len(namespace) + 1 :]
+        if without_namespace:
+            variants.append(without_namespace)
+
+    # Remove duplicates while preserving order
+    unique_variants = []
+    for variant in variants:
+        if variant and variant not in unique_variants:
+            unique_variants.append(variant)
+
+    return unique_variants
 
 
-# ---------- cache_write (writes) ----------
+# ---------- Cache Write Operations ----------
+
+
 def cache_write(
     *,
     tags: Union[Iterable[str], Callable[..., Iterable[str]]],
@@ -239,135 +394,179 @@ def cache_write(
     recache_max_concurrency: int = 5,
 ):
     """
-    Decorator for POST/PUT/DELETE:
-      1) invalidate tags
-      2) optionally recache reads (delete exact key when provided to guarantee recompute)
+    Cache invalidation decorator for write operations.
+
+    This decorator invalidates cache tags after write operations and
+    optionally recaches dependent data to warm the cache.
+
+    Args:
+        tags: Cache tags to invalidate (static list or callable)
+        recache: Specifications for recaching operations
+        recache_max_concurrency: Maximum concurrent recache operations
+
+    Returns:
+        Decorated function with cache invalidation
+
+    Example:
+        @cache_write(
+            tags=["user:{user_id}"],
+            recache=[recache(get_user_profile, include=["user_id"])]
+        )
+        async def update_user(user_id: int, data: dict):
+            return await save_user(user_id, data)
     """
 
     def _resolve_tags(*args, **kwargs) -> list[str]:
-        if callable(tags):
-            return list(tags(*args, **kwargs))
-        return list(tags)
+        """Resolve tags from static list or callable."""
+        try:
+            if callable(tags):
+                result = tags(*args, **kwargs)
+                return list(result) if result is not None else []
+            return list(tags)
+        except Exception as e:
+            logger.error(f"Failed to resolve cache tags: {e}")
+            return []
 
-    def _kwargs_for_getter(spec, mut_args, mut_kwargs):
-        # Preferred: RecachePlan
+    def _build_getter_kwargs(
+        spec: RecacheSpec, mut_args: tuple, mut_kwargs: dict
+    ) -> tuple[Callable, dict]:
+        """Build keyword arguments for getter function from mutation parameters."""
+
+        # Handle RecachePlan objects
         if isinstance(spec, RecachePlan):
             getter = spec.getter
-            gparams = signature(getter).parameters
+            getter_params = signature(getter).parameters
             call_kwargs: dict[str, Any] = {}
 
-            source = dict(mut_kwargs)
+            # Include specified parameters
+            source_params = dict(mut_kwargs)
             if spec.include:
-                keep = set(spec.include)
-                source = {k: v for k, v in source.items() if k in keep}
+                include_set = set(spec.include)
+                source_params = {k: v for k, v in source_params.items() if k in include_set}
 
+            # Apply parameter renaming
             if spec.rename:
-                for src_k, dst_k in spec.rename.items():
-                    if src_k in mut_kwargs and dst_k in gparams:
-                        call_kwargs[dst_k] = mut_kwargs[src_k]
+                for src_name, dst_name in spec.rename.items():
+                    if src_name in mut_kwargs and dst_name in getter_params:
+                        call_kwargs[dst_name] = mut_kwargs[src_name]
 
-            for name in gparams.keys():
-                if name not in call_kwargs and name in source:
-                    call_kwargs[name] = source[name]
+            # Add direct parameter matches
+            for param_name in getter_params.keys():
+                if param_name not in call_kwargs and param_name in source_params:
+                    call_kwargs[param_name] = source_params[param_name]
 
+            # Add extra parameters
             if spec.extra:
-                for k, v in spec.extra.items():
-                    if k in gparams:
-                        call_kwargs[k] = v
+                for param_name, value in spec.extra.items():
+                    if param_name in getter_params:
+                        call_kwargs[param_name] = value
 
-            call_kwargs = {k: v for k, v in call_kwargs.items() if k in gparams}
-            for name, p in gparams.items():
-                if p.default is Parameter.empty and name not in call_kwargs:
-                    log.debug(
-                        "recache missing required arg '%s' for %r",
-                        name,
-                        getattr(getter, "__name__", getter),
+            # Filter to only include valid parameters
+            call_kwargs = {k: v for k, v in call_kwargs.items() if k in getter_params}
+
+            # Check for missing required parameters
+            for param_name, param in getter_params.items():
+                if param.default is Parameter.empty and param_name not in call_kwargs:
+                    logger.debug(
+                        f"Recache missing required parameter '{param_name}' for {getattr(getter, '__name__', getter)}"
                     )
+
             return getter, call_kwargs
 
-        # Legacy: (getter, mapping_or_builder)
+        # Handle legacy tuple format
         if isinstance(spec, tuple):
             getter, mapping_or_builder = spec
-            gparams = signature(getter).parameters
+            getter_params = signature(getter).parameters
             call_kwargs: dict[str, Any] = {}
 
             if callable(mapping_or_builder):
-                produced = mapping_or_builder(*mut_args, **mut_kwargs) or {}
-                if isinstance(produced, dict):
-                    for k, v in produced.items():
-                        if k in gparams:
-                            call_kwargs[k] = v
+                try:
+                    produced = mapping_or_builder(*mut_args, **mut_kwargs) or {}
+                    if isinstance(produced, dict):
+                        for param_name, value in produced.items():
+                            if param_name in getter_params:
+                                call_kwargs[param_name] = value
+                except Exception as e:
+                    logger.warning(f"Recache mapping function failed: {e}")
             elif isinstance(mapping_or_builder, dict):
-                for gk, source in mapping_or_builder.items():
-                    if gk not in gparams:
+                for getter_param, source in mapping_or_builder.items():
+                    if getter_param not in getter_params:
                         continue
-                    if callable(source):
-                        try:
-                            call_kwargs[gk] = source(*mut_args, **mut_kwargs)
-                        except Exception:
-                            continue
-                    else:
-                        if isinstance(source, str) and source in mut_kwargs:
-                            call_kwargs[gk] = mut_kwargs[source]
+                    try:
+                        if callable(source):
+                            call_kwargs[getter_param] = source(*mut_args, **mut_kwargs)
+                        elif isinstance(source, str) and source in mut_kwargs:
+                            call_kwargs[getter_param] = mut_kwargs[source]
+                    except Exception as e:
+                        logger.warning(f"Recache parameter mapping failed for {getter_param}: {e}")
 
-            for name in gparams.keys():
-                if name not in call_kwargs and name in mut_kwargs:
-                    call_kwargs[name] = mut_kwargs[name]
+            # Add direct parameter matches
+            for param_name in getter_params.keys():
+                if param_name not in call_kwargs and param_name in mut_kwargs:
+                    call_kwargs[param_name] = mut_kwargs[param_name]
 
-            call_kwargs = {k: v for k, v in call_kwargs.items() if k in gparams}
+            call_kwargs = {k: v for k, v in call_kwargs.items() if k in getter_params}
             return getter, call_kwargs
 
-        # Simple: spec is the getter
+        # Handle simple getter function
         getter = spec
-        gparams = signature(getter).parameters
-        return getter, {k: v for k, v in mut_kwargs.items() if k in gparams}
+        getter_params = signature(getter).parameters
+        call_kwargs = {k: v for k, v in mut_kwargs.items() if k in getter_params}
+        return getter, call_kwargs
 
-    def _render_key_template(
-        tmpl: Union[str, tuple[str, ...]], params: dict[str, Any]
-    ) -> Optional[str]:
-        if isinstance(tmpl, tuple):
-            parts = [p for p in tmpl if p]
-            template = ":".join(p.strip(":") for p in parts)
-        else:
-            template = str(tmpl)
-        try:
-            concrete = template.format(**params)  # now we DO render
-        except KeyError:
-            return None
-        ns = _alias() or ""
-        return f"{ns}:{concrete}" if ns and not concrete.startswith(f"{ns}:") else concrete
-
-    async def _do_recache(specs, *mut_args, **mut_kwargs):
+    async def _execute_recache(specs: Iterable[RecacheSpec], *mut_args, **mut_kwargs) -> None:
+        """Execute recache operations with concurrency control."""
         if not specs:
             return
-        sem = asyncio.Semaphore(recache_max_concurrency)
 
-        async def _run_one(spec):
-            async with sem:
-                getter, call_kwargs = _kwargs_for_getter(spec, mut_args, mut_kwargs)
+        semaphore = asyncio.Semaphore(recache_max_concurrency)
 
-                # If RecachePlan.key is provided, delete the exact cache key first.
-                if isinstance(spec, RecachePlan) and spec.key is not None:
-                    for k in _key_variants(spec.key, call_kwargs):
-                        try:
-                            await _cache.delete(k)
-                        except Exception:
-                            pass
+        async def _run_single_recache(spec: RecacheSpec) -> None:
+            async with semaphore:
+                try:
+                    getter, call_kwargs = _build_getter_kwargs(spec, mut_args, mut_kwargs)
 
-                return await getter(**call_kwargs)
+                    # Delete specific cache keys if RecachePlan has key template
+                    if isinstance(spec, RecachePlan) and spec.key is not None:
+                        key_variants = _generate_key_variants(spec.key, call_kwargs)
+                        for key_variant in key_variants:
+                            try:
+                                await _cache.delete(key_variant)
+                            except Exception as e:
+                                logger.debug(f"Failed to delete cache key {key_variant}: {e}")
 
-        await asyncio.gather(*(_run_one(s) for s in specs), return_exceptions=False)
+                    # Execute the getter to warm the cache
+                    await getter(**call_kwargs)
 
-    def _decorator(fn: Callable[..., Awaitable[Any]]):
+                except Exception as e:
+                    logger.error(f"Recache operation failed: {e}")
+
+        # Execute all recache operations concurrently
+        await asyncio.gather(*[_run_single_recache(spec) for spec in specs], return_exceptions=True)
+
+    def _decorator(func: Callable[..., Awaitable[Any]]):
         async def _wrapped(*args, **kwargs):
-            result = await fn(*args, **kwargs)
+            # Execute the original function
+            result = await func(*args, **kwargs)
+
             try:
-                t = _resolve_tags(*args, **kwargs)
-                if t:
-                    await invalidate_tags(*t)
+                # Invalidate cache tags
+                resolved_tags = _resolve_tags(*args, **kwargs)
+                if resolved_tags:
+                    invalidated_count = await invalidate_tags(*resolved_tags)
+                    logger.debug(
+                        f"Invalidated {invalidated_count} cache entries for tags: {resolved_tags}"
+                    )
+            except Exception as e:
+                logger.error(f"Cache tag invalidation failed: {e}")
             finally:
+                # Execute recache operations (always run, even if invalidation fails)
                 if recache:
-                    await _do_recache(recache, *args, **kwargs)
+                    try:
+                        await _execute_recache(recache, *args, **kwargs)
+                    except Exception as e:
+                        logger.error(f"Cache recaching failed: {e}")
+
             return result
 
         return _wrapped
@@ -375,15 +574,31 @@ def cache_write(
     return _decorator
 
 
-# Back-compat alias
+# Back-compatibility alias
 mutates = cache_write
 
 
-# ---------- Resource helper ----------
+# ---------- Resource Management ----------
+
+
 class Resource:
+    """
+    Resource-based cache management helper.
+
+    This class provides convenient decorators for entity-based caching
+    with standardized key patterns and tag management.
+    """
+
     def __init__(self, name: str, id_field: str):
-        self.name = name  # e.g., "user"
-        self.id_field = id_field  # e.g., "user_id"
+        """
+        Initialize resource cache manager.
+
+        Args:
+            name: Resource name (e.g., "user", "product")
+            id_field: ID field name (e.g., "user_id", "product_id")
+        """
+        self.name = name
+        self.id_field = id_field
 
     def cache_read(
         self,
@@ -395,17 +610,27 @@ class Resource:
         lock: bool = True,
     ):
         """
-        Decorator for async getters. Uses cashews directly with:
-          - key: string template (e.g., "user:profile:{user_id}")
-          - tags: string template(s) (e.g., ("user:{user_id}",))
-          - lock: singleflight (avoid stampede)
-        Namespace/versioning is applied globally via backend.setup_cache -> cache.set_prefix.
+        Cache decorator for resource read operations.
+
+        Args:
+            suffix: Cache key suffix (e.g., "profile", "settings")
+            ttl: Time to live in seconds
+            key_template: Custom key template (defaults to "{name}:{suffix}:{id_field}")
+            tags_template: Custom tags template (defaults to ("{name}:{id_field}",))
+            lock: Enable singleflight to prevent cache stampede
+
+        Returns:
+            Cache decorator function
         """
-        key_tpl = key_template or f"{self.name}:{suffix}:{{{self.id_field}}}"
-        tags_tpl = tags_template or (f"{self.name}:{{{self.id_field}}}",)
+        key_template = key_template or f"{self.name}:{suffix}:{{{self.id_field}}}"
+        tags_template = tags_template or (f"{self.name}:{{{self.id_field}}}",)
 
         def _decorator(func: Callable):
-            return _cache(ttl=ttl, key=key_tpl, tags=tags_tpl, lock=lock)(func)
+            try:
+                return _cache(ttl=ttl, key=key_template, tags=tags_template, lock=lock)(func)
+            except TypeError:
+                # Fallback for older cashews versions
+                return _cache(ttl=ttl, key=key_template, tags=tags_template)(func)
 
         return _decorator
 
@@ -416,91 +641,136 @@ class Resource:
         recache_max_concurrency: int = 5,
     ):
         """
-        Decorator for async mutators.
+        Cache invalidation decorator for resource write operations.
 
-        After mutation:
-          1) Invalidate per-entity tag (if available on this cashews build)
-          2) Hard-delete concrete keys for this entity (namespaced and non-prefixed)
-          3) Optionally eager recache provided getters
+        Args:
+            recache: List of (getter, kwargs_builder) pairs for recaching
+            recache_max_concurrency: Maximum concurrent recache operations
+
+        Returns:
+            Cache invalidation decorator
         """
 
         async def _maybe_await(value):
+            """Await value if it's awaitable, otherwise return as-is."""
             if inspect.isawaitable(value):
                 return await value
             return value
 
-        async def _delete_keys_for_entity(entity_name: str, ident: str):
-            # Resolve current namespace prefix ("apiframeworks-api:vdev:")
-            ns = getattr(backend, "alias", lambda: "")()
-            ns_prefix = f"{ns}:" if ns and not ns.endswith(":") else ns
+        async def _delete_entity_keys(entity_name: str, entity_id: str) -> None:
+            """Delete all cache keys for a specific entity."""
+            namespace = _alias() or ""
+            namespace_prefix = (
+                f"{namespace}:" if namespace and not namespace.endswith(":") else namespace
+            )
 
-            # Build candidate exact keys we want gone
-            candidates = [
-                # Namespaced, exact keys
-                f"{ns_prefix}{entity_name}:profile:{ident}",
-                f"{ns_prefix}{entity_name}:profile_view:{ident}",
-                # Non-prefixed fallbacks (in case set_prefix isn't applied in this build)
-                f"{entity_name}:profile:{ident}",
-                f"{entity_name}:profile_view:{ident}",
+            # Generate candidate keys to delete
+            key_patterns = [
+                f"{entity_name}:profile:{entity_id}",
+                f"{entity_name}:profile_view:{entity_id}",
+                f"{entity_name}:settings:{entity_id}",
+                f"{entity_name}:*:{entity_id}",
             ]
 
-            # Try precise deletes first (most reliable across backends)
+            candidates = []
+            for pattern in key_patterns:
+                # Add namespaced versions
+                if namespace_prefix:
+                    candidates.append(f"{namespace_prefix}{pattern}")
+                # Add non-namespaced versions
+                candidates.append(pattern)
+
+            # Try precise deletions first
             for key in candidates:
-                deleter = getattr(_cache, "delete", None)
-                if callable(deleter):
-                    await _maybe_await(deleter(key))
+                if "*" not in key:  # Skip wildcard patterns for precise deletion
+                    try:
+                        deleter = getattr(_cache, "delete", None)
+                        if callable(deleter):
+                            await _maybe_await(deleter(key))
+                    except Exception as e:
+                        logger.debug(f"Failed to delete cache key {key}: {e}")
 
-            # Safety net: a wildcard sweep inside the current namespace
-            dm = getattr(_cache, "delete_match", None)
-            if callable(dm):
-                # Namespaced wildcard
-                if ns_prefix:
-                    await _maybe_await(dm(f"{ns_prefix}{entity_name}:*:{ident}*"))
-                # Non-prefixed wildcard (just in case)
-                await _maybe_await(dm(f"{entity_name}:*:{ident}*"))
+            # Wildcard deletions as safety net
+            delete_match = getattr(_cache, "delete_match", None)
+            if callable(delete_match):
+                try:
+                    # Namespaced wildcard
+                    if namespace_prefix:
+                        await _maybe_await(
+                            delete_match(f"{namespace_prefix}{entity_name}:*:{entity_id}*")
+                        )
+                    # Non-namespaced wildcard
+                    await _maybe_await(delete_match(f"{entity_name}:*:{entity_id}*"))
+                except Exception as e:
+                    logger.debug(f"Wildcard deletion failed: {e}")
 
-        async def _do_recache(specs, *m_args, **m_kwargs):
+        async def _execute_resource_recache(specs, *mut_args, **mut_kwargs) -> None:
+            """Execute recache operations for resource."""
             if not specs:
                 return
-            sem = asyncio.Semaphore(recache_max_concurrency)
 
-            async def _run_one(spec):
-                getter, builder = spec
-                call_kwargs = builder(*m_args, **m_kwargs) or {}
-                async with sem:
-                    # With keys deleted above, this recomputes and repopulates cache
-                    await _maybe_await(getter(**call_kwargs))
+            semaphore = asyncio.Semaphore(recache_max_concurrency)
 
-            await asyncio.gather(*(_run_one(s) for s in specs), return_exceptions=False)
+            async def _run_single_resource_recache(spec):
+                getter, kwargs_builder = spec
+                try:
+                    call_kwargs = kwargs_builder(*mut_args, **mut_kwargs) or {}
+                    async with semaphore:
+                        await _maybe_await(getter(**call_kwargs))
+                except Exception as e:
+                    logger.error(f"Resource recache failed: {e}")
+
+            await asyncio.gather(
+                *[_run_single_resource_recache(spec) for spec in specs], return_exceptions=True
+            )
 
         def _decorator(mutator: Callable):
-            async def wrapped(*args, **kwargs):
+            async def _wrapped(*args, **kwargs):
+                # Execute the mutation
                 result = await _maybe_await(mutator(*args, **kwargs))
 
-                ident = kwargs.get(self.id_field)
-                if ident is not None:
-                    # 1) Tag invalidation (if supported by your cashews)
-                    inv = getattr(_cache, "invalidate", None)
-                    if callable(inv):
-                        await _maybe_await(inv(f"{self.name}:{ident}"))
+                entity_id = kwargs.get(self.id_field)
+                if entity_id is not None:
+                    try:
+                        # Tag invalidation
+                        invalidate_func = getattr(_cache, "invalidate", None)
+                        if callable(invalidate_func):
+                            await _maybe_await(invalidate_func(f"{self.name}:{entity_id}"))
 
-                    # 2) Bulletproof exact-key deletes (then wildcard safety net)
-                    await _delete_keys_for_entity(self.name, ident)
+                        # Precise key deletion
+                        await _delete_entity_keys(self.name, str(entity_id))
+                    except Exception as e:
+                        logger.error(f"Resource cache invalidation failed: {e}")
 
-                # 3) Eager recache of dependent getters
-                if recache:
-                    await _do_recache(recache, *args, **kwargs)
+                    # Recache operations
+                    if recache:
+                        try:
+                            await _execute_resource_recache(recache, *args, **kwargs)
+                        except Exception as e:
+                            logger.error(f"Resource recaching failed: {e}")
 
                 return result
 
-            return wrapped
+            return _wrapped
 
         return _decorator
 
 
 def resource(name: str, id_field: str) -> Resource:
+    """
+    Create a resource cache manager.
+
+    Args:
+        name: Resource name
+        id_field: ID field name
+
+    Returns:
+        Resource instance for cache management
+    """
     return Resource(name, id_field)
 
 
-def entity(name: str, id_param: str) -> Resource:  # legacy alias
+# Legacy alias for backward compatibility
+def entity(name: str, id_param: str) -> Resource:
+    """Legacy alias for resource() function."""
     return Resource(name, id_param)
