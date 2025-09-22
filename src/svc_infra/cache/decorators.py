@@ -8,11 +8,10 @@ invalidating cache on write operations, and managing cache recaching strategies.
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 from dataclasses import dataclass
 from inspect import Parameter, signature
-from typing import Any, Awaitable, Callable, Iterable, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Iterable, Optional, Union
 
 from cashews import cache as _cache
 
@@ -590,170 +589,102 @@ class Resource:
     """
 
     def __init__(self, name: str, id_field: str):
-        """
-        Initialize resource cache manager.
-
-        Args:
-            name: Resource name (e.g., "user", "product")
-            id_field: ID field name (e.g., "user_id", "product_id")
-        """
-        self.name = name
+        self.name = name.strip().lower()
         self.id_field = id_field
+        # Registry of reads so we can warm them later when warm=True on writes
+        # Each entry: {"getter": <callable>, "key_template": "<template string>"}
+        self._read_registry: list[dict[str, Any]] = []
+
+    def _tags(self, **kwargs) -> list[str]:
+        _id = kwargs[self.id_field]
+        # Keep your existing two-level tag strategy: entity kind + entity instance
+        return [self.name, f"{self.name}:{_id}"]
+
+    def _key_base(self) -> tuple[str, ...]:
+        # Standardized base key: "<name>:{<id_field>}"
+        return (self.name, "{%s}" % self.id_field)
 
     def cache_read(
         self,
         *,
-        suffix: str,
-        ttl: int,
-        key_template: Optional[str] = None,
-        tags_template: Optional[Tuple[str, ...]] = None,
-        lock: bool = True,
+        suffix: Optional[Union[str, tuple[str, ...]]] = None,
+        ttl: Optional[int] = None,
+        early_ttl: Optional[int] = None,
+        refresh: bool = False,
     ):
         """
         Cache decorator for resource read operations.
 
-        Args:
-            suffix: Cache key suffix (e.g., "profile", "settings")
-            ttl: Time to live in seconds
-            key_template: Custom key template (defaults to "{name}:{suffix}:{id_field}")
-            tags_template: Custom tags template (defaults to ("{name}:{id_field}",))
-            lock: Enable singleflight to prevent cache stampede
-
-        Returns:
-            Cache decorator function
+        Registers the wrapped getter in a per-resource registry so writes with
+        warm=True can automatically recache all reads for the same entity.
         """
-        key_template = key_template or f"{self.name}:{suffix}:{{{self.id_field}}}"
-        tags_template = tags_template or (f"{self.name}:{{{self.id_field}}}",)
+        parts: list[str] = list(self._key_base())
+        if suffix:
+            if isinstance(suffix, tuple):
+                parts.extend(suffix)
+            else:
+                parts.append(str(suffix))
 
-        def _decorator(func: Callable):
-            try:
-                return _cache(ttl=ttl, key=key_template, tags=tags_template, lock=lock)(func)
-            except TypeError:
-                # Fallback for older cashews versions
-                return _cache(ttl=ttl, key=key_template, tags=tags_template)(func)
+        # Build the actual decorator using your top-level cache_read
+        decorator = cache_read(
+            key=tuple(parts),
+            ttl=ttl,
+            tags=lambda **kw: self._tags(**kw),
+            early_ttl=early_ttl,
+            refresh=refresh,
+        )
 
-        return _decorator
+        def _wrap(func: Callable[..., Awaitable[Any]]):
+            wrapped = decorator(func)
+
+            # Record for future warm-ups: getter + concrete template
+            # The top-level cache_read already publishes __svc_key_variants__
+            # for exact-key deletion; we keep the human template too.
+            template_str = ":".join(parts)
+            self._read_registry.append({"getter": wrapped, "key_template": template_str})
+            return wrapped
+
+        return _wrap
 
     def cache_write(
         self,
         *,
-        recache: Optional[list[tuple[Callable, Callable]]] = None,
+        recache_specs: Optional[Iterable[RecacheSpec]] = None,
         recache_max_concurrency: int = 5,
+        warm: bool = False,
     ):
         """
         Cache invalidation decorator for resource write operations.
 
-        Args:
-            recache: List of (getter, kwargs_builder) pairs for recaching
-            recache_max_concurrency: Maximum concurrent recache operations
-
-        Returns:
-            Cache invalidation decorator
+        If warm=True, automatically recache all registered reads for this resource
+        (same id_field) with no specs required.
         """
+        # If warm=True, synthesize recache plans from the registry
+        synthesized: list[RecacheSpec] = []
+        if warm and self._read_registry:
+            for entry in self._read_registry:
+                getter = entry["getter"]
+                template = entry["key_template"]
+                # Use the top-level recache(...) factory to delete exact key variants then warm
+                synthesized.append(
+                    recache(
+                        getter,
+                        include=[self.id_field],  # pass through id
+                        key=template,  # delete exact key variants before warm
+                    )
+                )
 
-        async def _maybe_await(value):
-            """Await value if it's awaitable, otherwise return as-is."""
-            if inspect.isawaitable(value):
-                return await value
-            return value
+        # Merge user-provided recache specs (if any) with synthesized ones
+        merged_recache: Optional[Iterable[RecacheSpec]] = recache_specs
+        if synthesized:
+            merged_recache = (list(recache_specs) if recache_specs else []) + synthesized
 
-        async def _delete_entity_keys(entity_name: str, entity_id: str) -> None:
-            """Delete all cache keys for a specific entity."""
-            namespace = _alias() or ""
-            namespace_prefix = (
-                f"{namespace}:" if namespace and not namespace.endswith(":") else namespace
-            )
-
-            # Generate candidate keys to delete
-            key_patterns = [
-                f"{entity_name}:profile:{entity_id}",
-                f"{entity_name}:profile_view:{entity_id}",
-                f"{entity_name}:settings:{entity_id}",
-                f"{entity_name}:*:{entity_id}",
-            ]
-
-            candidates = []
-            for pattern in key_patterns:
-                # Add namespaced versions
-                if namespace_prefix:
-                    candidates.append(f"{namespace_prefix}{pattern}")
-                # Add non-namespaced versions
-                candidates.append(pattern)
-
-            # Try precise deletions first
-            for key in candidates:
-                if "*" not in key:  # Skip wildcard patterns for precise deletion
-                    try:
-                        deleter = getattr(_cache, "delete", None)
-                        if callable(deleter):
-                            await _maybe_await(deleter(key))
-                    except Exception as e:
-                        logger.debug(f"Failed to delete cache key {key}: {e}")
-
-            # Wildcard deletions as safety net
-            delete_match = getattr(_cache, "delete_match", None)
-            if callable(delete_match):
-                try:
-                    # Namespaced wildcard
-                    if namespace_prefix:
-                        await _maybe_await(
-                            delete_match(f"{namespace_prefix}{entity_name}:*:{entity_id}*")
-                        )
-                    # Non-namespaced wildcard
-                    await _maybe_await(delete_match(f"{entity_name}:*:{entity_id}*"))
-                except Exception as e:
-                    logger.debug(f"Wildcard deletion failed: {e}")
-
-        async def _execute_resource_recache(specs, *mut_args, **mut_kwargs) -> None:
-            """Execute recache operations for resource."""
-            if not specs:
-                return
-
-            semaphore = asyncio.Semaphore(recache_max_concurrency)
-
-            async def _run_single_resource_recache(spec):
-                getter, kwargs_builder = spec
-                try:
-                    call_kwargs = kwargs_builder(*mut_args, **mut_kwargs) or {}
-                    async with semaphore:
-                        await _maybe_await(getter(**call_kwargs))
-                except Exception as e:
-                    logger.error(f"Resource recache failed: {e}")
-
-            await asyncio.gather(
-                *[_run_single_resource_recache(spec) for spec in specs], return_exceptions=True
-            )
-
-        def _decorator(mutator: Callable):
-            async def _wrapped(*args, **kwargs):
-                # Execute the mutation
-                result = await _maybe_await(mutator(*args, **kwargs))
-
-                entity_id = kwargs.get(self.id_field)
-                if entity_id is not None:
-                    try:
-                        # Tag invalidation
-                        invalidate_func = getattr(_cache, "invalidate", None)
-                        if callable(invalidate_func):
-                            await _maybe_await(invalidate_func(f"{self.name}:{entity_id}"))
-
-                        # Precise key deletion
-                        await _delete_entity_keys(self.name, str(entity_id))
-                    except Exception as e:
-                        logger.error(f"Resource cache invalidation failed: {e}")
-
-                    # Recache operations
-                    if recache:
-                        try:
-                            await _execute_resource_recache(recache, *args, **kwargs)
-                        except Exception as e:
-                            logger.error(f"Resource recaching failed: {e}")
-
-                return result
-
-            return _wrapped
-
-        return _decorator
+        # Delegate to top-level cache_write, preserving your tag strategy
+        return cache_write(
+            tags=lambda **kw: self._tags(**kw),
+            recache=merged_recache,
+            recache_max_concurrency=recache_max_concurrency,
+        )
 
 
 def resource(name: str, id_field: str) -> Resource:

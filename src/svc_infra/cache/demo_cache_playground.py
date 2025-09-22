@@ -48,7 +48,7 @@ async def get_user_profile(*, user_id: int):
     return await fetch_user(user_id)
 
 
-@user.cache_write()  # no recache; built-in invalidation handles it
+@user.cache_write(warm=True)  # ← flips on auto-warming for all registered reads
 async def update_user_profile(*, user_id: int, data: dict):
     return await save_user(user_id, data)
 
