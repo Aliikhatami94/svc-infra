@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-import asyncio
-import os
-import time
 from typing import Optional
 
 from cashews import cache as _cache
 
-DEFAULT_PREFIX = os.getenv("CACHE_PREFIX", "svc")
-DEFAULT_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-CACHE_VERSION = os.getenv("CACHE_VERSION", "v1")  # bump to invalidate whole namespace
+_current_prefix: str = "svc"
+_current_version: str = "v1"
 
 
-def _alias(prefix: Optional[str] = None, version: Optional[str] = None) -> str:
-    p = prefix or DEFAULT_PREFIX
-    v = version or CACHE_VERSION
-    return f"{p}:{v}"
+def alias() -> str:
+    """Human-readable namespace label."""
+    return f"{_current_prefix}:{_current_version}"
+
+
+def _full_prefix() -> str:
+    """Actual key prefix applied by cashews."""
+    return f"{_current_prefix}:{_current_version}:"
 
 
 def setup_cache(
@@ -23,31 +23,42 @@ def setup_cache(
     *,
     prefix: Optional[str] = None,
     version: Optional[str] = None,
-) -> None:
-    _cache.setup(url or DEFAULT_URL, client_side=None)
-    _cache.set_alias(_alias(prefix, version))
+):
+    """
+    Configure Cashews and set a global key prefix so keys are namespaced by
+    {prefix}:{version}:  e.g.  apiframeworks-api:vdev:
+    Returned value is awaitable (Cashews’ setup), so callers may await or not.
+    """
+    global _current_prefix, _current_version
+
+    if prefix:
+        _current_prefix = prefix
+    if version:
+        _current_version = version
+
+    # Setup backend (awaitable)
+    setup_awaitable = _cache.setup(url) if url else _cache.setup()
+
+    # ★ The important line: make the namespace real
+    if hasattr(_cache, "set_prefix"):
+        _cache.set_prefix(_full_prefix())
+
+    return setup_awaitable  # callers can await or not
 
 
-async def startup_check(retries: int = 3, delay_seconds: float = 0.5) -> None:
-    """
-    Optional readiness probe: round-trip set/get. Async-safe (no blocking).
-    """
-    key = f"{_cache.get_alias()}:_startup:{int(time.time())}"
-    for attempt in range(1, retries + 1):
-        try:
-            await _cache.set(key, "ok", expire=5)
-            v = await _cache.get(key)
-            if v == "ok":
-                return
-        except Exception:
-            if attempt == retries:
-                raise
-        # IMPORTANT: yield the event loop
-        await asyncio.sleep(delay_seconds)
+async def wait_ready(timeout: float = 5.0) -> None:
+    probe_key = f"{_full_prefix()}__probe__"
+    await _cache.set(probe_key, "ok", expire=3)
+    ok = await _cache.get(probe_key)
+    if ok != "ok":
+        raise RuntimeError("cache readiness probe failed")
 
 
 async def shutdown_cache() -> None:
-    await _cache.close()
+    try:
+        await _cache.close()
+    except Exception:
+        pass
 
 
 def instance():
