@@ -1,7 +1,8 @@
 import asyncio
 import os
 
-from svc_infra.cache import TTL_LONG, init_cache, resource
+from svc_infra.cache import init_cache, resource
+from svc_infra.cache.ttl import TTL_LONG
 
 init_cache(
     url="redis://default:BXytVfHOZOiWwAZXbThkxrZIqtxqETyR@shinkansen.proxy.rlwy.net:28540",
