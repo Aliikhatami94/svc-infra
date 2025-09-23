@@ -113,28 +113,28 @@ def oauth_router_with_backend(
 
         if kind == "oidc":
             claims: dict[str, Any] = {}
+            id_token_present = isinstance(token, dict) and "id_token" in token
 
-            # Prefer ID token if present; handle both Authlib signatures.
-            id_token_str = token.get("id_token") if isinstance(token, dict) else None
-            if id_token_str:
+            if id_token_present:
+                # Try both Authlib signatures and make sure nonce is provided
                 try:
-                    # Authlib >= 1.2 often supports this signature
-                    claims = await client.parse_id_token(token)
+                    # Newer-style: parse_id_token(token, nonce=...)
+                    claims = await client.parse_id_token(token, nonce=nonce)
                 except TypeError:
-                    # Older Starlette client signature: (request, token)
-                    claims = await client.parse_id_token(request, token)
+                    # Older-style: parse_id_token(request, token, nonce)
+                    claims = await client.parse_id_token(request, token, nonce)
                 except Exception:
-                    # If parsing fails for any reason, fall back to userinfo
+                    # If anything else goes wrong, we’ll fall back to userinfo
                     claims = {}
 
-            # Fallback to userinfo when id_token is absent or couldn't be parsed
+            # If we still don't have claims, or there was no id_token, use UserInfo
             if not claims:
                 try:
                     claims = await client.userinfo(token=token)
                 except Exception:
                     raise HTTPException(400, "oidc_userinfo_failed")
 
-            # If provider sent a nonce in claims, verify it (when we have one)
+            # If provider sent a nonce in claims, verify it (only when present)
             if nonce and claims.get("nonce") and claims["nonce"] != nonce:
                 raise HTTPException(400, "invalid_nonce")
 
