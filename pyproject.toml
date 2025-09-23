@@ -84,6 +84,7 @@ motor = "^3.7.1"
 pre-commit = "^4.3.0"
 redis = "^6.4.0"
 cashews = {extras = ["redis"], version = "^7.4.1"}
+itsdangerous = "^2.2.0"
 
 [tool.poetry.extras]
 # Postgres v3
