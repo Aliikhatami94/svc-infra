@@ -33,6 +33,7 @@ class Subcommand(str, Enum):
     sql_scaffold_schemas = "sql-scaffold-schemas"
 
     # Mongo commands
+    mongo_prepare = "mongo-prepare"
     mongo_setup_and_prepare = "mongo-setup-and-prepare"
     mongo_ping = "mongo-ping"
     mongo_scaffold = "mongo-scaffold"
@@ -40,11 +41,10 @@ class Subcommand(str, Enum):
     mongo_scaffold_schemas = "mongo-scaffold-schemas"
     mongo_scaffold_resources = "mongo-scaffold-resources"
 
-    # Grafana commands
-    grafana_up = "obs-up"
-    grafana_down = "obs-down"
-    grafana_status = "obs-status"
-    grafana_open = "obs-open"
+    # Observability commands
+    obs_up = "obs-up"
+    obs_down = "obs-down"
+    obs_scaffold = "obs-scaffold"
 
 
 async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict:

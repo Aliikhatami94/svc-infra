@@ -13,7 +13,6 @@ __all__ = [
     "register_sql_scaffold",
     "register_mongo",
     "register_mongo_scaffold",
-    "register_redis",
     "register_obs",
     "_HELP",
 ]
