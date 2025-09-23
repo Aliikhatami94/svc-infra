@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+import base64
+import hashlib
+import secrets
+from typing import Any, Dict, Literal, cast
+from urllib.parse import urlparse
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, Request
@@ -11,6 +15,21 @@ from sqlalchemy import select
 
 from svc_infra.api.fastapi import DualAPIRouter
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
+
+from .settings import get_auth_settings
+
+
+def _gen_pkce_pair() -> tuple[str, str]:
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+    digest = hashlib.sha256(verifier.encode()).digest()
+    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+    return verifier, challenge
+
+
+def _validate_redirect(url: str, allow_hosts: list[str]) -> None:
+    host = urlparse(url).hostname or ""
+    if host.lower() not in {h.lower() for h in allow_hosts}:
+        raise HTTPException(status_code=400, detail="redirect_not_allowed")
 
 
 def oauth_router_with_backend(
@@ -44,7 +63,6 @@ def oauth_router_with_backend(
                 client_kwargs={"scope": cfg.get("scope", "")},
             )
         else:
-            # you can add more branches (facebook, apple*) as needed
             pass
 
     router = DualAPIRouter(prefix=prefix, tags=["auth:oauth"])
@@ -54,8 +72,24 @@ def oauth_router_with_backend(
         client = oauth.create_client(provider)
         if not client:
             raise HTTPException(404, "Provider not configured")
-        redirect_uri = request.url_for("oauth_callback", provider=provider)
-        return await client.authorize_redirect(request, str(redirect_uri))
+
+        verifier, challenge = _gen_pkce_pair()
+        state = secrets.token_urlsafe(24)
+        nonce = secrets.token_urlsafe(24)
+
+        request.session[f"oauth:{provider}:pkce_verifier"] = verifier
+        request.session[f"oauth:{provider}:state"] = state
+        request.session[f"oauth:{provider}:nonce"] = nonce
+
+        redirect_uri = str(request.url_for("oauth_callback", provider=provider))
+        return await client.authorize_redirect(
+            request,
+            redirect_uri,
+            code_challenge=challenge,
+            code_challenge_method="S256",
+            state=state,
+            nonce=nonce,
+        )
 
     @router.get("/{provider}/callback", name="oauth_callback")
     async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
@@ -63,43 +97,50 @@ def oauth_router_with_backend(
         if not client:
             raise HTTPException(404, "Provider not configured")
 
-        token = await client.authorize_access_token(request)
+        provided_state = request.query_params.get("state")
+        expected_state = request.session.pop(f"oauth:{provider}:state", None)
+        verifier = request.session.pop(f"oauth:{provider}:pkce_verifier", None)
+        nonce = request.session.pop(f"oauth:{provider}:nonce", None)
+        if not expected_state or provided_state != expected_state:
+            raise HTTPException(400, "invalid_state")
 
-        email = None
+        token = await client.authorize_access_token(request, code_verifier=verifier)
 
         cfg = providers.get(provider, {})
         kind = cfg.get("kind")
 
+        email = None
+
         if kind == "oidc":
-            userinfo = token.get("userinfo") or await client.parse_id_token(request, token)
-            email = userinfo.get("email")
-            full_name = userinfo.get("name") or userinfo.get("preferred_username")
-        elif kind == "github":
-            resp = await client.get("user", token=token)
-            data = resp.json()
-            email = data.get("email")
+            claims = await client.parse_id_token(request, token)
+            if nonce and claims.get("nonce") != nonce:
+                raise HTTPException(400, "invalid_nonce")
+            email = claims.get("email")
+            full_name = claims.get("name") or claims.get("preferred_username")
             if not email:
-                emails = (await client.get("user/emails", token=token)).json()
-                primary = next((e for e in emails if e.get("primary")), emails[0] if emails else {})
-                email = primary.get("email")
-            full_name = data.get("name") or data.get("login")
+                userinfo = await client.userinfo(token=token)
+                email = userinfo.get("email") or email
+                full_name = userinfo.get("name") or full_name
+        elif kind == "github":
+            u = (await client.get("user", token=token)).json()
+            emails_resp = (await client.get("user/emails", token=token)).json()
+            primary = next((e for e in emails_resp if e.get("primary") and e.get("verified")), None)
+            email = (primary or (emails_resp[0] if emails_resp else {})).get("email")
+            full_name = u.get("name") or u.get("login")
         elif kind == "linkedin":
-            # profile
             me = (await client.get("me", token=token)).json()
-            # email
             em = (
                 await client.get(
-                    "emailAddress?q=members&projection=(elements*(handle~))",
-                    token=token,
+                    "emailAddress?q=members&projection=(elements*(handle~))", token=token
                 )
             ).json()
-            elements = em.get("elements") or []
-            if elements and "handle~" in elements[0]:
-                email = elements[0]["handle~"].get("emailAddress")
-            localizedFirst = (((me.get("firstName") or {}).get("localized")) or {}).values()
-            localizedLast = (((me.get("lastName") or {}).get("localized")) or {}).values()
-            first = next(iter(localizedFirst), None)
-            last = next(iter(localizedLast), None)
+            els = em.get("elements") or []
+            if els and "handle~" in els[0]:
+                email = els[0]["handle~"].get("emailAddress")
+            lf = (((me.get("firstName") or {}).get("localized")) or {}).values()
+            ll = (((me.get("lastName") or {}).get("localized")) or {}).values()
+            first = next(iter(lf), None)
+            last = next(iter(ll), None)
             full_name = " ".join([x for x in [first, last] if x])
         else:
             raise HTTPException(400, "Unsupported provider kind")
@@ -107,7 +148,7 @@ def oauth_router_with_backend(
         if not email:
             raise HTTPException(400, "No email from provider")
 
-        # Upsert user
+        # Upsert user (by email)
         existing = (
             (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
         )
@@ -115,13 +156,42 @@ def oauth_router_with_backend(
             user = existing
         else:
             user = user_model(email=email, is_active=True, is_superuser=False, is_verified=True)
-            user.hashed_password = PasswordHelper().hash("!oauth!")
-            if hasattr(user, "full_name"):
+            # Ensure compatibility with FastAPI Users expected field
+            if hasattr(user, "hashed_password"):
+                # set unusable sentinel hash for OAuth-only accounts
+                user.hashed_password = PasswordHelper().hash("!oauth!")
+            elif hasattr(user, "password_hash"):
+                user.password_hash = PasswordHelper().hash("!oauth!")
+            if full_name and hasattr(user, "full_name"):
                 setattr(user, "full_name", full_name)
             session.add(user)
             await session.flush()
 
-        jwt = (auth_backend.get_strategy)().write_token(user)
-        return RedirectResponse(url=f"{post_login_redirect}?token={jwt}")
+        # Issue JWT
+        jwt_token = (auth_backend.get_strategy)().write_token(user)
+
+        # Set HttpOnly cookie and redirect (allow-listed)
+        st = get_auth_settings()
+        redirect_url = str(
+            getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
+        )
+        _validate_redirect(redirect_url, list(getattr(st, "redirect_allow_hosts", ["localhost"])))
+
+        same_site_lit = cast(
+            Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower()
+        )
+
+        resp = RedirectResponse(url=redirect_url)
+        resp.set_cookie(
+            key=st.session_cookie_name,
+            value=jwt_token,
+            max_age=st.session_cookie_max_age_seconds,
+            httponly=True,
+            secure=bool(st.session_cookie_secure),
+            samesite=same_site_lit,
+            domain=st.session_cookie_domain,
+            path="/",
+        )
+        return resp
 
     return router

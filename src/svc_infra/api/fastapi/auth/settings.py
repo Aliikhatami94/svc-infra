@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import AnyHttpUrl, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,13 +16,14 @@ class OIDCProvider(BaseModel):
 
 class JWTSettings(BaseModel):
     secret: SecretStr
-    lifetime_seconds: int = 60 * 60 * 24 * 7
+    lifetime_seconds: int = 60 * 60 * 24 * 7  # 7d
 
 
 class AuthSettings(BaseSettings):
+    # ---- JWT ----
     jwt: Optional[JWTSettings] = None
 
-    # Built-ins (all optional)
+    # ---- Built-in provider creds (all optional) ----
     google_client_id: Optional[str] = None
     google_client_secret: Optional[SecretStr] = None
 
@@ -41,6 +42,17 @@ class AuthSettings(BaseSettings):
     # Generic OIDC providers (Okta, Auth0, Keycloak, Azure AD via issuer, etc.)
     oidc_providers: List[OIDCProvider] = Field(default_factory=list)
 
+    # ---- Post-login redirect + allowlist ----
+    post_login_redirect: AnyHttpUrl | str = "http://localhost:3000/app"
+    redirect_allow_hosts: List[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
+
+    # ---- Session/Cookie (used for OAuth round-trip + JWT cookie) ----
+    session_cookie_name: str = "svc_session"
+    session_cookie_secure: bool = False  # True in prod/HTTPS
+    session_cookie_samesite: str = "lax"  # "lax" | "strict" | "none"
+    session_cookie_domain: Optional[str] = None
+    session_cookie_max_age_seconds: int = 60 * 60 * 4  # 4h
+
     model_config = SettingsConfigDict(
         env_prefix="AUTH_",
         env_file=".env",
@@ -55,6 +67,5 @@ _settings: AuthSettings | None = None
 def get_auth_settings() -> AuthSettings:
     global _settings
     if _settings is None:
-        # Instantiate to load from environment and cache singleton
         _settings = AuthSettings()
     return _settings
