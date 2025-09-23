@@ -17,7 +17,7 @@ class OIDCProvider(BaseModel):
 
 class JWTSettings(BaseModel):
     secret: SecretStr
-    lifetime_seconds: int = 60 * 60 * 24 * 7  # 7d
+    lifetime_seconds: int = 60 * 60 * 24 * 7
 
 
 class AuthSettings(BaseSettings):
