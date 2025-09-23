@@ -37,11 +37,28 @@ def get_fastapi_users(
         yield UserManager(user_db)
 
     def get_jwt_strategy() -> JWTStrategy:
+        """
+        Support nested settings:
+          settings.jwt.secret (SecretStr)
+          settings.jwt.lifetime_seconds (int)
+
+        Falls back to safe dev defaults if unset (only for local/test).
+        """
         settings = get_auth_settings()
-        return JWTStrategy(
-            secret=settings.jwt_secret.get_secret_value(),
-            lifetime_seconds=settings.jwt_lifetime_seconds,
-        )
+
+        # Nested fields: settings.jwt.secret, settings.jwt.lifetime_seconds
+        jwt_block = getattr(settings, "jwt", None)
+        if jwt_block and getattr(jwt_block, "secret", None):
+            secret = jwt_block.secret.get_secret_value()
+        else:
+            # dev/test fallback to avoid crashes; DO NOT use in prod
+            secret = "svc-dev-secret-change-me"
+
+        lifetime = getattr(jwt_block, "lifetime_seconds", None) if jwt_block else None
+        if not isinstance(lifetime, int) or lifetime <= 0:
+            lifetime = 3600  # 1 hour default
+
+        return JWTStrategy(secret=secret, lifetime_seconds=lifetime)
 
     bearer_transport = BearerTransport(tokenUrl=f"{auth_prefix}/jwt/login")
     auth_backend = AuthenticationBackend(
