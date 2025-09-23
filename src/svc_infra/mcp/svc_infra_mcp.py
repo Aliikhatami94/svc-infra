@@ -40,24 +40,11 @@ class Subcommand(str, Enum):
     mongo_scaffold_schemas = "mongo-scaffold-schemas"
     mongo_scaffold_resources = "mongo-scaffold-resources"
 
-    # Cache commands
-    cache_ping = "cache-ping"
-    cache_doctor = "cache-doctor"
-    cache_check = "cache-check"
-    cache_keys = "cache-keys"
-    cache_rm = "cache-rm"
-    cache_flush = "cache-flush"
-    cache_setup = "cache-setup"
-
     # Grafana commands
-    grafana_up = "grafana-up"
-    grafana_down = "grafana-down"
-    grafana_status = "grafana-status"
-    grafana_open = "grafana-open"
-
-    # Uptrace commands
-    uptrace_init = "uptrace-init"
-    uptrace_deploy = "uptrace-deploy"
+    grafana_up = "obs-up"
+    grafana_down = "obs-down"
+    grafana_status = "obs-status"
+    grafana_open = "obs-open"
 
 
 async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict:

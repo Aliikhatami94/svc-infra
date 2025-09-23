@@ -8,7 +8,6 @@ from svc_infra.cli.cmds import (
     register_mongo,
     register_mongo_scaffold,
     register_obs,
-    register_redis,
     register_sql_scaffold,
 )
 from svc_infra.cli.foundation.typer_bootstrap import pre_cli
@@ -23,9 +22,6 @@ register_sql_scaffold(app)
 # --- nosql commands ---
 register_mongo(app)
 register_mongo_scaffold(app)
-
-# --- cache commands ---
-register_redis(app)
 
 # -- observability commands ---
 register_obs(app)

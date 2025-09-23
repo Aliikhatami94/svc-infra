@@ -4,7 +4,7 @@ import os
 
 import typer
 
-from svc_infra.cache.core import (
+from svc_infra.cache import (
     check_roundtrip,
     delete_by_prefix,
     doctor,

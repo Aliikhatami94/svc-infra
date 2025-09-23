@@ -1,4 +1,3 @@
-from svc_infra.cli.cmds.cache.redis.redis_cmds import register as register_redis
 from svc_infra.cli.cmds.db.nosql.mongo.mongo_cmds import register as register_mongo
 from svc_infra.cli.cmds.db.nosql.mongo.mongo_scaffold_cmds import (
     register as register_mongo_scaffold,
