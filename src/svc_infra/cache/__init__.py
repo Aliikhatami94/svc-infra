@@ -2,51 +2,34 @@
 Cache module providing decorators and utilities for caching operations.
 
 This module offers high-level decorators for read/write caching, cache invalidation,
-recaching strategies, and resource-based cache management.
+and resource-based cache management.
 """
 
-# Backend setup
-from .backend import alias, setup_cache, wait_ready
+# Core decorators - main public API
+from .decorators import cached  # alias for cache_read
+from .decorators import mutates  # alias for cache_write
+from .decorators import cache_read, cache_write, init_cache, init_cache_async
 
-# Core decorators and utilities
-from .decorators import cache_read, cache_write, cached, init_cache, init_cache_async, mutates
+# Recaching functionality for advanced use cases
+from .recache import RecachePlan, recache
 
-# Recaching functionality
-from .recache import RecachePlan, RecacheSpec, execute_recache, recache
-
-# Resource management
-from .resources import Resource, entity, resource
-
-# Tag invalidation
-from .tags import invalidate_tags
-
-# TTL utilities
-from .ttl import validate_ttl
+# Resource management for entity-based caching
+from .resources import entity  # legacy alias
+from .resources import resource
 
 __all__ = [
-    # Core decorators
+    # Primary decorators developers use
     "cache_read",
     "cached",
     "cache_write",
     "mutates",
-    # Initialization
+    # Cache initialization
     "init_cache",
     "init_cache_async",
-    # Recaching
+    # Advanced recaching
     "RecachePlan",
-    "RecacheSpec",
     "recache",
-    "execute_recache",
-    # Resource management
-    "Resource",
+    # Resource-based caching
     "resource",
     "entity",
-    # Tag invalidation
-    "invalidate_tags",
-    # TTL utilities
-    "validate_ttl",
-    # Backend
-    "setup_cache",
-    "wait_ready",
-    "alias",
 ]
