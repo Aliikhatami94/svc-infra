@@ -34,12 +34,12 @@ _function_executed: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "function_executed", default=False
 )
 
+# group name -> list of {"getter": <callable>, "key_template": str}
+_read_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
 # Production readiness features - runtime toggleable
 _DEBUG_MODE = False
 _METRICS_ENABLED = False
-
-# group name -> list of {"getter": <callable>, "key_template": str}
-_read_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
 
 # Initialize from environment on first import
