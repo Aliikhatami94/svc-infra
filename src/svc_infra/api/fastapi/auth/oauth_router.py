@@ -44,6 +44,7 @@ def oauth_router_with_backend(
     providers: Dict[str, Dict[str, Any]],
     post_login_redirect: str = "/",
     prefix: str = "/auth/oauth",
+    provider_account_model: type | None = None,
 ) -> DualAPIRouter:
     oauth = OAuth()
 
@@ -144,36 +145,36 @@ def oauth_router_with_backend(
 
         email: str | None = None
         full_name: str | None = None
+        provider_user_id: str | None = None
 
         if kind == "oidc":
             claims: dict[str, Any] = {}
             id_token_present = isinstance(token, dict) and "id_token" in token
 
             if id_token_present:
-                # Try both Authlib signatures and make sure nonce is provided
                 try:
-                    # Newer-style: parse_id_token(token, nonce=...)
-                    claims = await client.parse_id_token(token, nonce=nonce)
+                    claims = await client.parse_id_token(token, nonce=nonce)  # newer Authlib
                 except TypeError:
-                    # Older-style: parse_id_token(request, token, nonce)
-                    claims = await client.parse_id_token(request, token, nonce)
+                    claims = await client.parse_id_token(request, token, nonce)  # older signature
                 except Exception:
-                    # If anything else goes wrong, we’ll fall back to userinfo
                     claims = {}
 
-            # If we still don't have claims, or there was no id_token, use UserInfo
             if not claims:
                 try:
                     claims = await client.userinfo(token=token)
                 except Exception:
                     raise HTTPException(400, "oidc_userinfo_failed")
 
-            # If provider sent a nonce in claims, verify it (only when present)
             if nonce and claims.get("nonce") and claims["nonce"] != nonce:
                 raise HTTPException(400, "invalid_nonce")
 
             email = claims.get("email")
             full_name = claims.get("name") or claims.get("preferred_username")
+
+            provider_user_id = None
+            sub_or_oid = claims.get("sub") or claims.get("oid")
+            if sub_or_oid is not None:
+                provider_user_id = str(sub_or_oid).strip()
 
             # Last-ditch: try userinfo again to grab email if missing
             if not email:
@@ -186,6 +187,9 @@ def oauth_router_with_backend(
 
         elif kind == "github":
             u = (await client.get("user", token=token)).json()
+            provider_user_id = (
+                str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
+            )
             emails_resp = (await client.get("user/emails", token=token)).json()
             primary = next((e for e in emails_resp if e.get("primary") and e.get("verified")), None)
             email = (primary or (emails_resp[0] if emails_resp else {})).get("email")
@@ -193,6 +197,9 @@ def oauth_router_with_backend(
 
         elif kind == "linkedin":
             me = (await client.get("me", token=token)).json()
+            provider_user_id = (
+                str(me.get("id")) if isinstance(me, dict) and me.get("id") is not None else None
+            )
             em = (
                 await client.get(
                     "emailAddress?q=members&projection=(elements*(handle~))", token=token
@@ -213,22 +220,121 @@ def oauth_router_with_backend(
         if not email:
             raise HTTPException(400, "No email from provider")
 
-        # Upsert user (by email)
-        existing = (
-            (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
-        )
-        if existing:
-            user = existing
-        else:
-            user = user_model(email=email, is_active=True, is_superuser=False, is_verified=True)
-            if hasattr(user, "hashed_password"):
-                user.hashed_password = PasswordHelper().hash("!oauth!")
-            elif hasattr(user, "password_hash"):
-                user.password_hash = PasswordHelper().hash("!oauth!")
-            if full_name and hasattr(user, "full_name"):
-                setattr(user, "full_name", full_name)
-            session.add(user)
-            await session.flush()
+        # --- Try resolving by an existing provider link first ----------------
+        user = None
+        existing_link = None
+        if provider_account_model is not None and provider_user_id:
+            existing_link = (
+                (
+                    await session.execute(
+                        select(provider_account_model).filter_by(
+                            provider=provider,
+                            provider_account_id=provider_user_id,
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if existing_link and hasattr(existing_link, "user"):
+                user = existing_link.user
+
+        # --- Fallback: resolve/create by email (previous logic) --------------
+        if user is None:
+            existing = (
+                (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
+            )
+            if existing:
+                user = existing
+            else:
+                user = user_model(
+                    email=email,
+                    is_active=True,
+                    is_superuser=False,
+                    is_verified=True,
+                )
+                # Keep compatibility with FastAPI Users field names
+                if hasattr(user, "hashed_password"):
+                    user.hashed_password = PasswordHelper().hash("!oauth!")
+                elif hasattr(user, "password_hash"):
+                    user.password_hash = PasswordHelper().hash("!oauth!")
+                if full_name and hasattr(user, "full_name"):
+                    setattr(user, "full_name", full_name)
+
+                session.add(user)
+                await session.flush()  # ensure user.id exists
+
+        # --- Ensure provider link exists ------------------------------------
+        if provider_account_model is not None and provider_user_id:
+            link = (
+                (
+                    await session.execute(
+                        select(provider_account_model).filter_by(
+                            provider=provider,
+                            provider_account_id=provider_user_id,
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+
+            # Optional token/claims payloads (only set if your ProviderAccount has these columns)
+            access_token = (token or {}).get("access_token") if isinstance(token, dict) else None
+            refresh_token = (token or {}).get("refresh_token") if isinstance(token, dict) else None
+            expires_at = (token or {}).get("expires_at") if isinstance(token, dict) else None
+            raw_claims = None
+            if kind == "oidc":
+                raw_claims = claims
+            elif kind == "github":
+                raw_claims = {"user": u}
+            elif kind == "linkedin":
+                raw_claims = {"me": me}
+
+            if not link:
+                # Create link
+                values = dict(
+                    user_id=user.id,
+                    provider=provider,
+                    provider_account_id=provider_user_id,
+                )
+                # only set these if your model has them
+                if hasattr(provider_account_model, "access_token"):
+                    values["access_token"] = access_token
+                if hasattr(provider_account_model, "refresh_token"):
+                    values["refresh_token"] = refresh_token
+                if hasattr(provider_account_model, "expires_at"):
+                    values["expires_at"] = expires_at
+                if hasattr(provider_account_model, "raw_claims"):
+                    values["raw_claims"] = raw_claims
+
+                session.add(provider_account_model(**values))
+                await session.flush()
+            else:
+                # Refresh token/claims if columns exist
+                dirty = False
+                if (
+                    hasattr(link, "access_token")
+                    and access_token
+                    and link.access_token != access_token
+                ):
+                    link.access_token = access_token
+                    dirty = True
+                if (
+                    hasattr(link, "refresh_token")
+                    and refresh_token
+                    and link.refresh_token != refresh_token
+                ):
+                    link.refresh_token = refresh_token
+                    dirty = True
+                if hasattr(link, "expires_at") and expires_at and link.expires_at != expires_at:
+                    link.expires_at = expires_at
+                    dirty = True
+                if hasattr(link, "raw_claims") and raw_claims and link.raw_claims != raw_claims:
+                    link.raw_claims = raw_claims
+                    dirty = True
+                if dirty:
+                    await session.flush()
 
         # Issue JWT
         strategy = auth_backend.get_strategy()
