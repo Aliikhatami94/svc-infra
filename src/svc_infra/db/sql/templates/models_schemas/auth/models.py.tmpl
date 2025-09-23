@@ -3,13 +3,16 @@ from datetime import datetime
 import uuid
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
-from sqlalchemy import String, Boolean, DateTime, JSON, Text, text
-from svc_infra.db.sql.types import GUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    String, Boolean, DateTime, JSON, Text, text,
+    ForeignKey, UniqueConstraint, Index
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from fastapi_users.password import PasswordHelper
 
+from svc_infra.db.sql.types import GUID
 from svc_infra.db.sql.base import ModelBase
 from svc_infra.db.sql.uniq import make_unique_sql_indexes
 from svc_infra.db.sql.uniq_hooks import dedupe_sql_service
@@ -18,7 +21,7 @@ from svc_infra.db.sql.repository import SqlRepository
 # --- local password helper must be defined before class (used by property) ---
 _pwd = PasswordHelper()
 
-# ------------------------------ Model ------------------------------
+# ------------------------------ Model: User (${AuthEntity}) -------------------
 
 class ${AuthEntity}(ModelBase):
     __tablename__ = "${auth_table_name}"
@@ -63,19 +66,27 @@ class ${AuthEntity}(ModelBase):
     # misc (avoid attr name 'metadata' clash)
     extra: Mapped[dict] = mapped_column("metadata", MutableDict.as_mutable(JSON), default=dict)
 
+    # OAuth links
+    provider_accounts: Mapped[list["ProviderAccount"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     # auditing (DB-side timestamps)
-    created_at = mapped_column(DateTime(timezone=True),
-                               server_default=text("CURRENT_TIMESTAMP"),
-                               nullable=False)
-    updated_at = mapped_column(DateTime(timezone=True),
-                               server_default=text("CURRENT_TIMESTAMP"),
-                               onupdate=text("CURRENT_TIMESTAMP"),
-                               nullable=False)
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+    )
+    updated_at = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=text("CURRENT_TIMESTAMP"), nullable=False
+    )
 
     def __repr__(self) -> str:
         return f"<${AuthEntity} id={self.id} email={self.email!r}>"
 
-# --- Uniqueness policy --------------------------------------------------------
+
+# --- Uniqueness policy for User ------------------------------------------------
 
 # Unique indexes, including case-insensitive and/or tenant-scoped.
 for _ix in make_unique_sql_indexes(
@@ -85,6 +96,50 @@ for _ix in make_unique_sql_indexes(
 ):
     # Registered with Table metadata (alembic/autogenerate will pick them up)
     pass
+
+
+# ------------------------------ Model: ProviderAccount -------------------------
+
+class ProviderAccount(ModelBase):
+    """
+    Links a local user to an external identity provider account.
+
+    - (provider, provider_account_id) is unique
+    - Optionally stores tokens for later API calls (encrypt at rest in prod)
+    """
+    __tablename__ = "provider_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("${auth_table_name}.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped["${AuthEntity}"] = relationship(back_populates="provider_accounts")
+
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)               # "google"|"github"|"linkedin"|"microsoft"|...
+    provider_account_id: Mapped[str] = mapped_column(String(255), nullable=False)   # sub/oid (OIDC) or id (github/linkedin)
+
+    # Optional token material (store encrypted in real deployments)
+    access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    raw_claims: Mapped[Optional[dict]] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
+
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+    )
+    updated_at = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=text("CURRENT_TIMESTAMP"), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_account_id", name="uq_provider_account"),
+        Index("ix_provider_accounts_user_id", "user_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ProviderAccount provider={self.provider!r} provider_account_id={self.provider_account_id!r} user_id={self.user_id}>"
 
 # --- Auth service factory ------------------------------------------------------
 

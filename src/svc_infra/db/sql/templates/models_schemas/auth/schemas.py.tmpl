@@ -5,10 +5,27 @@ from typing import Optional, Any, Dict, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
+# ------------------------------ Base mixin ------------------------------------
+
 class Timestamped(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     created_at: datetime
     updated_at: datetime
+
+# ------------------------------ ProviderAccount -------------------------------
+
+class ProviderAccountBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    provider: str = Field(..., examples=["google", "github", "linkedin", "microsoft"])
+    provider_account_id: str
+
+class ProviderAccountRead(ProviderAccountBase, Timestamped):
+    id: UUID
+
+# Note: we generally do not expose create/update for provider accounts directly
+# via public API; they’re created server-side during OAuth callback.
+
+# ------------------------------ ${AuthEntity} ---------------------------------
 
 class ${AuthEntity}Base(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -26,6 +43,7 @@ class ${AuthEntity}Read(${AuthEntity}Base, Timestamped):
     id: UUID
     last_login: Optional[datetime] = None
     disabled_reason: Optional[str] = None
+    provider_accounts: List[ProviderAccountRead] = Field(default_factory=list)
 
 class ${AuthEntity}Create(BaseModel):
     email: EmailStr

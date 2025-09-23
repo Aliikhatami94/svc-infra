@@ -4,8 +4,9 @@ import base64
 import hashlib
 import secrets
 from typing import Any, Dict, Literal, cast
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
+from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -13,6 +14,7 @@ from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
 from sqlalchemy import select
 from starlette import status
+from starlette.responses import Response
 
 from svc_infra.api.fastapi import DualAPIRouter
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
@@ -26,10 +28,14 @@ def _gen_pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
-def _validate_redirect(url: str, allow_hosts: list[str]) -> None:
-    host = urlparse(url).hostname or ""
-    if host.lower() not in {h.lower() for h in allow_hosts}:
-        raise HTTPException(status_code=400, detail="redirect_not_allowed")
+def _validate_redirect(url: str, allow_hosts: list[str], *, require_https: bool) -> None:
+    p = urlparse(url)
+    host_port = p.hostname.lower() + (f":{p.port}" if p.port else "")
+    allowed = {h.lower() for h in allow_hosts}
+    if host_port not in allowed and p.hostname.lower() not in allowed:
+        raise HTTPException(400, "redirect_not_allowed")
+    if require_https and p.scheme != "https":
+        raise HTTPException(400, "https_required")
 
 
 def oauth_router_with_backend(
@@ -93,6 +99,24 @@ def oauth_router_with_backend(
 
     @router.get("/{provider}/callback", name="oauth_callback")
     async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
+        # Handle provider-side errors up front
+        if err := request.query_params.get("error"):
+            # clear transient oauth session state so user can retry
+            request.session.pop(f"oauth:{provider}:state", None)
+            request.session.pop(f"oauth:{provider}:pkce_verifier", None)
+            request.session.pop(f"oauth:{provider}:nonce", None)
+
+            st = get_auth_settings()
+            fallback = str(getattr(st, "post_login_redirect", "/"))
+            # send the error back to frontend (adjust route as you like)
+            qs = urlencode(
+                {
+                    "oauth_error": err,
+                    "error_description": request.query_params.get("error_description", ""),
+                }
+            )
+            return RedirectResponse(url=f"{fallback}?{qs}", status_code=status.HTTP_302_FOUND)
+
         client = oauth.create_client(provider)
         if not client:
             raise HTTPException(404, "Provider not configured")
@@ -104,7 +128,16 @@ def oauth_router_with_backend(
         if not expected_state or provided_state != expected_state:
             raise HTTPException(400, "invalid_state")
 
-        token = await client.authorize_access_token(request, code_verifier=verifier)
+        try:
+            token = await client.authorize_access_token(request, code_verifier=verifier)
+        except OAuthError as e:
+            # clear transient state so user can retry
+            for k in ("state", "pkce_verifier", "nonce"):
+                request.session.pop(f"oauth:{provider}:{k}", None)
+            st = get_auth_settings()
+            fallback = str(getattr(st, "post_login_redirect", "/"))
+            qs = urlencode({"oauth_error": e.error, "error_description": e.description or ""})
+            return RedirectResponse(f"{fallback}?{qs}", status_code=status.HTTP_302_FOUND)
 
         cfg = providers.get(provider, {})
         kind = cfg.get("kind")
@@ -198,7 +231,7 @@ def oauth_router_with_backend(
             await session.flush()
 
         # Issue JWT
-        strategy = (auth_backend.get_strategy)()
+        strategy = auth_backend.get_strategy()
         jwt_token = await strategy.write_token(user)
 
         # Set HttpOnly cookie and redirect (allow-listed)
@@ -208,20 +241,62 @@ def oauth_router_with_backend(
         )
 
         allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
-        _validate_redirect(redirect_url, allow_hosts)
+        require_https = bool(getattr(st, "session_cookie_secure", False))
+
+        _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
+
+        nxt = request.query_params.get("next")
+        if nxt:
+            try:
+                _validate_redirect(nxt, allow_hosts, require_https=require_https)
+                redirect_url = nxt
+            except HTTPException:
+                pass
 
         same_site_lit = cast(
             Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower()
         )
+        if same_site_lit == "none" and not bool(st.session_cookie_secure):
+            # auto-fix to lax or raise; I suggest raising in dev
+            raise HTTPException(
+                500, "session_cookie_samesite=None requires session_cookie_secure=True"
+            )
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
+        name = st.session_cookie_name
+        if (
+            st.session_cookie_secure
+            and not st.session_cookie_domain
+            and st.session_cookie_name[:7] != "__Host-"
+        ):
+            name = "__Host-" + st.session_cookie_name
+
         resp.set_cookie(
-            key=st.session_cookie_name,
-            value=jwt_token,  # now a real string token
+            key=name,
+            value=jwt_token,
             max_age=st.session_cookie_max_age_seconds,
             httponly=True,
             secure=bool(st.session_cookie_secure),
-            samesite=same_site_lit,
-            domain=st.session_cookie_domain,
+            samesite=same_site_lit,  # "none" only if secure
+            domain=st.session_cookie_domain,  # must be None for __Host-
+            path="/",
+        )
+        return resp
+
+    @router.post("/logout")
+    async def logout():
+        st = get_auth_settings()
+        name = st.session_cookie_name
+        if (
+            st.session_cookie_secure
+            and not st.session_cookie_domain
+            and not name.startswith("__Host-")
+        ):
+            name = "__Host-" + name
+        resp = Response(status_code=204)
+        resp.delete_cookie(
+            key=name,
+            domain=st.session_cookie_domain,  # must be None for __Host-
             path="/",
         )
         return resp
