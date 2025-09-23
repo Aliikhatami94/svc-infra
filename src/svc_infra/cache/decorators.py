@@ -13,6 +13,7 @@ import logging
 import os
 import time
 import warnings
+from collections import defaultdict
 from dataclasses import dataclass
 from inspect import Parameter, signature
 from typing import Any, Awaitable, Callable, Iterable, Optional, Union
@@ -36,6 +37,9 @@ _function_executed: contextvars.ContextVar[bool] = contextvars.ContextVar(
 # Production readiness features - runtime toggleable
 _DEBUG_MODE = False
 _METRICS_ENABLED = False
+
+# group name -> list of {"getter": <callable>, "key_template": str}
+_read_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
 
 # Initialize from environment on first import
@@ -228,6 +232,7 @@ def cache_read(
     early_ttl: Optional[int] = None,
     refresh: Optional[bool] = None,
     smooth_expiry: bool = False,
+    group: Optional[str] = None,
 ):
     """
     Cache decorator for read operations with version-resilient key handling.
@@ -440,6 +445,15 @@ def cache_read(
         # Attach key variants renderer for cache writers - use exact-key deletion first
         setattr(wrapped, "__svc_key_variants__", _build_key_variants_renderer(template))
 
+        # NEW: register this read into a named group (for non-resource warming)
+        if group:
+            _read_groups[group].append(
+                {
+                    "getter": wrapped,
+                    "key_template": template,  # used for exact deletes if needed
+                }
+            )
+
         return wrapped
 
     return _decorator
@@ -631,8 +645,9 @@ def _generate_key_variants(
 def cache_write(
     *,
     tags: Union[Iterable[str], Callable[..., Iterable[str]]],
-    recache_specs: Optional[Iterable[RecacheSpec]] = None,  # Fixed name shadowing
+    recache_specs: Optional[Iterable[RecacheSpec]] = None,
     recache_max_concurrency: int = 5,
+    warm: Union[bool, str, Iterable[Union[RecacheSpec, Callable]]] = False,  # ← NEW
 ):
     """
     Cache invalidation decorator for write operations.
@@ -816,11 +831,40 @@ def cache_write(
         await asyncio.gather(*[_run_single_recache(spec) for spec in specs], return_exceptions=True)
 
     def _decorator(func: Callable[..., Awaitable[Any]]):
-        # Validate tags usage
-        _validate_tags_usage(tags, func.__name__)
+        # synthesize additional recache plans from "warm"
+        synthesized: list[RecacheSpec] = []
+
+        # Helper to auto-build include list = intersection(mutator kwargs & getter params)
+        def _auto_plan(getter: Callable, key_template: Optional[str] = None) -> RecachePlan:
+            gparams = set(signature(getter).parameters.keys())
+            # we don't have concrete kwargs here; choose safe heuristic: take all mutator params that getter understands
+            mparams = set(signature(func).parameters.keys())
+            include = sorted(gparams & mparams)
+            return recache(getter, include=include, key=key_template)
+
+        # Case A: warm by group name
+        if isinstance(warm, str) and warm:
+            for entry in _read_groups.get(warm, []):
+                synthesized.append(_auto_plan(entry["getter"], entry["key_template"]))
+
+        # Case B: warm by explicit list of getters / recache plans
+        elif isinstance(warm, (list, tuple)):
+            for item in warm:
+                if isinstance(item, RecachePlan):
+                    synthesized.append(item)
+                elif callable(item):
+                    synthesized.append(
+                        _auto_plan(item, getattr(item, "__svc_key_template__", None))
+                    )
+                else:
+                    logger.warning(f"Unsupported warm entry: {item!r}")
+
+        # Merge user-provided recache_specs with synthesized
+        merged_recache_specs = recache_specs
+        if synthesized:
+            merged_recache_specs = (list(recache_specs) if recache_specs else []) + synthesized
 
         async def _wrapped(*args, **kwargs):
-            # Execute the original function
             result = await func(*args, **kwargs)
 
             try:
@@ -843,6 +887,12 @@ def cache_write(
                         logger.error(f"Cache recaching failed: {e}")
                         _increment_metric("cache.error")
 
+            if merged_recache_specs:
+                try:
+                    await _execute_recache(merged_recache_specs, *args, **kwargs)
+                except Exception as e:
+                    logger.error(f"Cache recaching failed: {e}")
+                    _increment_metric("cache.error")
             return result
 
         return _wrapped
