@@ -24,6 +24,7 @@ def add_auth(
     oauth_prefix: str = "/auth/oauth",
     enable_password: bool = True,
     enable_oauth: bool = True,
+    provider_account_model=None,
 ) -> None:
     """
     Wire auth into the app.
@@ -77,9 +78,10 @@ def add_auth(
                 oauth_router_with_backend(
                     user_model=user_model,
                     auth_backend=auth_backend,
-                    providers=providers,
+                    providers=providers_from_settings(settings_obj),
                     post_login_redirect=post_login_redirect
                     or getattr(settings_obj, "post_login_redirect", "/"),
                     prefix="/_sql" + oauth_prefix,
+                    provider_account_model=provider_account_model,
                 )
             )
