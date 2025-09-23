@@ -9,7 +9,7 @@ from fastapi_users.authentication import AuthenticationBackend, BearerTransport,
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
 from svc_infra.api.fastapi import DualAPIRouter, dualize_router
-from svc_infra.auth.settings import get_auth_settings
+from svc_infra.api.fastapi.auth.settings import get_auth_settings
 
 
 def get_fastapi_users(
