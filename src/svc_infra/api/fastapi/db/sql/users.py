@@ -11,6 +11,8 @@ from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 from svc_infra.api.fastapi import DualAPIRouter, dualize_router
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 
+from .session import SqlSessionDep
+
 
 def get_fastapi_users(
     user_model: Any,
@@ -26,7 +28,7 @@ def get_fastapi_users(
     # Lazy import to avoid hard dependency at module import time
     from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
-    async def get_user_db(session) -> AsyncIterator[Any]:
+    async def get_user_db(session: SqlSessionDep) -> AsyncIterator[Any]:
         yield SQLAlchemyUserDatabase(session, user_model)
 
     class UserManager(UUIDIDMixin, BaseUserManager[Any, UUID]):
