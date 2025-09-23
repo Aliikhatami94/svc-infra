@@ -43,6 +43,15 @@ class ${AuthEntity}(ModelBase):
     def password(self, raw: str) -> None:
         self.password_hash = _pwd.hash(raw)
 
+    @property
+    def hashed_password(self) -> str:
+        return self.password_hash
+
+    @hashed_password.setter
+    def hashed_password(self, value: str) -> None:
+        # Accept pre-hashed assignments (FastAPI Users sets hashed_password directly)
+        self.password_hash = value
+
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     disabled_reason: Mapped[Optional[str]] = mapped_column(Text)
 
