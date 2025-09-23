@@ -108,31 +108,47 @@ def oauth_router_with_backend(
         cfg = providers.get(provider, {})
         kind = cfg.get("kind")
 
-        email = None
-        full_name = None
+        email: str | None = None
+        full_name: str | None = None
 
         if kind == "oidc":
             claims: dict[str, Any] = {}
 
-            # Prefer ID token when present, otherwise fall back to UserInfo
-            if "id_token" in token:
-                claims = await client.parse_id_token(request, token)
-                if nonce and claims.get("nonce") != nonce:
-                    raise HTTPException(400, "invalid_nonce")
-            else:
+            # Prefer ID token if present; handle both Authlib signatures.
+            id_token_str = token.get("id_token") if isinstance(token, dict) else None
+            if id_token_str:
+                try:
+                    # Authlib >= 1.2 often supports this signature
+                    claims = await client.parse_id_token(token)
+                except TypeError:
+                    # Older Starlette client signature: (request, token)
+                    claims = await client.parse_id_token(request, token)
+                except Exception:
+                    # If parsing fails for any reason, fall back to userinfo
+                    claims = {}
+
+            # Fallback to userinfo when id_token is absent or couldn't be parsed
+            if not claims:
                 try:
                     claims = await client.userinfo(token=token)
                 except Exception:
-                    raise HTTPException(400, "missing_id_token_and_userinfo")
+                    raise HTTPException(400, "oidc_userinfo_failed")
+
+            # If provider sent a nonce in claims, verify it (when we have one)
+            if nonce and claims.get("nonce") and claims["nonce"] != nonce:
+                raise HTTPException(400, "invalid_nonce")
 
             email = claims.get("email")
             full_name = claims.get("name") or claims.get("preferred_username")
 
-            # If email still not present, try userinfo explicitly as a final fallback
+            # Last-ditch: try userinfo again to grab email if missing
             if not email:
-                ui = await client.userinfo(token=token)
-                email = ui.get("email") or email
-                full_name = ui.get("name") or full_name
+                try:
+                    ui = await client.userinfo(token=token)
+                    email = ui.get("email") or email
+                    full_name = ui.get("name") or full_name
+                except Exception:
+                    pass
 
         elif kind == "github":
             u = (await client.get("user", token=token)).json()
@@ -171,7 +187,6 @@ def oauth_router_with_backend(
             user = existing
         else:
             user = user_model(email=email, is_active=True, is_superuser=False, is_verified=True)
-            # Ensure compatibility with FastAPI Users expected field
             if hasattr(user, "hashed_password"):
                 user.hashed_password = PasswordHelper().hash("!oauth!")
             elif hasattr(user, "password_hash"):
@@ -189,14 +204,12 @@ def oauth_router_with_backend(
         redirect_url = str(
             getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
         )
-
         allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
         _validate_redirect(redirect_url, allow_hosts)
 
         same_site_lit = cast(
             Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower()
         )
-
         resp = RedirectResponse(url=redirect_url)
         resp.set_cookie(
             key=st.session_cookie_name,
