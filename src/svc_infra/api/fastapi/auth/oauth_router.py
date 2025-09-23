@@ -12,6 +12,7 @@ from fastapi.responses import RedirectResponse
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
 from sqlalchemy import select
+from starlette import status
 
 from svc_infra.api.fastapi import DualAPIRouter
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
@@ -197,23 +198,25 @@ def oauth_router_with_backend(
             await session.flush()
 
         # Issue JWT
-        jwt_token = (auth_backend.get_strategy)().write_token(user)
+        strategy = (auth_backend.get_strategy)()
+        jwt_token = await strategy.write_token(user)
 
         # Set HttpOnly cookie and redirect (allow-listed)
         st = get_auth_settings()
         redirect_url = str(
             getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
         )
+
         allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
         _validate_redirect(redirect_url, allow_hosts)
 
         same_site_lit = cast(
             Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower()
         )
-        resp = RedirectResponse(url=redirect_url)
+        resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
         resp.set_cookie(
             key=st.session_cookie_name,
-            value=jwt_token,
+            value=jwt_token,  # now a real string token
             max_age=st.session_cookie_max_age_seconds,
             httponly=True,
             secure=bool(st.session_cookie_secure),
