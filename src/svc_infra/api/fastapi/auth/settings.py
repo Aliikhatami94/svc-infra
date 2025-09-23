@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import List, Optional
 
-from pydantic import AnyHttpUrl, BaseModel, Field, SecretStr, field_validator
+from pydantic import AnyHttpUrl, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,21 +31,21 @@ class AuthSettings(BaseSettings):
     github_client_id: Optional[str] = None
     github_client_secret: Optional[SecretStr] = None
 
-    # Microsoft Entra ID (Azure AD)
     ms_client_id: Optional[str] = None
     ms_client_secret: Optional[SecretStr] = None
     ms_tenant: Optional[str] = None
 
-    # LinkedIn (non-OIDC)
     li_client_id: Optional[str] = None
     li_client_secret: Optional[SecretStr] = None
 
-    # Generic OIDC providers
     oidc_providers: List[OIDCProvider] = Field(default_factory=list)
 
     # ---- Redirect + cookie settings ----
     post_login_redirect: AnyHttpUrl | str = "http://localhost:3000/app"
-    redirect_allow_hosts: List[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
+
+    # NOTE: keep as raw string to avoid pydantic JSON parsing at env stage.
+    # Accepts either JSON (["a","b"]) or comma-separated ("a,b").
+    redirect_allow_hosts_raw: str = "localhost,127.0.0.1"
 
     session_cookie_name: str = "svc_session"
     session_cookie_secure: bool = False
@@ -60,26 +60,6 @@ class AuthSettings(BaseSettings):
         env_nested_delimiter="__",
     )
 
-    @field_validator("redirect_allow_hosts", mode="before")
-    @classmethod
-    def _coerce_redirect_hosts(cls, v):
-        if v is None or v == "":
-            return ["localhost", "127.0.0.1"]
-        if isinstance(v, list):
-            return [str(x) for x in v]
-        if isinstance(v, str):
-            s = v.strip()
-            # Try JSON first
-            try:
-                parsed = json.loads(s)
-                if isinstance(parsed, list):
-                    return [str(x) for x in parsed]
-            except Exception:
-                pass
-            # Fallback: comma/space separated
-            return [h.strip() for h in s.split(",") if h.strip()]
-        return v
-
 
 _settings: AuthSettings | None = None
 
@@ -89,3 +69,20 @@ def get_auth_settings() -> AuthSettings:
     if _settings is None:
         _settings = AuthSettings()
     return _settings
+
+
+def parse_redirect_allow_hosts(raw: str | None) -> list[str]:
+    """Parse JSON list or comma-separated hosts into a list of strings."""
+    if not raw:
+        return ["localhost", "127.0.0.1"]
+    s = raw.strip()
+    # Try JSON first
+    if s.startswith("["):
+        try:
+            val = json.loads(s)
+            if isinstance(val, list):
+                return [str(x).strip() for x in val if str(x).strip()]
+        except Exception:
+            pass
+    # Fallback: comma-separated
+    return [h.strip() for h in s.split(",") if h.strip()]
