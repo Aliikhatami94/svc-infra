@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-from svc_infra.api.fastapi import DualAPIRouter
-from svc_infra.auth import integration
+from svc_infra.api.fastapi.auth import integration
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 
 
 def _make_router(path: str) -> DualAPIRouter:

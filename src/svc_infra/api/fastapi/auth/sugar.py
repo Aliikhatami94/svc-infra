@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Sequence
 
 from fastapi import Depends
 
-from svc_infra.api.fastapi import DualAPIRouter
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 
 from .deps import optional_user_dep_factory, require_roles_dep_factory, require_user_dep_factory
 
