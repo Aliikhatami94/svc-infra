@@ -170,6 +170,7 @@ def oauth_router_with_backend(
         email: str | None = None
         full_name: str | None = None
         provider_user_id: str | None = None
+        email_verified: bool | None = None
 
         if kind == "oidc":
             claims: dict[str, Any] = {}
@@ -194,6 +195,7 @@ def oauth_router_with_backend(
 
             email = claims.get("email")
             full_name = claims.get("name") or claims.get("preferred_username")
+            email_verified = bool(claims.get("email_verified", True))
 
             provider_user_id = None
             sub_or_oid = claims.get("sub") or claims.get("oid")
@@ -211,13 +213,14 @@ def oauth_router_with_backend(
 
         elif kind == "github":
             u = (await client.get("user", token=token)).json()
-            provider_user_id = (
-                str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
-            )
             emails_resp = (await client.get("user/emails", token=token)).json()
             primary = next((e for e in emails_resp if e.get("primary") and e.get("verified")), None)
             email = (primary or (emails_resp[0] if emails_resp else {})).get("email")
             full_name = u.get("name") or u.get("login")
+            provider_user_id = (
+                str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
+            )
+            email_verified = bool(primary and primary.get("verified", False))
 
         elif kind == "linkedin":
             me = (await client.get("me", token=token)).json()
@@ -237,9 +240,14 @@ def oauth_router_with_backend(
             first = next(iter(lf), None)
             last = next(iter(ll), None)
             full_name = " ".join([x for x in [first, last] if x])
+            email_verified = True
 
         else:
             raise HTTPException(400, "Unsupported provider kind")
+
+        if email_verified is False:
+            # Stop here—don’t create/link accounts on unverified addresses.
+            raise HTTPException(400, "unverified_email")
 
         if not email:
             raise HTTPException(400, "No email from provider")
@@ -425,6 +433,35 @@ def oauth_router_with_backend(
             secure=bool(st.session_cookie_secure),
             samesite=same_site_lit,  # "none" only if secure
             domain=st.session_cookie_domain,  # must be None for __Host-
+            path="/",
+        )
+        return resp
+
+    @router.post("/refresh")
+    async def refresh(request: Request):
+        st = get_auth_settings()
+        name = st.session_cookie_name
+        raw = request.cookies.get(name)
+        if not raw:
+            raise HTTPException(401, "missing_token")
+
+        strategy = auth_backend.get_strategy()
+        try:
+            user = await strategy.read_token(raw, None)  # contextless
+        except Exception:
+            raise HTTPException(401, "invalid_token")
+
+        new_token = await strategy.write_token(user)
+
+        resp = Response(status_code=204)
+        resp.set_cookie(
+            key=name,
+            value=new_token,
+            max_age=st.session_cookie_max_age_seconds,
+            httponly=True,
+            secure=bool(st.session_cookie_secure),
+            samesite=str(st.session_cookie_samesite).lower(),
+            domain=st.session_cookie_domain,
             path="/",
         )
         return resp

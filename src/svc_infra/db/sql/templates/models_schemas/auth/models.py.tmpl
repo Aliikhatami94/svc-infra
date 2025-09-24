@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
+import os
 import uuid
 from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
@@ -12,6 +13,8 @@ from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from fastapi_users.password import PasswordHelper
 
+from cryptography.fernet import Fernet  # <-- for refresh_token encryption
+
 from svc_infra.db.sql.types import GUID
 from svc_infra.db.sql.base import ModelBase
 from svc_infra.db.sql.uniq import make_unique_sql_indexes
@@ -20,6 +23,30 @@ from svc_infra.db.sql.repository import SqlRepository
 
 # --- local password helper must be defined before class (used by property) ---
 _pwd = PasswordHelper()
+
+# --- Fernet setup for refresh_token encryption --------------------------------
+# In prod, provide REFRESH_TOKEN_KEY via env/secret manager.
+# Example key generation (one-off): >>> from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())
+_FERNET_KEY = os.environ.get("REFRESH_TOKEN_KEY")
+if not _FERNET_KEY:
+    # Fallback for local/dev; DO NOT rely on this in prod.
+    _FERNET_KEY = Fernet.generate_key().decode()
+_f = Fernet(_FERNET_KEY.encode())
+
+def _encrypt(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return _f.encrypt(value.encode()).decode()
+
+def _decrypt(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        return _f.decrypt(value.encode()).decode()
+    except Exception:
+        # If key rotated and old value can’t decrypt, you may want to null it out,
+        # or handle migration/reencryption elsewhere.
+        return None
 
 # ------------------------------ Model: User (${AuthEntity}) -------------------
 
@@ -85,7 +112,6 @@ class ${AuthEntity}(ModelBase):
     def __repr__(self) -> str:
         return f"<${AuthEntity} id={self.id} email={self.email!r}>"
 
-
 # --- Uniqueness policy for User ------------------------------------------------
 
 # Unique indexes, including case-insensitive and/or tenant-scoped.
@@ -97,7 +123,6 @@ for _ix in make_unique_sql_indexes(
     # Registered with Table metadata (alembic/autogenerate will pick them up)
     pass
 
-
 # ------------------------------ Model: ProviderAccount -------------------------
 
 class ProviderAccount(ModelBase):
@@ -105,7 +130,7 @@ class ProviderAccount(ModelBase):
     Links a local user to an external identity provider account.
 
     - (provider, provider_account_id) is unique
-    - Optionally stores tokens for later API calls (encrypt at rest in prod)
+    - Optionally stores tokens for later API calls (refresh_token encrypted at rest)
     """
     __tablename__ = "provider_accounts"
 
@@ -122,9 +147,20 @@ class ProviderAccount(ModelBase):
     provider: Mapped[str] = mapped_column(String(50), nullable=False)               # "google"|"github"|"linkedin"|"microsoft"|...
     provider_account_id: Mapped[str] = mapped_column(String(255), nullable=False)   # sub/oid (OIDC) or id (github/linkedin)
 
-    # Optional token material (store encrypted in real deployments)
+    # Optional token material
     access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Store encrypted refresh_token in the same column name for DB compatibility.
+    _refresh_token: Mapped[Optional[str]] = mapped_column("refresh_token", Text, nullable=True)
+
+    @property
+    def refresh_token(self) -> Optional[str]:
+        return _decrypt(self._refresh_token)
+
+    @refresh_token.setter
+    def refresh_token(self, value: Optional[str]) -> None:
+        self._refresh_token = _encrypt(value)
+
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     raw_claims: Mapped[Optional[dict]] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
 
