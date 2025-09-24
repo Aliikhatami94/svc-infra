@@ -260,8 +260,24 @@ def oauth_router_with_backend(
                 .scalars()
                 .first()
             )
-            if existing_link and hasattr(existing_link, "user"):
-                user = existing_link.user
+
+            user = None
+            existing_link = None
+            if provider_account_model is not None and provider_user_id:
+                existing_link = (
+                    (
+                        await session.execute(
+                            select(provider_account_model).filter_by(
+                                provider=provider,
+                                provider_account_id=provider_user_id,
+                            )
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
+                if existing_link:
+                    user = await session.get(user_model, existing_link.user_id)
 
         # --- Fallback: resolve/create by email (previous logic) --------------
         if user is None:

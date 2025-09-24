@@ -114,7 +114,10 @@ class ProviderAccount(ModelBase):
     user_id: Mapped[uuid.UUID] = mapped_column(
         GUID(), ForeignKey("${auth_table_name}.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped["${AuthEntity}"] = relationship(back_populates="provider_accounts")
+    user: Mapped["${AuthEntity}"] = relationship(
+        back_populates="provider_accounts",
+        lazy="selectin",
+    )
 
     provider: Mapped[str] = mapped_column(String(50), nullable=False)               # "google"|"github"|"linkedin"|"microsoft"|...
     provider_account_id: Mapped[str] = mapped_column(String(255), nullable=False)   # sub/oid (OIDC) or id (github/linkedin)
