@@ -71,6 +71,12 @@ def _cookie_name(st) -> str:
     return name
 
 
+def _cookie_domain(st):
+    # IMPORTANT: return None for localhost/dev instead of "" or invalid host
+    d = getattr(st, "session_cookie_domain", None)
+    return d or None
+
+
 def oauth_router_with_backend(
     user_model: type,
     auth_backend: AuthenticationBackend,
@@ -413,14 +419,16 @@ def oauth_router_with_backend(
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
         name = _cookie_name(st)
+        domain = _cookie_domain(st)
+
         resp.set_cookie(
             key=name,
             value=jwt_token,
             max_age=st.session_cookie_max_age_seconds,
             httponly=True,
             secure=bool(st.session_cookie_secure),
-            samesite=same_site_lit,  # "none" only if secure
-            domain=st.session_cookie_domain,  # must be None for __Host-
+            samesite=same_site_lit,
+            domain=domain,
             path="/",
         )
         return resp
@@ -449,7 +457,7 @@ def oauth_router_with_backend(
             httponly=True,
             secure=bool(st.session_cookie_secure),
             samesite=str(st.session_cookie_samesite).lower(),
-            domain=st.session_cookie_domain,
+            domain=_cookie_domain(st),
             path="/",
         )
         return resp
@@ -466,7 +474,11 @@ def oauth_router_with_backend(
         # delete auth cookie
         name = _cookie_name(st)
         resp = Response(status_code=204)
-        resp.delete_cookie(key=name, domain=st.session_cookie_domain, path="/")
+        resp.delete_cookie(
+            key=name,
+            domain=_cookie_domain(st),
+            path="/",
+        )
         return resp
 
     return router
