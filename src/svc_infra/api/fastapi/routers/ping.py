@@ -4,7 +4,7 @@ import logging
 
 from fastapi import Response, status
 
-from svc_infra.api.fastapi import public_router
+from svc_infra.api.fastapi.auth import public_router
 
 router = public_router()
 ROUTER_TAG = "health"
