@@ -3,7 +3,8 @@ from __future__ import annotations
 from fastapi import Response, status
 from sqlalchemy import text
 
-from svc_infra.api.fastapi import DualAPIRouter, public_router
+from svc_infra.api.fastapi.auth.sugar import public_router
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 
 from .session import SqlSessionDep
 

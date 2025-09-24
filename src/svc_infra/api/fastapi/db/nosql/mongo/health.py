@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from svc_infra.api.fastapi import DualAPIRouter, public_router
+from svc_infra.api.fastapi.auth.sugar import public_router
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 from svc_infra.db.nosql.mongo.client import ping_mongo
 
 

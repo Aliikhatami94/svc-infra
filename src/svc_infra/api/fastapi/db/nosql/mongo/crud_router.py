@@ -3,7 +3,7 @@ from typing import Annotated, Any, Optional, Sequence, Type, cast
 from fastapi import Body, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from svc_infra.api.fastapi import DualAPIRouter, public_router
+from svc_infra.api.fastapi.auth.sugar import public_router
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,
     OrderParams,
@@ -13,6 +13,7 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
+from svc_infra.api.fastapi.dual_router import DualAPIRouter
 from svc_infra.db.nosql.mongo.client import acquire_db
 from svc_infra.db.nosql.service import NoSqlService
 
