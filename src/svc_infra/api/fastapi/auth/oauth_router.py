@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Literal, cast
 from urllib.parse import urlencode, urlparse
 
+import jwt
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, Request
@@ -432,21 +433,45 @@ def oauth_router_with_backend(
         return resp
 
     @router.post("/refresh")
-    async def refresh(request: Request):
+    async def refresh(request: Request, session: SqlSessionDep):
         st = get_auth_settings()
-        name = _cookie_name(st)  # <-- add this
-        raw = request.cookies.get(name)  # <-- use it
+
+        # 1) read cookie
+        name = _cookie_name(st)
+        raw = request.cookies.get(name)
         if not raw:
             raise HTTPException(401, "missing_token")
 
-        strategy = auth_backend.get_strategy()
+        # 2) decode token (verify secret + aud)
         try:
-            user = await strategy.read_token(raw, None)  # ok to pass None context
+            secret = (
+                st.jwt.secret.get_secret_value()
+                if getattr(st, "jwt", None) and getattr(st.jwt, "secret", None)
+                else "dev-change-me"  # same fallback you used for sessions
+            )
+            # FastAPI Users uses this default audience for JWTs
+            payload = jwt.decode(
+                raw,
+                secret,
+                algorithms=["HS256"],
+                audience=["fastapi-users:auth"],
+            )
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(401, "invalid_token")
         except Exception:
             raise HTTPException(401, "invalid_token")
 
+        # 3) load user
+        user = await session.get(user_model, user_id)
+        if not user:
+            raise HTTPException(401, "invalid_token")
+
+        # 4) mint new token via the same strategy you use at login
+        strategy = auth_backend.get_strategy()
         new_token = await strategy.write_token(user)
 
+        # 5) set cookie and return 204
         resp = Response(status_code=204)
         resp.set_cookie(
             key=name,
