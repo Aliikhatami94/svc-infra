@@ -65,7 +65,8 @@ def _coerce_expires_at(token: dict | None) -> datetime | None:
 
 
 def _cookie_name(st) -> str:
-    name = st.session_cookie_name
+    # use the dedicated auth cookie name, NOT the Starlette session one
+    name = getattr(st, "auth_cookie_name", "svc_auth")
     if st.session_cookie_secure and not st.session_cookie_domain and not name.startswith("__Host-"):
         name = "__Host-" + name
     return name
@@ -418,17 +419,14 @@ def oauth_router_with_backend(
             )
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
-        name = _cookie_name(st)
-        domain = _cookie_domain(st)
-
         resp.set_cookie(
-            key=name,
+            key=_cookie_name(st),
             value=jwt_token,
             max_age=st.session_cookie_max_age_seconds,
             httponly=True,
             secure=bool(st.session_cookie_secure),
             samesite=same_site_lit,
-            domain=domain,
+            domain=_cookie_domain(st),
             path="/",
         )
         return resp
@@ -436,7 +434,6 @@ def oauth_router_with_backend(
     @router.post("/refresh")
     async def refresh(request: Request):
         st = get_auth_settings()
-        name = _cookie_name(st)
         raw = request.cookies.get(name)
         if not raw:
             raise HTTPException(401, "missing_token")
@@ -451,7 +448,7 @@ def oauth_router_with_backend(
 
         resp = Response(status_code=204)
         resp.set_cookie(
-            key=name,
+            key=_cookie_name(st),
             value=new_token,
             max_age=st.session_cookie_max_age_seconds,
             httponly=True,
@@ -472,10 +469,9 @@ def oauth_router_with_backend(
                 request.session.pop(k, None)
 
         # delete auth cookie
-        name = _cookie_name(st)
         resp = Response(status_code=204)
         resp.delete_cookie(
-            key=name,
+            key=_cookie_name(st),
             domain=_cookie_domain(st),
             path="/",
         )

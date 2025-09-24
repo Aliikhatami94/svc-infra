@@ -47,11 +47,12 @@ class AuthSettings(BaseSettings):
     # Accepts either JSON (["a","b"]) or comma-separated ("a,b").
     redirect_allow_hosts_raw: str = "localhost,127.0.0.1"
 
-    session_cookie_name: str = "svc_session"
+    session_cookie_name: str = "svc_session"  # Starlette session
+    auth_cookie_name: str = "svc_auth"  # JWT cookie
     session_cookie_secure: bool = False
-    session_cookie_samesite: str = "lax"  # "lax" | "strict" | "none"
+    session_cookie_samesite: str = "lax"
     session_cookie_domain: Optional[str] = None
-    session_cookie_max_age_seconds: int = 60 * 60 * 4  # 4h
+    session_cookie_max_age_seconds: int = 60 * 60 * 4
 
     model_config = SettingsConfigDict(
         env_prefix="AUTH_",
