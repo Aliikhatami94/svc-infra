@@ -31,6 +31,8 @@ def _gen_pkce_pair() -> tuple[str, str]:
 
 def _validate_redirect(url: str, allow_hosts: list[str], *, require_https: bool) -> None:
     p = urlparse(url)
+    if not p.netloc:
+        return
     host_port = p.hostname.lower() + (f":{p.port}" if p.port else "")
     allowed = {h.lower() for h in allow_hosts}
     if host_port not in allowed and p.hostname.lower() not in allowed:
@@ -222,12 +224,14 @@ def oauth_router_with_backend(
             u = (await client.get("user", token=token)).json()
             emails_resp = (await client.get("user/emails", token=token)).json()
             primary = next((e for e in emails_resp if e.get("primary") and e.get("verified")), None)
-            email = (primary or (emails_resp[0] if emails_resp else {})).get("email")
+            if not primary:
+                raise HTTPException(400, "unverified_email")
+            email = primary["email"]
+            email_verified = True
             full_name = u.get("name") or u.get("login")
             provider_user_id = (
                 str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
             )
-            email_verified = bool(primary and primary.get("verified", False))
 
         elif kind == "linkedin":
             me = (await client.get("me", token=token)).json()
@@ -275,24 +279,8 @@ def oauth_router_with_backend(
                 .scalars()
                 .first()
             )
-
-            user = None
-            existing_link = None
-            if provider_account_model is not None and provider_user_id:
-                existing_link = (
-                    (
-                        await session.execute(
-                            select(provider_account_model).filter_by(
-                                provider=provider,
-                                provider_account_id=provider_user_id,
-                            )
-                        )
-                    )
-                    .scalars()
-                    .first()
-                )
-                if existing_link:
-                    user = await session.get(user_model, existing_link.user_id)
+            if existing_link:
+                user = await session.get(user_model, existing_link.user_id)
 
         # --- Fallback: resolve/create by email (previous logic) --------------
         if user is None:

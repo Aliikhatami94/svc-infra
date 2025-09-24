@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
+from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings
@@ -40,8 +41,9 @@ def add_auth(
         auth_prefix="/_sql" + auth_prefix,
     )
 
-    # ---- settings & session middleware (for OAuth round-trip + cookie) ----
+    # ---- settings & session middleware (for OAuth round-trip + cookie) & docs ----
     settings_obj = get_auth_settings()
+    include_in_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
 
     # ensure SessionMiddleware mounted exactly once
     if not any(m.cls.__name__ == "SessionMiddleware" for m in app.user_middleware):
@@ -67,8 +69,12 @@ def add_auth(
 
     # ---- Conditionally mount password-based auth ----
     if enable_password:
-        app.include_router(auth_router, prefix=auth_prefix, tags=["auth"])
-        app.include_router(users_router, prefix=auth_prefix, tags=["users"])
+        app.include_router(
+            auth_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
+        )
+        app.include_router(
+            users_router, prefix=auth_prefix, tags=["users"], include_in_schema=include_in_docs
+        )
 
     # ---- Conditionally mount OAuth providers ----
     if enable_oauth:
@@ -83,5 +89,6 @@ def add_auth(
                     or getattr(settings_obj, "post_login_redirect", "/"),
                     prefix="/_sql" + oauth_prefix,
                     provider_account_model=provider_account_model,
-                )
+                ),
+                include_in_schema=include_in_docs,
             )
