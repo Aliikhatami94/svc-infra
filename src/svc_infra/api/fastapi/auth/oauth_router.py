@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Literal, cast
 from urllib.parse import urlencode, urlparse
 
@@ -36,6 +37,29 @@ def _validate_redirect(url: str, allow_hosts: list[str], *, require_https: bool)
         raise HTTPException(400, "redirect_not_allowed")
     if require_https and p.scheme != "https":
         raise HTTPException(400, "https_required")
+
+
+def _coerce_expires_at(token: dict | None) -> datetime | None:
+    if not isinstance(token, dict):
+        return None
+    # Prefer absolute expires_at if present
+    if token.get("expires_at") is not None:
+        try:
+            v = float(token["expires_at"])
+            # Some providers return ms; normalize
+            if v > 1e12:  # heuristic: ms epoch
+                v /= 1000.0
+            return datetime.fromtimestamp(v, tz=timezone.utc)
+        except Exception:
+            pass
+    # Fallback to expires_in (relative)
+    if token.get("expires_in") is not None:
+        try:
+            secs = int(token["expires_in"])
+            return datetime.now(timezone.utc) + timedelta(seconds=secs)
+        except Exception:
+            pass
+    return None
 
 
 def oauth_router_with_backend(
@@ -280,9 +304,10 @@ def oauth_router_with_backend(
             )
 
             # Optional token/claims payloads (only set if your ProviderAccount has these columns)
-            access_token = (token or {}).get("access_token") if isinstance(token, dict) else None
-            refresh_token = (token or {}).get("refresh_token") if isinstance(token, dict) else None
-            expires_at = (token or {}).get("expires_at") if isinstance(token, dict) else None
+            tok = token if isinstance(token, dict) else {}
+            access_token = tok.get("access_token")
+            refresh_token = tok.get("refresh_token")
+            expires_at = _coerce_expires_at(tok)  # <-- convert to datetime
             raw_claims = None
             if kind == "oidc":
                 raw_claims = claims
@@ -298,7 +323,6 @@ def oauth_router_with_backend(
                     provider=provider,
                     provider_account_id=provider_user_id,
                 )
-                # only set these if your model has them
                 if hasattr(provider_account_model, "access_token"):
                     values["access_token"] = access_token
                 if hasattr(provider_account_model, "refresh_token"):
@@ -390,8 +414,15 @@ def oauth_router_with_backend(
         return resp
 
     @router.post("/logout")
-    async def logout():
+    async def logout(request: Request):
         st = get_auth_settings()
+
+        # nuke transient OAuth state
+        for k in list(request.session.keys()):
+            if k.startswith("oauth:"):
+                request.session.pop(k, None)
+
+        # delete auth cookie
         name = st.session_cookie_name
         if (
             st.session_cookie_secure
@@ -399,12 +430,9 @@ def oauth_router_with_backend(
             and not name.startswith("__Host-")
         ):
             name = "__Host-" + name
+
         resp = Response(status_code=204)
-        resp.delete_cookie(
-            key=name,
-            domain=st.session_cookie_domain,  # must be None for __Host-
-            path="/",
-        )
+        resp.delete_cookie(key=name, domain=st.session_cookie_domain, path="/")
         return resp
 
     return router
