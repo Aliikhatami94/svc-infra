@@ -10,7 +10,7 @@ from urllib.parse import urlencode, urlparse
 import jwt
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
-from fastapi import HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
@@ -21,7 +21,6 @@ from starlette.responses import Response
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
 from svc_infra.api.fastapi.auth.sugar import public_router
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
-from svc_infra.api.fastapi.dual_router import DualAPIRouter
 
 
 def _gen_pkce_pair() -> tuple[str, str]:
@@ -87,7 +86,7 @@ def oauth_router_with_backend(
     post_login_redirect: str = "/",
     prefix: str = "/auth/oauth",
     provider_account_model: type | None = None,
-) -> DualAPIRouter:
+) -> APIRouter:
     oauth = OAuth()
 
     # Register all providers

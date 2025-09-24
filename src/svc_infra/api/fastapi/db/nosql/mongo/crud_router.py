@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Optional, Sequence, Type, cast
 
-from fastapi import Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from svc_infra.api.fastapi.auth.sugar import public_router
@@ -13,7 +13,6 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
-from svc_infra.api.fastapi.dual_router import DualAPIRouter
 from svc_infra.db.nosql.mongo.client import acquire_db
 from svc_infra.db.nosql.service import NoSqlService
 
@@ -46,7 +45,7 @@ def make_crud_router_plus_mongo(
     default_ordering: Optional[str] = None,
     allowed_order_fields: Optional[list[str]] = None,
     mount_under_db_prefix: bool = True,
-) -> DualAPIRouter:
+) -> APIRouter:
     router_prefix = ("/_mongo" + prefix) if mount_under_db_prefix else prefix
     router = public_router(
         prefix=router_prefix,

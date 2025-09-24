@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from fastapi import Response, status
+from fastapi import APIRouter, Response, status
 from sqlalchemy import text
 
 from svc_infra.api.fastapi.auth.sugar import public_router
-from svc_infra.api.fastapi.dual_router import DualAPIRouter
 
 from .session import SqlSessionDep
 
@@ -13,7 +12,7 @@ def _make_db_health_router(
     *,
     prefix: str = "/_sql/health",
     include_in_schema: bool = False,
-) -> DualAPIRouter:
+) -> APIRouter:
     """Internal factory for the DB health router."""
     router = public_router(prefix=prefix, tags=["health"], include_in_schema=include_in_schema)
 
