@@ -434,13 +434,14 @@ def oauth_router_with_backend(
     @router.post("/refresh")
     async def refresh(request: Request):
         st = get_auth_settings()
-        raw = request.cookies.get(name)
+        name = _cookie_name(st)  # <-- add this
+        raw = request.cookies.get(name)  # <-- use it
         if not raw:
             raise HTTPException(401, "missing_token")
 
         strategy = auth_backend.get_strategy()
         try:
-            user = await strategy.read_token(raw, None)  # contextless
+            user = await strategy.read_token(raw, None)  # ok to pass None context
         except Exception:
             raise HTTPException(401, "invalid_token")
 
@@ -448,7 +449,7 @@ def oauth_router_with_backend(
 
         resp = Response(status_code=204)
         resp.set_cookie(
-            key=_cookie_name(st),
+            key=name,
             value=new_token,
             max_age=st.session_cookie_max_age_seconds,
             httponly=True,
