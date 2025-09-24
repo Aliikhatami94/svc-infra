@@ -62,6 +62,13 @@ def _coerce_expires_at(token: dict | None) -> datetime | None:
     return None
 
 
+def _cookie_name(st) -> str:
+    name = st.session_cookie_name
+    if st.session_cookie_secure and not st.session_cookie_domain and not name.startswith("__Host-"):
+        name = "__Host-" + name
+    return name
+
+
 def oauth_router_with_backend(
     user_model: type,
     auth_backend: AuthenticationBackend,
@@ -417,14 +424,7 @@ def oauth_router_with_backend(
             )
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
-        name = st.session_cookie_name
-        if (
-            st.session_cookie_secure
-            and not st.session_cookie_domain
-            and st.session_cookie_name[:7] != "__Host-"
-        ):
-            name = "__Host-" + st.session_cookie_name
-
+        name = _cookie_name(st)
         resp.set_cookie(
             key=name,
             value=jwt_token,
@@ -440,7 +440,7 @@ def oauth_router_with_backend(
     @router.post("/refresh")
     async def refresh(request: Request):
         st = get_auth_settings()
-        name = st.session_cookie_name
+        name = _cookie_name(st)
         raw = request.cookies.get(name)
         if not raw:
             raise HTTPException(401, "missing_token")
@@ -476,14 +476,7 @@ def oauth_router_with_backend(
                 request.session.pop(k, None)
 
         # delete auth cookie
-        name = st.session_cookie_name
-        if (
-            st.session_cookie_secure
-            and not st.session_cookie_domain
-            and not name.startswith("__Host-")
-        ):
-            name = "__Host-" + name
-
+        name = _cookie_name(st)
         resp = Response(status_code=204)
         resp.delete_cookie(key=name, domain=st.session_cookie_domain, path="/")
         return resp
