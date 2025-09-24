@@ -3,6 +3,7 @@ from typing import Annotated, Any, Optional, Sequence, Type, TypeVar, cast
 from fastapi import Body, Depends, HTTPException
 from pydantic import BaseModel
 
+from svc_infra.api.fastapi import DualAPIRouter, public_router
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,
     OrderParams,
@@ -13,7 +14,6 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
-from svc_infra.api.fastapi.dual_router import DualAPIRouter
 from svc_infra.db.sql.service import SqlService
 
 from .session import SqlSessionDep
@@ -38,7 +38,7 @@ def make_crud_router_plus_sql(
     mount_under_db_prefix: bool = True,
 ) -> DualAPIRouter:
     router_prefix = ("/_sql" + prefix) if mount_under_db_prefix else prefix
-    router = DualAPIRouter(
+    router = public_router(
         prefix=router_prefix,
         tags=tags or [prefix.strip("/")],
         redirect_slashes=False,

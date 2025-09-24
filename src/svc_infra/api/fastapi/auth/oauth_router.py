@@ -18,7 +18,7 @@ from sqlalchemy import select
 from starlette import status
 from starlette.responses import Response
 
-from svc_infra.api.fastapi import DualAPIRouter
+from svc_infra.api.fastapi import DualAPIRouter, public_router
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
@@ -113,7 +113,7 @@ def oauth_router_with_backend(
         else:
             pass
 
-    router = DualAPIRouter(prefix=prefix, tags=["auth:oauth"])
+    router = public_router(prefix=prefix, tags=["auth:oauth"])
 
     @router.get("/{provider}/login")
     async def oauth_login(request: Request, provider: str):

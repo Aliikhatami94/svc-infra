@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import Response, status
 from sqlalchemy import text
 
-from svc_infra.api.fastapi import DualAPIRouter
+from svc_infra.api.fastapi import DualAPIRouter, public_router
 
 from .session import SqlSessionDep
 
@@ -14,7 +14,7 @@ def _make_db_health_router(
     include_in_schema: bool = False,
 ) -> DualAPIRouter:
     """Internal factory for the DB health router."""
-    router = DualAPIRouter(prefix=prefix, tags=["health"], include_in_schema=include_in_schema)
+    router = public_router(prefix=prefix, tags=["health"], include_in_schema=include_in_schema)
 
     @router.get("", status_code=status.HTTP_200_OK)
     async def db_health(session: SqlSessionDep) -> Response:

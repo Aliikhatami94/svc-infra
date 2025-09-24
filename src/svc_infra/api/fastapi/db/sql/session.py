@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from typing import Annotated, AsyncIterator, Tuple
 
-from fastapi import Depends
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -11,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from svc_infra.api.fastapi.deps import Require
 from svc_infra.db.sql.utils import _coerce_to_async_url
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,6 @@ async def get_session() -> AsyncIterator[AsyncSession]:
             raise
 
 
-SqlSessionDep = Annotated[AsyncSession, Depends(get_session)]
+SqlSessionDep = Annotated[AsyncSession, Require(get_session)]
 
 __all__ = ["SqlSessionDep", "initialize_session", "dispose_session"]
