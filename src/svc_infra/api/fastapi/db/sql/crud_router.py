@@ -3,7 +3,7 @@ from typing import Annotated, Any, Optional, Sequence, Type, TypeVar, cast
 from fastapi import Body, Depends, HTTPException
 from pydantic import BaseModel
 
-from svc_infra.api.fastapi.auth.sugar import public_router
+from svc_infra.api.fastapi import public_router
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,
     OrderParams,
