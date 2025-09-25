@@ -5,6 +5,8 @@ from typing import Optional, Any, Dict, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
+from fastapi_users.schemas import BaseUser, BaseUserCreate, BaseUserUpdate
+
 # ------------------------------ Base mixin ------------------------------------
 
 class Timestamped(BaseModel):
@@ -22,11 +24,11 @@ class ProviderAccountBase(BaseModel):
 class ProviderAccountRead(ProviderAccountBase, Timestamped):
     id: UUID
 
-# Note: we generally do not expose create/update for provider accounts directly
-# via public API; they’re created server-side during OAuth callback.
+# Note: provider accounts are created server-side during OAuth callback.
 
 # ------------------------------ ${AuthEntity} ---------------------------------
 
+# (Optional helper; keep if used elsewhere)
 class ${AuthEntity}Base(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     email: EmailStr
@@ -39,23 +41,26 @@ class ${AuthEntity}Base(BaseModel):
     mfa_enabled: bool = False
     metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")  # matches model.extra
 
-class ${AuthEntity}Read(${AuthEntity}Base, Timestamped):
-    id: UUID
+class ${AuthEntity}Read(BaseUser[UUID], Timestamped):
+    # BaseUser[UUID] already provides: id, email, is_active, is_superuser, is_verified
+    full_name: Optional[str] = None
+    tenant_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    mfa_enabled: bool = False
+    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")
+    provider_accounts: List[ProviderAccountRead] = Field(default_factory=list)
     last_login: Optional[datetime] = None
     disabled_reason: Optional[str] = None
-    provider_accounts: List[ProviderAccountRead] = Field(default_factory=list)
 
-class ${AuthEntity}Create(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8)
+class ${AuthEntity}Create(BaseUserCreate):
+    # BaseUserCreate already has: email, password
     full_name: Optional[str] = None
     tenant_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
-class ${AuthEntity}Update(BaseModel):
-    email: Optional[EmailStr] = None
+class ${AuthEntity}Update(BaseUserUpdate):
+    # BaseUserUpdate already has: email?, password?
     full_name: Optional[str] = None
-    password: Optional[str] = None
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
     is_verified: Optional[bool] = None
