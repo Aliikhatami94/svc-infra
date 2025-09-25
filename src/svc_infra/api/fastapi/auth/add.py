@@ -29,14 +29,21 @@ def add_auth(
     enable_oauth: bool = True,
     provider_account_model=None,
 ) -> None:
-    fapi, auth_backend, auth_router, users_router, _, register_router, verify_router = (
-        get_fastapi_users(
-            user_model=user_model,
-            user_schema_read=schema_read,
-            user_schema_create=schema_create,
-            user_schema_update=schema_update,
-            public_auth_prefix=auth_prefix,
-        )
+    (
+        fapi,
+        auth_backend,
+        auth_router,
+        users_router,
+        _,
+        register_router,
+        verify_router,
+        reset_router,
+    ) = get_fastapi_users(
+        user_model=user_model,
+        user_schema_read=schema_read,
+        user_schema_create=schema_create,
+        user_schema_update=schema_update,
+        public_auth_prefix=auth_prefix,
     )
 
     settings_obj = get_auth_settings()
@@ -78,6 +85,9 @@ def add_auth(
         )
         app.include_router(
             verify_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
+        )
+        app.include_router(
+            reset_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
         )
 
     if enable_oauth:

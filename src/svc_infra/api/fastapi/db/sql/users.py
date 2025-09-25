@@ -31,6 +31,7 @@ def get_fastapi_users(
     Callable,
     DualAPIRouter,
     DualAPIRouter,
+    DualAPIRouter,
 ]:
     from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
@@ -42,28 +43,41 @@ def get_fastapi_users(
         verification_token_secret = "unused"
 
         async def on_after_register(self, user: Any, request=None):
-            # In dev/local, optionally auto-verify (no email)
             st = get_auth_settings()
             if CURRENT_ENVIRONMENT in (DEV_ENV, LOCAL_ENV) and bool(st.auto_verify_in_dev):
-                # safest across versions: update the flag via the user_db
                 await self.user_db.update(user, {"is_verified": True})
                 return
-
-            # Normal flow: ask FastAPI Users to generate token and call our hook
             await self.request_verify(user, request)
 
         async def on_after_request_verify(self, user: Any, token: str, request=None):
-            # Build the verification URL your frontend/app will hit
             verify_url = f"{public_auth_prefix}/verify?token={token}"
+            sender = get_sender()
+            sender.send(
+                to=getattr(user, "email"),
+                subject="Verify your account",
+                html_body=f"""
+                    <p>Hi {getattr(user, 'full_name', '') or 'there'},</p>
+                    <p>Click to verify your account:</p>
+                    <p><a href="{verify_url}">{verify_url}</a></p>
+                """,
+            )
 
-            sender = get_sender()  # raises in prod if SMTP not configured (by design)
-            subject = "Verify your account"
-            body = f"""
-                <p>Hi {getattr(user, 'full_name', '') or 'there'},</p>
-                <p>Click to verify your account:</p>
-                <p><a href="{verify_url}">{verify_url}</a></p>
-            """
-            sender.send(to=getattr(user, "email"), subject=subject, html_body=body)
+        async def on_after_forgot_password(self, user: Any, token: str, request=None):
+            reset_url = f"{public_auth_prefix}/reset-password?token={token}"
+            sender = get_sender()
+            sender.send(
+                to=getattr(user, "email"),
+                subject="Reset your password",
+                html_body=f"""
+                    <p>We received a request to reset your password.</p>
+                    <p><a href="{reset_url}">{reset_url}</a></p>
+                    <p>If you didn’t request this, you can ignore this email.</p>
+                """,
+            )
+
+        async def on_after_reset_password(self, user: Any, request=None):
+            # Optional: audit/log, notify, etc. Keep it no-op by default.
+            pass
 
     async def get_user_manager(user_db=Require(get_user_db)):
         yield UserManager(user_db)
@@ -96,11 +110,10 @@ def get_fastapi_users(
     register_router = dualize_router(
         fastapi_users.get_register_router(user_schema_read, user_schema_create)
     )
+    reset_router = dualize_router(fastapi_users.get_reset_password_router())
 
-    # Add verify router (handles GET /verify?token=...)
     verify_router = dualize_router(fastapi_users.get_verify_router(user_schema_read))
 
-    # Return verify_router in the tuple (so add_auth can mount it)
     return (
         fastapi_users,
         auth_backend,
@@ -109,4 +122,5 @@ def get_fastapi_users(
         get_jwt_strategy,
         register_router,
         verify_router,
+        reset_router,
     )
