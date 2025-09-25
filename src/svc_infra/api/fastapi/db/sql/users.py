@@ -110,9 +110,8 @@ def get_fastapi_users(
     register_router = dualize_router(
         fastapi_users.get_register_router(user_schema_read, user_schema_create)
     )
-    reset_router = dualize_router(fastapi_users.get_reset_password_router())
-
     verify_router = dualize_router(fastapi_users.get_verify_router(user_schema_read))
+    reset_router = dualize_router(fastapi_users.get_reset_password_router())
 
     return (
         fastapi_users,
