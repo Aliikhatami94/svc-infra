@@ -131,11 +131,12 @@ def setup_service_api(
       - Root app (one set of root routers, incl. svc-infra /ping)
       - One child app per APIVersionSpec mounted at /{tag}
     """
+    include_in_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
     parent = FastAPI(
         title=root_title or service.name,
-        docs_url="/docs" if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV) else None,
-        redoc_url="/redoc" if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV) else None,
-        openapi_url="/openapi.json" if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV) else None,
+        docs_url="/docs" if include_in_docs else None,
+        redoc_url="/redoc" if include_in_docs else None,
+        openapi_url="/openapi.json" if include_in_docs else None,
         version=service.release,
     )
 
@@ -161,43 +162,41 @@ def setup_service_api(
         parent.mount(mount_path, child, name=spec.tag.strip("/"))
         _set_servers(child, spec.public_base_url, mount_path)
 
-    if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV):
+    @parent.get("/", include_in_schema=include_in_docs)
+    def index():
+        cards: list[CardSpec] = []
 
-        @parent.get("/", include_in_schema=False)
-        def index():
-            cards: list[CardSpec] = []
+        # Root card first
+        cards.append(
+            CardSpec(
+                tag="",  # renders as "/"
+                docs=DocTargets(
+                    swagger="/docs",
+                    redoc="/redoc",
+                    openapi_json="/openapi.json",
+                ),
+            )
+        )
 
-            # Root card first
+        # One card per version
+        for spec in versions:
+            tag = spec.tag.strip("/")
             cards.append(
                 CardSpec(
-                    tag="",  # renders as "/"
+                    tag=tag,
                     docs=DocTargets(
-                        swagger="/docs",
-                        redoc="/redoc",
-                        openapi_json="/openapi.json",
+                        swagger=f"/{tag}/docs",
+                        redoc=f"/{tag}/redoc",
+                        openapi_json=f"/{tag}/openapi.json",
                     ),
                 )
             )
 
-            # One card per version
-            for spec in versions:
-                tag = spec.tag.strip("/")
-                cards.append(
-                    CardSpec(
-                        tag=tag,
-                        docs=DocTargets(
-                            swagger=f"/{tag}/docs",
-                            redoc=f"/{tag}/redoc",
-                            openapi_json=f"/{tag}/openapi.json",
-                        ),
-                    )
-                )
-
-            html = render_index_html(
-                service_name=service.name,
-                release=service.release,
-                cards=cards,
-            )
-            return HTMLResponse(html)
+        html = render_index_html(
+            service_name=service.name,
+            release=service.release,
+            cards=cards,
+        )
+        return HTMLResponse(html)
 
     return parent
