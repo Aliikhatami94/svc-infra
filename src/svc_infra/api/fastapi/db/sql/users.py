@@ -42,20 +42,21 @@ def get_fastapi_users(
         verification_token_secret = "unused"
 
         async def on_after_register(self, user: Any, request=None):
-            # Dev convenience: optionally auto-verify
+            # In dev/local, optionally auto-verify (no email)
             st = get_auth_settings()
             if CURRENT_ENVIRONMENT in (DEV_ENV, LOCAL_ENV) and bool(st.auto_verify_in_dev):
-                try:
-                    await self.verify(user, safe=True)
-                    return
-                except Exception:
-                    # fall through to email flow
-                    pass
+                # safest across versions: update the flag via the user_db
+                await self.user_db.update(user, {"is_verified": True})
+                return
 
-            # Otherwise send verification email (prod MUST have SMTP)
-            token = await self.generate_verification_token(user)
+            # Normal flow: ask FastAPI Users to generate token and call our hook
+            await self.request_verify(user, request)
+
+        async def on_after_request_verify(self, user: Any, token: str, request=None):
+            # Build the verification URL your frontend/app will hit
             verify_url = f"{public_auth_prefix}/verify?token={token}"
-            sender = get_sender()  # raises in prod if not configured
+
+            sender = get_sender()  # raises in prod if SMTP not configured (by design)
             subject = "Verify your account"
             body = f"""
                 <p>Hi {getattr(user, 'full_name', '') or 'there'},</p>
