@@ -38,7 +38,7 @@ def add_auth(
         user_schema_read=schema_read,
         user_schema_create=schema_create,
         user_schema_update=schema_update,
-        public_auth_prefix="/_sql" + auth_prefix,
+        public_auth_prefix=auth_prefix,
         login_path="/jwt/login",
     )
 
@@ -91,7 +91,7 @@ def add_auth(
                     providers=providers_from_settings(settings_obj),
                     post_login_redirect=post_login_redirect
                     or getattr(settings_obj, "post_login_redirect", "/"),
-                    prefix="/_sql" + oauth_prefix,
+                    prefix=oauth_prefix,
                     provider_account_model=provider_account_model,
                 ),
                 include_in_schema=include_in_docs,
