@@ -12,6 +12,7 @@ from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from .. import Require
 from .gaurd import login_client_guard, mfa_login_router
 from .oauth_router import oauth_router_with_backend
+from .policy import AuthPolicy, DefaultAuthPolicy
 from .pre_auth import get_mfa_pre_jwt_writer
 from .providers import providers_from_settings
 from .settings import get_auth_settings
@@ -30,6 +31,7 @@ def add_auth(
     enable_password: bool = True,
     enable_oauth: bool = True,
     provider_account_model=None,
+    auth_policy: AuthPolicy | None = None,
 ) -> None:
     (
         fapi,
@@ -49,6 +51,7 @@ def add_auth(
     )
 
     settings_obj = get_auth_settings()
+    policy = auth_policy or DefaultAuthPolicy(settings_obj)
     include_in_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
 
     if not any(m.cls.__name__ == "SessionMiddleware" for m in app.user_middleware):
@@ -80,6 +83,7 @@ def add_auth(
                 user_model=user_model,
                 get_mfa_pre_writer=get_mfa_pre_jwt_writer,
                 public_auth_prefix=auth_prefix,
+                auth_policy=policy,
             ),
             include_in_schema=include_in_docs,
             dependencies=[Require(login_client_guard)],
@@ -135,6 +139,7 @@ def add_auth(
                     or getattr(settings_obj, "post_login_redirect", "/"),
                     prefix=oauth_prefix,
                     provider_account_model=provider_account_model,
+                    auth_policy=policy,
                 ),
                 include_in_schema=include_in_docs,
             )

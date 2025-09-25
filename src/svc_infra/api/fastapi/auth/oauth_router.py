@@ -19,6 +19,7 @@ from starlette import status
 from starlette.responses import Response
 
 from svc_infra.api.fastapi import public_router
+from svc_infra.api.fastapi.auth.policy import DefaultAuthPolicy
 from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
@@ -87,8 +88,10 @@ def oauth_router_with_backend(
     post_login_redirect: str = "/",
     prefix: str = "/auth/oauth",
     provider_account_model: type | None = None,
+    auth_policy: DefaultAuthPolicy | None = None,
 ) -> APIRouter:
     oauth = OAuth()
+    policy = auth_policy or DefaultAuthPolicy(get_auth_settings())
 
     # Register all providers
     for name, cfg in providers.items():
@@ -393,7 +396,7 @@ def oauth_router_with_backend(
         jwt_token = await strategy.write_token(user)
 
         # --- Enforce MFA for OAuth logins: redirect with pre-auth token -------------
-        if getattr(user, "mfa_enabled", False):
+        if await policy.should_require_mfa(user):
             pre = await get_mfa_pre_jwt_writer().write(user)
             st = get_auth_settings()
             redirect_url = str(
@@ -492,7 +495,7 @@ def oauth_router_with_backend(
             raise HTTPException(401, "invalid_token")
 
         # 4) --- Enforce MFA on refresh if the user requires it -------------------------
-        if getattr(user, "mfa_enabled", False):
+        if await policy.should_require_mfa(user):
             pre = await get_mfa_pre_jwt_writer().write(user)
             st = get_auth_settings()
             redirect_url = str(

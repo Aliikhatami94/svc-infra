@@ -8,6 +8,7 @@ from fastapi_users.password import PasswordHelper
 
 from svc_infra.api.fastapi import public_router
 
+from .policy import AuthPolicy, DefaultAuthPolicy
 from .settings import get_auth_settings
 
 
@@ -55,8 +56,10 @@ def mfa_login_router(
     user_model: type,
     get_mfa_pre_writer,
     public_auth_prefix: str = "/auth",
+    auth_policy: AuthPolicy | None = None,  # <-- NEW
 ) -> APIRouter:
     router = public_router(prefix=public_auth_prefix, tags=["auth"])
+    policy = auth_policy or DefaultAuthPolicy(get_auth_settings())
 
     @router.post("/login", name="auth:jwt.login")
     async def login(
@@ -74,7 +77,6 @@ def mfa_login_router(
         email = username.strip().lower()
         user = await fapi.get_user_manager().user_db.get_by_email(email)
         if not user:
-            # Dummy verify to equalize timing when user doesn't exist
             _ = pwd.verify(password, pwd.hash("dummy-password"))
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
 
@@ -88,9 +90,10 @@ def mfa_login_router(
         if getattr(user, "is_verified") is False:
             raise HTTPException(400, "LOGIN_USER_NOT_VERIFIED")
 
-        # 3) MFA check (user-driven or tenant policy handled elsewhere)
-        if getattr(user, "mfa_enabled", False):
+        # 3) MFA policy check (user flag, tenant/global, etc.)
+        if await policy.should_require_mfa(user):
             pre = await get_mfa_pre_writer().write(user)
+            await policy.on_mfa_challenge(user)
             return JSONResponse(
                 status_code=401,
                 content={"detail": "MFA_REQUIRED", "pre_token": pre},
@@ -100,11 +103,6 @@ def mfa_login_router(
         # 4) mint token and set cookie
         token = await strategy.write_token(user)
         st = get_auth_settings()
-
-        # (Optional) record last_login if you want; requires a DB session elsewhere
-        # from datetime import datetime, timezone
-        # user.last_login = datetime.now(timezone.utc)
-        # ... flush/commit via your session if injected here
 
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
         resp.set_cookie(
@@ -117,6 +115,10 @@ def mfa_login_router(
             domain=(st.session_cookie_domain or None),
             path="/",
         )
+
+        # optional post-login hook
+        await policy.on_login_success(user)
+
         return resp
 
     return router
