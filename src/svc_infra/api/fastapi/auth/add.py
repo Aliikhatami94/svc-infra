@@ -8,6 +8,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
+from .. import Require
+from .gaurd import login_client_guard
 from .oauth_router import oauth_router_with_backend
 from .providers import providers_from_settings
 from .settings import get_auth_settings
@@ -39,7 +41,6 @@ def add_auth(
         user_schema_create=schema_create,
         user_schema_update=schema_update,
         public_auth_prefix=auth_prefix,
-        login_path="/jwt/login",
     )
 
     # ---- settings & session middleware (for OAuth round-trip + cookie) & docs ----
@@ -71,7 +72,11 @@ def add_auth(
     # ---- Conditionally mount password-based auth ----
     if enable_password:
         app.include_router(
-            auth_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
+            auth_router,
+            prefix=auth_prefix,
+            tags=["auth"],
+            include_in_schema=include_in_docs,
+            dependencies=[Require(login_client_guard)],
         )
         app.include_router(
             users_router, prefix=auth_prefix, tags=["users"], include_in_schema=include_in_docs

@@ -20,9 +20,18 @@ class JWTSettings(BaseModel):
     lifetime_seconds: int = 60 * 60 * 24 * 7
 
 
+class PasswordClient(BaseModel):
+    client_id: str
+    client_secret: SecretStr
+
+
 class AuthSettings(BaseSettings):
     # ---- JWT ----
     jwt: Optional[JWTSettings] = None
+
+    # ---- Password login ----
+    password_clients: List[PasswordClient] = Field(default_factory=list)
+    require_client_secret_on_password_login: bool = False
 
     # ---- Built-in provider creds (all optional) ----
     google_client_id: Optional[str] = None
