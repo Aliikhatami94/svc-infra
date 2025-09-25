@@ -21,7 +21,6 @@ def get_fastapi_users(
     user_schema_update: Any,
     *,
     public_auth_prefix: str = "/auth",
-    login_path: str = "/jwt/login",
 ) -> Tuple[
     FastAPIUsers, AuthenticationBackend, DualAPIRouter, DualAPIRouter, Callable, DualAPIRouter
 ]:
@@ -58,7 +57,7 @@ def get_fastapi_users(
         return JWTStrategy(secret=secret, lifetime_seconds=lifetime)
 
     # IMPORTANT: tokenUrl must match how you mount the router externally
-    bearer_transport = BearerTransport(tokenUrl=f"{public_auth_prefix}{login_path}")
+    bearer_transport = BearerTransport(tokenUrl=f"{public_auth_prefix}/login")
 
     auth_backend = AuthenticationBackend(
         name="jwt",

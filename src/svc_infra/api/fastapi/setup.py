@@ -133,14 +133,13 @@ def setup_service_api(
     """
     parent = FastAPI(
         title=root_title or service.name,
-        docs_url="/docs" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
-        redoc_url="/redoc" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
-        openapi_url="/openapi.json" if CURRENT_ENVIRONMENT == LOCAL_ENV else None,
+        docs_url="/docs" if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV) else None,
+        redoc_url="/redoc" if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV) else None,
+        openapi_url="/openapi.json" if CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV) else None,
         version=service.release,
     )
 
     _setup_cors(parent, public_cors_origins)
-
     parent.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(parent)
 
