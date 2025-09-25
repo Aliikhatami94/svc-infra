@@ -491,11 +491,34 @@ def oauth_router_with_backend(
         if not user:
             raise HTTPException(401, "invalid_token")
 
-        # 4) mint new token via the same strategy you use at login
+        # 4) --- Enforce MFA on refresh if the user requires it -------------------------
+        if getattr(user, "mfa_enabled", False):
+            pre = await get_mfa_pre_jwt_writer().write(user)
+            st = get_auth_settings()
+            redirect_url = str(
+                getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
+            )
+
+            allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
+            require_https = bool(getattr(st, "session_cookie_secure", False))
+            _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
+
+            nxt = request.query_params.get("next")
+            if nxt:
+                try:
+                    _validate_redirect(nxt, allow_hosts, require_https=require_https)
+                    redirect_url = nxt
+                except HTTPException:
+                    pass
+
+            qs = urlencode({"mfa": "required", "pre_token": pre})
+            return RedirectResponse(url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND)
+
+        # 5) mint new token via the same strategy you use at login
         strategy = auth_backend.get_strategy()
         new_token = await strategy.write_token(user)
 
-        # 5) set cookie and return 204
+        # 6) set cookie and return 204
         resp = Response(status_code=204)
         resp.set_cookie(
             key=name,
