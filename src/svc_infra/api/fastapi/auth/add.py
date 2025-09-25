@@ -33,12 +33,13 @@ def add_auth(
     - Password login (/auth/jwt/*, /auth/users/*) is optional via enable_password.
     - OAuth providers (/auth/oauth/*) are optional via enable_oauth.
     """
-    fastapi_users, auth_backend, auth_router, users_router, _ = get_fastapi_users(
+    fapi, auth_backend, auth_router, users_router, _, register_router = get_fastapi_users(
         user_model=user_model,
         user_schema_read=schema_read,
         user_schema_create=schema_create,
         user_schema_update=schema_update,
-        auth_prefix="/_sql" + auth_prefix,
+        public_auth_prefix="/_sql" + auth_prefix,
+        login_path="/jwt/login",
     )
 
     # ---- settings & session middleware (for OAuth round-trip + cookie) & docs ----
@@ -74,6 +75,9 @@ def add_auth(
         )
         app.include_router(
             users_router, prefix=auth_prefix, tags=["users"], include_in_schema=include_in_docs
+        )
+        app.include_router(
+            register_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
         )
 
     # ---- Conditionally mount OAuth providers ----
