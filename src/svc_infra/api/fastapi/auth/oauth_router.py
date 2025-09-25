@@ -19,6 +19,7 @@ from starlette import status
 from starlette.responses import Response
 
 from svc_infra.api.fastapi import public_router
+from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
@@ -390,6 +391,29 @@ def oauth_router_with_backend(
         # Issue JWT
         strategy = auth_backend.get_strategy()
         jwt_token = await strategy.write_token(user)
+
+        # --- Enforce MFA for OAuth logins: redirect with pre-auth token -------------
+        if getattr(user, "mfa_enabled", False):
+            pre = await get_mfa_pre_jwt_writer().write(user)
+            st = get_auth_settings()
+            redirect_url = str(
+                getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
+            )
+
+            allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
+            require_https = bool(getattr(st, "session_cookie_secure", False))
+            _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
+
+            nxt = request.query_params.get("next")
+            if nxt:
+                try:
+                    _validate_redirect(nxt, allow_hosts, require_https=require_https)
+                    redirect_url = nxt
+                except HTTPException:
+                    pass
+
+            qs = urlencode({"mfa": "required", "pre_token": pre})
+            return RedirectResponse(url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND)
 
         # Set HttpOnly cookie and redirect (allow-listed)
         st = get_auth_settings()

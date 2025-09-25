@@ -5,12 +5,14 @@ from typing import Literal, cast
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from svc_infra.api.fastapi.auth.mfa import mfa_router
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 from .. import Require
-from .gaurd import login_client_guard
+from .gaurd import login_client_guard, mfa_login_router
 from .oauth_router import oauth_router_with_backend
+from .pre_auth import get_mfa_pre_jwt_writer
 from .providers import providers_from_settings
 from .settings import get_auth_settings
 
@@ -34,7 +36,7 @@ def add_auth(
         auth_backend,
         auth_router,
         users_router,
-        _,
+        get_strategy,
         register_router,
         verify_router,
         reset_router,
@@ -70,24 +72,55 @@ def add_auth(
         )
 
     if enable_password:
+        # MFA-aware password login (returns MFA_REQUIRED + pre_token when needed)
         app.include_router(
-            auth_router,
-            prefix=auth_prefix,
-            tags=["auth"],
+            mfa_login_router(
+                fapi=fapi,
+                auth_backend=auth_backend,
+                user_model=user_model,
+                get_mfa_pre_writer=get_mfa_pre_jwt_writer,
+                public_auth_prefix=auth_prefix,
+            ),
             include_in_schema=include_in_docs,
             dependencies=[Require(login_client_guard)],
         )
+
+        # Users + registration + email verify + password reset
         app.include_router(
-            users_router, prefix=auth_prefix, tags=["users"], include_in_schema=include_in_docs
+            users_router,
+            prefix=auth_prefix,
+            tags=["users"],
+            include_in_schema=include_in_docs,
         )
         app.include_router(
-            register_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
+            register_router,
+            prefix=auth_prefix,
+            tags=["auth"],
+            include_in_schema=include_in_docs,
         )
         app.include_router(
-            verify_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
+            verify_router,
+            prefix=auth_prefix,
+            tags=["auth"],
+            include_in_schema=include_in_docs,
         )
         app.include_router(
-            reset_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
+            reset_router,
+            prefix=auth_prefix,
+            tags=["auth"],
+            include_in_schema=include_in_docs,
+        )
+
+        # TOTP MFA endpoints (setup/confirm/disable/verify).
+        # Mounting these doesn't force MFA; enforcement is driven by per-user flags
+        # and any project/tenant-wide settings you apply in your login/OAuth flows.
+        app.include_router(
+            mfa_router(
+                user_model=user_model,
+                get_strategy=get_strategy,
+                auth_prefix=auth_prefix,
+            ),
+            include_in_schema=include_in_docs,
         )
 
     if enable_oauth:

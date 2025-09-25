@@ -33,6 +33,15 @@ class AuthSettings(BaseSettings):
     password_clients: List[PasswordClient] = Field(default_factory=list)
     require_client_secret_on_password_login: bool = False
 
+    # ---- MFA / TOTP ----
+    mfa_default_enabled_for_new_users: bool = False
+    mfa_enforce_for_all_users: bool = False
+    mfa_enforce_for_tenants: list[str] = []
+    mfa_issuer: str = "svc-infra"
+    mfa_pre_token_lifetime_seconds: int = 300
+    mfa_recovery_codes: int = 8
+    mfa_recovery_code_length: int = 10
+
     # ---- Email/SMTP (verification, reset, etc.) ----
     smtp_host: Optional[str] = None
     smtp_port: int = 587
