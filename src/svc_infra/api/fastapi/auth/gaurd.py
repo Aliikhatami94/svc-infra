@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend
+from fastapi_users.password import PasswordHelper
 
 from svc_infra.api.fastapi import public_router
-from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
 from .settings import get_auth_settings
 
@@ -66,35 +66,46 @@ def mfa_login_router(
         scope: str = Form(""),
         client_id: str | None = Form(None),
         client_secret: str | None = Form(None),
-        session: SqlSessionDep = Depends(),  # if your DI requires
     ):
-        # 1) authenticate via backend's strategy (password)
+        # 1) lookup user (normalize email)
+        pwd = PasswordHelper()
         strategy = auth_backend.get_strategy()
-        user = await fapi.get_user_manager().user_db.get_by_email(username)  # quick way
-        if not user:
-            raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
-        # verify password
-        from fastapi_users.password import PasswordHelper
 
-        if not getattr(user, "is_active", True) or not PasswordHelper().verify(
+        email = username.strip().lower()
+        user = await fapi.get_user_manager().user_db.get_by_email(email)
+        if not user:
+            # Dummy verify to equalize timing when user doesn't exist
+            _ = pwd.verify(password, pwd.hash("dummy-password"))
+            raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
+
+        # 2) verify status + password
+        if not getattr(user, "is_active", True):
+            raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
+        if not pwd.verify(
             password, getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
         ):
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
         if getattr(user, "is_verified") is False:
             raise HTTPException(400, "LOGIN_USER_NOT_VERIFIED")
 
-        # 2) MFA check
+        # 3) MFA check (user-driven or tenant policy handled elsewhere)
         if getattr(user, "mfa_enabled", False):
             pre = await get_mfa_pre_writer().write(user)
-            # Tell client to call /auth/mfa/verify with code + pre_token
             return JSONResponse(
                 status_code=401,
                 content={"detail": "MFA_REQUIRED", "pre_token": pre},
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # 3) otherwise mint normal token (cookie or json)
+        # 4) mint token and set cookie
         token = await strategy.write_token(user)
         st = get_auth_settings()
+
+        # (Optional) record last_login if you want; requires a DB session elsewhere
+        # from datetime import datetime, timezone
+        # user.last_login = datetime.now(timezone.utc)
+        # ... flush/commit via your session if injected here
+
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
         resp.set_cookie(
             key=st.auth_cookie_name,
