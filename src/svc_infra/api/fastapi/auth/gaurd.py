@@ -1,59 +1,42 @@
 from __future__ import annotations
 
-import base64
-from typing import Optional
-
-from fastapi import Depends, HTTPException, Request
-from fastapi.security import OAuth2PasswordRequestForm
-from starlette import status
+from fastapi import HTTPException, Request, status
 
 from .settings import get_auth_settings
 
 
-def _parse_basic(header: Optional[str]) -> tuple[Optional[str], Optional[str]]:
-    if not header or not header.lower().startswith("basic "):
-        return None, None
-    try:
-        decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
-        cid, csec = decoded.split(":", 1)
-        return cid, csec
-    except Exception:
-        return None, None
-
-
-async def login_client_guard(
-    request: Request,
-    form: OAuth2PasswordRequestForm = Depends(),  # includes client_id/client_secret fields
-) -> None:
-    # Only enforce on the password login route
-    if request.method.upper() != "POST" or not request.url.path.endswith("/login"):
-        return
-
+async def login_client_guard(request: Request):
+    """
+    If AUTH_REQUIRE_CLIENT_SECRET_ON_PASSWORD_LOGIN is True,
+    require client_id/client_secret on POST .../login requests.
+    Applied at the router level; we only enforce for the /login subpath.
+    """
     st = get_auth_settings()
-    clients = getattr(st, "password_clients", []) or []
-    require = bool(getattr(st, "require_client_secret_on_password_login", False))
-
-    # Collect creds from either the form or Basic auth header
-    cid = form.client_id
-    csec = form.client_secret
-    if not cid or not csec:
-        b_cid, b_sec = _parse_basic(request.headers.get("authorization"))
-        cid = cid or b_cid
-        csec = csec or b_sec
-
-    if not clients:
-        # No clients configured: allow if not required; otherwise reject.
-        if require:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_client")
+    if not bool(getattr(st, "require_client_secret_on_password_login", False)):
         return
 
-    # If not “require” and user didn’t send client creds, allow
-    if not require and not (cid and csec):
-        return
+    # only enforce on the login endpoint (form-encoded)
+    if request.method.upper() == "POST" and request.url.path.endswith("/login"):
+        try:
+            form = await request.form()
+        except Exception:
+            form = {}
 
-    # Validate against configured list
-    for c in clients:
-        if c.client_id == cid and c.client_secret.get_secret_value() == (csec or ""):
-            return
+        client_id = (form.get("client_id") or "").strip()
+        client_secret = (form.get("client_secret") or "").strip()
+        if not client_id or not client_secret:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="client_credentials_required"
+            )
 
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_client")
+        # validate against configured clients
+        ok = False
+        for pc in getattr(st, "password_clients", []) or []:
+            if pc.client_id == client_id and pc.client_secret.get_secret_value() == client_secret:
+                ok = True
+                break
+
+        if not ok:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_client_credentials"
+            )

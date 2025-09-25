@@ -33,31 +33,34 @@ class AuthSettings(BaseSettings):
     password_clients: List[PasswordClient] = Field(default_factory=list)
     require_client_secret_on_password_login: bool = False
 
-    # ---- Built-in provider creds (all optional) ----
+    # ---- Email/SMTP (verification, reset, etc.) ----
+    smtp_host: Optional[str] = None
+    smtp_port: int = 587
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[SecretStr] = None
+    smtp_from: Optional[str] = None
+
+    # Dev convenience: auto-verify users without sending email
+    auto_verify_in_dev: bool = True
+
+    # ---- Built-in provider creds (optional) ----
     google_client_id: Optional[str] = None
     google_client_secret: Optional[SecretStr] = None
-
     github_client_id: Optional[str] = None
     github_client_secret: Optional[SecretStr] = None
-
     ms_client_id: Optional[str] = None
     ms_client_secret: Optional[SecretStr] = None
     ms_tenant: Optional[str] = None
-
     li_client_id: Optional[str] = None
     li_client_secret: Optional[SecretStr] = None
-
     oidc_providers: List[OIDCProvider] = Field(default_factory=list)
 
     # ---- Redirect + cookie settings ----
     post_login_redirect: AnyHttpUrl | str = "http://localhost:3000/app"
-
-    # NOTE: keep as raw string to avoid pydantic JSON parsing at env stage.
-    # Accepts either JSON (["a","b"]) or comma-separated ("a,b").
     redirect_allow_hosts_raw: str = "localhost,127.0.0.1"
 
-    session_cookie_name: str = "svc_session"  # Starlette session
-    auth_cookie_name: str = "svc_auth"  # JWT cookie
+    session_cookie_name: str = "svc_session"
+    auth_cookie_name: str = "svc_auth"
     session_cookie_secure: bool = False
     session_cookie_samesite: str = "lax"
     session_cookie_domain: Optional[str] = None
@@ -82,11 +85,9 @@ def get_auth_settings() -> AuthSettings:
 
 
 def parse_redirect_allow_hosts(raw: str | None) -> list[str]:
-    """Parse JSON list or comma-separated hosts into a list of strings."""
     if not raw:
         return ["localhost", "127.0.0.1"]
     s = raw.strip()
-    # Try JSON first
     if s.startswith("["):
         try:
             val = json.loads(s)
@@ -94,5 +95,4 @@ def parse_redirect_allow_hosts(raw: str | None) -> list[str]:
                 return [str(x).strip() for x in val if str(x).strip()]
         except Exception:
             pass
-    # Fallback: comma-separated
     return [h.strip() for h in s.split(",") if h.strip()]

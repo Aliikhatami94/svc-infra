@@ -29,27 +29,20 @@ def add_auth(
     enable_oauth: bool = True,
     provider_account_model=None,
 ) -> None:
-    """
-    Wire auth into the app.
-
-    - Password login (/auth/jwt/*, /auth/users/*) is optional via enable_password.
-    - OAuth providers (/auth/oauth/*) are optional via enable_oauth.
-    """
-    fapi, auth_backend, auth_router, users_router, _, register_router = get_fastapi_users(
-        user_model=user_model,
-        user_schema_read=schema_read,
-        user_schema_create=schema_create,
-        user_schema_update=schema_update,
-        public_auth_prefix=auth_prefix,
+    fapi, auth_backend, auth_router, users_router, _, register_router, verify_router = (
+        get_fastapi_users(
+            user_model=user_model,
+            user_schema_read=schema_read,
+            user_schema_create=schema_create,
+            user_schema_update=schema_update,
+            public_auth_prefix=auth_prefix,
+        )
     )
 
-    # ---- settings & session middleware (for OAuth round-trip + cookie) & docs ----
     settings_obj = get_auth_settings()
     include_in_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
 
-    # ensure SessionMiddleware mounted exactly once
     if not any(m.cls.__name__ == "SessionMiddleware" for m in app.user_middleware):
-        # Use JWT secret as session secret fallback
         jwt_block = getattr(settings_obj, "jwt", None)
         secret = (
             jwt_block.secret.get_secret_value()
@@ -69,7 +62,6 @@ def add_auth(
             https_only=bool(getattr(settings_obj, "session_cookie_secure", False)),
         )
 
-    # ---- Conditionally mount password-based auth ----
     if enable_password:
         app.include_router(
             auth_router,
@@ -84,8 +76,10 @@ def add_auth(
         app.include_router(
             register_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
         )
+        app.include_router(
+            verify_router, prefix=auth_prefix, tags=["auth"], include_in_schema=include_in_docs
+        )
 
-    # ---- Conditionally mount OAuth providers ----
     if enable_oauth:
         providers = providers_from_settings(settings_obj)
         if providers:
@@ -93,7 +87,7 @@ def add_auth(
                 oauth_router_with_backend(
                     user_model=user_model,
                     auth_backend=auth_backend,
-                    providers=providers_from_settings(settings_obj),
+                    providers=providers,
                     post_login_redirect=post_login_redirect
                     or getattr(settings_obj, "post_login_redirect", "/"),
                     prefix=oauth_prefix,
