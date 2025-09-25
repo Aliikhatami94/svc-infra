@@ -162,7 +162,7 @@ def setup_service_api(
         parent.mount(mount_path, child, name=spec.tag.strip("/"))
         _set_servers(child, spec.public_base_url, mount_path)
 
-    @parent.get("/", include_in_schema=include_in_docs)
+    @parent.get("/", include_in_schema=False)
     def index():
         cards: list[CardSpec] = []
 
