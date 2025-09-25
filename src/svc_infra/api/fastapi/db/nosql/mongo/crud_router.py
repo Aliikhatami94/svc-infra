@@ -3,7 +3,7 @@ from typing import Annotated, Any, Optional, Sequence, Type, cast
 from fastapi import APIRouter, Body, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from svc_infra.api.fastapi.auth.sugar import public_router
+from svc_infra.api.fastapi import public_router
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,
     OrderParams,

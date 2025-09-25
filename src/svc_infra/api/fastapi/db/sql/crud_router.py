@@ -3,6 +3,7 @@ from typing import Annotated, Any, Optional, Sequence, Type, TypeVar, cast
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 
+from svc_infra.api.fastapi import public_router
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,
     OrderParams,
@@ -36,8 +37,6 @@ def make_crud_router_plus_sql(
     allowed_order_fields: Optional[list[str]] = None,
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
-    from svc_infra.api.fastapi.auth import public_router
-
     router_prefix = ("/_sql" + prefix) if mount_under_db_prefix else prefix
     router = public_router(
         prefix=router_prefix,

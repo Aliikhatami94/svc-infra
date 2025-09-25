@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from svc_infra.api.fastapi.auth.sugar import public_router
+from svc_infra.api.fastapi import public_router
 from svc_infra.db.nosql.mongo.client import ping_mongo
 
 
