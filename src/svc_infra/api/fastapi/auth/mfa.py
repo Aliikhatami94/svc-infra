@@ -91,14 +91,18 @@ def mfa_router(
 
         strategy = get_strategy()
         try:
-            # v10 returns a User object or None
-            user = await strategy.read_token(token, user_manager)
+            user = await strategy.read_token(token, user_manager)  # fastapi-users user
             if not user:
                 raise HTTPException(401, "Invalid token")
         except Exception:
             raise HTTPException(401, "Invalid token")
 
-        return user, session
+        # IMPORTANT: rehydrate into *your* session
+        db_user = await session.get(user_model, user.id)
+        if not db_user:
+            raise HTTPException(401, "Invalid token")
+
+        return db_user, session
 
     @router.post(
         "/start",
@@ -120,7 +124,7 @@ def mfa_router(
         user.mfa_secret = secret
         user.mfa_enabled = False
         user.mfa_confirmed_at = None
-        await session.flush()
+        await session.commit()
 
         return StartSetupOut(otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri))
 
@@ -147,7 +151,7 @@ def mfa_router(
         user.mfa_recovery = [_hash(c) for c in codes]
         user.mfa_enabled = True
         user.mfa_confirmed_at = datetime.now(timezone.utc)
-        await session.flush()
+        await session.commit()
 
         return RecoveryCodesOut(codes=codes)
 
@@ -181,7 +185,7 @@ def mfa_router(
         user.mfa_secret = None
         user.mfa_recovery = None
         user.mfa_confirmed_at = None
-        await session.flush()
+        await session.commit()
         return JSONResponse(status_code=204, content={})
 
     @router.post(
