@@ -113,3 +113,31 @@ def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type
     global _ApiKeyModel
     _ApiKeyModel = ApiKey
     return ApiKey
+
+
+def try_autobind_apikey_model(*, require_env: bool = False) -> Optional[type]:
+    """
+    If API keys aren’t bound yet, try to discover the User model and bind.
+    - If require_env=True, only bind when AUTH_ENABLE_API_KEYS is truthy.
+    """
+    global _ApiKeyModel
+    if _ApiKeyModel is not None:
+        return _ApiKeyModel
+
+    if require_env:
+        flag = os.getenv("AUTH_ENABLE_API_KEYS", "")
+        if str(flag).strip().lower() not in {"1", "true", "yes"}:
+            return None
+
+    try:
+        from svc_infra.db.sql.base import ModelBase
+
+        # SQLAlchemy 2.x: iterate registry mappers to get mapped classes
+        for mapper in list(getattr(ModelBase, "registry").mappers):
+            cls = mapper.class_
+            if getattr(cls, "__svc_infra_auth_user__", False):
+                return bind_apikey_model(cls)  # binds and returns ApiKey
+    except Exception:
+        return None
+
+    return None

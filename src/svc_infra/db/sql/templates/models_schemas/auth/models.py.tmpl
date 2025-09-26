@@ -52,6 +52,7 @@ def _decrypt(value: Optional[str]) -> Optional[str]:
 
 class ${AuthEntity}(ModelBase):
     __tablename__ = "${auth_table_name}"
+    __svc_infra_auth_user__ = True
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
 

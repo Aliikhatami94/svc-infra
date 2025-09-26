@@ -169,6 +169,14 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
+    # --- AUTOBIND API KEY MODEL (if a marked User model exists) ---
+    try:
+        from svc_infra.db.sql.apikey import try_autobind_apikey_model
+        # If you prefer gating on env, pass require_env=True and set AUTH_ENABLE_API_KEYS=1
+        try_autobind_apikey_model(require_env=False)
+    except Exception as e:
+        logger.debug("svc-infra apikey autobind skipped: %s", e)
+
     uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
