@@ -86,9 +86,10 @@ async def resolve_bearer_or_cookie_principal(
     st = get_auth_settings()
 
     raw_auth = (request.headers.get("authorization") or "").strip()
-    raw_bearer = (
-        raw_auth.removeprefix("Bearer ").strip() if raw_auth.lower().startswith("bearer ") else ""
-    )
+    raw_bearer = ""
+    if raw_auth.lower().startswith("bearer "):
+        raw_bearer = raw_auth.split(" ", 1)[1].strip()
+
     raw_cookie = (request.cookies.get(st.auth_cookie_name) or "").strip()
 
     token = raw_bearer or raw_cookie
