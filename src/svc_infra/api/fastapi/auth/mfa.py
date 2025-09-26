@@ -14,8 +14,12 @@ from starlette.responses import JSONResponse
 
 from svc_infra.api.fastapi import public_router
 from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
+from svc_infra.api.fastapi.auth.sender import get_sender
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
+
+# --- Email OTP store (replace with Redis in prod) ---
+EMAIL_OTP_STORE: dict[str, dict] = {}  # key = uid (or jti), value={hash,exp,attempts,next_send}
 
 
 # ---- DTOs ----
@@ -43,6 +47,15 @@ class RecoveryCodesOut(BaseModel):
     codes: list[str]
 
 
+class SendEmailCodeIn(BaseModel):
+    pre_token: str
+
+
+class SendEmailCodeOut(BaseModel):
+    sent: bool = True
+    cooldown_seconds: int = 60
+
+
 def _qr_svg_from_uri(uri: str) -> str:
     # Placeholder SVG; most frontends will render their own QR
     return (
@@ -68,6 +81,19 @@ def _hash(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 
+def _gen_numeric_code(n: int = 6) -> str:
+    import random
+
+    return "".join(str(random.randrange(10)) for _ in range(n))
+
+
+def _now_utc_ts() -> int:
+    from datetime import datetime, timezone
+
+    return int(datetime.now(timezone.utc).timestamp())
+
+
+# ---- Router factory ----
 def mfa_router(
     *,
     user_model: type,
@@ -230,17 +256,35 @@ def mfa_router(
         ):
             raise HTTPException(401, "MFA not enabled")
 
-        # 3) verify TOTP or recovery
+        # 3) verify TOTP or fallback
         ok = False
+
+        # A) TOTP
         totp = pyotp.TOTP(user.mfa_secret)
         if totp.verify(payload.code, valid_window=1):
             ok = True
         else:
+            # B) Recovery code
             dig = _hash(payload.code)
             if getattr(user, "mfa_recovery", None) and dig in user.mfa_recovery:
                 user.mfa_recovery.remove(dig)
-                await session.flush()
+                await session.commit()  # <-- persist burn
                 ok = True
+            else:
+                # C) Email OTP (bound to uid via pre_token above)
+                rec = EMAIL_OTP_STORE.get(str(uid))
+                now = _now_utc_ts()
+                if rec:
+                    if (
+                        now <= rec["exp"]
+                        and rec["attempts_left"] > 0
+                        and _hash(payload.code) == rec["hash"]
+                    ):
+                        ok = True
+                        EMAIL_OTP_STORE.pop(str(uid), None)  # burn on success
+                    else:
+                        rec["attempts_left"] = max(0, rec["attempts_left"] - 1)
+
         if not ok:
             raise HTTPException(400, "Invalid code")
 
@@ -258,5 +302,59 @@ def mfa_router(
             path="/",
         )
         return resp
+
+    @router.post("/send_code", response_model=SendEmailCodeOut)
+    async def send_email_code(
+        payload: SendEmailCodeIn = Body(...),
+        session: SqlSessionDep = Depends(),  # <-- add session so we can load the user
+    ):
+        # 1) Validate pre_token and extract uid
+        try:
+            pre = await get_mfa_pre_jwt_writer().read(payload.pre_token)
+            uid = pre.get("sub")
+            if not uid:
+                raise HTTPException(401, "Invalid pre-auth token")
+        except Exception:
+            raise HTTPException(401, "Invalid pre-auth token")
+
+        # 1b) Load user to get their email
+        user = await session.get(user_model, uid)
+        if not user or not getattr(user, "email", None):
+            # (optionally also check user.mfa_enabled here)
+            raise HTTPException(401, "Invalid pre-auth token")
+
+        st = get_auth_settings()
+        now = _now_utc_ts()
+        ttl = getattr(st, "email_otp_ttl_seconds", 5 * 60)
+        cooldown = getattr(st, "email_otp_cooldown_seconds", 60)
+        max_attempts = getattr(st, "email_otp_attempts", 5)
+
+        # 2) Throttle resends
+        rec = EMAIL_OTP_STORE.get(str(uid))
+        if rec and rec.get("next_send") and now < rec["next_send"]:
+            return SendEmailCodeOut(sent=True, cooldown_seconds=rec["next_send"] - now)
+
+        # 3) Generate + store (hashed) OTP
+        code = _gen_numeric_code(6)
+        EMAIL_OTP_STORE[str(uid)] = {
+            "hash": _hash(code),
+            "exp": now + ttl,
+            "attempts_left": max_attempts,
+            "next_send": now + cooldown,
+        }
+
+        # 4) Send email
+        sender = get_sender()
+        sender.send(
+            to=user.email,
+            subject="Your sign-in code",
+            html_body=f"""
+                <p>Your code is: <b>{code}</b></p>
+                <p>It expires in {ttl // 60} minutes.</p>
+                <p>If you didn’t request this, you can ignore this email.</p>
+            """,
+        )
+
+        return SendEmailCodeOut(sent=True, cooldown_seconds=cooldown)
 
     return router

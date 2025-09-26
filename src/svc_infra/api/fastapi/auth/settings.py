@@ -42,6 +42,11 @@ class AuthSettings(BaseSettings):
     mfa_recovery_codes: int = 8
     mfa_recovery_code_length: int = 10
 
+    # ---- Email OTP ----
+    email_otp_ttl_seconds: int = 5 * 60
+    email_otp_cooldown_seconds: int = 60
+    email_otp_attempts: int = 5
+
     # ---- Email/SMTP (verification, reset, etc.) ----
     smtp_host: Optional[str] = None
     smtp_port: int = 587
