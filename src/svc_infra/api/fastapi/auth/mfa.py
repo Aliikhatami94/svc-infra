@@ -304,7 +304,7 @@ def mfa_router(
 
         # 4) mint normal JWT and set cookie
         token = await strategy.write_token(user)
-        resp = JSONResponse({"ok": True})
+        resp = JSONResponse({"access_token": token, "token_type": "bearer"})
         resp.set_cookie(
             key=st.auth_cookie_name,
             value=token,
