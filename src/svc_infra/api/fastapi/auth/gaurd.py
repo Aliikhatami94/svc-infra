@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend
@@ -69,13 +69,14 @@ def mfa_login_router(
         scope: str = Form(""),
         client_id: str | None = Form(None),
         client_secret: str | None = Form(None),
+        user_manager=Depends(fapi.get_user_manager),
     ):
         # 1) lookup user (normalize email)
         pwd = PasswordHelper()
         strategy = auth_backend.get_strategy()
 
         email = username.strip().lower()
-        user = await fapi.get_user_manager().user_db.get_by_email(email)
+        user = await user_manager.user_db.get_by_email(email)
         if not user:
             _ = pwd.verify(password, pwd.hash("dummy-password"))
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
@@ -118,7 +119,6 @@ def mfa_login_router(
 
         # optional post-login hook
         await policy.on_login_success(user)
-
         return resp
 
     return router
