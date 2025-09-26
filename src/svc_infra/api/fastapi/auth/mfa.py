@@ -56,6 +56,15 @@ class SendEmailCodeOut(BaseModel):
     cooldown_seconds: int = 60
 
 
+class MFAStatusOut(BaseModel):
+    enabled: bool
+    methods: list[str]
+    confirmed_at: datetime | None = None
+    email_mask: str | None = None
+    email_otp: dict | None = None
+
+
+# ---- Utils ----
 def _qr_svg_from_uri(uri: str) -> str:
     # Placeholder SVG; most frontends will render their own QR
     return (
@@ -227,10 +236,7 @@ def mfa_router(
         await session.commit()
         return JSONResponse(status_code=204, content={})
 
-    @router.post(
-        "/verify",
-        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
-    )
+    @router.post("/verify")
     async def verify_mfa(
         session: SqlSessionDep,
         payload: VerifyMFAIn = Body(...),
@@ -303,7 +309,11 @@ def mfa_router(
         )
         return resp
 
-    @router.post("/send_code", response_model=SendEmailCodeOut)
+    @router.post(
+        "/send_code",
+        response_model=SendEmailCodeOut,
+        description="Sends a 6-digit email OTP tied to the `pre_token`. Returns a resend cooldown.",
+    )
     async def send_email_code(
         session: SqlSessionDep,
         payload: SendEmailCodeIn = Body(...),
@@ -356,5 +366,60 @@ def mfa_router(
         )
 
         return SendEmailCodeOut(sent=True, cooldown_seconds=cooldown)
+
+    @router.get(
+        "/status",
+        response_model=MFAStatusOut,
+        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
+    )
+    async def mfa_status(user_sess=Depends(_get_user_and_session)):
+        user, _ = user_sess
+        enabled = bool(getattr(user, "mfa_enabled", False))
+        confirmed_at = getattr(user, "mfa_confirmed_at", None)
+
+        methods = []
+        if enabled and getattr(user, "mfa_secret", None):
+            methods.append("totp")
+            methods.append("recovery")
+        # Email OTP is always offered in your flow at verify-time
+        methods.append("email")
+
+        def _mask(email: str) -> str:
+            if not email or "@" not in email:
+                return None
+            name, domain = email.split("@", 1)
+            if len(name) <= 1:
+                masked = "*"
+            elif len(name) == 2:
+                masked = name[0] + "*"
+            else:
+                masked = name[0] + "*" * (len(name) - 2) + name[-1]
+            return f"{masked}@{domain}"
+
+        email = getattr(user, "email", None)
+        st = get_auth_settings()
+        return MFAStatusOut(
+            enabled=enabled,
+            methods=methods,
+            confirmed_at=confirmed_at,
+            email_mask=_mask(email) if email else None,
+            email_otp={"cooldown_seconds": st.email_otp_cooldown_seconds},
+        )
+
+    @router.post(
+        "/recovery/regenerate",
+        response_model=RecoveryCodesOut,
+        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
+    )
+    async def regenerate_recovery_codes(user_sess=Depends(_get_user_and_session)):
+        user, session = user_sess
+        if not getattr(user, "mfa_enabled", False):
+            raise HTTPException(400, "MFA not enabled")
+
+        st = get_auth_settings()
+        codes = _gen_recovery_codes(st.mfa_recovery_codes, st.mfa_recovery_code_length)
+        user.mfa_recovery = [_hash(c) for c in codes]
+        await session.commit()
+        return RecoveryCodesOut(codes=codes)
 
     return router
