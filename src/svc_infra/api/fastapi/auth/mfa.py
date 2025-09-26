@@ -143,7 +143,9 @@ def mfa_router(
     @router.post(
         "/start",
         response_model=StartSetupOut,
-        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
+        openapi_extra={
+            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
+        },
     )
     async def start_setup(user_sess=Depends(_get_user_and_session)):
         user, session = user_sess
@@ -174,7 +176,9 @@ def mfa_router(
     @router.post(
         "/confirm",
         response_model=RecoveryCodesOut,
-        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
+        openapi_extra={
+            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
+        },
     )
     async def confirm_setup(
         payload: ConfirmSetupIn = Body(...), user_sess=Depends(_get_user_and_session)
@@ -206,7 +210,9 @@ def mfa_router(
     @router.post(
         "/disable",
         status_code=status.HTTP_204_NO_CONTENT,
-        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
+        openapi_extra={
+            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
+        },
     )
     async def disable_mfa(
         payload: DisableMFAIn = Body(...),
@@ -378,7 +384,9 @@ def mfa_router(
     @router.get(
         "/status",
         response_model=MFAStatusOut,
-        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
+        openapi_extra={
+            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
+        },
     )
     async def mfa_status(user_sess=Depends(_get_user_and_session)):
         user, _ = user_sess
@@ -417,7 +425,9 @@ def mfa_router(
     @router.post(
         "/recovery/regenerate",
         response_model=RecoveryCodesOut,
-        openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
+        openapi_extra={
+            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
+        },
     )
     async def regenerate_recovery_codes(user_sess=Depends(_get_user_and_session)):
         user, session = user_sess

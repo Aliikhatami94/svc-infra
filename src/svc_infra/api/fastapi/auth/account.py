@@ -105,7 +105,10 @@ def account_router(
         return False
 
     @router.post(
-        "/disable", openapi_extra={"security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}]}
+        "/disable",
+        openapi_extra={
+            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
+        },
     )
     async def disable_account(
         _b: str | None = Security(oauth2_scheme_optional),
@@ -129,7 +132,10 @@ def account_router(
         return JSONResponse({"ok": True})
 
     @router.post(
-        "/delete", openapi_extra={"security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}]}
+        "/delete",
+        openapi_extra={
+            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
+        },
     )
     async def delete_account(
         payload: DeleteAccountIn | None = Body(None), dep=Depends(_current_user)
