@@ -41,7 +41,7 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
         openapi_extra={
             "security": [
                 {"OAuth2PasswordBearer": []},
-                {"cookieAuth": []},
+                {"APIKeyCookie": []},
                 {"APIKeyHeader": []},
             ]
         },
@@ -51,8 +51,10 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
         payload: ApiKeyCreateIn = Body(...),
         p=Depends(current_principal),
     ):
-        # require superuser or owner policy as you prefer
-        if not p.user or not getattr(p.user, "is_superuser", False):
+        owner_id = payload.user_id or getattr(p.user, "id", None)
+        if not p.user:
+            raise HTTPException(401, "unauthorized")
+        if owner_id != getattr(p.user, "id") and not getattr(p.user, "is_superuser", False):
             raise HTTPException(403, "forbidden")
 
         plaintext, prefix, hashed = ApiKey.make_secret()
@@ -91,15 +93,21 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
         openapi_extra={
             "security": [
                 {"OAuth2PasswordBearer": []},
-                {"cookieAuth": []},
+                {"APIKeyCookie": []},
                 {"APIKeyHeader": []},
             ]
         },
     )
     async def list_keys(sess: SqlSessionDep, p=Depends(current_principal)):
-        if not p.user or not getattr(p.user, "is_superuser", False):
-            raise HTTPException(403, "forbidden")
-        rows = (await sess.execute(select(ApiKey))).scalars().all()
+        if not p.user:
+            raise HTTPException(401, "unauthorized")
+
+        q = select(ApiKey)
+        # superuser sees everything, normal user only their own
+        if not getattr(p.user, "is_superuser", False):
+            q = q.where(ApiKey.user_id == p.user.id)
+
+        rows = (await sess.execute(q)).scalars().all()
         return [
             ApiKeyOut(
                 id=str(x.id),
@@ -120,7 +128,7 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
         openapi_extra={
             "security": [
                 {"OAuth2PasswordBearer": []},
-                {"cookieAuth": []},
+                {"APIKeyCookie": []},
                 {"APIKeyHeader": []},
             ]
         },
@@ -131,6 +139,13 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
         row = await sess.get(ApiKey, key_id)
         if not row:
             raise HTTPException(404, "not_found")
+
+        # Only the owner or superuser can revoke
+        if row.user_id != getattr(p.user, "id", None) and not getattr(
+            p.user, "is_superuser", False
+        ):
+            raise HTTPException(403, "forbidden")
+
         row.active = False
         await sess.commit()
         return {"ok": True}
