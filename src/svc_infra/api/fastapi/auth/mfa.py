@@ -18,6 +18,8 @@ from svc_infra.api.fastapi.auth.sender import get_sender
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
+from ._cookies import compute_cookie_params
+
 # --- Email OTP store (replace with Redis in prod) ---
 EMAIL_OTP_STORE: dict[str, dict] = {}  # key = uid (or jti), value={hash,exp,attempts,next_send}
 
@@ -311,16 +313,9 @@ def mfa_router(
         # 4) mint normal JWT and set cookie
         token = await strategy.write_token(user)
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
-        resp.set_cookie(
-            key=st.auth_cookie_name,
-            value=token,
-            max_age=st.session_cookie_max_age_seconds,
-            httponly=True,
-            secure=bool(st.session_cookie_secure),
-            samesite=str(st.session_cookie_samesite).lower(),
-            domain=(getattr(st, "session_cookie_domain", None) or None),
-            path="/",
-        )
+        st = get_auth_settings()
+        cp = compute_cookie_params(session, name=st.auth_cookie_name)
+        resp.set_cookie(**cp, value=token)
         return resp
 
     @router.post(

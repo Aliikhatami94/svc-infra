@@ -15,6 +15,7 @@ from .account import account_router
 from .apikey_router import apikey_router
 from .gaurd import login_client_guard, mfa_login_router
 from .oauth_router import oauth_router_with_backend
+from .openapi_security import install_openapi_auth
 from .policy import AuthPolicy, DefaultAuthPolicy
 from .pre_auth import get_mfa_pre_jwt_writer
 from .providers import providers_from_settings
@@ -158,3 +159,6 @@ def add_auth(
                 ),
                 include_in_schema=include_in_docs,
             )
+
+    if include_in_docs and (enable_password or enable_oauth or enable_api_keys):
+        install_openapi_auth(app)

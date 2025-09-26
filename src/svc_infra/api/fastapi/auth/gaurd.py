@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -11,6 +10,7 @@ from fastapi_users.password import PasswordHelper
 
 from svc_infra.api.fastapi import public_router
 
+from ._cookies import compute_cookie_params
 from .policy import AuthPolicy, DefaultAuthPolicy
 from .settings import get_auth_settings
 
@@ -135,25 +135,9 @@ def mfa_login_router(
         # 5) mint token and set cookie
         token = await strategy.write_token(user)
         st = get_auth_settings()
-
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
-        resp.set_cookie(
-            key=st.auth_cookie_name,
-            value=token,
-            max_age=st.session_cookie_max_age_seconds,
-            httponly=True,
-            secure=bool(st.session_cookie_secure),
-            samesite=str(st.session_cookie_samesite).lower(),
-            domain=(st.session_cookie_domain or None),
-            path="/",
-        )
-
-        # optional post-login hook
-        if hasattr(policy, "on_login_success"):
-            res = policy.on_login_success(user)
-            if inspect.iscoroutine(res):
-                await res
-
+        cp = compute_cookie_params(request, name=st.auth_cookie_name)
+        resp.set_cookie(**cp, value=token)
         return resp
 
     return router

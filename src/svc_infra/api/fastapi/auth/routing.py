@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional, Sequence
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 
 from ..dual_router import DualAPIRouter
-from .deps import make_optional_user_dep, make_require_roles_dep, make_require_user_dep
+from .security import current_principal
 
 
 def _merge(base: Optional[Sequence[Any]], extra: Optional[Sequence[Any]]) -> list[Any]:
@@ -17,38 +17,56 @@ def _merge(base: Optional[Sequence[Any]], extra: Optional[Sequence[Any]]) -> lis
     return out
 
 
-def optional_user(
-    *,
-    session_dep,
-    get_user_by_id: Callable,
-    dependencies: Optional[Sequence[Any]] = None,
-    **kwargs: Any,
+# OPTIONAL: attach principal if present; never 401
+def optional_principal_router(
+    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
 ) -> DualAPIRouter:
-    dep = make_optional_user_dep(session_dep=session_dep, get_user_by_id=get_user_by_id)
-    return DualAPIRouter(dependencies=_merge([Depends(dep)], dependencies), **kwargs)
+    async def _opt(p=Depends(current_principal.optional)):  # uses .optional() helper
+        return p
+
+    return DualAPIRouter(dependencies=_merge([Depends(_opt)], dependencies), **kwargs)
 
 
-def require_user(
-    *,
-    session_dep,
-    get_user_by_id: Callable,
-    dependencies: Optional[Sequence[Any]] = None,
-    **kwargs: Any,
+# PROTECTED (ANY): cookie/Bearer OR API key
+def protected_router(
+    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
 ) -> DualAPIRouter:
-    opt = make_optional_user_dep(session_dep=session_dep, get_user_by_id=get_user_by_id)
-    req = make_require_user_dep(opt)
-    return DualAPIRouter(dependencies=_merge([Depends(req)], dependencies), **kwargs)
+    return DualAPIRouter(dependencies=_merge([Depends(current_principal)], dependencies), **kwargs)
 
 
-def require_roles(
+# USER-ONLY: must be an authenticated user (API key alone is not enough)
+def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
+    async def _req_user(p=Depends(current_principal)):
+        if not p.user:
+            raise HTTPException(401, "user_required")
+        return p
+
+    return DualAPIRouter(dependencies=_merge([Depends(_req_user)], dependencies), **kwargs)
+
+
+# SERVICE-ONLY: must present a valid API key (no user needed)
+def service_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
+    async def _req_service(p=Depends(current_principal)):
+        if not p.api_key:
+            raise HTTPException(401, "api_key_required")
+        return p
+
+    return DualAPIRouter(dependencies=_merge([Depends(_req_service)], dependencies), **kwargs)
+
+
+# ROLE-GATED: user with specific roles
+def roles_router(
     *roles: str,
-    session_dep,
-    get_user_by_id: Callable,
-    get_user_roles: Callable,
+    role_resolver: Callable[[Any], list[str]] | None = None,
     dependencies: Optional[Sequence[Any]] = None,
     **kwargs: Any,
 ) -> DualAPIRouter:
-    opt = make_optional_user_dep(session_dep=session_dep, get_user_by_id=get_user_by_id)
-    req = make_require_user_dep(opt)
-    rol = make_require_roles_dep(require_user_dep=req, get_user_roles=get_user_roles, roles=roles)
-    return DualAPIRouter(dependencies=_merge([Depends(rol)], dependencies), **kwargs)
+    async def _req_roles(p=Depends(current_principal)):
+        if not p.user:
+            raise HTTPException(401, "user_required")
+        have = set((role_resolver(p.user) if role_resolver else getattr(p.user, "roles", []) or []))
+        if not set(roles).issubset(have):
+            raise HTTPException(403, "forbidden")
+        return p
+
+    return DualAPIRouter(dependencies=_merge([Depends(_req_roles)], dependencies), **kwargs)
