@@ -191,7 +191,6 @@ def mfa_router(
     async def verify_mfa(
         payload: VerifyMFAIn = Body(...),
         session: SqlSessionDep = Depends(),
-        request: Request = Depends(),
     ):
         st = get_auth_settings()
         strategy = get_strategy()
