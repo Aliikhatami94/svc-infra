@@ -10,7 +10,7 @@ from sqlalchemy import select
 from svc_infra.api.fastapi import public_router
 from svc_infra.api.fastapi.auth.security import current_principal
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
-from svc_infra.db.sql.apikey import ApiKey
+from svc_infra.db.sql.apikey import get_apikey_model
 
 
 class ApiKeyCreateIn(BaseModel):
@@ -34,6 +34,7 @@ class ApiKeyOut(BaseModel):
 
 def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
     r = public_router(prefix=prefix, tags=["auth:apikeys"])
+    ApiKey = get_apikey_model()
 
     @r.post(
         "",
@@ -51,9 +52,9 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
         payload: ApiKeyCreateIn = Body(...),
         p=Depends(current_principal),
     ):
-        owner_id = payload.user_id or getattr(p.user, "id", None)
         if not p.user:
             raise HTTPException(401, "unauthorized")
+        owner_id = payload.user_id or getattr(p.user, "id", None)
         if owner_id != getattr(p.user, "id") and not getattr(p.user, "is_superuser", False):
             raise HTTPException(403, "forbidden")
 
@@ -65,7 +66,7 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
         )
 
         row = ApiKey(
-            user_id=payload.user_id or (getattr(p.user, "id", None)),
+            user_id=owner_id,
             name=payload.name,
             key_prefix=prefix,
             key_hash=hashed,

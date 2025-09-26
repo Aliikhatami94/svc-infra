@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from svc_infra.api.fastapi.auth.mfa import mfa_router
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
+from svc_infra.db.sql.apikey import bind_apikey_model
 
 from .. import Require
 from .account import account_router
@@ -32,6 +33,8 @@ def add_auth(
     oauth_prefix: str = "/auth/oauth",
     enable_password: bool = True,
     enable_oauth: bool = True,
+    enable_api_keys: bool = False,
+    apikey_table_name: str = "api_keys",
     provider_account_model=None,
     auth_policy: AuthPolicy | None = None,
 ) -> None:
@@ -77,7 +80,18 @@ def add_auth(
         )
 
     if enable_password:
-        # MFA-aware password login (returns MFA_REQUIRED + pre_token when needed)
+        # Account management
+        app.include_router(
+            account_router(user_model=user_model, auth_prefix=auth_prefix),
+            include_in_schema=include_in_docs,
+        )
+
+        # ---- API Keys (optional) ----
+        if enable_api_keys:
+            # Bind the ApiKey model to this app's user model/table
+            bind_apikey_model(user_model, table_name=apikey_table_name)
+            app.include_router(apikey_router(), include_in_schema=include_in_docs)
+
         app.include_router(
             mfa_login_router(
                 fapi=fapi,

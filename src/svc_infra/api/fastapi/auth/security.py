@@ -9,12 +9,13 @@ from sqlalchemy import select
 
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
-from svc_infra.db.sql.apikey import ApiKey
+from svc_infra.db.sql.apikey import get_apikey_model
 
 # Note: auto_error=False so these don't 403 if missing; we only want them to appear in OpenAPI.
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 cookie_auth_optional = APIKeyCookie(name=get_auth_settings().auth_cookie_name, auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+ApiKey = get_apikey_model()
 
 
 class Principal:
@@ -27,20 +28,17 @@ class Principal:
 
 
 async def resolve_api_key(
-    request: Request,
-    session: SqlSessionDep,
-    raw: Optional[str] = Security(api_key_header),
+    request: Request, session: SqlSessionDep, raw: Optional[str] = Security(api_key_header)
 ) -> Optional[Principal]:
     if not raw:
         return None
 
-    # Fast path: quick prefix parse “ak_<prefix>_...”
     prefix = ""
     parts = raw.split("_", 2)
     if len(parts) >= 3 and parts[0] == "ak":
         prefix = parts[1][:12]
 
-    apikey: ApiKey | None = None
+    apikey = None
     if prefix:
         apikey = (
             (await session.execute(select(ApiKey).where(ApiKey.key_prefix == prefix)))
@@ -49,27 +47,21 @@ async def resolve_api_key(
         )
 
     if not apikey:
-        # Fallback: you *could* avoid prefix lookup and accept constant-time compare over a small set,
-        # but prefix is strongly recommended for perf.
         raise HTTPException(401, "invalid_api_key")
 
-    # Verify HMAC
     from hmac import compare_digest
 
     if not compare_digest(ApiKey.hash(raw), apikey.key_hash):
         raise HTTPException(401, "invalid_api_key")
 
-    # Check active/expiry
     if not apikey.active:
         raise HTTPException(401, "api_key_revoked")
     if apikey.expires_at and datetime.now(timezone.utc) > apikey.expires_at:
         raise HTTPException(401, "api_key_expired")
 
-    # Touch last_used
     apikey.mark_used()
-    await session.flush()  # don't block the request on commit
+    await session.flush()
 
-    # Build principal (user may be None for service keys)
     return Principal(user=apikey.user, scopes=apikey.scopes, via="api_key")
 
 
