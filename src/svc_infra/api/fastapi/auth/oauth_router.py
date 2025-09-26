@@ -19,13 +19,14 @@ from starlette import status
 from starlette.responses import Response
 
 from svc_infra.api.fastapi import public_router
-from svc_infra.api.fastapi.auth.policy import DefaultAuthPolicy
+from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
 from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
 
 def _gen_pkce_pair() -> tuple[str, str]:
+    """Generate PKCE verifier and challenge pair for OAuth security."""
     verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
     digest = hashlib.sha256(verifier.encode()).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
@@ -33,6 +34,7 @@ def _gen_pkce_pair() -> tuple[str, str]:
 
 
 def _validate_redirect(url: str, allow_hosts: list[str], *, require_https: bool) -> None:
+    """Validate that a redirect URL is allowed and secure."""
     p = urlparse(url)
     if not p.netloc:
         return
@@ -45,19 +47,17 @@ def _validate_redirect(url: str, allow_hosts: list[str], *, require_https: bool)
 
 
 def _coerce_expires_at(token: dict | None) -> datetime | None:
+    """Extract expiration time from OAuth token."""
     if not isinstance(token, dict):
         return None
-    # Prefer absolute expires_at if present
     if token.get("expires_at") is not None:
         try:
             v = float(token["expires_at"])
-            # Some providers return ms; normalize
-            if v > 1e12:  # heuristic: ms epoch
+            if v > 1e12:  # ms -> s
                 v /= 1000.0
             return datetime.fromtimestamp(v, tz=timezone.utc)
         except Exception:
             pass
-    # Fallback to expires_in (relative)
     if token.get("expires_in") is not None:
         try:
             secs = int(token["expires_in"])
@@ -68,7 +68,7 @@ def _coerce_expires_at(token: dict | None) -> datetime | None:
 
 
 def _cookie_name(st) -> str:
-    # use the dedicated auth cookie name, NOT the Starlette session one
+    """Get the cookie name with appropriate security prefix."""
     name = getattr(st, "auth_cookie_name", "svc_auth")
     if st.session_cookie_secure and not st.session_cookie_domain and not name.startswith("__Host-"):
         name = "__Host-" + name
@@ -76,24 +76,13 @@ def _cookie_name(st) -> str:
 
 
 def _cookie_domain(st):
-    # IMPORTANT: return None for localhost/dev instead of "" or invalid host
+    """Get the cookie domain setting."""
     d = getattr(st, "session_cookie_domain", None)
     return d or None
 
 
-def oauth_router_with_backend(
-    user_model: type,
-    auth_backend: AuthenticationBackend,
-    providers: Dict[str, Dict[str, Any]],
-    post_login_redirect: str = "/",
-    prefix: str = "/auth/oauth",
-    provider_account_model: type | None = None,
-    auth_policy: DefaultAuthPolicy | None = None,
-) -> APIRouter:
-    oauth = OAuth()
-    policy = auth_policy or DefaultAuthPolicy(get_auth_settings())
-
-    # Register all providers
+def _register_oauth_providers(oauth: OAuth, providers: Dict[str, Dict[str, Any]]) -> None:
+    """Register all OAuth providers with the OAuth client."""
     for name, cfg in providers.items():
         kind = cfg.get("kind")
         if kind == "oidc":
@@ -114,13 +103,465 @@ def oauth_router_with_backend(
                 api_base_url=cfg["api_base_url"],
                 client_kwargs={"scope": cfg.get("scope", "")},
             )
-        else:
+
+
+def _handle_oauth_error(
+    request: Request, provider: str, error: str, description: str = ""
+) -> RedirectResponse:
+    """Handle OAuth errors by clearing session state and redirecting."""
+    # Clear transient oauth session state so user can retry
+    for k in ("state", "pkce_verifier", "nonce", "next"):
+        request.session.pop(f"oauth:{provider}:{k}", None)
+
+    st = get_auth_settings()
+    fallback = str(getattr(st, "post_login_redirect", "/"))
+    qs = urlencode(
+        {
+            "oauth_error": error,
+            "error_description": description,
+        }
+    )
+    return RedirectResponse(url=f"{fallback}?{qs}", status_code=status.HTTP_302_FOUND)
+
+
+async def _extract_user_info_oidc(
+    request: Request,
+    client,
+    token: dict,
+    nonce: str | None,
+) -> tuple[str | None, str | None, str | None, bool | None, dict]:
+    """Extract user information from OIDC provider."""
+    claims: dict[str, Any] = {}
+    id_token_present = isinstance(token, dict) and "id_token" in token
+
+    if id_token_present:
+        try:
+            claims = await client.parse_id_token(token, nonce=nonce)
+        except TypeError:
+            try:
+                claims = await client.parse_id_token(request, token, nonce)
+            except Exception:
+                claims = {}
+        except Exception:
+            claims = {}
+
+    if not claims:
+        try:
+            claims = await client.userinfo(token=token)
+        except Exception:
+            raise HTTPException(400, "oidc_userinfo_failed")
+
+    if nonce and claims.get("nonce") and claims["nonce"] != nonce:
+        raise HTTPException(400, "invalid_nonce")
+
+    email = claims.get("email")
+    full_name = claims.get("name") or claims.get("preferred_username")
+    email_verified = bool(claims.get("email_verified", True))
+
+    provider_user_id = None
+    sub_or_oid = claims.get("sub") or claims.get("oid")
+    if sub_or_oid is not None:
+        provider_user_id = str(sub_or_oid).strip()
+
+    if not email:
+        try:
+            ui = await client.userinfo(token=token)
+            email = ui.get("email") or email
+            full_name = ui.get("name") or full_name
+        except Exception:
             pass
+
+    return email, full_name, provider_user_id, email_verified, claims
+
+
+async def _extract_user_info_github(
+    client, token: dict
+) -> tuple[str | None, str | None, str | None, bool | None, dict]:
+    """Extract user information from GitHub provider."""
+    u = (await client.get("user", token=token)).json()
+    emails_resp = (await client.get("user/emails", token=token)).json()
+    primary = next((e for e in emails_resp if e.get("primary") and e.get("verified")), None)
+
+    if not primary:
+        raise HTTPException(400, "unverified_email")
+
+    email = primary["email"]
+    email_verified = True
+    full_name = u.get("name") or u.get("login")
+    provider_user_id = str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
+
+    return email, full_name, provider_user_id, email_verified, {"user": u}
+
+
+async def _extract_user_info_linkedin(
+    client, token: dict
+) -> tuple[str | None, str | None, str | None, bool | None, dict]:
+    """Extract user information from LinkedIn provider."""
+    me = (await client.get("me", token=token)).json()
+    provider_user_id = (
+        str(me.get("id")) if isinstance(me, dict) and me.get("id") is not None else None
+    )
+
+    em = (
+        await client.get("emailAddress?q=members&projection=(elements*(handle~))", token=token)
+    ).json()
+
+    email = None
+    els = em.get("elements") or []
+    if els and "handle~" in els[0]:
+        email = els[0]["handle~"].get("emailAddress")
+
+    lf = (((me.get("firstName") or {}).get("localized")) or {}).values()
+    ll = (((me.get("lastName") or {}).get("localized")) or {}).values()
+    first = next(iter(lf), None)
+    last = next(iter(ll), None)
+    full_name = " ".join([x for x in [first, last] if x])
+    email_verified = True
+
+    return email, full_name, provider_user_id, email_verified, {"me": me}
+
+
+async def _extract_user_info_from_provider(
+    request: Request,
+    client,
+    token: dict,
+    provider: str,
+    cfg: dict,
+    nonce: str | None = None,
+) -> tuple[str | None, str | None, str | None, bool | None, dict | None]:
+    """Extract user information from OAuth provider based on provider type."""
+    kind = cfg.get("kind")
+
+    if kind == "oidc":
+        return await _extract_user_info_oidc(request, client, token, nonce)
+    elif kind == "github":
+        return await _extract_user_info_github(client, token)
+    elif kind == "linkedin":
+        return await _extract_user_info_linkedin(client, token)
+    else:
+        raise HTTPException(400, "Unsupported provider kind")
+
+
+async def _find_or_create_user(session, user_model, email: str, full_name: str | None) -> Any:
+    """Find existing user by email or create a new one."""
+    existing = (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
+
+    if existing:
+        return existing
+
+    user = user_model(
+        email=email,
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+
+    # Set hashed password for OAuth users
+    if hasattr(user, "hashed_password"):
+        user.hashed_password = PasswordHelper().hash("!oauth!")
+    elif hasattr(user, "password_hash"):
+        user.password_hash = PasswordHelper().hash("!oauth!")
+
+    if full_name and hasattr(user, "full_name"):
+        setattr(user, "full_name", full_name)
+
+    session.add(user)
+    await session.flush()  # ensure user.id exists
+    return user
+
+
+async def _find_user_by_provider_link(
+    session, provider_account_model, user_model, provider: str, provider_user_id: str
+) -> Any | None:
+    """Find user by existing provider account link."""
+    if provider_account_model is None or not provider_user_id:
+        return None
+
+    existing_link = (
+        (
+            await session.execute(
+                select(provider_account_model).filter_by(
+                    provider=provider,
+                    provider_account_id=provider_user_id,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+    if existing_link:
+        return await session.get(user_model, existing_link.user_id)
+
+    return None
+
+
+async def _update_provider_account(
+    session,
+    provider_account_model,
+    user,
+    provider: str,
+    provider_user_id: str,
+    token: dict,
+    raw_claims: dict | None,
+) -> None:
+    """Create or update provider account link."""
+    if provider_account_model is None or not provider_user_id:
+        return
+
+    link = (
+        (
+            await session.execute(
+                select(provider_account_model).filter_by(
+                    provider=provider,
+                    provider_account_id=provider_user_id,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+    tok = token if isinstance(token, dict) else {}
+    access_token = tok.get("access_token")
+    refresh_token = tok.get("refresh_token")
+    expires_at = _coerce_expires_at(tok)
+
+    if not link:
+        values = dict(
+            user_id=user.id,
+            provider=provider,
+            provider_account_id=provider_user_id,
+        )
+        if hasattr(provider_account_model, "access_token"):
+            values["access_token"] = access_token
+        if hasattr(provider_account_model, "refresh_token"):
+            values["refresh_token"] = refresh_token
+        if hasattr(provider_account_model, "expires_at"):
+            values["expires_at"] = expires_at
+        if hasattr(provider_account_model, "raw_claims"):
+            values["raw_claims"] = raw_claims
+
+        session.add(provider_account_model(**values))
+        await session.flush()
+    else:
+        # Update existing link if values have changed
+        dirty = False
+        if hasattr(link, "access_token") and access_token and link.access_token != access_token:
+            link.access_token = access_token
+            dirty = True
+        if hasattr(link, "refresh_token") and refresh_token and link.refresh_token != refresh_token:
+            link.refresh_token = refresh_token
+            dirty = True
+        if hasattr(link, "expires_at") and expires_at and link.expires_at != expires_at:
+            link.expires_at = expires_at
+            dirty = True
+        if hasattr(link, "raw_claims") and raw_claims and link.raw_claims != raw_claims:
+            link.raw_claims = raw_claims
+            dirty = True
+        if dirty:
+            await session.flush()
+
+
+def _determine_final_redirect_url(request: Request, provider: str, post_login_redirect: str) -> str:
+    """Determine the final redirect URL after successful authentication."""
+    st = get_auth_settings()
+    redirect_url = str(
+        getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
+    )
+    allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
+    require_https = bool(getattr(st, "session_cookie_secure", False))
+
+    _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
+
+    # Prefer ?next or the stashed value from /login
+    nxt = request.query_params.get("next") or request.session.pop(f"oauth:{provider}:next", None)
+    if nxt:
+        try:
+            _validate_redirect(nxt, allow_hosts, require_https=require_https)
+            redirect_url = nxt
+        except HTTPException:
+            pass
+
+    return redirect_url
+
+
+async def _validate_oauth_state(request: Request, provider: str) -> tuple[str | None, str | None]:
+    """Validate OAuth state and extract session values."""
+    provided_state = request.query_params.get("state")
+    expected_state = request.session.pop(f"oauth:{provider}:state", None)
+    verifier = request.session.pop(f"oauth:{provider}:pkce_verifier", None)
+    nonce = request.session.pop(f"oauth:{provider}:nonce", None)
+
+    if not expected_state or provided_state != expected_state:
+        raise HTTPException(400, "invalid_state")
+
+    return verifier, nonce
+
+
+async def _exchange_code_for_token(client, request: Request, verifier: str | None, provider: str):
+    """Exchange OAuth authorization code for access token."""
+    try:
+        return await client.authorize_access_token(request, code_verifier=verifier)
+    except OAuthError as e:
+        return _handle_oauth_error(request, provider, e.error, e.description or "")
+
+
+async def _process_user_authentication(
+    session,
+    user_model,
+    provider_account_model,
+    provider: str,
+    email: str,
+    full_name: str | None,
+    provider_user_id: str,
+    token: dict,
+    raw_claims: dict | None,
+) -> Any:
+    """Process user authentication by finding or creating user and updating provider account."""
+    # Try resolving by existing provider link first
+    user = await _find_user_by_provider_link(
+        session, provider_account_model, user_model, provider, provider_user_id
+    )
+
+    # Fallback: resolve/create by email
+    if user is None:
+        user = await _find_or_create_user(session, user_model, email, full_name)
+
+    # Ensure provider link exists
+    await _update_provider_account(
+        session, provider_account_model, user, provider, provider_user_id, token, raw_claims
+    )
+
+    return user
+
+
+async def _validate_and_decode_jwt_token(raw_token: str) -> str:
+    """Validate and decode JWT token to extract user ID."""
+    st = get_auth_settings()
+    secret = (
+        st.jwt.secret.get_secret_value()
+        if getattr(st, "jwt", None) and getattr(st.jwt, "secret", None)
+        else "dev-change-me"
+    )
+
+    try:
+        payload = jwt.decode(
+            raw_token,
+            secret,
+            algorithms=["HS256"],
+            audience=["fastapi-users:auth"],
+        )
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(401, "invalid_token")
+        return user_id
+    except Exception:
+        raise HTTPException(401, "invalid_token")
+
+
+async def _set_cookie_on_response(
+    resp: Response, auth_backend: AuthenticationBackend, user: Any
+) -> None:
+    """Set authentication cookie on response."""
+    st = get_auth_settings()
+    strategy = auth_backend.get_strategy()
+    jwt_token = await strategy.write_token(user)
+
+    same_site_lit = cast(Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower())
+    if same_site_lit == "none" and not bool(st.session_cookie_secure):
+        raise HTTPException(500, "session_cookie_samesite=None requires session_cookie_secure=True")
+
+    resp.set_cookie(
+        key=_cookie_name(st),
+        value=jwt_token,
+        max_age=st.session_cookie_max_age_seconds,
+        httponly=True,
+        secure=bool(st.session_cookie_secure),
+        samesite=same_site_lit,
+        domain=_cookie_domain(st),
+        path="/",
+    )
+
+
+def _clean_oauth_session_state(request: Request, provider: str) -> None:
+    """Clean up transient OAuth session state."""
+    for k in ("state", "pkce_verifier", "nonce", "next"):
+        request.session.pop(f"oauth:{provider}:{k}", None)
+
+
+def _clear_oauth_session_data(request: Request):
+    """Clear all OAuth-related session data."""
+    for k in list(request.session.keys()):
+        if k.startswith("oauth:"):
+            request.session.pop(k, None)
+
+
+def _create_logout_response() -> Response:
+    """Create logout response with cookie deletion."""
+    st = get_auth_settings()
+    resp = Response(status_code=204)
+    resp.delete_cookie(
+        key=_cookie_name(st),
+        domain=_cookie_domain(st),
+        path="/",
+    )
+    return resp
+
+
+async def _handle_mfa_redirect(
+    policy: AuthPolicy, user: Any, redirect_url: str
+) -> RedirectResponse | None:
+    """Handle MFA redirect if required, return None if MFA not needed."""
+    if not await policy.should_require_mfa(user):
+        return None
+
+    pre = await get_mfa_pre_jwt_writer().write(user)
+    qs = urlencode({"mfa": "required", "pre_token": pre})
+    return RedirectResponse(url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND)
+
+
+def oauth_router_with_backend(
+    user_model: type,
+    auth_backend: AuthenticationBackend,
+    providers: Dict[str, Dict[str, Any]],
+    post_login_redirect: str = "/",
+    prefix: str = "/auth/oauth",
+    provider_account_model: type | None = None,
+    auth_policy: AuthPolicy | None = None,
+) -> APIRouter:
+    return _create_oauth_router(
+        user_model,
+        auth_backend,
+        providers,
+        post_login_redirect,
+        prefix,
+        provider_account_model,
+        auth_policy,
+    )
+
+
+def _create_oauth_router(
+    user_model: type,
+    auth_backend: AuthenticationBackend,
+    providers: Dict[str, Dict[str, Any]],
+    post_login_redirect: str = "/",
+    prefix: str = "/auth/oauth",
+    provider_account_model: type | None = None,
+    auth_policy: AuthPolicy | None = None,
+) -> APIRouter:
+    """Create OAuth router with all endpoints."""
+    oauth = OAuth()
+    policy: AuthPolicy = auth_policy or DefaultAuthPolicy(get_auth_settings())
+
+    # Register all providers
+    _register_oauth_providers(oauth, providers)
 
     router = public_router(prefix=prefix, tags=["auth:oauth"])
 
     @router.get("/{provider}/login")
     async def oauth_login(request: Request, provider: str):
+        """Initiate OAuth login flow."""
         client = oauth.create_client(provider)
         if not client:
             raise HTTPException(404, "Provider not configured")
@@ -132,6 +573,11 @@ def oauth_router_with_backend(
         request.session[f"oauth:{provider}:pkce_verifier"] = verifier
         request.session[f"oauth:{provider}:state"] = state
         request.session[f"oauth:{provider}:nonce"] = nonce
+
+        # Stash 'next' across the round-trip (some IdPs drop unknown params)
+        nxt = request.query_params.get("next")
+        if nxt:
+            request.session[f"oauth:{provider}:next"] = nxt
 
         redirect_uri = str(request.url_for("oauth_callback", provider=provider))
         return await client.authorize_redirect(
@@ -145,363 +591,96 @@ def oauth_router_with_backend(
 
     @router.get("/{provider}/callback", name="oauth_callback")
     async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
+        """Handle OAuth callback and complete authentication."""
         # Handle provider-side errors up front
         if err := request.query_params.get("error"):
-            # clear transient oauth session state so user can retry
-            request.session.pop(f"oauth:{provider}:state", None)
-            request.session.pop(f"oauth:{provider}:pkce_verifier", None)
-            request.session.pop(f"oauth:{provider}:nonce", None)
-
-            st = get_auth_settings()
-            fallback = str(getattr(st, "post_login_redirect", "/"))
-            # send the error back to frontend (adjust route as you like)
-            qs = urlencode(
-                {
-                    "oauth_error": err,
-                    "error_description": request.query_params.get("error_description", ""),
-                }
-            )
-            return RedirectResponse(url=f"{fallback}?{qs}", status_code=status.HTTP_302_FOUND)
+            description = request.query_params.get("error_description", "")
+            return _handle_oauth_error(request, provider, err, description)
 
         client = oauth.create_client(provider)
         if not client:
             raise HTTPException(404, "Provider not configured")
 
-        provided_state = request.query_params.get("state")
-        expected_state = request.session.pop(f"oauth:{provider}:state", None)
-        verifier = request.session.pop(f"oauth:{provider}:pkce_verifier", None)
-        nonce = request.session.pop(f"oauth:{provider}:nonce", None)
-        if not expected_state or provided_state != expected_state:
-            raise HTTPException(400, "invalid_state")
+        # Validate state and get session values
+        verifier, nonce = await _validate_oauth_state(request, provider)
 
-        try:
-            token = await client.authorize_access_token(request, code_verifier=verifier)
-        except OAuthError as e:
-            # clear transient state so user can retry
-            for k in ("state", "pkce_verifier", "nonce"):
-                request.session.pop(f"oauth:{provider}:{k}", None)
-            st = get_auth_settings()
-            fallback = str(getattr(st, "post_login_redirect", "/"))
-            qs = urlencode({"oauth_error": e.error, "error_description": e.description or ""})
-            return RedirectResponse(f"{fallback}?{qs}", status_code=status.HTTP_302_FOUND)
+        # Exchange code for token
+        token = await _exchange_code_for_token(client, request, verifier, provider)
+        if isinstance(token, RedirectResponse):  # Error occurred
+            return token
 
+        # Extract user information from provider
         cfg = providers.get(provider, {})
-        kind = cfg.get("kind")
-
-        email: str | None = None
-        full_name: str | None = None
-        provider_user_id: str | None = None
-        email_verified: bool | None = None
-
-        if kind == "oidc":
-            claims: dict[str, Any] = {}
-            id_token_present = isinstance(token, dict) and "id_token" in token
-
-            if id_token_present:
-                try:
-                    claims = await client.parse_id_token(token, nonce=nonce)  # newer Authlib
-                except TypeError:
-                    claims = await client.parse_id_token(request, token, nonce)  # older signature
-                except Exception:
-                    claims = {}
-
-            if not claims:
-                try:
-                    claims = await client.userinfo(token=token)
-                except Exception:
-                    raise HTTPException(400, "oidc_userinfo_failed")
-
-            if nonce and claims.get("nonce") and claims["nonce"] != nonce:
-                raise HTTPException(400, "invalid_nonce")
-
-            email = claims.get("email")
-            full_name = claims.get("name") or claims.get("preferred_username")
-            email_verified = bool(claims.get("email_verified", True))
-
-            provider_user_id = None
-            sub_or_oid = claims.get("sub") or claims.get("oid")
-            if sub_or_oid is not None:
-                provider_user_id = str(sub_or_oid).strip()
-
-            # Last-ditch: try userinfo again to grab email if missing
-            if not email:
-                try:
-                    ui = await client.userinfo(token=token)
-                    email = ui.get("email") or email
-                    full_name = ui.get("name") or full_name
-                except Exception:
-                    pass
-
-        elif kind == "github":
-            u = (await client.get("user", token=token)).json()
-            emails_resp = (await client.get("user/emails", token=token)).json()
-            primary = next((e for e in emails_resp if e.get("primary") and e.get("verified")), None)
-            if not primary:
-                raise HTTPException(400, "unverified_email")
-            email = primary["email"]
-            email_verified = True
-            full_name = u.get("name") or u.get("login")
-            provider_user_id = (
-                str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
-            )
-
-        elif kind == "linkedin":
-            me = (await client.get("me", token=token)).json()
-            provider_user_id = (
-                str(me.get("id")) if isinstance(me, dict) and me.get("id") is not None else None
-            )
-            em = (
-                await client.get(
-                    "emailAddress?q=members&projection=(elements*(handle~))", token=token
-                )
-            ).json()
-            els = em.get("elements") or []
-            if els and "handle~" in els[0]:
-                email = els[0]["handle~"].get("emailAddress")
-            lf = (((me.get("firstName") or {}).get("localized")) or {}).values()
-            ll = (((me.get("lastName") or {}).get("localized")) or {}).values()
-            first = next(iter(lf), None)
-            last = next(iter(ll), None)
-            full_name = " ".join([x for x in [first, last] if x])
-            email_verified = True
-
-        else:
-            raise HTTPException(400, "Unsupported provider kind")
+        email, full_name, provider_user_id, email_verified, raw_claims = (
+            await _extract_user_info_from_provider(request, client, token, provider, cfg, nonce)
+        )
 
         if email_verified is False:
-            # Stop here—don’t create/link accounts on unverified addresses.
             raise HTTPException(400, "unverified_email")
-
         if not email:
             raise HTTPException(400, "No email from provider")
 
-        # --- Try resolving by an existing provider link first ----------------
-        user = None
-        existing_link = None
-        if provider_account_model is not None and provider_user_id:
-            existing_link = (
-                (
-                    await session.execute(
-                        select(provider_account_model).filter_by(
-                            provider=provider,
-                            provider_account_id=provider_user_id,
-                        )
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            if existing_link:
-                user = await session.get(user_model, existing_link.user_id)
-
-        # --- Fallback: resolve/create by email (previous logic) --------------
-        if user is None:
-            existing = (
-                (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
-            )
-            if existing:
-                user = existing
-            else:
-                user = user_model(
-                    email=email,
-                    is_active=True,
-                    is_superuser=False,
-                    is_verified=True,
-                )
-                # Keep compatibility with FastAPI Users field names
-                if hasattr(user, "hashed_password"):
-                    user.hashed_password = PasswordHelper().hash("!oauth!")
-                elif hasattr(user, "password_hash"):
-                    user.password_hash = PasswordHelper().hash("!oauth!")
-                if full_name and hasattr(user, "full_name"):
-                    setattr(user, "full_name", full_name)
-
-                session.add(user)
-                await session.flush()  # ensure user.id exists
-
-        # --- Ensure provider link exists ------------------------------------
-        if provider_account_model is not None and provider_user_id:
-            link = (
-                (
-                    await session.execute(
-                        select(provider_account_model).filter_by(
-                            provider=provider,
-                            provider_account_id=provider_user_id,
-                        )
-                    )
-                )
-                .scalars()
-                .first()
-            )
-
-            # Optional token/claims payloads (only set if your ProviderAccount has these columns)
-            tok = token if isinstance(token, dict) else {}
-            access_token = tok.get("access_token")
-            refresh_token = tok.get("refresh_token")
-            expires_at = _coerce_expires_at(tok)  # <-- convert to datetime
-            raw_claims = None
-            if kind == "oidc":
-                raw_claims = claims
-            elif kind == "github":
-                raw_claims = {"user": u}
-            elif kind == "linkedin":
-                raw_claims = {"me": me}
-
-            if not link:
-                # Create link
-                values = dict(
-                    user_id=user.id,
-                    provider=provider,
-                    provider_account_id=provider_user_id,
-                )
-                if hasattr(provider_account_model, "access_token"):
-                    values["access_token"] = access_token
-                if hasattr(provider_account_model, "refresh_token"):
-                    values["refresh_token"] = refresh_token
-                if hasattr(provider_account_model, "expires_at"):
-                    values["expires_at"] = expires_at
-                if hasattr(provider_account_model, "raw_claims"):
-                    values["raw_claims"] = raw_claims
-
-                session.add(provider_account_model(**values))
-                await session.flush()
-            else:
-                # Refresh token/claims if columns exist
-                dirty = False
-                if (
-                    hasattr(link, "access_token")
-                    and access_token
-                    and link.access_token != access_token
-                ):
-                    link.access_token = access_token
-                    dirty = True
-                if (
-                    hasattr(link, "refresh_token")
-                    and refresh_token
-                    and link.refresh_token != refresh_token
-                ):
-                    link.refresh_token = refresh_token
-                    dirty = True
-                if hasattr(link, "expires_at") and expires_at and link.expires_at != expires_at:
-                    link.expires_at = expires_at
-                    dirty = True
-                if hasattr(link, "raw_claims") and raw_claims and link.raw_claims != raw_claims:
-                    link.raw_claims = raw_claims
-                    dirty = True
-                if dirty:
-                    await session.flush()
-
-        # Issue JWT
-        strategy = auth_backend.get_strategy()
-        jwt_token = await strategy.write_token(user)
-
-        # --- Enforce MFA for OAuth logins: redirect with pre-auth token -------------
-        if await policy.should_require_mfa(user):
-            pre = await get_mfa_pre_jwt_writer().write(user)
-            st = get_auth_settings()
-            redirect_url = str(
-                getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
-            )
-
-            allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
-            require_https = bool(getattr(st, "session_cookie_secure", False))
-            _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
-
-            nxt = request.query_params.get("next")
-            if nxt:
-                try:
-                    _validate_redirect(nxt, allow_hosts, require_https=require_https)
-                    redirect_url = nxt
-                except HTTPException:
-                    pass
-
-            qs = urlencode({"mfa": "required", "pre_token": pre})
-            return RedirectResponse(url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND)
-
-        # Set HttpOnly cookie and redirect (allow-listed)
-        st = get_auth_settings()
-        redirect_url = str(
-            getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
+        # Process user authentication
+        user = await _process_user_authentication(
+            session,
+            user_model,
+            provider_account_model,
+            provider,
+            email,
+            full_name,
+            provider_user_id,
+            token,
+            raw_claims,
         )
 
-        allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
-        require_https = bool(getattr(st, "session_cookie_secure", False))
+        # Determine final redirect URL
+        redirect_url = _determine_final_redirect_url(request, provider, post_login_redirect)
 
-        _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
+        # Handle MFA if required
+        mfa_response = await _handle_mfa_redirect(policy, user, redirect_url)
+        if mfa_response:
+            _clean_oauth_session_state(request, provider)
+            return mfa_response
 
-        nxt = request.query_params.get("next")
-        if nxt:
-            try:
-                _validate_redirect(nxt, allow_hosts, require_https=require_https)
-                redirect_url = nxt
-            except HTTPException:
-                pass
-
-        same_site_lit = cast(
-            Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower()
-        )
-        if same_site_lit == "none" and not bool(st.session_cookie_secure):
-            # auto-fix to lax or raise; I suggest raising in dev
-            raise HTTPException(
-                500, "session_cookie_samesite=None requires session_cookie_secure=True"
-            )
+        # Create response with auth cookie
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        await _set_cookie_on_response(resp, auth_backend, user)
 
-        resp.set_cookie(
-            key=_cookie_name(st),
-            value=jwt_token,
-            max_age=st.session_cookie_max_age_seconds,
-            httponly=True,
-            secure=bool(st.session_cookie_secure),
-            samesite=same_site_lit,
-            domain=_cookie_domain(st),
-            path="/",
-        )
+        # Clean up session state
+        _clean_oauth_session_state(request, provider)
+
+        # Optional: notify policy hook
+        if hasattr(policy, "on_login_success"):
+            try:
+                await policy.on_login_success(user)
+            except Exception:
+                pass  # don't block login on hook failure
+
         return resp
 
     @router.post("/refresh")
     async def refresh(request: Request, session: SqlSessionDep):
+        """Refresh authentication token."""
         st = get_auth_settings()
 
-        # 1) read cookie
+        # Read and validate cookie
         name = _cookie_name(st)
         raw = request.cookies.get(name)
         if not raw:
             raise HTTPException(401, "missing_token")
 
-        # 2) decode token (verify secret + aud)
-        try:
-            secret = (
-                st.jwt.secret.get_secret_value()
-                if getattr(st, "jwt", None) and getattr(st.jwt, "secret", None)
-                else "dev-change-me"  # same fallback you used for sessions
-            )
-            # FastAPI Users uses this default audience for JWTs
-            payload = jwt.decode(
-                raw,
-                secret,
-                algorithms=["HS256"],
-                audience=["fastapi-users:auth"],
-            )
-            user_id = payload.get("sub")
-            if not user_id:
-                raise HTTPException(401, "invalid_token")
-        except Exception:
-            raise HTTPException(401, "invalid_token")
+        # Validate and decode JWT token
+        user_id = await _validate_and_decode_jwt_token(raw)
 
-        # 3) load user
+        # Load user
         user = await session.get(user_model, user_id)
         if not user:
             raise HTTPException(401, "invalid_token")
 
-        # 4) --- Enforce MFA on refresh if the user requires it -------------------------
+        # Handle MFA if required
         if await policy.should_require_mfa(user):
             pre = await get_mfa_pre_jwt_writer().write(user)
-            st = get_auth_settings()
-            redirect_url = str(
-                getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
-            )
-
+            redirect_url = str(getattr(st, "post_login_redirect", "/"))
             allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
             require_https = bool(getattr(st, "session_cookie_secure", False))
             _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
@@ -517,40 +696,26 @@ def oauth_router_with_backend(
             qs = urlencode({"mfa": "required", "pre_token": pre})
             return RedirectResponse(url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND)
 
-        # 5) mint new token via the same strategy you use at login
-        strategy = auth_backend.get_strategy()
-        new_token = await strategy.write_token(user)
-
-        # 6) set cookie and return 204
+        # Create response with new token
         resp = Response(status_code=204)
-        resp.set_cookie(
-            key=name,
-            value=new_token,
-            max_age=st.session_cookie_max_age_seconds,
-            httponly=True,
-            secure=bool(st.session_cookie_secure),
-            samesite=str(st.session_cookie_samesite).lower(),
-            domain=_cookie_domain(st),
-            path="/",
-        )
+        await _set_cookie_on_response(resp, auth_backend, user)
+
+        # Optional: notify policy hook
+        if hasattr(policy, "on_token_refresh"):
+            try:
+                await policy.on_token_refresh(user)
+            except Exception:
+                pass
+
         return resp
 
     @router.post("/logout")
     async def logout(request: Request):
-        st = get_auth_settings()
+        """Logout and clear authentication."""
+        # Clear OAuth session state
+        _clear_oauth_session_data(request)
 
-        # nuke transient OAuth state
-        for k in list(request.session.keys()):
-            if k.startswith("oauth:"):
-                request.session.pop(k, None)
-
-        # delete auth cookie
-        resp = Response(status_code=204)
-        resp.delete_cookie(
-            key=_cookie_name(st),
-            domain=_cookie_domain(st),
-            path="/",
-        )
-        return resp
+        # Create logout response with cookie deletion
+        return _create_logout_response()
 
     return router
