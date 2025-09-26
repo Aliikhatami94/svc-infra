@@ -305,8 +305,8 @@ def mfa_router(
 
     @router.post("/send_code", response_model=SendEmailCodeOut)
     async def send_email_code(
+        session: SqlSessionDep,
         payload: SendEmailCodeIn = Body(...),
-        session: SqlSessionDep = Depends(),  # <-- add session so we can load the user
     ):
         # 1) Validate pre_token and extract uid
         try:
