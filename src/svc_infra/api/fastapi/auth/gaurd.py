@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi_users import FastAPIUsers
@@ -10,6 +12,9 @@ from svc_infra.api.fastapi import public_router
 
 from .policy import AuthPolicy, DefaultAuthPolicy
 from .settings import get_auth_settings
+
+_pwd = PasswordHelper()
+_DUMMY_BCRYPT = _pwd.hash("dummy-password")
 
 
 async def login_client_guard(request: Request):
@@ -72,22 +77,39 @@ def mfa_login_router(
         user_manager=Depends(fapi.get_user_manager),
     ):
         # 1) lookup user (normalize email)
-        pwd = PasswordHelper()
         strategy = auth_backend.get_strategy()
 
         email = username.strip().lower()
         user = await user_manager.user_db.get_by_email(email)
         if not user:
-            _ = pwd.verify(password, pwd.hash("dummy-password"))
+            _, _ = _pwd.verify_and_update(password, _DUMMY_BCRYPT)
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
 
         # 2) verify status + password
         if not getattr(user, "is_active", True):
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
-        if not pwd.verify(
-            password, getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
-        ):
+
+        hashed = getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
+        if not hashed:
+            # No password set (likely OAuth-only account)
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
+
+        ok, new_hash = _pwd.verify_and_update(password, hashed)
+        if not ok:
+            raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
+
+        # If the hash needs upgrading, persist it (optional but recommended)
+        if new_hash:
+            if hasattr(user, "hashed_password"):
+                user.hashed_password = new_hash
+            elif hasattr(user, "password_hash"):
+                user.password_hash = new_hash
+            try:
+                await user_manager.user_db.update(user)
+            except Exception:
+                # don't block login if updating hash fails; log if you have logging here
+                pass
+
         if getattr(user, "is_verified") is False:
             raise HTTPException(400, "LOGIN_USER_NOT_VERIFIED")
 
@@ -118,7 +140,11 @@ def mfa_login_router(
         )
 
         # optional post-login hook
-        await policy.on_login_success(user)
+        if hasattr(policy, "on_login_success"):
+            res = policy.on_login_success(user)
+            if inspect.iscoroutine(res):
+                await res
+
         return resp
 
     return router
