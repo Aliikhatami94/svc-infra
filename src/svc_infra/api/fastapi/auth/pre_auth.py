@@ -7,13 +7,13 @@ def get_mfa_pre_jwt_writer():
     st = get_auth_settings()
     jwt_block = getattr(st, "jwt", None)
 
-    # Force to a plain string aggressively
-    secret_value = (
+    # Force to plain string
+    secret = (
         jwt_block.secret.get_secret_value()
         if jwt_block and getattr(jwt_block, "secret", None)
         else "svc-dev-secret-change-me"
     )
-    secret: str = str(secret_value)
+    secret = str(secret)
 
     lifetime = int(getattr(st, "mfa_pre_token_lifetime_seconds", 300))
 
@@ -37,7 +37,7 @@ def get_mfa_pre_jwt_writer():
         async def read(self, token: str):
             from fastapi_users.jwt import decode_jwt
 
-            # IMPORTANT: pass a single string, not a list
+            # IMPORTANT: pass a STRING, not a list
             return decode_jwt(token, self.secret, audience=["fastapi-users:mfa"])
 
     return PreTokenWriter(secret, lifetime)
