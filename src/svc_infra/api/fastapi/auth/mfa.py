@@ -189,8 +189,8 @@ def mfa_router(
         openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
     )
     async def verify_mfa(
+        session: SqlSessionDep,
         payload: VerifyMFAIn = Body(...),
-        session: SqlSessionDep = Depends(),
     ):
         st = get_auth_settings()
         strategy = get_strategy()
