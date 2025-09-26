@@ -35,7 +35,17 @@ class ApiKeyOut(BaseModel):
 def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
     r = public_router(prefix=prefix, tags=["auth:apikeys"])
 
-    @r.post("", response_model=ApiKeyOut)
+    @r.post(
+        "",
+        response_model=ApiKeyOut,
+        openapi_extra={
+            "security": [
+                {"OAuth2PasswordBearer": []},
+                {"cookieAuth": []},
+                {"APIKeyHeader": []},
+            ]
+        },
+    )
     async def create_key(
         sess: SqlSessionDep,
         payload: ApiKeyCreateIn = Body(...),
@@ -75,7 +85,17 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
             last_used_at=row.last_used_at,
         )
 
-    @r.get("", response_model=list[ApiKeyOut])
+    @r.get(
+        "",
+        response_model=list[ApiKeyOut],
+        openapi_extra={
+            "security": [
+                {"OAuth2PasswordBearer": []},
+                {"cookieAuth": []},
+                {"APIKeyHeader": []},
+            ]
+        },
+    )
     async def list_keys(sess: SqlSessionDep, p=Depends(current_principal)):
         if not p.user or not getattr(p.user, "is_superuser", False):
             raise HTTPException(403, "forbidden")
@@ -95,7 +115,16 @@ def apikey_router(prefix: str = "/auth/keys") -> APIRouter:
             for x in rows
         ]
 
-    @r.post("/{key_id}/revoke")
+    @r.post(
+        "/{key_id}/revoke",
+        openapi_extra={
+            "security": [
+                {"OAuth2PasswordBearer": []},
+                {"cookieAuth": []},
+                {"APIKeyHeader": []},
+            ]
+        },
+    )
     async def revoke_key(key_id: str, sess: SqlSessionDep, p=Depends(current_principal)):
         if not p.user or not getattr(p.user, "is_superuser", False):
             raise HTTPException(403, "forbidden")
