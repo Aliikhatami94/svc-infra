@@ -61,7 +61,7 @@ def mfa_login_router(
     user_model: type,
     get_mfa_pre_writer,
     public_auth_prefix: str = "/auth",
-    auth_policy: AuthPolicy | None = None,  # <-- NEW
+    auth_policy: AuthPolicy | None = None,
 ) -> APIRouter:
     router = public_router(prefix=public_auth_prefix, tags=["auth"])
     policy = auth_policy or DefaultAuthPolicy(get_auth_settings())
@@ -87,7 +87,7 @@ def mfa_login_router(
 
         # 2) verify status + password
         if not getattr(user, "is_active", True):
-            raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
+            raise HTTPException(401, "account_disabled")
 
         hashed = getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
         if not hashed:

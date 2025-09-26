@@ -633,14 +633,22 @@ def _create_oauth_router(
             raw_claims,
         )
 
+        # Reject disabled accounts early
+        if not getattr(user, "is_active", True):
+            raise HTTPException(401, "account_disabled")
+
         # Determine final redirect URL
         redirect_url = _determine_final_redirect_url(request, provider, post_login_redirect)
 
-        # Handle MFA if required
+        # Handle MFA if required (do NOT set last_login yet; do it after MFA)
         mfa_response = await _handle_mfa_redirect(policy, user, redirect_url)
         if mfa_response:
             _clean_oauth_session_state(request, provider)
             return mfa_response
+
+        # NEW: set last_login only when we are actually logging in now
+        user.last_login = datetime.now(timezone.utc)
+        await session.commit()
 
         # Create response with auth cookie
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
@@ -649,12 +657,12 @@ def _create_oauth_router(
         # Clean up session state
         _clean_oauth_session_state(request, provider)
 
-        # Optional: notify policy hook
+        # Optional: hook
         if hasattr(policy, "on_login_success"):
             try:
                 await policy.on_login_success(user)
             except Exception:
-                pass  # don't block login on hook failure
+                pass
 
         return resp
 

@@ -255,11 +255,14 @@ def mfa_router(
 
         # 2) load user
         user = await session.get(user_model, uid)
-        if (
-            not user
-            or not getattr(user, "mfa_enabled", False)
-            or not getattr(user, "mfa_secret", None)
-        ):
+        if not user:
+            raise HTTPException(401, "Invalid pre-auth token")
+
+        # NEW: block disabled accounts here with a clear error
+        if not getattr(user, "is_active", True):
+            raise HTTPException(401, "account_disabled")
+
+        if (not getattr(user, "mfa_enabled", False)) or (not getattr(user, "mfa_secret", None)):
             raise HTTPException(401, "MFA not enabled")
 
         # 3) verify TOTP or fallback
@@ -274,7 +277,7 @@ def mfa_router(
             dig = _hash(payload.code)
             if getattr(user, "mfa_recovery", None) and dig in user.mfa_recovery:
                 user.mfa_recovery.remove(dig)
-                await session.commit()  # <-- persist burn
+                await session.commit()  # persist burn
                 ok = True
             else:
                 # C) Email OTP (bound to uid via pre_token above)
@@ -293,6 +296,10 @@ def mfa_router(
 
         if not ok:
             raise HTTPException(400, "Invalid code")
+
+        # NEW: set last_login on successful MFA
+        user.last_login = datetime.now(timezone.utc)
+        await session.commit()
 
         # 4) mint normal JWT and set cookie
         token = await strategy.write_token(user)

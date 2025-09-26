@@ -10,6 +10,7 @@ from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 from .. import Require
+from .account import account_router
 from .gaurd import login_client_guard, mfa_login_router
 from .oauth_router import oauth_router_with_backend
 from .policy import AuthPolicy, DefaultAuthPolicy
@@ -125,6 +126,12 @@ def add_auth(
                 fapi=fapi,
                 auth_prefix=auth_prefix,
             ),
+            include_in_schema=include_in_docs,
+        )
+
+        # Account management (disable/delete)
+        app.include_router(
+            account_router(user_model=user_model, auth_prefix=auth_prefix),
             include_in_schema=include_in_docs,
         )
 
