@@ -15,7 +15,6 @@ from svc_infra.db.sql.apikey import get_apikey_model
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 cookie_auth_optional = APIKeyCookie(name=get_auth_settings().auth_cookie_name, auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-ApiKey = get_apikey_model()
 
 
 class Principal:
@@ -32,6 +31,8 @@ async def resolve_api_key(
 ) -> Optional[Principal]:
     if not raw:
         return None
+
+    ApiKey = get_apikey_model()
 
     prefix = ""
     parts = raw.split("_", 2)
@@ -88,14 +89,14 @@ async def resolve_bearer_or_cookie_principal(
     if not token:
         return None
 
-    # Discover the concrete User model class via the ApiKey.user relationship
     # so we avoid importing app-specific models here.
+    # Discover User model via ApiKey relationship (only if API keys enabled)
+    ApiKey = get_apikey_model()  # <-- LAZY here
     UserModel = ApiKey.user.property.mapper.class_
 
     # Defer import to avoid circulars and to keep this infra module reusable.
     from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 
-    # NOTE: public_auth_prefix must match how you mounted auth (usually "/auth")
     fapi, auth_backend, *_ = get_fastapi_users(
         UserModel, None, None, None, public_auth_prefix="/auth"
     )

@@ -80,18 +80,12 @@ def add_auth(
         )
 
     if enable_password:
-        # Account management
-        app.include_router(
-            account_router(user_model=user_model, auth_prefix=auth_prefix),
-            include_in_schema=include_in_docs,
-        )
-
-        # ---- API Keys (optional) ----
+        # Bind + mount (optional) API keys BEFORE adding the keys router
         if enable_api_keys:
-            # Bind the ApiKey model to this app's user model/table
             bind_apikey_model(user_model, table_name=apikey_table_name)
             app.include_router(apikey_router(), include_in_schema=include_in_docs)
 
+        # MFA-aware login
         app.include_router(
             mfa_login_router(
                 fapi=fapi,
@@ -105,7 +99,7 @@ def add_auth(
             dependencies=[Require(login_client_guard)],
         )
 
-        # Users + registration + email verify + password reset
+        # Users & auth management
         app.include_router(
             users_router,
             prefix=auth_prefix,
@@ -131,9 +125,7 @@ def add_auth(
             include_in_schema=include_in_docs,
         )
 
-        # TOTP MFA endpoints (setup/confirm/disable/verify).
-        # Mounting these doesn't force MFA; enforcement is driven by per-user flags
-        # and any project/tenant-wide settings you apply in your login/OAuth flows.
+        # MFA endpoints
         app.include_router(
             mfa_router(
                 user_model=user_model,
@@ -144,12 +136,11 @@ def add_auth(
             include_in_schema=include_in_docs,
         )
 
-        # Account management (disable/delete)
+        # Account management
         app.include_router(
             account_router(user_model=user_model, auth_prefix=auth_prefix),
             include_in_schema=include_in_docs,
         )
-        app.include_router(apikey_router(), include_in_schema=include_in_docs)
 
     if enable_oauth:
         providers = providers_from_settings(settings_obj)
