@@ -16,7 +16,7 @@ from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMi
 from svc_infra.api.fastapi.middleware.errors.error_handlers import register_error_handlers
 from svc_infra.api.fastapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.routers import register_all_routers
-from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
+from svc_infra.app.env import CURRENT_ENVIRONMENT
 
 logger = logging.getLogger(__name__)
 
@@ -131,12 +131,11 @@ def setup_service_api(
       - Root app (one set of root routers, incl. svc-infra /ping)
       - One child app per APIVersionSpec mounted at /{tag}
     """
-    include_in_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
     parent = FastAPI(
         title=root_title or service.name,
-        docs_url="/docs" if include_in_docs else None,
-        redoc_url="/redoc" if include_in_docs else None,
-        openapi_url="/openapi.json" if include_in_docs else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
         version=service.release,
     )
 
