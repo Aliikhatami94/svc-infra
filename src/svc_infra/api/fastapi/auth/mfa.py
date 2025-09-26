@@ -84,7 +84,7 @@ def mfa_router(
         if not token:
             raise HTTPException(401, "Missing token")
         try:
-            payload = await strategy.read_token(token, token_type="access")
+            payload = await strategy.read_token(token)
             sub = payload.get("sub")
         except Exception:
             raise HTTPException(401, "Invalid token")
