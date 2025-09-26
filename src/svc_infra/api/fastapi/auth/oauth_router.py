@@ -589,7 +589,11 @@ def _create_oauth_router(
             nonce=nonce,
         )
 
-    @router.get("/{provider}/callback", name="oauth_callback")
+    @router.get(
+        "/{provider}/callback",
+        name="oauth_callback",
+        responses={302: {"description": "Redirect to app (or MFA redirect)."}},
+    )
     async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
         """Handle OAuth callback and complete authentication."""
         # Handle provider-side errors up front
@@ -666,7 +670,11 @@ def _create_oauth_router(
 
         return resp
 
-    @router.post("/refresh")
+    @router.post(
+        "/refresh",
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={204: {"description": "Cookie refreshed"}},
+    )
     async def refresh(request: Request, session: SqlSessionDep):
         """Refresh authentication token."""
         st = get_auth_settings()
@@ -717,7 +725,11 @@ def _create_oauth_router(
 
         return resp
 
-    @router.post("/logout")
+    @router.post(
+        "/logout",
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={204: {"description": "Cookie cleared"}},
+    )
     async def logout(request: Request):
         """Logout and clear authentication."""
         # Clear OAuth session state

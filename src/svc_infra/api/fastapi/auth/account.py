@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pyotp
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Security
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
@@ -11,6 +11,7 @@ from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
 from .mfa import EMAIL_OTP_STORE, _hash, _now_utc_ts  # reuse helpers
+from .security import cookie_auth_optional, oauth2_scheme_optional
 
 
 class RequireMFAIn(BaseModel):
@@ -103,9 +104,14 @@ def account_router(
                     rec["attempts_left"] = max(0, rec["attempts_left"] - 1)
         return False
 
-    @router.post("/disable")
+    @router.post(
+        "/disable", openapi_extra={"security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}]}
+    )
     async def disable_account(
-        payload: DisableAccountIn | None = Body(None), dep=Depends(_current_user)
+        _b: str | None = Security(oauth2_scheme_optional),
+        _c: str | None = Security(cookie_auth_optional),
+        payload: DisableAccountIn | None = Body(None),
+        dep=Depends(_current_user),
     ):
         user, session = dep
 
@@ -122,7 +128,9 @@ def account_router(
         await session.commit()
         return JSONResponse({"ok": True})
 
-    @router.post("/delete")
+    @router.post(
+        "/delete", openapi_extra={"security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}]}
+    )
     async def delete_account(
         payload: DeleteAccountIn | None = Body(None), dep=Depends(_current_user)
     ):

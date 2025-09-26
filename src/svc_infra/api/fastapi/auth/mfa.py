@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timezone
 
 import pyotp
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi_users import FastAPIUsers
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -205,6 +205,7 @@ def mfa_router(
 
     @router.post(
         "/disable",
+        status_code=status.HTTP_204_NO_CONTENT,
         openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
     )
     async def disable_mfa(
