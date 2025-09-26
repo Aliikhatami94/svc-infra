@@ -1,9 +1,17 @@
 from .add import add_auth
-from .routing import optional_user, require_roles, require_user
+from .routing import (
+    optional_principal_router,
+    protected_router,
+    roles_router,
+    service_router,
+    user_router,
+)
 
 __all__ = [
     "add_auth",
-    "optional_user",
-    "require_user",
-    "require_roles",
+    "optional_principal_router",
+    "protected_router",
+    "roles_router",
+    "service_router",
+    "user_router",
 ]
