@@ -9,6 +9,7 @@ import pyotp
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi_users import FastAPIUsers
 from pydantic import BaseModel
+from sqlalchemy import select
 from starlette.responses import JSONResponse
 
 from svc_infra.api.fastapi import public_router
@@ -111,6 +112,7 @@ def mfa_router(
     )
     async def start_setup(user_sess=Depends(_get_user_and_session)):
         user, session = user_sess
+
         if getattr(user, "mfa_enabled", False):
             raise HTTPException(400, "MFA already enabled")
 
@@ -120,11 +122,17 @@ def mfa_router(
         label = getattr(user, "email", None) or f"user-{user.id}"
         uri = pyotp.totp.TOTP(secret).provisioning_uri(name=label, issuer_name=issuer)
 
-        # Stage secret until confirmed
+        # Update and COMMIT
         user.mfa_secret = secret
         user.mfa_enabled = False
         user.mfa_confirmed_at = None
         await session.commit()
+
+        # (Optional) verify it actually persisted:
+        # fresh_secret = (await session.execute(
+        #     select(user_model.mfa_secret).where(user_model.id == user.id)
+        # )).scalar_one()
+        # assert fresh_secret == secret
 
         return StartSetupOut(otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri))
 
@@ -134,10 +142,15 @@ def mfa_router(
         openapi_extra={"security": [{"OAuth2PasswordBearer": []}]},
     )
     async def confirm_setup(
-        payload: ConfirmSetupIn = Body(...),
-        user_sess=Depends(_get_user_and_session),
+        payload: ConfirmSetupIn = Body(...), user_sess=Depends(_get_user_and_session)
     ):
         user, session = user_sess
+
+        # RELOAD from DB to avoid stale state
+        user = (
+            await session.execute(select(user_model).where(user_model.id == user.id))
+        ).scalar_one()
+
         if not getattr(user, "mfa_secret", None):
             raise HTTPException(400, "No setup in progress")
 
