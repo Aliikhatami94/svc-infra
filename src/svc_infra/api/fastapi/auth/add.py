@@ -122,6 +122,7 @@ def add_auth(
             mfa_router(
                 user_model=user_model,
                 get_strategy=get_strategy,
+                fapi=fapi,
                 auth_prefix=auth_prefix,
             ),
             include_in_schema=include_in_docs,
