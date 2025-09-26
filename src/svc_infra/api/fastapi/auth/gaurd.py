@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -123,7 +124,15 @@ def mfa_login_router(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # 4) mint token and set cookie
+        # 4) record last_login for password logins that do NOT require MFA
+        try:
+            user.last_login = datetime.now(timezone.utc)
+            await user_manager.user_db.update(user, {"last_login": user.last_login})
+        except Exception:
+            # don’t block login if this write fails
+            pass
+
+        # 5) mint token and set cookie
         token = await strategy.write_token(user)
         st = get_auth_settings()
 

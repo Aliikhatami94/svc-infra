@@ -14,8 +14,8 @@ from .mfa import EMAIL_OTP_STORE, _hash, _now_utc_ts  # reuse helpers
 
 
 class RequireMFAIn(BaseModel):
-    code: str
-    pre_token: str | None = None  # allow providing a pre_token if you want email-OTP for extra step
+    code: str | None = None
+    pre_token: str | None = None
 
 
 class DisableAccountIn(RequireMFAIn):
@@ -47,16 +47,16 @@ def account_router(
         fapi, auth_backend, *_ = get_fastapi_users(
             user_model, None, None, None, public_auth_prefix=auth_prefix
         )
-        user_manager_dep = fapi.get_user_manager
-        strategy = auth_backend.get_strategy()
+        # IMPORTANT: get a real user_manager instance to pass into read_token
+        user_manager_gen = fapi.get_user_manager
+        async for user_manager in user_manager_gen():  # type: ignore
+            strategy = auth_backend.get_strategy()
+            try:
+                user = await strategy.read_token(token, user_manager)
+            finally:
+                break  # we only need one instance
 
-        try:
-            user = await strategy.read_token(
-                token, user_manager_dep.__wrapped__(None)
-            )  # FastAPI Users user
-            if not user:
-                raise HTTPException(401, "Invalid token")
-        except Exception:
+        if not user:
             raise HTTPException(401, "Invalid token")
 
         db_user = await session.get(user_model, user.id)
@@ -67,8 +67,10 @@ def account_router(
 
         return db_user, session
 
-    async def _verify_code_for_user(user, code: str, pre_token: str | None) -> bool:
+    async def _verify_code_for_user(user, code: str | None, pre_token: str | None) -> bool:
         """Accept TOTP, recovery, or email OTP (requires pre_token for email)."""
+        if not code:
+            return False
         # TOTP
         if getattr(user, "mfa_secret", None):
             if pyotp.TOTP(user.mfa_secret).verify(code, valid_window=1):
@@ -102,30 +104,39 @@ def account_router(
         return False
 
     @router.post("/disable")
-    async def disable_account(payload: DisableAccountIn = Body(...), dep=Depends(_current_user)):
+    async def disable_account(
+        payload: DisableAccountIn | None = Body(None), dep=Depends(_current_user)
+    ):
         user, session = dep
 
-        # If MFA is enabled, require a valid code
         if getattr(user, "mfa_enabled", False):
-            if not await _verify_code_for_user(user, payload.code, payload.pre_token):
+            if not payload or not await _verify_code_for_user(
+                user, payload.code, payload.pre_token
+            ):
                 raise HTTPException(400, "Invalid code")
             await session.flush()  # burns recovery code if used
 
+        reason = (payload.reason if payload else None) or "user_disabled_self"
         user.is_active = False
-        user.disabled_reason = payload.reason or "user_disabled_self"
+        user.disabled_reason = reason
         await session.commit()
         return JSONResponse({"ok": True})
 
     @router.post("/delete")
-    async def delete_account(payload: DeleteAccountIn = Body(...), dep=Depends(_current_user)):
+    async def delete_account(
+        payload: DeleteAccountIn | None = Body(None), dep=Depends(_current_user)
+    ):
         user, session = dep
 
         if getattr(user, "mfa_enabled", False):
-            if not await _verify_code_for_user(user, payload.code, payload.pre_token):
+            if not payload or not await _verify_code_for_user(
+                user, payload.code, payload.pre_token
+            ):
                 raise HTTPException(400, "Invalid code")
             await session.flush()
 
-        if payload.hard:
+        hard = bool(payload.hard) if payload else False
+        if hard:
             await session.delete(user)
             await session.commit()
             return JSONResponse({"ok": True, "deleted": "hard"})
