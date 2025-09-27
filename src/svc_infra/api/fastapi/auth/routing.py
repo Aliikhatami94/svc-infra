@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional, Sequence
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException
 
 from ..dual_router import DualAPIRouter
 from .security import current_principal
@@ -36,10 +36,9 @@ def protected_router(
 
 # USER-ONLY: must be an authenticated user (API key alone is not enough)
 def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
-    async def _req_user(request: Request, p=Depends(current_principal)):
+    async def _req_user(p=Depends(current_principal)):
         if not p.user:
             raise HTTPException(401, "user_required")
-        request.state.principal = p
         return p
 
     return DualAPIRouter(dependencies=_merge([Depends(_req_user)], dependencies), **kwargs)
@@ -47,10 +46,9 @@ def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) 
 
 # SERVICE-ONLY: must present a valid API key (no user needed)
 def service_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
-    async def _req_service(request: Request, p=Depends(current_principal)):
+    async def _req_service(p=Depends(current_principal)):
         if not p.api_key:
             raise HTTPException(401, "api_key_required")
-        request.state.principal = p
         return p
 
     return DualAPIRouter(dependencies=_merge([Depends(_req_service)], dependencies), **kwargs)
@@ -63,13 +61,12 @@ def roles_router(
     dependencies: Optional[Sequence[Any]] = None,
     **kwargs: Any,
 ) -> DualAPIRouter:
-    async def _req_roles(request: Request, p=Depends(current_principal)):
+    async def _req_roles(p=Depends(current_principal)):
         if not p.user:
             raise HTTPException(401, "user_required")
         have = set((role_resolver(p.user) if role_resolver else getattr(p.user, "roles", []) or []))
         if not set(roles).issubset(have):
             raise HTTPException(403, "forbidden")
-        request.state.principal = p
         return p
 
     return DualAPIRouter(dependencies=_merge([Depends(_req_roles)], dependencies), **kwargs)
