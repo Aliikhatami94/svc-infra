@@ -4,8 +4,8 @@ from typing import Any, Callable, Optional, Sequence
 
 from fastapi import Depends, HTTPException
 
-from ..dualize import DualAPIRouter
-from .security import current_principal
+from svc_infra.api.fastapi.auth.security import current_principal
+from svc_infra.api.fastapi.dual.dualize import DualAPIRouter
 
 
 def _merge(base: Optional[Sequence[Any]], extra: Optional[Sequence[Any]]) -> list[Any]:

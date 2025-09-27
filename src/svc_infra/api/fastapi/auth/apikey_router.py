@@ -7,9 +7,9 @@ from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from svc_infra.api.fastapi.auth.routers import user_router
 from svc_infra.api.fastapi.auth.security import current_principal
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
+from svc_infra.api.fastapi.dual.protected import user_router
 from svc_infra.db.sql.apikey import get_apikey_model
 
 

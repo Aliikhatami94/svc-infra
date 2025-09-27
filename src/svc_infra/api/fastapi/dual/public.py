@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .dualize import DualAPIRouter
+from svc_infra.api.fastapi.dual.dualize import DualAPIRouter
 
 
 def public_router(**kwargs: Any) -> DualAPIRouter:
