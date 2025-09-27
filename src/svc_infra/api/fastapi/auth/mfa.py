@@ -247,10 +247,10 @@ def mfa_router(
 
     @router.post("/verify")
     async def verify_mfa(
+        request: Request,
         session: SqlSessionDep,
         payload: VerifyMFAIn = Body(...),
     ):
-        st = get_auth_settings()
         strategy = get_strategy()
 
         # 1) read/verify pre-auth token (aud = mfa)
@@ -314,7 +314,7 @@ def mfa_router(
         token = await strategy.write_token(user)
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
         st = get_auth_settings()
-        cp = compute_cookie_params(session, name=st.auth_cookie_name)
+        cp = compute_cookie_params(request, name=st.auth_cookie_name)
         resp.set_cookie(**cp, value=token)
         return resp
 
