@@ -5,8 +5,7 @@ from typing import Callable, Sequence
 from fastapi import APIRouter
 from fastapi.routing import APIRoute
 
-from svc_infra.api.fastapi.auth import protected_router, service_router, user_router
-
+from .protected import protected_router, service_router, user_router
 from .public import public_router
 from .router import DualAPIRouter
 from .utils import _alt_with_slash, _norm_primary
