@@ -8,7 +8,7 @@ from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
 
-from svc_infra.api.fastapi.dual import public_router
+from svc_infra.api.fastapi.dual.public import public_router
 
 from ._cookies import compute_cookie_params
 from .policy import AuthPolicy, DefaultAuthPolicy

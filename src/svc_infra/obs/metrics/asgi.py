@@ -246,7 +246,7 @@ def add_prometheus(app, *, path: str = "/metrics", skip_paths: Optional[Iterable
     )
 
     try:
-        from svc_infra.api.fastapi.dual import public_router
+        from svc_infra.api.fastapi.dual.public import public_router
 
         router = public_router()
         router.add_api_route(

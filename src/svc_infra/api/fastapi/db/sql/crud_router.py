@@ -13,7 +13,7 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
-from svc_infra.api.fastapi.dual import public_router
+from svc_infra.api.fastapi.dual.public import public_router
 from svc_infra.db.sql.service import SqlService
 
 from .session import SqlSessionDep
