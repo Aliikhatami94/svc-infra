@@ -59,15 +59,19 @@ from svc_infra.api.fastapi.auth.security import OptionalIdentity  # same, but op
 from svc_infra.api.fastapi.auth.security import (
     Principal,  # the identity object you'll receive in endpoints
 )
-from svc_infra.api.fastapi.auth.security import RequireAnyScope  # guard factory -> Depends(...)
-from svc_infra.api.fastapi.auth.security import RequireIdentity  # router-level dependency constant
-from svc_infra.api.fastapi.auth.security import RequireScopes  # guard factory -> Depends(...)
-from svc_infra.api.fastapi.auth.security import RequireService  # guard factory -> Depends(...)
-from svc_infra.api.fastapi.auth.security import RequireUser  # guard factory -> Depends(...)
+from svc_infra.api.fastapi.auth.security import (
+    RequireAnyScope,
+    RequireIdentity,
+    RequireRoles,
+    RequireScopes,
+    RequireService,
+    RequireUser,
+)
 from svc_infra.api.fastapi.auth.settings import AuthSettings, get_auth_settings
 from svc_infra.api.fastapi.dual.protected import (
     optional_identity_router,
     protected_router,
+    roles_router,
     scopes_router,
     service_router,
     user_router,
@@ -117,6 +121,7 @@ __all__ = [
     "RequireService",
     "RequireScopes",
     "RequireAnyScope",
+    "RequireRoles",
     # Routers
     "public_router",
     "optional_identity_router",
@@ -124,6 +129,7 @@ __all__ = [
     "user_router",
     "service_router",
     "scopes_router",
+    "roles_router",
     # Feature routers
     "apikey_router",
     "mfa_router",
