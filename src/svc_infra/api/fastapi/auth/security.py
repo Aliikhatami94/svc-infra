@@ -133,6 +133,8 @@ async def resolve_bearer_or_cookie_principal(
 
 
 async def current_principal(
+    request: Request,
+    session: SqlSessionDep,
     jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
     ak: Optional[Principal] = Depends(resolve_api_key),
 ) -> Principal:
