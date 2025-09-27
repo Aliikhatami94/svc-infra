@@ -25,7 +25,6 @@ def compute_cookie_params(request: Request, *, name: str) -> dict:
     st = get_auth_settings()
     cfg_domain = (getattr(st, "session_cookie_domain", "") or "").strip()
 
-    # Only set cookie domain when it's a *real* domain (never for localhost/127.0.0.1)
     domain: Optional[str] = None
     if cfg_domain and not _is_local_host(cfg_domain):
         domain = cfg_domain
