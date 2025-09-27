@@ -79,9 +79,11 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
         await session.commit()
         return JSONResponse({"ok": True})
 
-    @router.post("/delete")
-    async def delete_account(
-        request: Request, session: SqlSessionDep, payload: DeleteAccountIn | None = Body(None)
+    @router.delete("/delete")
+    async def delete_account_delete(
+        request: Request,
+        session: SqlSessionDep,
+        payload: DeleteAccountIn | None = Body(None),
     ):
         p = request.state.principal
         user = p.user
@@ -99,5 +101,3 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
         user.disabled_reason = "user_soft_deleted"
         await session.commit()
         return JSONResponse({"ok": True, "deleted": "soft"})
-
-    return router

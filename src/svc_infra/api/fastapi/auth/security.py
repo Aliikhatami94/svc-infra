@@ -10,6 +10,7 @@ from sqlalchemy import select
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.db.sql.apikey import get_apikey_model
+from svc_infra.db.sql.base import ModelBase
 
 # Note: auto_error=False so these don't 403 if missing; we only want them to appear in OpenAPI.
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
@@ -66,16 +67,23 @@ async def resolve_api_key(
     return Principal(user=apikey.user, scopes=apikey.scopes, via="api_key")
 
 
+def _discover_user_model():
+    # Look for the mapped class that was marked as the auth user
+    for mapper in list(getattr(ModelBase, "registry").mappers):
+        cls = mapper.class_
+        if getattr(cls, "__svc_infra_auth_user__", False):
+            return cls
+    # As a last resort, fall back to ApiKey-based discovery if available
+    try:
+        ApiKey = get_apikey_model()
+        return ApiKey.user.property.mapper.class_
+    except Exception:
+        return None
+
+
 async def resolve_bearer_or_cookie_principal(
-    request: Request,
-    session: SqlSessionDep,
+    request: Request, session: SqlSessionDep
 ) -> Optional[Principal]:
-    """
-    Try to authenticate a user via:
-      1) Authorization: Bearer <jwt>
-      2) auth cookie (settings.auth_cookie_name)
-    Returns None if neither is present/valid (so caller can try API key).
-    """
     st = get_auth_settings()
 
     raw_auth = (request.headers.get("authorization") or "").strip()
@@ -84,24 +92,22 @@ async def resolve_bearer_or_cookie_principal(
         raw_bearer = raw_auth.split(" ", 1)[1].strip()
 
     raw_cookie = (request.cookies.get(st.auth_cookie_name) or "").strip()
-
     token = raw_bearer or raw_cookie
     if not token:
         return None
 
-    # so we avoid importing app-specific models here.
-    # Discover User model via ApiKey relationship (only if API keys enabled)
-    ApiKey = get_apikey_model()  # <-- LAZY here
-    UserModel = ApiKey.user.property.mapper.class_
+    # NEW: find the user model without relying on ApiKey
+    UserModel = _discover_user_model()
+    if UserModel is None:
+        # No user model available means we can’t read the cookie/JWT; treat as not authenticated
+        return None
 
-    # Defer import to avoid circulars and to keep this infra module reusable.
     from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 
     fapi, auth_backend, *_ = get_fastapi_users(
         UserModel, None, None, None, public_auth_prefix="/auth"
     )
 
-    # fastapi-users needs a real user_manager instance to read tokens
     user_manager_gen = fapi.get_user_manager  # async generator
     strategy = auth_backend.get_strategy()
 
@@ -113,14 +119,12 @@ async def resolve_bearer_or_cookie_principal(
             break
 
     if not user:
-        return None  # let API key fallback try
+        return None
 
-    # Rehydrate into *your* session so it's the real ORM instance
     db_user = await session.get(UserModel, user.id)
     if not db_user:
         return None
 
-    # Enforce active status (keeps parity with your other guards)
     if not getattr(db_user, "is_active", True):
         raise HTTPException(401, "account_disabled")
 
@@ -129,8 +133,6 @@ async def resolve_bearer_or_cookie_principal(
 
 
 async def current_principal(
-    request: Request,
-    session: SqlSessionDep,
     jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
     ak: Optional[Principal] = Depends(resolve_api_key),
 ) -> Principal:
