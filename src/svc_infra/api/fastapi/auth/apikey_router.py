@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -60,7 +60,7 @@ def apikey_router(prefix: str = "/auth/keys"):
         )
 
         row = ApiKey(
-            user_id=owner_id,  # UUID goes into GUID column
+            user_id=owner_id,
             name=payload.name,
             key_prefix=prefix,
             key_hash=hashed,
@@ -74,7 +74,7 @@ def apikey_router(prefix: str = "/auth/keys"):
             id=str(row.id),
             name=row.name,
             user_id=str(row.user_id) if row.user_id else None,
-            key=plaintext,  # show once
+            key=plaintext,
             key_prefix=row.key_prefix,
             scopes=row.scopes,
             active=row.active,
@@ -116,5 +116,28 @@ def apikey_router(prefix: str = "/auth/keys"):
         row.active = False
         await sess.commit()
         return {"ok": True}
+
+    @r.delete("/{key_id}", status_code=204)
+    async def delete_key(
+        key_id: str,
+        sess: SqlSessionDep,
+        p=Depends(current_principal),
+        force: bool = Query(False, description="Allow deleting an active key if True"),
+    ):
+        row = await sess.get(ApiKey, key_id)
+        if not row:
+            return
+
+        caller_id: UUID = getattr(p.user, "id")
+        if not (getattr(p.user, "is_superuser", False) or row.user_id == caller_id):
+            raise HTTPException(403, "forbidden")
+
+        # Require revoke first unless force=true
+        if row.active and not force and not getattr(p.user, "is_superuser", False):
+            raise HTTPException(400, "key_active; revoke first or pass force=true")
+
+        await sess.delete(row)
+        await sess.commit()
+        return
 
     return r
