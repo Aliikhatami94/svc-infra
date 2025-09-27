@@ -30,7 +30,6 @@ def compute_cookie_params(request: Request, *, name: str) -> dict:
     if cfg_domain and not _is_local_host(cfg_domain):
         domain = cfg_domain
 
-    # If not explicitly set in settings, be secure on prod or when the request is HTTPS.
     explicit_secure = getattr(st, "session_cookie_secure", None)
     secure = (
         bool(explicit_secure) if explicit_secure is not None else (_is_https(request) or IS_PROD)
