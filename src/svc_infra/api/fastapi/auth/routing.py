@@ -17,24 +17,25 @@ def _merge(base: Optional[Sequence[Any]], extra: Optional[Sequence[Any]]) -> lis
     return out
 
 
-# OPTIONAL: attach principal if present; never 401
+# IMPORTANT: DO NOT DEFINE 'public_router' HERE.
+# Only define routers that add auth requirements.
+
+
 def optional_principal_router(
     *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
 ) -> DualAPIRouter:
-    async def _opt(p=Depends(current_principal.optional)):  # uses .optional() helper
+    async def _opt(p=Depends(current_principal.optional)):
         return p
 
     return DualAPIRouter(dependencies=_merge([Depends(_opt)], dependencies), **kwargs)
 
 
-# PROTECTED (ANY): cookie/Bearer OR API key
 def protected_router(
     *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
 ) -> DualAPIRouter:
     return DualAPIRouter(dependencies=_merge([Depends(current_principal)], dependencies), **kwargs)
 
 
-# USER-ONLY: must be an authenticated user (API key alone is not enough)
 def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
     async def _req_user(p=Depends(current_principal)):
         if not p.user:
@@ -44,7 +45,6 @@ def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) 
     return DualAPIRouter(dependencies=_merge([Depends(_req_user)], dependencies), **kwargs)
 
 
-# SERVICE-ONLY: must present a valid API key (no user needed)
 def service_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
     async def _req_service(p=Depends(current_principal)):
         if not p.api_key:
@@ -54,7 +54,6 @@ def service_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: An
     return DualAPIRouter(dependencies=_merge([Depends(_req_service)], dependencies), **kwargs)
 
 
-# ROLE-GATED: user with specific roles
 def roles_router(
     *roles: str,
     role_resolver: Callable[[Any], list[str]] | None = None,
