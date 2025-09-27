@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
+from uuid import UUID
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -32,6 +33,10 @@ class ApiKeyOut(BaseModel):
     last_used_at: Optional[datetime]
 
 
+def _to_uuid(val):
+    return val if isinstance(val, UUID) else UUID(str(val))
+
+
 def apikey_router(prefix: str = "/auth/keys"):
     r = user_router(prefix=prefix, tags=["auth:apikeys"])
     ApiKey = get_apikey_model()
@@ -40,17 +45,22 @@ def apikey_router(prefix: str = "/auth/keys"):
     async def create_key(
         sess: SqlSessionDep, payload: ApiKeyCreateIn, p=Depends(current_principal)
     ):
-        owner_id = payload.user_id or getattr(p.user, "id", None)
-        if owner_id != getattr(p.user, "id") and not getattr(p.user, "is_superuser", False):
+        caller_id: UUID = getattr(p.user, "id")
+        owner_id: UUID = _to_uuid(payload.user_id) if payload.user_id else caller_id
+
+        # allow self, or superuser for others
+        if owner_id != caller_id and not getattr(p.user, "is_superuser", False):
             raise HTTPException(403, "forbidden")
+
         plaintext, prefix, hashed = ApiKey.make_secret()
         expires = (
             (datetime.now(timezone.utc) + timedelta(hours=payload.ttl_hours))
             if payload.ttl_hours
             else None
         )
+
         row = ApiKey(
-            user_id=owner_id,
+            user_id=owner_id,  # UUID goes into GUID column
             name=payload.name,
             key_prefix=prefix,
             key_hash=hashed,
@@ -95,15 +105,14 @@ def apikey_router(prefix: str = "/auth/keys"):
 
     @r.post("/{key_id}/revoke")
     async def revoke_key(key_id: str, sess: SqlSessionDep, p=Depends(current_principal)):
-        if not getattr(p.user, "is_superuser", False):
-            raise HTTPException(403, "forbidden")
         row = await sess.get(ApiKey, key_id)
         if not row:
             raise HTTPException(404, "not_found")
-        if row.user_id != getattr(p.user, "id", None) and not getattr(
-            p.user, "is_superuser", False
-        ):
+
+        caller_id: UUID = getattr(p.user, "id")
+        if not (getattr(p.user, "is_superuser", False) or row.user_id == caller_id):
             raise HTTPException(403, "forbidden")
+
         row.active = False
         await sess.commit()
         return {"ok": True}
