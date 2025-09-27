@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional, Sequence
 
-from fastapi import Depends, HTTPException
-
-from svc_infra.api.fastapi.auth.security import AllowIdentity  # for router-level dependencies
-from svc_infra.api.fastapi.auth.security import Identity  # for endpoint params
 from svc_infra.api.fastapi.auth.security import RequireIdentity  # for router-level dependencies
 from svc_infra.api.fastapi.auth.security import RequireScopes  # guard factory
 from svc_infra.api.fastapi.auth.security import RequireService  # guard factory
 from svc_infra.api.fastapi.auth.security import RequireUser  # guard factory
+from svc_infra.api.fastapi.auth.security import (  # for router-level dependencies
+    AllowIdentity,
+    RequireRoles,
+)
 
 from .router import DualAPIRouter
 
@@ -94,21 +94,10 @@ def scopes_router(*scopes: str, **kwargs: Any) -> DualAPIRouter:
 
 
 # ROLE-GATED (example using roles attribute or resolver passed by caller)
-def roles_router(
-    *roles: str,
-    role_resolver: Callable[[Any], list[str]] | None = None,
-    dependencies: Optional[Sequence[Any]] = None,
-    **kwargs: Any,
-) -> DualAPIRouter:
-    async def _req_roles(p: Identity):
-        if not p.user:
-            raise HTTPException(401, "user_required")
-        have = set((role_resolver(p.user) if role_resolver else getattr(p.user, "roles", []) or []))
-        if not set(roles).issubset(have):
-            raise HTTPException(403, "forbidden")
-        return p
-
-    r = DualAPIRouter(dependencies=_merge([Depends(_req_roles)], dependencies), **kwargs)
+def roles_router(*roles: str, role_resolver=None, **kwargs):
+    r = DualAPIRouter(
+        dependencies=[RequireUser(), RequireRoles(*roles, resolver=role_resolver)], **kwargs
+    )
     _apply_default_security(
         r, default_security=[{"OAuth2PasswordBearer": []}, {"SessionCookie": []}]
     )

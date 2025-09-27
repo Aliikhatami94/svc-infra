@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Callable, Optional
 
 from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2PasswordBearer
@@ -148,6 +148,16 @@ AllowIdentity = Depends(_optional_principal)  # same, but optional
 
 
 # ---------- DX: small guard factories ----------
+def RequireRoles(*roles: str, resolver: Callable[[Any], list[str]] | None = None):
+    async def _guard(p: Identity):
+        have = set((resolver(p.user) if resolver else getattr(p.user, "roles", []) or []))
+        if not set(roles).issubset(have):
+            raise HTTPException(403, "forbidden")
+        return p
+
+    return Depends(_guard)
+
+
 def RequireScopes(*needed: str):
     async def _guard(p: Identity):  # Identity = resolves to Principal
         if not set(needed).issubset(set(p.scopes or [])):

@@ -42,7 +42,7 @@ def apikey_router(prefix: str = "/auth/keys"):
     ApiKey = get_apikey_model()
 
     @r.post("", response_model=ApiKeyOut)
-    async def create_key(sess: SqlSessionDep, payload: ApiKeyCreateIn, p=Identity):
+    async def create_key(sess: SqlSessionDep, payload: ApiKeyCreateIn, p: Identity):
         caller_id: UUID = getattr(p.user, "id")
         owner_id: UUID = _to_uuid(payload.user_id) if payload.user_id else caller_id
 
@@ -81,7 +81,7 @@ def apikey_router(prefix: str = "/auth/keys"):
         )
 
     @r.get("", response_model=list[ApiKeyOut])
-    async def list_keys(sess: SqlSessionDep, p=Identity):
+    async def list_keys(sess: SqlSessionDep, p: Identity):
         q = select(ApiKey)
         if not getattr(p.user, "is_superuser", False):
             q = q.where(ApiKey.user_id == p.user.id)
@@ -102,7 +102,7 @@ def apikey_router(prefix: str = "/auth/keys"):
         ]
 
     @r.post("/{key_id}/revoke")
-    async def revoke_key(key_id: str, sess: SqlSessionDep, p=Identity):
+    async def revoke_key(key_id: str, sess: SqlSessionDep, p: Identity):
         row = await sess.get(ApiKey, key_id)
         if not row:
             raise HTTPException(404, "not_found")
@@ -119,7 +119,7 @@ def apikey_router(prefix: str = "/auth/keys"):
     async def delete_key(
         key_id: str,
         sess: SqlSessionDep,
-        p=Identity,
+        p: Identity,
         force: bool = Query(False, description="Allow deleting an active key if True"),
     ):
         row = await sess.get(ApiKey, key_id)
