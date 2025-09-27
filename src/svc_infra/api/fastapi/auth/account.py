@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
-from svc_infra.api.fastapi.auth.routing import user_router
+from svc_infra.api.fastapi.auth.routers import user_router
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
 from .mfa import EMAIL_OTP_STORE, _hash, _now_utc_ts

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .dual_router import DualAPIRouter
+from .dualize import DualAPIRouter
 
 
 def public_router(**kwargs: Any) -> DualAPIRouter:

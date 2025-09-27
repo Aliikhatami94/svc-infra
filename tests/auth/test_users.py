@@ -8,7 +8,7 @@ import pytest
 from pydantic import BaseModel, SecretStr
 
 import svc_infra.api.fastapi.db.sql.users as users_mod
-from svc_infra.api.fastapi.dual_router import DualAPIRouter
+from svc_infra.api.fastapi.dualize import DualAPIRouter
 
 
 # -----------------------------

@@ -4,7 +4,7 @@ from typing import Any, Callable, Optional, Sequence
 
 from fastapi import Depends, HTTPException
 
-from ..dual_router import DualAPIRouter
+from ..dualize import DualAPIRouter
 from .security import current_principal
 
 

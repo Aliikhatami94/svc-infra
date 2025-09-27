@@ -1,5 +1,5 @@
 from .add import add_auth
-from .routing import (
+from .routers import (
     optional_principal_router,
     protected_router,
     roles_router,

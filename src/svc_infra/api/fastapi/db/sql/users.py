@@ -7,7 +7,7 @@ from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
-from svc_infra.api.fastapi import DualAPIRouter, dualize_router
+from svc_infra.api.fastapi import DualAPIRouter, dualize_public, dualize_user
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.deps import Require
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
@@ -101,17 +101,17 @@ def get_fastapi_users(
     fastapi_users = FastAPIUsers(get_user_manager, [auth_backend])
 
     # IMPORTANT: requires_verification=True forces unverified users to be rejected on login.
-    auth_router = dualize_router(
+    auth_router = dualize_public(
         fastapi_users.get_auth_router(auth_backend, requires_verification=True)
     )
-    users_router = dualize_router(
+    users_router = dualize_user(
         fastapi_users.get_users_router(user_schema_read, user_schema_create, user_schema_update)
     )
-    register_router = dualize_router(
+    register_router = dualize_public(
         fastapi_users.get_register_router(user_schema_read, user_schema_create)
     )
-    verify_router = dualize_router(fastapi_users.get_verify_router(user_schema_read))
-    reset_router = dualize_router(fastapi_users.get_reset_password_router())
+    verify_router = dualize_public(fastapi_users.get_verify_router(user_schema_read))
+    reset_router = dualize_public(fastapi_users.get_reset_password_router())
 
     return (
         fastapi_users,
