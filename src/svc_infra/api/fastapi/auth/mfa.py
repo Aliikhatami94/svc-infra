@@ -18,6 +18,8 @@ from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.public import public_router
 
+from .. import DualAPIRouter
+from ..dual import user_router
 from ._cookies import compute_cookie_params
 
 # --- Email OTP store (replace with Redis in prod) ---
@@ -112,7 +114,8 @@ def mfa_router(
     fapi: FastAPIUsers,
     auth_prefix: str = "/auth",
 ) -> APIRouter:
-    router = public_router(prefix=f"{auth_prefix}/mfa", tags=["auth:mfa"])
+    u = user_router(prefix=f"{auth_prefix}/mfa", tags=["auth:mfa"])
+    p = public_router(prefix=f"{auth_prefix}/mfa", tags=["auth:mfa"])
 
     # Resolve current user via cookie OR bearer, using fastapi-users v10 strategy.read_token(..., user_manager)
     async def _get_user_and_session(
@@ -142,12 +145,9 @@ def mfa_router(
 
         return db_user, session
 
-    @router.post(
+    @u.post(
         "/start",
         response_model=StartSetupOut,
-        openapi_extra={
-            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
-        },
     )
     async def start_setup(user_sess=Depends(_get_user_and_session)):
         user, session = user_sess
@@ -175,12 +175,9 @@ def mfa_router(
 
         return StartSetupOut(otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri))
 
-    @router.post(
+    @u.post(
         "/confirm",
         response_model=RecoveryCodesOut,
-        openapi_extra={
-            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
-        },
     )
     async def confirm_setup(
         payload: ConfirmSetupIn = Body(...), user_sess=Depends(_get_user_and_session)
@@ -209,12 +206,9 @@ def mfa_router(
 
         return RecoveryCodesOut(codes=codes)
 
-    @router.post(
+    @u.post(
         "/disable",
         status_code=status.HTTP_204_NO_CONTENT,
-        openapi_extra={
-            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
-        },
     )
     async def disable_mfa(
         payload: DisableMFAIn = Body(...),
@@ -245,7 +239,7 @@ def mfa_router(
         await session.commit()
         return JSONResponse(status_code=204, content={})
 
-    @router.post("/verify")
+    @p.post("/verify")
     async def verify_mfa(
         request: Request,
         session: SqlSessionDep,
@@ -318,7 +312,7 @@ def mfa_router(
         resp.set_cookie(**cp, value=token)
         return resp
 
-    @router.post(
+    @p.post(
         "/send_code",
         response_model=SendEmailCodeOut,
         description="Sends a 6-digit email OTP tied to the `pre_token`. Returns a resend cooldown.",
@@ -376,12 +370,9 @@ def mfa_router(
 
         return SendEmailCodeOut(sent=True, cooldown_seconds=cooldown)
 
-    @router.get(
+    @u.get(
         "/status",
         response_model=MFAStatusOut,
-        openapi_extra={
-            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
-        },
     )
     async def mfa_status(user_sess=Depends(_get_user_and_session)):
         user, _ = user_sess
@@ -417,12 +408,9 @@ def mfa_router(
             email_otp={"cooldown_seconds": st.email_otp_cooldown_seconds},
         )
 
-    @router.post(
+    @u.post(
         "/recovery/regenerate",
         response_model=RecoveryCodesOut,
-        openapi_extra={
-            "security": [{"OAuth2PasswordBearer": []}, {"cookieAuth": []}, {"APIKeyHeader": []}]
-        },
     )
     async def regenerate_recovery_codes(user_sess=Depends(_get_user_and_session)):
         user, session = user_sess
@@ -435,4 +423,7 @@ def mfa_router(
         await session.commit()
         return RecoveryCodesOut(codes=codes)
 
+    router = DualAPIRouter()
+    router.include_router(u)
+    router.include_router(p)
     return router

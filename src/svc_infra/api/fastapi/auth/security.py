@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2PasswordBearer
 from sqlalchemy import select
 
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
-from svc_infra.api.fastapi.auth.state import get_auth_state
+from svc_infra.api.fastapi.auth.state import get_auth_state, get_user_scope_resolver
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.db.sql.apikey import get_apikey_model
 
@@ -21,10 +21,18 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 class Principal:
     """A unified principal that can be a user (JWT/cookie/api-key) or a service principal."""
 
-    def __init__(self, *, user=None, scopes: list[str] | None = None, via: str = "jwt"):
+    def __init__(
+        self,
+        *,
+        user=None,
+        scopes: list[str] | None = None,
+        via: str = "jwt",
+        api_key=None,
+    ):
         self.user = user
         self.scopes = scopes or []
-        self.via = via  # "jwt" | "cookie" | "api_key"
+        self.via = via
+        self.api_key = api_key
 
 
 async def resolve_api_key(
@@ -64,7 +72,12 @@ async def resolve_api_key(
     apikey.mark_used()
     await session.flush()
 
-    return Principal(user=apikey.user, scopes=apikey.scopes, via="api_key")
+    return Principal(
+        user=apikey.user,
+        scopes=apikey.scopes,
+        via="api_key",
+        api_key=apikey,
+    )
 
 
 async def resolve_bearer_or_cookie_principal(
@@ -118,7 +131,8 @@ async def resolve_bearer_or_cookie_principal(
         raise HTTPException(401, "account_disabled")
 
     via = "jwt" if raw_auth else "cookie"
-    return Principal(user=db_user, scopes=[], via=via)
+    user_scopes = get_user_scope_resolver()(db_user)
+    return Principal(user=db_user, scopes=list(dict.fromkeys(user_scopes)), via=via)
 
 
 async def current_principal(
@@ -139,3 +153,16 @@ async def current_principal(
     if ak:
         return ak
     raise HTTPException(401, "Missing credentials")
+
+
+async def optional_identity(
+    request: Request,
+    session: SqlSessionDep,
+    jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
+    ak: Optional[Principal] = Depends(resolve_api_key),
+) -> Optional[Principal]:
+    return jwt_or_cookie or ak or None
+
+
+Identity = Annotated[Principal, Depends(current_principal)]
+MaybeIdentity = Annotated[Principal | None, Depends(optional_identity)]

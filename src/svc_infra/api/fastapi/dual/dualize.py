@@ -5,7 +5,7 @@ from typing import Callable, Sequence
 from fastapi import APIRouter
 from fastapi.routing import APIRoute
 
-from .protected import protected_router, service_router, user_router
+from .protected import api_service_router, protected_router, user_router
 from .public import public_router
 from .router import DualAPIRouter
 from .utils import _alt_with_slash, _norm_primary
@@ -99,7 +99,7 @@ def dualize_protected(src: APIRouter, *, show_in_schema=True) -> DualAPIRouter:
 
 
 def dualize_service(src: APIRouter, *, show_in_schema=True) -> DualAPIRouter:
-    return dualize_into(src, service_router, show_in_schema=show_in_schema)
+    return dualize_into(src, api_service_router, show_in_schema=show_in_schema)
 
 
 __all__ = [
