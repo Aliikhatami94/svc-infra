@@ -7,9 +7,10 @@ from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
-from svc_infra.api.fastapi import DualAPIRouter, dualize_public, dualize_user
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.deps import Require
+from svc_infra.api.fastapi.dual.dualize import dualize_public, dualize_user
+from svc_infra.api.fastapi.dual.router import DualAPIRouter
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 from ...auth.sender import get_sender
