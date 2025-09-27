@@ -20,6 +20,7 @@ from .policy import AuthPolicy, DefaultAuthPolicy
 from .pre_auth import get_mfa_pre_jwt_writer
 from .providers import providers_from_settings
 from .settings import get_auth_settings
+from .state import set_auth_state
 
 
 def add_auth(
@@ -55,6 +56,9 @@ def add_auth(
         user_schema_update=schema_update,
         public_auth_prefix=auth_prefix,
     )
+
+    # Make the boot-time strategy and model available to resolvers
+    set_auth_state(user_model=user_model, get_strategy=get_strategy, auth_prefix=auth_prefix)
 
     settings_obj = get_auth_settings()
     policy = auth_policy or DefaultAuthPolicy(settings_obj)
