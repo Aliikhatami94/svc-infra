@@ -4,7 +4,12 @@ from typing import Any, Callable, Optional, Sequence
 
 from fastapi import Depends, HTTPException
 
-from svc_infra.api.fastapi.auth.security import Identity, MaybeIdentity
+from svc_infra.api.fastapi.auth.security import AllowIdentity  # for router-level dependencies
+from svc_infra.api.fastapi.auth.security import Identity  # for endpoint params
+from svc_infra.api.fastapi.auth.security import RequireIdentity  # for router-level dependencies
+from svc_infra.api.fastapi.auth.security import RequireScopes  # guard factory
+from svc_infra.api.fastapi.auth.security import RequireService  # guard factory
+from svc_infra.api.fastapi.auth.security import RequireUser  # guard factory
 
 from .router import DualAPIRouter
 
@@ -19,7 +24,6 @@ def _merge(base: Optional[Sequence[Any]], extra: Optional[Sequence[Any]]) -> lis
 
 
 def _apply_default_security(router: DualAPIRouter, default_security: list[dict] | None) -> None:
-    """Wrap add_api_route to inject OpenAPI security if the operation didn’t set it."""
     if default_security is None:
         return
     original_add = router.add_api_route
@@ -34,24 +38,20 @@ def _apply_default_security(router: DualAPIRouter, default_security: list[dict] 
     router.add_api_route = _wrapped_add_api_route  # type: ignore[attr-defined]
 
 
-# OPTIONAL principal attached; **public looking** in docs
-def optional_principal_router(
+# PUBLIC (but attach OptionalIdentity for convenience)
+def optional_identity_router(
     *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
 ) -> DualAPIRouter:
-    async def _opt(p=MaybeIdentity):
-        return p
-
-    r = DualAPIRouter(dependencies=_merge([Depends(_opt)], dependencies), **kwargs)
-    # Render as public in docs (no lock)
-    _apply_default_security(r, default_security=[])
+    r = DualAPIRouter(dependencies=_merge([AllowIdentity], dependencies), **kwargs)
+    _apply_default_security(r, default_security=[])  # public looking in docs
     return r
 
 
-# PROTECTED (ANY): cookie/Bearer OR API key
+# PROTECTED: any auth (JWT/cookie OR API key)
 def protected_router(
     *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
 ) -> DualAPIRouter:
-    r = DualAPIRouter(dependencies=_merge([Identity], dependencies), **kwargs)
+    r = DualAPIRouter(dependencies=_merge([RequireIdentity], dependencies), **kwargs)
     _apply_default_security(
         r,
         default_security=[
@@ -63,46 +63,44 @@ def protected_router(
     return r
 
 
-# USER-ONLY: must be an authenticated user (API key alone is not enough)
+# USER-ONLY (no API-key-only access)
 def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
-    async def _req_user(p=Identity):
-        if not p.user:
-            raise HTTPException(401, "user_required")
-        return p
+    r = DualAPIRouter(dependencies=_merge([RequireUser()], dependencies), **kwargs)
+    _apply_default_security(
+        r, default_security=[{"OAuth2PasswordBearer": []}, {"SessionCookie": []}]
+    )
+    return r
 
-    r = DualAPIRouter(dependencies=_merge([Depends(_req_user)], dependencies), **kwargs)
+
+# SERVICE-ONLY (API key required)
+def service_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
+    r = DualAPIRouter(dependencies=_merge([RequireService()], dependencies), **kwargs)
+    _apply_default_security(r, default_security=[{"ApiKeyHeader": []}])
+    return r
+
+
+# SCOPE-GATED (works with user scopes and api-key scopes)
+def scopes_router(*scopes: str, **kwargs: Any) -> DualAPIRouter:
+    r = DualAPIRouter(dependencies=[RequireIdentity, RequireScopes(*scopes)], **kwargs)
     _apply_default_security(
         r,
         default_security=[
             {"OAuth2PasswordBearer": []},
             {"SessionCookie": []},
+            {"ApiKeyHeader": []},
         ],
     )
     return r
 
 
-# SERVICE-ONLY: must present a valid API key (no user needed)
-def api_service_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
-) -> DualAPIRouter:
-    async def _req_service(p=Identity):
-        if not p.api_key:
-            raise HTTPException(401, "api_key_required")
-        return p
-
-    r = DualAPIRouter(dependencies=_merge([Depends(_req_service)], dependencies), **kwargs)
-    _apply_default_security(r, default_security=[{"ApiKeyHeader": []}])
-    return r
-
-
-# ROLE-GATED: user with specific roles
+# ROLE-GATED (example using roles attribute or resolver passed by caller)
 def roles_router(
     *roles: str,
     role_resolver: Callable[[Any], list[str]] | None = None,
     dependencies: Optional[Sequence[Any]] = None,
     **kwargs: Any,
 ) -> DualAPIRouter:
-    async def _req_roles(p=Identity):
+    async def _req_roles(p: Identity):
         if not p.user:
             raise HTTPException(401, "user_required")
         have = set((role_resolver(p.user) if role_resolver else getattr(p.user, "roles", []) or []))
@@ -112,36 +110,6 @@ def roles_router(
 
     r = DualAPIRouter(dependencies=_merge([Depends(_req_roles)], dependencies), **kwargs)
     _apply_default_security(
-        r,
-        default_security=[
-            {"OAuth2PasswordBearer": []},
-            {"SessionCookie": []},
-        ],
-    )
-    return r
-
-
-def require_scopes(*needed: str):
-    async def _dep(p=Identity):
-        have = set(p.scopes or [])
-        if not set(needed).issubset(have):
-            raise HTTPException(403, "insufficient_scope")
-        return p
-
-    return _dep
-
-
-def scopes_router(*scopes: str, **kwargs):
-    async def _req(p=Depends(require_scopes(*scopes))):
-        return p
-
-    r = DualAPIRouter(dependencies=[Depends(_req)], **kwargs)
-    _apply_default_security(
-        r,
-        default_security=[
-            {"OAuth2PasswordBearer": []},
-            {"SessionCookie": []},
-            {"ApiKeyHeader": []},
-        ],
+        r, default_security=[{"OAuth2PasswordBearer": []}, {"SessionCookie": []}]
     )
     return r

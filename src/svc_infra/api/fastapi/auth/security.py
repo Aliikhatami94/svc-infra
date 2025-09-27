@@ -12,42 +12,36 @@ from svc_infra.api.fastapi.auth.state import get_auth_state, get_user_scope_reso
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.db.sql.apikey import get_apikey_model
 
-# Note: auto_error=False so these don't 403 if missing; we only want them to appear in OpenAPI.
+# ---------- OpenAPI security schemes (appear in docs) ----------
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 cookie_auth_optional = APIKeyCookie(name=get_auth_settings().auth_cookie_name, auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
+# ---------- Principal ----------
 class Principal:
-    """A unified principal that can be a user (JWT/cookie/api-key) or a service principal."""
+    """Unified identity: user via JWT/cookie or service via API key."""
 
     def __init__(
-        self,
-        *,
-        user=None,
-        scopes: list[str] | None = None,
-        via: str = "jwt",
-        api_key=None,
+        self, *, user=None, scopes: list[str] | None = None, via: str = "jwt", api_key=None
     ):
         self.user = user
         self.scopes = scopes or []
-        self.via = via
+        self.via = via  # "jwt" | "cookie" | "api_key"
         self.api_key = api_key
 
 
+# ---------- Resolvers ----------
 async def resolve_api_key(
     request: Request, session: SqlSessionDep, raw: Optional[str] = Security(api_key_header)
 ) -> Optional[Principal]:
     if not raw:
         return None
-
     ApiKey = get_apikey_model()
-
     prefix = ""
     parts = raw.split("_", 2)
     if len(parts) >= 3 and parts[0] == "ak":
         prefix = parts[1][:12]
-
     apikey = None
     if prefix:
         apikey = (
@@ -55,7 +49,6 @@ async def resolve_api_key(
             .scalars()
             .first()
         )
-
     if not apikey:
         raise HTTPException(401, "invalid_api_key")
 
@@ -63,7 +56,6 @@ async def resolve_api_key(
 
     if not compare_digest(ApiKey.hash(raw), apikey.key_hash):
         raise HTTPException(401, "invalid_api_key")
-
     if not apikey.active:
         raise HTTPException(401, "api_key_revoked")
     if apikey.expires_at and datetime.now(timezone.utc) > apikey.expires_at:
@@ -72,35 +64,23 @@ async def resolve_api_key(
     apikey.mark_used()
     await session.flush()
 
-    return Principal(
-        user=apikey.user,
-        scopes=apikey.scopes,
-        via="api_key",
-        api_key=apikey,
-    )
+    return Principal(user=apikey.user, scopes=apikey.scopes, via="api_key", api_key=apikey)
 
 
 async def resolve_bearer_or_cookie_principal(
     request: Request, session: SqlSessionDep
 ) -> Optional[Principal]:
     st = get_auth_settings()
-
     raw_auth = (request.headers.get("authorization") or "").strip()
-    token = ""
-    if raw_auth.lower().startswith("bearer "):
-        token = raw_auth.split(" ", 1)[1].strip()
+    token = raw_auth.split(" ", 1)[1].strip() if raw_auth.lower().startswith("bearer ") else ""
     if not token:
-        # try cookie
         token = (request.cookies.get(st.auth_cookie_name) or "").strip()
     if not token:
         return None
 
-    # Use the exact UserModel and JWTStrategy from boot:
     UserModel, get_strategy, _ = get_auth_state()
     strategy = get_strategy()
 
-    # We still need a user_manager to satisfy fastapi-users’ read_token signature,
-    # but we don’t want to rebuild everything. Use a tiny, local manager shim.
     from fastapi_users.manager import BaseUserManager, UUIDIDMixin
     from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
@@ -110,7 +90,6 @@ async def resolve_bearer_or_cookie_principal(
         reset_password_token_secret = "unused"
         verification_token_secret = "unused"
 
-        # fastapi-users only needs .user_db for read_token()
         def __init__(self, db):
             super().__init__(db)
 
@@ -123,7 +102,6 @@ async def resolve_bearer_or_cookie_principal(
     if not user:
         return None
 
-    # Rehydrate into your ORM session
     db_user = await session.get(UserModel, user.id)
     if not db_user:
         return None
@@ -132,22 +110,18 @@ async def resolve_bearer_or_cookie_principal(
 
     via = "jwt" if raw_auth else "cookie"
     user_scopes = get_user_scope_resolver()(db_user)
-    return Principal(user=db_user, scopes=list(dict.fromkeys(user_scopes)), via=via)
+    # dedupe while keeping order
+    scopes = list(dict.fromkeys(user_scopes))
+    return Principal(user=db_user, scopes=scopes, via=via)
 
 
-async def current_principal(
+# ---------- Unifying dependencies ----------
+async def _current_principal(
     request: Request,
     session: SqlSessionDep,
     jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
     ak: Optional[Principal] = Depends(resolve_api_key),
 ) -> Principal:
-    """
-    Unified principal:
-      - Bearer JWT (preferred)
-      - auth cookie
-      - X-API-Key
-    Raises 401 if none are present/valid.
-    """
     if jwt_or_cookie:
         return jwt_or_cookie
     if ak:
@@ -155,7 +129,7 @@ async def current_principal(
     raise HTTPException(401, "Missing credentials")
 
 
-async def optional_identity(
+async def _optional_principal(
     request: Request,
     session: SqlSessionDep,
     jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
@@ -164,5 +138,47 @@ async def optional_identity(
     return jwt_or_cookie or ak or None
 
 
-Identity = Annotated[Principal, Depends(current_principal)]
-MaybeIdentity = Annotated[Principal | None, Depends(optional_identity)]
+# ---------- DX: types for endpoint params ----------
+Identity = Annotated[Principal, Depends(_current_principal)]
+OptionalIdentity = Annotated[Principal | None, Depends(_optional_principal)]
+
+# ---------- DX: constants for router-level dependencies ----------
+RequireIdentity = Depends(_current_principal)  # use inside router dependencies=[...]
+AllowIdentity = Depends(_optional_principal)  # same, but optional
+
+
+# ---------- DX: small guard factories ----------
+def RequireScopes(*needed: str):
+    async def _guard(p: Identity):  # Identity = resolves to Principal
+        if not set(needed).issubset(set(p.scopes or [])):
+            raise HTTPException(403, "insufficient_scope")
+        return p
+
+    return Depends(_guard)
+
+
+def RequireAnyScope(*candidates: str):
+    async def _guard(p: Identity):
+        if not set(p.scopes or []) & set(candidates):
+            raise HTTPException(403, "insufficient_scope")
+        return p
+
+    return Depends(_guard)
+
+
+def RequireUser():
+    async def _guard(p: Identity):
+        if not p.user:
+            raise HTTPException(401, "user_required")
+        return p
+
+    return Depends(_guard)
+
+
+def RequireService():
+    async def _guard(p: Identity):
+        if not p.api_key:
+            raise HTTPException(401, "api_key_required")
+        return p
+
+    return Depends(_guard)

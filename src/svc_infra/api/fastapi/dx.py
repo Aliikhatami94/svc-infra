@@ -4,8 +4,8 @@
 # from .auth.state import set_auth_state, set_user_scope_resolver
 # from .dual.dualize import dualize_protected, dualize_public, dualize_service, dualize_user
 # from .dual.protected import (
-#     api_service_router,
-#     optional_principal_router,
+#     service_router,
+#     optional_identity_router,
 #     protected_router,
 #     require_scopes,
 #     roles_router,
