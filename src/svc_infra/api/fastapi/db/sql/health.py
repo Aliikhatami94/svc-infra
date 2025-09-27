@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Response, status
 from sqlalchemy import text
 
-from svc_infra.api.fastapi import public_router
+from svc_infra.api.fastapi.dual import public_router
 
 from .session import SqlSessionDep
 

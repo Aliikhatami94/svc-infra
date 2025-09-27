@@ -12,11 +12,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from starlette.responses import JSONResponse
 
-from svc_infra.api.fastapi import public_router
 from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.sender import get_sender
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
+from svc_infra.api.fastapi.dual import public_router
 
 from ._cookies import compute_cookie_params
 

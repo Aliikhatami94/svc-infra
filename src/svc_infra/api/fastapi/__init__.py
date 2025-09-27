@@ -3,7 +3,6 @@ from svc_infra.api.fastapi.dual import (
     dualize_protected,
     dualize_public,
     dualize_user,
-    public_router,
 )
 
 from .cache.add import setup_caching
@@ -15,7 +14,6 @@ from .setup import setup_service_api
 __all__ = [
     "DualAPIRouter",
     "dualize_public",
-    "public_router",
     "dualize_user",
     "dualize_protected",
     "ServiceInfo",

@@ -3,7 +3,6 @@ from typing import Annotated, Any, Optional, Sequence, Type, TypeVar, cast
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 
-from svc_infra.api.fastapi import public_router
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,
     OrderParams,
@@ -14,6 +13,7 @@ from svc_infra.api.fastapi.db.http import (
     dep_order,
     dep_search,
 )
+from svc_infra.api.fastapi.dual import public_router
 from svc_infra.db.sql.service import SqlService
 
 from .session import SqlSessionDep
