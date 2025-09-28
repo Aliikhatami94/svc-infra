@@ -1,8 +1,6 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
-from svc_infra.api.fastapi.auth.settings import get_auth_settings
-
 
 def install_openapi_auth(app: FastAPI) -> None:
     def _openapi():
@@ -10,11 +8,10 @@ def install_openapi_auth(app: FastAPI) -> None:
             return app.openapi_schema
 
         schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
-        st = get_auth_settings()
 
         comps = schema.setdefault("components", {}).setdefault("securitySchemes", {})
 
-        # Merge without clobbering existing definitions.
+        # Only schemes Swagger UI can actually manage in the modal:
         comps.setdefault(
             "OAuth2PasswordBearer",
             {
@@ -23,15 +20,12 @@ def install_openapi_auth(app: FastAPI) -> None:
             },
         )
         comps.setdefault(
-            "SessionCookie",
-            {"type": "apiKey", "name": st.auth_cookie_name, "in": "cookie"},
-        )
-        comps.setdefault(  # NOTE: capitalized key
-            "APIKeyHeader",
+            "APIKeyHeader",  # keep this exact name consistent with your routers
             {"type": "apiKey", "name": "X-API-Key", "in": "header"},
         )
 
-        # Do NOT set top-level schema["security"] here.
+        # Do NOT add a cookie scheme to avoid confusing “Authorize” options.
+        # Do NOT set top-level schema["security"].
 
         app.openapi_schema = schema
         return schema

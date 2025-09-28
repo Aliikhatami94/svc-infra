@@ -490,25 +490,6 @@ def _clean_oauth_session_state(request: Request, provider: str) -> None:
         request.session.pop(f"oauth:{provider}:{k}", None)
 
 
-def _clear_oauth_session_data(request: Request):
-    """Clear all OAuth-related session data."""
-    for k in list(request.session.keys()):
-        if k.startswith("oauth:"):
-            request.session.pop(k, None)
-
-
-def _create_logout_response() -> Response:
-    """Create logout response with cookie deletion."""
-    st = get_auth_settings()
-    resp = Response(status_code=204)
-    resp.delete_cookie(
-        key=_cookie_name(st),
-        domain=_cookie_domain(st),
-        path="/",
-    )
-    return resp
-
-
 async def _handle_mfa_redirect(
     policy: AuthPolicy, user: Any, redirect_url: str
 ) -> RedirectResponse | None:
@@ -724,18 +705,5 @@ def _create_oauth_router(
                 pass
 
         return resp
-
-    @router.post(
-        "/logout",
-        status_code=status.HTTP_204_NO_CONTENT,
-        responses={204: {"description": "Cookie cleared"}},
-    )
-    async def logout(request: Request):
-        """Logout and clear authentication."""
-        # Clear OAuth session state
-        _clear_oauth_session_data(request)
-
-        # Create logout response with cookie deletion
-        return _create_logout_response()
 
     return router
