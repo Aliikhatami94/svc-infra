@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated, Any, Callable, Optional
 
-from fastapi import Depends, HTTPException, Request, Security
+from fastapi import Body, Depends, HTTPException, Query, Request, Security
 from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2PasswordBearer
 from sqlalchemy import select
 
+from svc_infra.api.fastapi.auth.mfa import MFAProof, verify_mfa_for_user
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.auth.state import get_auth_state, get_user_scope_resolver
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
@@ -192,3 +193,31 @@ def RequireService():
         return p
 
     return Depends(_guard)
+
+
+def RequireMFAIfEnabled(body_field: str = "mfa"):
+    """
+    Requires MFA iff the current user has MFA enabled.
+    Looks for proof in the request body under `body_field` (e.g. "mfa"),
+    and falls back to query params ?mfa_code=&mfa_pre_token= for methods that
+    may not send bodies (e.g. DELETE).
+    """
+
+    async def _dep(
+        p: Identity,
+        sess: SqlSessionDep,
+        mfa: Optional[MFAProof] = Body(None, embed=True, alias=body_field),
+        mfa_code: Optional[str] = Query(None, alias="mfa_code"),
+        mfa_pre_token: Optional[str] = Query(None, alias="mfa_pre_token"),
+    ):
+        proof = mfa or (
+            MFAProof(code=mfa_code, pre_token=mfa_pre_token) if mfa_code or mfa_pre_token else None
+        )
+        res = await verify_mfa_for_user(
+            user=p.user, session=sess, proof=proof, require_enabled=True
+        )
+        if not res.ok:
+            raise HTTPException(400, "Invalid code")
+        return p
+
+    return Depends(_dep)

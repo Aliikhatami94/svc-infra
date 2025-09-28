@@ -62,6 +62,7 @@ from svc_infra.api.fastapi.auth.security import (
 from svc_infra.api.fastapi.auth.security import (
     RequireAnyScope,
     RequireIdentity,
+    RequireMFAIfEnabled,
     RequireRoles,
     RequireScopes,
     RequireService,
@@ -122,6 +123,7 @@ __all__ = [
     "RequireScopes",
     "RequireAnyScope",
     "RequireRoles",
+    "RequireMFAIfEnabled",
     # Routers
     "public_router",
     "optional_identity_router",
