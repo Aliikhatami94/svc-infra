@@ -25,6 +25,17 @@ def _trace_id_from_request(request: Request) -> Optional[str]:
     return None
 
 
+def _json_safe(obj):
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    # Convert any non-primitive (e.g., Exception) to string
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    return str(obj)
+
+
 def problem_response(
     *,
     status: int,
@@ -77,13 +88,14 @@ def register_error_handlers(app):
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(request: Request, exc: RequestValidationError):
         trace_id = _trace_id_from_request(request)
-        errors = exc.errors()
+        raw = exc.errors()
+        safe_errors = _json_safe(raw)
         detail = None if IS_PROD else "Validation failed."
         return problem_response(
             status=422,
             title="Unprocessable Entity",
             detail=detail,
-            errors=errors if not IS_PROD else None,
+            errors=safe_errors if not IS_PROD else None,
             code="VALIDATION_ERROR",
             instance=str(request.url),
             trace_id=trace_id,

@@ -23,11 +23,18 @@ def apply_default_security(router: APIRouter, *, default_security: list[dict] | 
 def apply_default_responses(router: APIRouter, defaults: dict[int, dict]) -> None:
     original_add = router.add_api_route
 
+    def _only_ref(obj: dict) -> dict:
+        # If someone passed {"description": "...", "$ref": "..."} normalize to only {"$ref": "..."}
+        return {"$ref": obj["$ref"]} if isinstance(obj, dict) and "$ref" in obj else obj
+
     def _wrapped_add_api_route(path: str, endpoint: Callable, **kwargs: Any):
-        responses = kwargs.get("responses") or {}
-        # don't clobber explicit codes; only fill gaps
+        responses = {**(kwargs.get("responses") or {})}
         for code, ref in (defaults or {}).items():
-            responses.setdefault(str(code), ref)
+            responses.setdefault(str(code), _only_ref(ref))
+        # Also normalize any explicitly-specified refs on this operation
+        for code, resp in list(responses.items()):
+            if isinstance(resp, dict) and "$ref" in resp and len(resp) > 1:
+                responses[code] = {"$ref": resp["$ref"]}
         kwargs["responses"] = responses
         return original_add(path, endpoint, **kwargs)
 
