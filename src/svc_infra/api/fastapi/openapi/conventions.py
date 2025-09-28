@@ -52,7 +52,7 @@ def _problem_example(**kw: Any) -> Dict[str, Any]:
 
 STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
     "BadRequest": {
-        "description": "The request was invalid or cannot be served",
+        "description": "The request is malformed or missing required fields",
         "content": {
             "application/problem+json": {
                 "schema": {"$ref": "#/components/schemas/Problem"},
@@ -61,7 +61,7 @@ STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
                         "value": _problem_example(
                             title="Bad Request",
                             status=400,
-                            detail="Invalid request.",
+                            detail="Invalid request payload.",
                             code="BAD_REQUEST",
                         )
                     }
