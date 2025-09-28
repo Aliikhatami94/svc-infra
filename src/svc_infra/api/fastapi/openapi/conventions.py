@@ -5,7 +5,6 @@ from typing import Any, Dict
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
-# ---- Problem Details (RFC 7807) schema ----
 PROBLEM_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -17,12 +16,7 @@ PROBLEM_SCHEMA: Dict[str, Any] = {
         "title": {"type": "string", "description": "Short, human-readable summary"},
         "status": {"type": "integer", "format": "int32", "description": "HTTP status code"},
         "detail": {"type": "string", "description": "Human-readable explanation"},
-        "instance": {
-            "type": "string",
-            "format": "uri",
-            "description": "URI identifying this occurrence",
-        },
-        # Extensions commonly requested by enterprises:
+        "instance": {"type": "string", "format": "uri", "description": "URI for this occurrence"},
         "code": {"type": "string", "description": "Stable application error code"},
         "errors": {
             "type": "array",
@@ -56,8 +50,25 @@ def _problem_example(**kw: Any) -> Dict[str, Any]:
     return base
 
 
-# ---- Reusable response components (with examples) ----
 STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
+    "BadRequest": {
+        "description": "The request was invalid or cannot be served",
+        "content": {
+            "application/problem+json": {
+                "schema": {"$ref": "#/components/schemas/Problem"},
+                "examples": {
+                    "default": {
+                        "value": _problem_example(
+                            title="Bad Request",
+                            status=400,
+                            detail="Invalid request.",
+                            code="BAD_REQUEST",
+                        )
+                    }
+                },
+            }
+        },
+    },
     "Unauthorized": {
         "description": "Authentication required or failed",
         "content": {
@@ -112,6 +123,24 @@ STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
             }
         },
     },
+    "Conflict": {
+        "description": "A conflicting resource already exists or constraints were violated",
+        "content": {
+            "application/problem+json": {
+                "schema": {"$ref": "#/components/schemas/Problem"},
+                "examples": {
+                    "default": {
+                        "value": _problem_example(
+                            title="Conflict",
+                            status=409,
+                            detail="Record already exists.",
+                            code="CONFLICT",
+                        )
+                    }
+                },
+            }
+        },
+    },
     "ValidationError": {
         "description": "Request failed validation",
         "content": {
@@ -131,24 +160,6 @@ STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
                                     "type": "value_error.email",
                                 }
                             ],
-                        )
-                    }
-                },
-            }
-        },
-    },
-    "Conflict": {
-        "description": "A conflicting resource already exists or constraints were violated",
-        "content": {
-            "application/problem+json": {
-                "schema": {"$ref": "#/components/schemas/Problem"},
-                "examples": {
-                    "default": {
-                        "value": _problem_example(
-                            title="Conflict",
-                            status=409,
-                            detail="Record already exists.",
-                            code="CONFLICT",
                         )
                     }
                 },
@@ -178,9 +189,7 @@ STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
         "content": {
             "application/problem+json": {
                 "schema": {"$ref": "#/components/schemas/Problem"},
-                "examples": {
-                    "default": {"value": _problem_example()},
-                },
+                "examples": {"default": {"value": _problem_example()}},
             }
         },
     },
@@ -188,16 +197,9 @@ STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
 
 
 def install_openapi_conventions(app: FastAPI) -> None:
-    """
-    Augment OpenAPI with:
-      - Problem schema
-      - Standard reusable responses (401/403/404/422/409/429/5xx) with examples
-      - Convert empty 200s to 204 for docs hygiene
-    """
     previous = getattr(app, "openapi", None)
 
     def _strip_ref_siblings(obj: dict) -> dict:
-        # If an object has a $ref, remove any sibling keys (Spectral: no-$ref-siblings)
         if isinstance(obj, dict) and "$ref" in obj:
             return {"$ref": obj["$ref"]}
         return obj
@@ -205,7 +207,6 @@ def install_openapi_conventions(app: FastAPI) -> None:
     def _is_effectively_empty_schema(s: dict | None) -> bool:
         if not isinstance(s, dict):
             return False
-        # Treat {} or {"type":"object"} (with no properties) as “empty”
         if s == {}:
             return True
         if s.get("type") == "object" and not s.get("properties"):
@@ -213,17 +214,37 @@ def install_openapi_conventions(app: FastAPI) -> None:
         return False
 
     def _openapi():
-        # Chain any prior openapi() customizer so we don't clobber other installers.
         base_schema = (
             previous()
             if callable(previous)
             else get_openapi(title=app.title, version=app.version, routes=app.routes)
         )
 
-        schema = dict(base_schema)  # shallow copy
+        # Shallow copy
+        schema = dict(base_schema)
         comps = schema.setdefault("components", {})
         schemas = comps.setdefault("schemas", {})
         responses = comps.setdefault("responses", {})
+
+        # --- Root-level hygiene Spectral likes ---
+        info = schema.setdefault("info", {})
+        info.setdefault("contact", {"name": "API Support", "email": "support@example.com"})
+        info.setdefault("license", {"name": "Apache-2.0"})
+        schema.setdefault("servers", [{"url": "/"}])
+
+        # Optional, but nice: tag descriptions dictionary -> OpenAPI tags array
+        # (only add if you want Spectral's tag rules happy)
+        tag_desc = {
+            "health": "Healthcheck endpoints",
+            "auth": "Authentication (username/password, registration, verification)",
+            "auth:apikeys": "Manage API keys",
+            "auth:mfa": "Multi-factor authentication",
+            "auth:oauth": "OAuth login and callbacks",
+            "auth:account": "Account lifecycle endpoints",
+            "users": "User profile and admin operations",
+        }
+        tags = [{"name": k, "description": v} for k, v in tag_desc.items()]
+        schema["tags"] = tags
 
         # Schemas
         schemas.setdefault("Problem", PROBLEM_SCHEMA)
@@ -232,7 +253,7 @@ def install_openapi_conventions(app: FastAPI) -> None:
         for k, v in STANDARD_RESPONSES.items():
             responses.setdefault(k, v)
 
-        # Empty 200 -> 204
+        # --- Convert “empty” 200s to 204 ---
         for path_item in (schema.get("paths") or {}).values():
             for method_obj in list(path_item.values()):
                 if not isinstance(method_obj, dict):
@@ -243,8 +264,14 @@ def install_openapi_conventions(app: FastAPI) -> None:
                     if not content:
                         resp.pop("200", None)
                         resp.setdefault("204", {"description": "No Content"})
+                    else:
+                        aj = content.get("application/json", {})
+                        sch = aj.get("schema") if isinstance(aj, dict) else None
+                        if _is_effectively_empty_schema(sch):
+                            resp.pop("200", None)
+                            resp.setdefault("204", {"description": "No Content"})
 
-        # --- Enforce no-$ref-siblings on operation responses ---
+        # --- Enforce Spectral no-$ref-siblings on operation responses ---
         for path_item in (schema.get("paths") or {}).values():
             for method_obj in list(path_item.values()):
                 if not isinstance(method_obj, dict):
@@ -252,25 +279,7 @@ def install_openapi_conventions(app: FastAPI) -> None:
                 resp_map = method_obj.get("responses") or {}
                 for code, resp in list(resp_map.items()):
                     if isinstance(resp, dict) and "$ref" in resp and len(resp) > 1:
-                        resp_map[code] = {"$ref": resp["$ref"]}  # strip siblings
-
-        # --- Upgrade "empty" 200s to 204 (also if schema was {} / root object with no props) ---
-        for path_item in (schema.get("paths") or {}).values():
-            for method_obj in list(path_item.values()):
-                if not isinstance(method_obj, dict):
-                    continue
-                responses = method_obj.get("responses") or {}
-                r200 = responses.get("200")
-                if isinstance(r200, dict):
-                    content = r200.get("content") or {}
-                    # Detect “empty json” schemas and convert to 204
-                    if "application/json" in content:
-                        sch = content["application/json"].get("schema") or {}
-                        if _is_effectively_empty_schema(sch):
-                            # Prefer 204 No Content
-                            responses.pop("200", None)
-                            responses.setdefault("204", {"description": "No Content"})
-                    # If 200 has no content at all, your existing block already converts to 204
+                        resp_map[code] = {"$ref": resp["$ref"]}
 
         app.openapi_schema = schema
         return schema
