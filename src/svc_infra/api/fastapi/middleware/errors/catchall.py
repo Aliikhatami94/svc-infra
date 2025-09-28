@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,6 @@ class CatchAllExceptionMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # Only handle HTTP; pass through websockets, lifespan, etc.
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
 
@@ -26,27 +26,30 @@ class CatchAllExceptionMiddleware:
         try:
             await self.app(scope, receive, send_wrapper)
         except Exception as exc:
-            # We can only replace the response if it hasn't started yet.
             logger.exception("Unhandled error on %s", scope.get("path"))
-
             if response_started:
-                # Can't change headers/status mid-stream; best effort to end stream.
                 try:
                     await send({"type": "http.response.body", "body": b"", "more_body": False})
                 except Exception:
                     pass
             else:
+                # Generate an ad-hoc instance URN
+                instance = f"urn:request:{uuid.uuid4()}"
                 body = json.dumps(
                     {
-                        "error": type(exc).__name__,
+                        "type": "about:blank",
+                        "title": "Internal Server Error",
+                        "status": 500,
                         "detail": str(exc),
+                        "instance": instance,
+                        "code": "internal_error",
                     }
                 ).encode("utf-8")
                 await send(
                     {
                         "type": "http.response.start",
                         "status": 500,
-                        "headers": [(b"content-type", b"application/json")],
+                        "headers": [(b"content-type", b"application/problem+json")],
                     }
                 )
                 await send({"type": "http.response.body", "body": body, "more_body": False})

@@ -5,15 +5,16 @@ from typing import Literal, cast
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
+from svc_infra.api.fastapi.auth.gaurd import auth_session_router, login_client_guard
 from svc_infra.api.fastapi.auth.mfa.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.mfa.router import mfa_router
-from svc_infra.api.fastapi.auth.openapi.gaurd import auth_session_router, login_client_guard
-from svc_infra.api.fastapi.auth.openapi.security import install_openapi_auth
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
+from svc_infra.api.fastapi.openapi.security import install_openapi_auth
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
 
 from .. import Require
+from ..openapi.conventions import install_openapi_conventions
 from .account import account_router
 from .apikey_router import apikey_router
 from .oauth_router import oauth_router_with_backend
@@ -164,5 +165,5 @@ def add_auth(
                 include_in_schema=include_in_docs,
             )
 
-    if include_in_docs and (enable_password or enable_oauth or enable_api_keys):
-        install_openapi_auth(app, include_api_key=enable_api_keys)
+    install_openapi_auth(app, include_api_key=enable_api_keys)
+    install_openapi_conventions(app)

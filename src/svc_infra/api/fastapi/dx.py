@@ -42,11 +42,6 @@ from svc_infra.api.fastapi.auth.apikey_router import apikey_router
 from svc_infra.api.fastapi.auth.mfa.router import mfa_router
 from svc_infra.api.fastapi.auth.mfa.security import RequireMFAIfEnabled
 from svc_infra.api.fastapi.auth.oauth_router import oauth_router_with_backend
-
-# ----------------
-# OpenAPI auth schemes installer (only when building a bare FastAPI app yourself)
-# ----------------
-from svc_infra.api.fastapi.auth.openapi.security import install_openapi_auth
 from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
 
 # ----------------
@@ -89,6 +84,11 @@ from svc_infra.api.fastapi.ease import (
     easy_service_api,
     easy_service_app,
 )
+
+# ----------------
+# OpenAPI auth schemes installer (only when building a bare FastAPI app yourself)
+# ----------------
+from svc_infra.api.fastapi.openapi.security import install_openapi_auth
 
 # ----------------
 # API key model binding (needed before using apikey_router if enable_api_keys=True)
