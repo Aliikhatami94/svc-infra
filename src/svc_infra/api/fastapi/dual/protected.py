@@ -2,15 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional, Sequence
 
-from svc_infra.api.fastapi.auth.security import RequireIdentity  # for router-level dependencies
-from svc_infra.api.fastapi.auth.security import RequireScopes  # guard factory
-from svc_infra.api.fastapi.auth.security import RequireService  # guard factory
-from svc_infra.api.fastapi.auth.security import RequireUser  # guard factory
-from svc_infra.api.fastapi.auth.security import (  # for router-level dependencies
+from ..auth.security import (
     AllowIdentity,
+    RequireIdentity,
     RequireRoles,
+    RequireScopes,
+    RequireService,
+    RequireUser,
 )
-
 from .router import DualAPIRouter
 
 
