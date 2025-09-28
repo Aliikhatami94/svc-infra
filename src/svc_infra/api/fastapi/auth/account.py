@@ -1,28 +1,11 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Body, Query
-from pydantic import BaseModel
 
-from svc_infra.api.fastapi.auth.security import Identity, RequireMFAIfEnabled
+from svc_infra.api.fastapi.auth.mfa.models import DisableAccountIn
+from svc_infra.api.fastapi.auth.mfa.security import Identity, RequireMFAIfEnabled
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.protected import user_router
-
-
-# ---------- DTOs ----------
-class MFAProof(BaseModel):
-    code: str | None = None
-    pre_token: str | None = None
-
-
-class DisableAccountIn(BaseModel):
-    reason: Optional[str] = None
-    mfa: Optional[MFAProof] = None
-
-
-class DeleteAccountIn(BaseModel):
-    mfa: Optional[MFAProof] = None
 
 
 # ---------- Router ----------

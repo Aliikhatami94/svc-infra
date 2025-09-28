@@ -18,8 +18,8 @@ from sqlalchemy import select
 from starlette import status
 from starlette.responses import Response
 
+from svc_infra.api.fastapi.auth.mfa.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
-from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.public import public_router

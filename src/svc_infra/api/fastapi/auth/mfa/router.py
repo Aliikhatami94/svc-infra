@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import os
 from datetime import datetime, timezone
-from typing import Literal
 
 import pyotp
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi_users import FastAPIUsers
-from pydantic import BaseModel
 from sqlalchemy import select
 from starlette.responses import JSONResponse
 
-from svc_infra.api.fastapi.auth.pre_auth import get_mfa_pre_jwt_writer
+from svc_infra.api.fastapi.auth._cookies import compute_cookie_params
+from svc_infra.api.fastapi.auth.mfa.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.sender import get_sender
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
@@ -21,163 +17,25 @@ from svc_infra.api.fastapi.dual.protected import user_router
 from svc_infra.api.fastapi.dual.public import public_router
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
 
-from ._cookies import compute_cookie_params
-
-# --- Email OTP store (replace with Redis in prod) ---
-EMAIL_OTP_STORE: dict[str, dict] = {}  # key = uid (or jti), value={hash,exp,attempts,next_send}
-
-
-# ---- DTOs ----
-class StartSetupOut(BaseModel):
-    otpauth_url: str
-    secret: str
-    qr_svg: str | None = None  # optional: inline SVG
-
-
-class ConfirmSetupIn(BaseModel):
-    code: str
-
-
-class VerifyMFAIn(BaseModel):
-    code: str
-    pre_token: str
-
-
-class DisableMFAIn(BaseModel):
-    code: str | None = None
-    recovery_code: str | None = None
-
-
-class RecoveryCodesOut(BaseModel):
-    codes: list[str]
-
-
-class SendEmailCodeIn(BaseModel):
-    pre_token: str
-
-
-class SendEmailCodeOut(BaseModel):
-    sent: bool = True
-    cooldown_seconds: int = 60
-
-
-class MFAStatusOut(BaseModel):
-    enabled: bool
-    methods: list[str]
-    confirmed_at: datetime | None = None
-    email_mask: str | None = None
-    email_otp: dict | None = None
-
-
-class MFAProof(BaseModel):
-    code: str | None = None
-    pre_token: str | None = None
-
-
-class MFAResult(BaseModel):
-    ok: bool
-    method: Literal["totp", "recovery", "email", "none"] = "none"
-    attempts_left: int | None = None
-
-
-# ---- Utils ----
-def _qr_svg_from_uri(uri: str) -> str:
-    # Placeholder SVG; most frontends will render their own QR
-    return (
-        "<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'>"
-        "<rect width='100%' height='100%' fill='#fff'/>"
-        f"<text x='10' y='20' font-size='10'>{uri}</text></svg>"
-    )
-
-
-def _random_base32() -> str:
-    return pyotp.random_base32(length=32)
-
-
-def _gen_recovery_codes(n: int, length: int) -> list[str]:
-    out = []
-    for _ in range(n):
-        raw = base64.urlsafe_b64encode(os.urandom(24)).decode().rstrip("=")
-        out.append(raw[:length])
-    return out
-
-
-def _hash(s: str) -> str:
-    return hashlib.sha256(s.encode()).hexdigest()
-
-
-def _gen_numeric_code(n: int = 6) -> str:
-    import random
-
-    return "".join(str(random.randrange(10)) for _ in range(n))
-
-
-def _now_utc_ts() -> int:
-    from datetime import datetime, timezone
-
-    return int(datetime.now(timezone.utc).timestamp())
-
-
-async def verify_mfa_for_user(
-    *,
-    user,
-    session: SqlSessionDep,
-    proof: MFAProof | None,
-    require_enabled: bool = True,
-) -> MFAResult:
-    """
-    Verifies user MFA with one of:
-      - TOTP (if mfa_secret set)
-      - Recovery code (burns on success)
-      - Email OTP (bound to pre_token; burns on success, decrements attempts on fail)
-
-    Returns MFAResult(ok=..., method=..., attempts_left=...).
-    If require_enabled=True and user has MFA enabled but no valid proof, returns ok=False.
-    """
-    # Quick short-circuit if user has no MFA
-    enabled = bool(getattr(user, "mfa_enabled", False))
-    if not enabled:
-        return MFAResult(ok=not require_enabled, method="none", attempts_left=None)
-
-    if not proof or not proof.code:
-        return MFAResult(ok=False, method="none", attempts_left=None)
-
-    # A) TOTP
-    secret = getattr(user, "mfa_secret", None)
-    if secret:
-        totp = pyotp.TOTP(secret)
-        if totp.verify(proof.code, valid_window=1):
-            return MFAResult(ok=True, method="totp", attempts_left=None)
-
-    # B) Recovery code
-    dig = _hash(proof.code)
-    recov = getattr(user, "mfa_recovery", None) or []
-    if dig in recov:
-        recov.remove(dig)  # burn one
-        await session.flush()  # persist mutation for MutableList
-        return MFAResult(ok=True, method="recovery", attempts_left=None)
-
-    # C) Email OTP (requires pre_token → uid)
-    if proof.pre_token:
-        try:
-            pre = await get_mfa_pre_jwt_writer().read(proof.pre_token)
-            uid = str(pre.get("sub") or "")
-        except Exception:
-            uid = ""
-
-        if uid and uid == str(user.id):
-            rec = EMAIL_OTP_STORE.get(uid)
-            now = _now_utc_ts()
-            if rec:
-                attempts_left = rec.get("attempts_left")
-                if now <= rec["exp"] and attempts_left and attempts_left > 0 and rec["hash"] == dig:
-                    EMAIL_OTP_STORE.pop(uid, None)  # burn on success
-                    return MFAResult(ok=True, method="email", attempts_left=None)
-                # decrement on failure
-                rec["attempts_left"] = max(0, (attempts_left or 0) - 1)
-                return MFAResult(ok=False, method="email", attempts_left=rec["attempts_left"])
-
-    return MFAResult(ok=False, method="none", attempts_left=None)
+from .models import (
+    EMAIL_OTP_STORE,
+    ConfirmSetupIn,
+    DisableMFAIn,
+    MFAStatusOut,
+    RecoveryCodesOut,
+    SendEmailCodeIn,
+    SendEmailCodeOut,
+    StartSetupOut,
+    VerifyMFAIn,
+)
+from .utils import (
+    _gen_numeric_code,
+    _gen_recovery_codes,
+    _hash,
+    _now_utc_ts,
+    _qr_svg_from_uri,
+    _random_base32,
+)
 
 
 # ---- Router factory ----

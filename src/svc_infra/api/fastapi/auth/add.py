@@ -5,7 +5,8 @@ from typing import Literal, cast
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
-from svc_infra.api.fastapi.auth.mfa import mfa_router
+from svc_infra.api.fastapi.auth.mfa.pre_auth import get_mfa_pre_jwt_writer
+from svc_infra.api.fastapi.auth.mfa.router import mfa_router
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
@@ -17,7 +18,6 @@ from .gaurd import login_client_guard, mfa_login_router
 from .oauth_router import oauth_router_with_backend
 from .openapi_security import install_openapi_auth
 from .policy import AuthPolicy, DefaultAuthPolicy
-from .pre_auth import get_mfa_pre_jwt_writer
 from .providers import providers_from_settings
 from .settings import get_auth_settings
 from .state import set_auth_state

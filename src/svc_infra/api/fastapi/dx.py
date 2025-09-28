@@ -39,7 +39,14 @@ from svc_infra.api.fastapi.auth.add import add_auth
 # Turnkey feature routers (opt-in)
 # ----------------
 from svc_infra.api.fastapi.auth.apikey_router import apikey_router
-from svc_infra.api.fastapi.auth.mfa import mfa_router
+from svc_infra.api.fastapi.auth.deps import (
+    AllowIdentity,
+    Identity,
+    OptionalIdentity,
+    RequireIdentity,
+)
+from svc_infra.api.fastapi.auth.mfa.router import mfa_router
+from svc_infra.api.fastapi.auth.mfa.security import RequireMFAIfEnabled
 from svc_infra.api.fastapi.auth.oauth_router import oauth_router_with_backend
 
 # ----------------
@@ -51,18 +58,9 @@ from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
 # ----------------
 # Identity primitives (endpoint params + router-level deps + guard factories)
 # ----------------
-from svc_infra.api.fastapi.auth.security import AllowIdentity  # router-level dependency constant
 from svc_infra.api.fastapi.auth.security import (
-    Identity,  # Annotated[Principal, Depends(...)] for endpoint params
-)
-from svc_infra.api.fastapi.auth.security import OptionalIdentity  # same, but optional
-from svc_infra.api.fastapi.auth.security import (
-    Principal,  # the identity object you'll receive in endpoints
-)
-from svc_infra.api.fastapi.auth.security import (
+    Principal,
     RequireAnyScope,
-    RequireIdentity,
-    RequireMFAIfEnabled,
     RequireRoles,
     RequireScopes,
     RequireService,
