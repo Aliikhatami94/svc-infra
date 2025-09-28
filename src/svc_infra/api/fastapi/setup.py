@@ -15,8 +15,6 @@ from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_inde
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
 from svc_infra.api.fastapi.models import APIVersionSpec, ServiceInfo
-from svc_infra.api.fastapi.openapi.conventions import install_openapi_conventions
-from svc_infra.api.fastapi.openapi.security import install_openapi_auth
 from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.app.env import CURRENT_ENVIRONMENT
 
@@ -84,16 +82,8 @@ def _coerce_list(value: str | Iterable[str] | None) -> list[str]:
 def _set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
     base = mount_path if not public_base_url else f"{public_base_url.rstrip('/')}{mount_path}"
 
-    previous = getattr(app, "openapi", None)
-
     def custom_openapi():
-        # chain any previously-installed openapi() customizer
-        base_schema = (
-            previous()
-            if callable(previous)
-            else get_openapi(title=app.title, version=app.version, routes=app.routes)
-        )
-        schema = dict(base_schema)
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
         schema["servers"] = [{"url": base}]
         app.openapi_schema = schema
         return schema
@@ -106,22 +96,21 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         title=service.name,
         version=service.release,
         generate_unique_id_function=_gen_operation_id_factory(),
+        # let parent control global docs; per-spec override handled via parent index links
     )
 
+    # only parent gets CORS; child shares the same ASGI app after mount
     child.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(child)
 
+    # version routers
     if spec.routers_package:
         register_all_routers(
             child,
             base_package=spec.routers_package,
-            prefix="",
+            prefix="",  # will be mounted under /{tag}
             environment=CURRENT_ENVIRONMENT,
         )
-
-    # 🔽 add these two lines so the child gets Problem schema + reusable responses + securitySchemes
-    install_openapi_conventions(child)
-    install_openapi_auth(child, include_api_key=True)
 
     logger.info(
         "[%s] initialized version %s [env: %s]", service.name, spec.tag, CURRENT_ENVIRONMENT
