@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated, Any, Callable, Optional
 
-from fastapi import Depends, HTTPException, Request, Security
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2PasswordBearer
 from sqlalchemy import select
 
@@ -33,8 +33,10 @@ class Principal:
 
 # ---------- Resolvers ----------
 async def resolve_api_key(
-    request: Request, session: SqlSessionDep, raw: Optional[str] = Security(api_key_header)
+    request: Request,
+    session: SqlSessionDep,
 ) -> Optional[Principal]:
+    raw = (request.headers.get("x-api-key") or "").strip()
     if not raw:
         return None
     ApiKey = get_apikey_model()
@@ -42,6 +44,7 @@ async def resolve_api_key(
     parts = raw.split("_", 2)
     if len(parts) >= 3 and parts[0] == "ak":
         prefix = parts[1][:12]
+
     apikey = None
     if prefix:
         apikey = (
@@ -63,7 +66,6 @@ async def resolve_api_key(
 
     apikey.mark_used()
     await session.flush()
-
     return Principal(user=apikey.user, scopes=apikey.scopes, via="api_key", api_key=apikey)
 
 
