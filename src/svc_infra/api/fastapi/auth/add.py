@@ -165,4 +165,4 @@ def add_auth(
             )
 
     if include_in_docs and (enable_password or enable_oauth or enable_api_keys):
-        install_openapi_auth(app)
+        install_openapi_auth(app, include_api_key=enable_api_keys)

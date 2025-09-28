@@ -44,33 +44,30 @@ def _normalize_security_list(sec: list | None, *, drop_schemes: set[str] = None)
     return final
 
 
-def install_openapi_auth(app: FastAPI) -> None:
+def install_openapi_auth(app: FastAPI, *, include_api_key: bool = False) -> None:
     def _openapi():
         if app.openapi_schema:
             return app.openapi_schema
 
         schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
-
         comps = schema.setdefault("components", {}).setdefault("securitySchemes", {})
+
         comps.setdefault(
             "OAuth2PasswordBearer",
             {"type": "oauth2", "flows": {"password": {"tokenUrl": "/auth/login", "scopes": {}}}},
         )
-        comps.setdefault(
-            "APIKeyHeader",
-            {"type": "apiKey", "name": "X-API-Key", "in": "header"},
-        )
-        # Intentionally NOT adding a cookie scheme to keep Swagger modal simple.
+        if include_api_key:
+            comps.setdefault(
+                "APIKeyHeader", {"type": "apiKey", "name": "X-API-Key", "in": "header"}
+            )
 
-        # ---- Normalize every operation’s security list ----
-        drop = {"SessionCookie"}  # if you previously had it and want it gone
+        drop = {"SessionCookie"}
         for path_item in (schema.get("paths") or {}).values():
             for method_obj in path_item.values():
-                if not isinstance(method_obj, dict):
-                    continue
-                method_obj["security"] = _normalize_security_list(
-                    method_obj.get("security"), drop_schemes=drop
-                )
+                if isinstance(method_obj, dict):
+                    method_obj["security"] = _normalize_security_list(
+                        method_obj.get("security"), drop_schemes=drop
+                    )
 
         app.openapi_schema = schema
         return schema
