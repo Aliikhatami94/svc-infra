@@ -2,24 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..openapi.apply import apply_default_responses, apply_default_security
+from ..openapi.responses import DEFAULT_PUBLIC
 from .router import DualAPIRouter
 
 
 def public_router(**kwargs: Any) -> DualAPIRouter:
     """
-    Public router: absolutely NO auth dependencies.
-    Automatically marks operations as public in OpenAPI (no lock icon).
+    Public router: no auth dependencies.
+    - Marks operations as public in OpenAPI (no lock icon) via security: []
+    - Attaches standard reusable responses for public endpoints
     """
     r = DualAPIRouter(**kwargs)
 
-    original_add = r.add_api_route
+    # Keep OpenAPI consistent with the other router factories
+    apply_default_security(r, default_security=[])
+    apply_default_responses(r, DEFAULT_PUBLIC)
 
-    def _wrapped_add_api_route(path: str, endpoint, **kw: Any):
-        ox = kw.get("openapi_extra") or {}
-        if "security" not in ox:
-            ox["security"] = []  # explicit: public
-            kw["openapi_extra"] = ox
-        return original_add(path, endpoint, **kw)
-
-    r.add_api_route = _wrapped_add_api_route  # type: ignore[attr-defined]
     return r
