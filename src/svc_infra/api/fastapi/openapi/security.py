@@ -15,6 +15,7 @@ def _normalize_security_list(sec: list | None, *, drop_schemes: set[str] = None)
         kept = {k: v for k, v in item.items() if k not in drop_schemes}
         if kept:
             cleaned.append(kept)
+    # dedupe exact dicts
     seen_dicts = set()
     unique = []
     for item in cleaned:
@@ -23,6 +24,7 @@ def _normalize_security_list(sec: list | None, *, drop_schemes: set[str] = None)
             continue
         seen_dicts.add(canon)
         unique.append(item)
+    # dedupe single-scheme repeats
     seen_schemes = set()
     final = []
     for item in unique:
@@ -36,11 +38,17 @@ def _normalize_security_list(sec: list | None, *, drop_schemes: set[str] = None)
 
 
 def install_openapi_auth(app: FastAPI, *, include_api_key: bool = False) -> None:
-    def _openapi():
-        if app.openapi_schema:
-            return app.openapi_schema
+    previous = getattr(app, "openapi", None)
 
-        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+    def _openapi():
+        # Chain prior customizer if any
+        base_schema = (
+            previous()
+            if callable(previous)
+            else get_openapi(title=app.title, version=app.version, routes=app.routes)
+        )
+
+        schema = dict(base_schema)
         comps = schema.setdefault("components", {}).setdefault("securitySchemes", {})
         comps.setdefault(
             "OAuth2PasswordBearer",
@@ -51,6 +59,7 @@ def install_openapi_auth(app: FastAPI, *, include_api_key: bool = False) -> None
                 "APIKeyHeader", {"type": "apiKey", "name": "X-API-Key", "in": "header"}
             )
 
+        # Drop SessionCookie references from ops and dedupe
         drop = {"SessionCookie"}
         for path_item in (schema.get("paths") or {}).values():
             for method_obj in path_item.values():

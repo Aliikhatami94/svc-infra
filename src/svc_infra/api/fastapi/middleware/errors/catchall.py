@@ -1,8 +1,9 @@
 import json
 import logging
-import uuid
 
 logger = logging.getLogger(__name__)
+
+PROBLEM_MT = "application/problem+json"
 
 
 class CatchAllExceptionMiddleware:
@@ -27,29 +28,28 @@ class CatchAllExceptionMiddleware:
             await self.app(scope, receive, send_wrapper)
         except Exception as exc:
             logger.exception("Unhandled error on %s", scope.get("path"))
+
             if response_started:
                 try:
                     await send({"type": "http.response.body", "body": b"", "more_body": False})
                 except Exception:
                     pass
             else:
-                # Generate an ad-hoc instance URN
-                instance = f"urn:request:{uuid.uuid4()}"
                 body = json.dumps(
                     {
                         "type": "about:blank",
                         "title": "Internal Server Error",
                         "status": 500,
                         "detail": str(exc),
-                        "instance": instance,
-                        "code": "internal_error",
+                        "instance": scope.get("path", "/"),
+                        "code": "INTERNAL_ERROR",
                     }
                 ).encode("utf-8")
                 await send(
                     {
                         "type": "http.response.start",
                         "status": 500,
-                        "headers": [(b"content-type", b"application/problem+json")],
+                        "headers": [(b"content-type", PROBLEM_MT.encode("ascii"))],
                     }
                 )
                 await send({"type": "http.response.body", "body": body, "more_body": False})

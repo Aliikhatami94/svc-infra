@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from typing import Any, Callable
 
-from svc_infra.api.fastapi.dual.router import DualAPIRouter
+from fastapi import APIRouter
 
 
-def apply_default_security(router: DualAPIRouter, default_security: list[dict] | None) -> None:
+def apply_default_security(router: APIRouter, *, default_security: list[dict] | None) -> None:
     if default_security is None:
         return
     original_add = router.add_api_route
@@ -18,16 +20,15 @@ def apply_default_security(router: DualAPIRouter, default_security: list[dict] |
     router.add_api_route = _wrapped_add_api_route  # type: ignore[attr-defined]
 
 
-def apply_default_responses(router: DualAPIRouter, defaults: dict[int, dict]) -> None:
-    """Automatically add standard error responses if the route didn't override them."""
+def apply_default_responses(router: APIRouter, defaults: dict[int, dict]) -> None:
     original_add = router.add_api_route
 
     def _wrapped_add_api_route(path: str, endpoint: Callable, **kwargs: Any):
-        resp = kwargs.get("responses") or {}
-        # only add codes that aren't already present
-        for code, spec in defaults.items():
-            resp.setdefault(code, spec)
-        kwargs["responses"] = resp
+        responses = kwargs.get("responses") or {}
+        # don't clobber explicit codes; only fill gaps
+        for code, ref in (defaults or {}).items():
+            responses.setdefault(str(code), ref)
+        kwargs["responses"] = responses
         return original_add(path, endpoint, **kwargs)
 
     router.add_api_route = _wrapped_add_api_route  # type: ignore[attr-defined]
