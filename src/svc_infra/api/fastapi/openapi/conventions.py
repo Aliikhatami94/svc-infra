@@ -196,6 +196,22 @@ def install_openapi_conventions(app: FastAPI) -> None:
     """
     previous = getattr(app, "openapi", None)
 
+    def _strip_ref_siblings(obj: dict) -> dict:
+        # If an object has a $ref, remove any sibling keys (Spectral: no-$ref-siblings)
+        if isinstance(obj, dict) and "$ref" in obj:
+            return {"$ref": obj["$ref"]}
+        return obj
+
+    def _is_effectively_empty_schema(s: dict | None) -> bool:
+        if not isinstance(s, dict):
+            return False
+        # Treat {} or {"type":"object"} (with no properties) as “empty”
+        if s == {}:
+            return True
+        if s.get("type") == "object" and not s.get("properties"):
+            return True
+        return False
+
     def _openapi():
         # Chain any prior openapi() customizer so we don't clobber other installers.
         base_schema = (
@@ -227,6 +243,34 @@ def install_openapi_conventions(app: FastAPI) -> None:
                     if not content:
                         resp.pop("200", None)
                         resp.setdefault("204", {"description": "No Content"})
+
+        # --- Enforce no-$ref-siblings on operation responses ---
+        for path_item in (schema.get("paths") or {}).values():
+            for method_obj in list(path_item.values()):
+                if not isinstance(method_obj, dict):
+                    continue
+                resp_map = method_obj.get("responses") or {}
+                for code, resp in list(resp_map.items()):
+                    if isinstance(resp, dict) and "$ref" in resp and len(resp) > 1:
+                        resp_map[code] = {"$ref": resp["$ref"]}  # strip siblings
+
+        # --- Upgrade "empty" 200s to 204 (also if schema was {} / root object with no props) ---
+        for path_item in (schema.get("paths") or {}).values():
+            for method_obj in list(path_item.values()):
+                if not isinstance(method_obj, dict):
+                    continue
+                responses = method_obj.get("responses") or {}
+                r200 = responses.get("200")
+                if isinstance(r200, dict):
+                    content = r200.get("content") or {}
+                    # Detect “empty json” schemas and convert to 204
+                    if "application/json" in content:
+                        sch = content["application/json"].get("schema") or {}
+                        if _is_effectively_empty_schema(sch):
+                            # Prefer 204 No Content
+                            responses.pop("200", None)
+                            responses.setdefault("204", {"description": "No Content"})
+                    # If 200 has no content at all, your existing block already converts to 204
 
         app.openapi_schema = schema
         return schema
