@@ -8,11 +8,10 @@ from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
 
+from svc_infra.api.fastapi.auth._cookies import compute_cookie_params
+from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
+from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.dual.public import public_router
-
-from ._cookies import compute_cookie_params
-from .policy import AuthPolicy, DefaultAuthPolicy
-from .settings import get_auth_settings
 
 _pwd = PasswordHelper()
 _DUMMY_BCRYPT = _pwd.hash("dummy-password")
@@ -55,7 +54,7 @@ async def login_client_guard(request: Request):
             )
 
 
-def mfa_login_router(
+def auth_session_router(
     *,
     fapi: FastAPIUsers,
     auth_backend: AuthenticationBackend,
@@ -138,6 +137,35 @@ def mfa_login_router(
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
         cp = compute_cookie_params(request, name=st.auth_cookie_name)
         resp.set_cookie(**cp, value=token)
+        return resp
+
+    @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, name="auth:logout")
+    async def logout(request: Request):
+        st = get_auth_settings()
+        resp = JSONResponse({"ok": True})
+
+        # mirror cookie params so deletion works across domains/samesite
+        cp_auth = compute_cookie_params(request, name=st.auth_cookie_name)
+        resp.delete_cookie(
+            key=cp_auth["key"],
+            path=cp_auth["path"],
+            domain=cp_auth["domain"],
+            samesite=cp_auth["samesite"],
+            secure=cp_auth["secure"],
+            httponly=cp_auth["httponly"],
+        )
+
+        # also clear the session cookie the middleware set up
+        cp_sess = compute_cookie_params(request, name=st.session_cookie_name)
+        resp.delete_cookie(
+            key=cp_sess["key"],
+            path=cp_sess["path"],
+            domain=cp_sess["domain"],
+            samesite=cp_sess["samesite"],
+            secure=cp_sess["secure"],
+            httponly=cp_sess["httponly"],
+        )
+
         return resp
 
     return router

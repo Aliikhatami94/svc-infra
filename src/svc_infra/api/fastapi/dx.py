@@ -46,7 +46,7 @@ from svc_infra.api.fastapi.auth.oauth_router import oauth_router_with_backend
 # ----------------
 # OpenAPI auth schemes installer (only when building a bare FastAPI app yourself)
 # ----------------
-from svc_infra.api.fastapi.auth.openapi_security import install_openapi_auth
+from svc_infra.api.fastapi.auth.openapi.security import install_openapi_auth
 from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
 
 # ----------------
