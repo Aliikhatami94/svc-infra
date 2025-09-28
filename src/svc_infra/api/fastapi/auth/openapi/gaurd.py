@@ -144,7 +144,7 @@ def auth_session_router(
         st = get_auth_settings()
         resp = JSONResponse({"ok": True})
 
-        # mirror cookie params so deletion works across domains/samesite
+        # Clear the auth cookie
         cp_auth = compute_cookie_params(request, name=st.auth_cookie_name)
         resp.delete_cookie(
             key=cp_auth["key"],
@@ -155,7 +155,7 @@ def auth_session_router(
             httponly=cp_auth["httponly"],
         )
 
-        # also clear the session cookie the middleware set up
+        # Clear the session middleware cookie
         cp_sess = compute_cookie_params(request, name=st.session_cookie_name)
         resp.delete_cookie(
             key=cp_sess["key"],
@@ -165,6 +165,9 @@ def auth_session_router(
             secure=cp_sess["secure"],
             httponly=cp_sess["httponly"],
         )
+
+        # Optional but helpful in dev: nuke site cookies
+        resp.headers["Clear-Site-Data"] = '"cookies"'
 
         return resp
 

@@ -90,7 +90,7 @@ def add_auth(
             bind_apikey_model(user_model, table_name=apikey_table_name)
             app.include_router(apikey_router(), include_in_schema=include_in_docs)
 
-        # MFA-aware login
+        # Auth session endpoints (login/logout)
         app.include_router(
             auth_session_router(
                 fapi=fapi,
