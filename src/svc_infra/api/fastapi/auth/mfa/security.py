@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import Body, Depends, HTTPException, Query
 
-from svc_infra.api.fastapi.auth.deps import Identity
+from svc_infra.api.fastapi.auth.security import Identity
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 
 from .models import MFAProof

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from typing import Annotated, Any, Callable, Optional
 
 from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2PasswordBearer
@@ -11,8 +11,6 @@ from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.auth.state import get_auth_state, get_user_scope_resolver
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.db.sql.apikey import get_apikey_model
-
-from .deps import Identity
 
 # ---------- OpenAPI security schemes (appear in docs) ----------
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
@@ -115,6 +113,37 @@ async def resolve_bearer_or_cookie_principal(
     # dedupe while keeping order
     scopes = list(dict.fromkeys(user_scopes))
     return Principal(user=db_user, scopes=scopes, via=via)
+
+
+async def _current_principal(
+    request: Request,
+    session: SqlSessionDep,
+    jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
+    ak: Optional[Principal] = Depends(resolve_api_key),
+) -> Principal:
+    if jwt_or_cookie:
+        return jwt_or_cookie
+    if ak:
+        return ak
+    raise HTTPException(401, "Missing credentials")
+
+
+async def _optional_principal(
+    request: Request,
+    session: SqlSessionDep,
+    jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
+    ak: Optional[Principal] = Depends(resolve_api_key),
+) -> Optional[Principal]:
+    return jwt_or_cookie or ak or None
+
+
+# ---------- DX: types for endpoint params ----------
+Identity = Annotated[Principal, Depends(_current_principal)]
+OptionalIdentity = Annotated[Principal | None, Depends(_optional_principal)]
+
+# ---------- DX: constants for router-level dependencies ----------
+RequireIdentity = Depends(_current_principal)  # use inside router dependencies=[...]
+AllowIdentity = Depends(_optional_principal)  # same, but optional
 
 
 # ---------- DX: small guard factories ----------
