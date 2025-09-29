@@ -14,9 +14,14 @@ from fastapi.routing import APIRoute
 from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_index_html
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
-from svc_infra.api.fastapi.openapi.conventions import install_openapi_conventions
 from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
-from svc_infra.api.fastapi.openapi.security import install_openapi_auth
+from svc_infra.api.fastapi.openapi.mutators import (
+    auth_mutator,
+    conventions_mutator,
+    info_mutator,
+    servers_mutator,
+)
+from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
 from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.app.env import CURRENT_ENVIRONMENT
 
@@ -152,7 +157,7 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     child = FastAPI(
         title=service.name,
         version=service.release,
-        contact=_dump_or_none(service.contact),
+        contact=_dump_or_none(service.contact),  # FastAPI expects plain dicts
         license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
         description=service.description,
@@ -162,21 +167,23 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     child.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(child)
 
-    # 1) Conventions (Problem + reusable responses)
-    install_openapi_conventions(child)
-
-    # 2) Security (per-child include_api_key; default to False unless you want otherwise)
+    # ---- OpenAPI pipeline (DRY!) ----
     include_api_key = bool(spec.include_api_key) if spec.include_api_key is not None else False
-    install_openapi_auth(child, include_api_key=include_api_key)
-
-    # 3) Info: base + per-child overrides
-    _apply_info_overrides(child, service, spec)
-
-    # 4) Servers: relative "/vN" by default unless you pass a full base
     mount_path = f"/{spec.tag.strip('/')}"
-    _set_servers(child, spec.public_base_url, mount_path)
+    server_url = (
+        mount_path
+        if not spec.public_base_url
+        else f"{spec.public_base_url.rstrip('/')}{mount_path}"
+    )
 
-    # 5) Routers (now that OpenAPI customizing is chained)
+    apply_mutators(
+        child,
+        conventions_mutator(),
+        auth_mutator(include_api_key),
+        info_mutator(service, spec),
+        servers_mutator(server_url),
+    )
+
     if spec.routers_package:
         register_all_routers(
             child, base_package=spec.routers_package, prefix="", environment=CURRENT_ENVIRONMENT

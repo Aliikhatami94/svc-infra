@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from fastapi import FastAPI
-from fastapi.openapi.utils import get_openapi
+
+from .mutators import conventions_mutator
+from .pipeline import apply_mutators
 
 PROBLEM_SCHEMA: Dict[str, Any] = {
     "type": "object",
@@ -197,32 +199,4 @@ STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
 
 
 def install_openapi_conventions(app: FastAPI) -> None:
-    previous = getattr(app, "openapi", None)
-
-    def _openapi():
-        base = (
-            previous()
-            if callable(previous)
-            else get_openapi(title=app.title, version=app.version, routes=app.routes)
-        )
-        schema = dict(base)
-
-        comps = schema.setdefault("components", {})
-        schemas = comps.setdefault("schemas", {})
-        responses = comps.setdefault("responses", {})
-
-        # Defaults only if missing
-        info = schema.setdefault("info", {})
-        info.setdefault("contact", {"name": "API Support", "email": "support@example.com"})
-        info.setdefault("license", {"name": "Apache-2.0"})
-        schema.setdefault("servers", [{"url": "/"}])
-
-        # Problem + reusable responses
-        schemas.setdefault("Problem", PROBLEM_SCHEMA)
-        for k, v in STANDARD_RESPONSES.items():
-            responses.setdefault(k, v)
-
-        app.openapi_schema = schema
-        return schema
-
-    app.openapi = _openapi
+    apply_mutators(app, conventions_mutator())
