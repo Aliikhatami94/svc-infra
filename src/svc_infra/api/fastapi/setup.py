@@ -144,12 +144,16 @@ def _set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
     app.openapi = custom_openapi
 
 
+def _dump_or_none(model):
+    return model.model_dump(exclude_none=True) if model is not None else None
+
+
 def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     child = FastAPI(
         title=service.name,
         version=service.release,
-        contact=service.contact,
-        license_info=service.license,
+        contact=_dump_or_none(service.contact),
+        license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
         description=service.description,
         generate_unique_id_function=_gen_operation_id_factory(),
@@ -199,8 +203,8 @@ def setup_service_api(
     parent = FastAPI(
         title=service.name,
         version=service.release,
-        contact=service.contact,
-        license_info=service.license,
+        contact=_dump_or_none(service.contact),
+        license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
         description=service.description,
         docs_url="/docs",
