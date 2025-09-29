@@ -48,7 +48,7 @@ def chain_openapi(app: FastAPI, mutator: Callable) -> None:
     def _openapi():
         base = (
             previous()
-            if Callable(previous)
+            if callable(previous)
             else get_openapi(title=app.title, version=app.version, routes=app.routes)
         )
         return mutator(base)
