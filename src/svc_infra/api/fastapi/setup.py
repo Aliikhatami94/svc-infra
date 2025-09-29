@@ -14,8 +14,8 @@ from fastapi.routing import APIRoute
 from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_index_html
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
-from svc_infra.api.fastapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.openapi.conventions import install_openapi_conventions
+from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.openapi.security import install_openapi_auth
 from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.app.env import CURRENT_ENVIRONMENT
@@ -81,12 +81,56 @@ def _coerce_list(value: str | Iterable[str] | None) -> list[str]:
     return [v for v in value if v]
 
 
+def _apply_info_overrides(app: FastAPI, base: ServiceInfo, spec: APIVersionSpec | None = None):
+    """Apply base ServiceInfo + optional per-child overrides into OpenAPI.info."""
+    prev = getattr(app, "openapi", None)
+
+    def patched():
+        base_schema = (
+            prev()
+            if callable(prev)
+            else get_openapi(title=app.title, version=app.version, routes=app.routes)
+        )
+        schema = dict(base_schema)
+        info = schema.setdefault("info", {})
+        # Base service identity
+        info.setdefault("title", base.name)
+        info.setdefault("version", base.release)
+        if base.description is not None:
+            info["description"] = base.description
+        if base.terms_of_service is not None:
+            info["termsOfService"] = base.terms_of_service
+        if base.contact:
+            info["contact"] = {k: v for k, v in base.contact.model_dump().items() if v is not None}
+        if base.license:
+            info["license"] = {k: v for k, v in base.license.model_dump().items() if v is not None}
+        # Per-child overrides
+        if spec is not None:
+            if spec.description is not None:
+                info["description"] = spec.description
+            if spec.terms_of_service is not None:
+                info["termsOfService"] = spec.terms_of_service
+            if spec.contact is not None:
+                info["contact"] = {
+                    k: v for k, v in spec.contact.model_dump().items() if v is not None
+                }
+            if spec.license is not None:
+                info["license"] = {
+                    k: v for k, v in spec.license.model_dump().items() if v is not None
+                }
+
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = patched
+
+
 def _set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
+    """Install servers AFTER all other installers so it wins."""
     base = mount_path if not public_base_url else f"{public_base_url.rstrip('/')}{mount_path}"
     previous = getattr(app, "openapi", None)
 
     def custom_openapi():
-        # CHAIN the previous openapi() so earlier installers (conventions/auth) remain
         base_schema = (
             previous()
             if callable(previous)
@@ -114,16 +158,24 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     child.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(child)
 
-    # IMPORTANT: install on the child so it has components.schemas & components.responses
+    # 1) Conventions (Problem + reusable responses)
     install_openapi_conventions(child)
-    install_openapi_auth(child, include_api_key=True)  # or False if v0 doesn’t use API keys
 
+    # 2) Security (per-child include_api_key; default to False unless you want otherwise)
+    include_api_key = bool(spec.include_api_key) if spec.include_api_key is not None else False
+    install_openapi_auth(child, include_api_key=include_api_key)
+
+    # 3) Info: base + per-child overrides
+    _apply_info_overrides(child, service, spec)
+
+    # 4) Servers: relative "/vN" by default unless you pass a full base
+    mount_path = f"/{spec.tag.strip('/')}"
+    _set_servers(child, spec.public_base_url, mount_path)
+
+    # 5) Routers (now that OpenAPI customizing is chained)
     if spec.routers_package:
         register_all_routers(
-            child,
-            base_package=spec.routers_package,
-            prefix="",
-            environment=CURRENT_ENVIRONMENT,
+            child, base_package=spec.routers_package, prefix="", environment=CURRENT_ENVIRONMENT
         )
 
     logger.info(

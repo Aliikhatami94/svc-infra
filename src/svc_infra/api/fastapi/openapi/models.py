@@ -24,14 +24,17 @@ class ServiceInfo(BaseModel):
 
 
 class APIVersionSpec(BaseModel):
-    """
-    One mounted API surface. tag is the URL mount (e.g. 'v0' → /v0).
-    """
-
     tag: str | int = "v0"
     routers_package: str | None = None
-    public_base_url: str | None = None  # used to set OpenAPI `servers`
-    docs: bool | None = None  # None = environment default
+    public_base_url: str | None = None  # None -> relative "/vN"
+    docs: bool | None = None
+
+    # NEW: per-child OpenAPI overrides
+    description: str | None = None
+    terms_of_service: str | None = None
+    contact: Contact | None = None
+    license: License | None = None
+    include_api_key: bool | None = None  # None -> inherit default you choose
 
     @field_validator("tag", mode="before")
     @classmethod
@@ -41,7 +44,6 @@ class APIVersionSpec(BaseModel):
         s = str(v or "").strip().lstrip("/")
         if not s:
             return "v0"
-        # accept 'v0', '0', '/v1', '/1'
         if s.startswith("v"):
             return s
         if s.isdigit():

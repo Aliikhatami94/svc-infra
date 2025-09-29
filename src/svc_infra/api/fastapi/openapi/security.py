@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-from fastapi.openapi.utils import get_openapi
+
+from svc_infra.api.fastapi.openapi.apply import chain_openapi
 
 
 def _normalize_security_list(sec: list | None, *, drop_schemes: set[str] = None) -> list:
@@ -37,18 +38,9 @@ def _normalize_security_list(sec: list | None, *, drop_schemes: set[str] = None)
     return final
 
 
-def install_openapi_auth(app: FastAPI, *, include_api_key: bool = False) -> None:
-    previous = getattr(app, "openapi", None)
-
-    def _openapi():
-        # Chain prior customizer if any
-        base_schema = (
-            previous()
-            if callable(previous)
-            else get_openapi(title=app.title, version=app.version, routes=app.routes)
-        )
-
-        schema = dict(base_schema)
+def auth_mutator(include_api_key: bool):
+    def _m(schema: dict) -> dict:
+        schema = dict(schema)
         comps = schema.setdefault("components", {}).setdefault("securitySchemes", {})
         comps.setdefault(
             "OAuth2PasswordBearer",
@@ -59,16 +51,49 @@ def install_openapi_auth(app: FastAPI, *, include_api_key: bool = False) -> None
                 "APIKeyHeader", {"type": "apiKey", "name": "X-API-Key", "in": "header"}
             )
 
-        # Drop SessionCookie references from ops and dedupe
+        # Drop SessionCookie and dedupe per-op security
+        def _normalize_security_list(sec: list | None, drop: set[str]) -> list:
+            if not sec:
+                return []
+            cleaned = []
+            for item in sec:
+                if isinstance(item, dict):
+                    kept = {k: v for k, v in item.items() if k not in drop}
+                    if kept:
+                        cleaned.append(kept)
+            # dedupe dicts
+            seen = set()
+            out = []
+            for d in cleaned:
+                key = tuple(sorted((k, tuple(v or [])) for k, v in d.items()))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(d)
+            # dedupe single-scheme repeats
+            seen_schemes = set()
+            final = []
+            for d in out:
+                if len(d) == 1:
+                    k = next(iter(d))
+                    if k in seen_schemes:
+                        continue
+                    seen_schemes.add(k)
+                final.append(d)
+            return final
+
         drop = {"SessionCookie"}
-        for path_item in (schema.get("paths") or {}).values():
-            for method_obj in path_item.values():
+        for path in (schema.get("paths") or {}).values():
+            for method_obj in path.values():
                 if isinstance(method_obj, dict):
                     method_obj["security"] = _normalize_security_list(
-                        method_obj.get("security"), drop_schemes=drop
+                        method_obj.get("security"), drop
                     )
 
-        app.openapi_schema = schema
         return schema
 
-    app.openapi = _openapi
+    return _m
+
+
+def install_openapi_auth(app: FastAPI, *, include_api_key: bool = False) -> None:
+    chain_openapi(app, auth_mutator(include_api_key))

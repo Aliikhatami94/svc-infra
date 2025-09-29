@@ -200,29 +200,27 @@ def install_openapi_conventions(app: FastAPI) -> None:
     previous = getattr(app, "openapi", None)
 
     def _openapi():
-        base_schema = (
+        base = (
             previous()
             if callable(previous)
             else get_openapi(title=app.title, version=app.version, routes=app.routes)
         )
-        schema = dict(base_schema)
+        schema = dict(base)
 
         comps = schema.setdefault("components", {})
         schemas = comps.setdefault("schemas", {})
         responses = comps.setdefault("responses", {})
 
-        # Respect existing info / servers – only set defaults if missing
+        # Defaults only if missing
         info = schema.setdefault("info", {})
         info.setdefault("contact", {"name": "API Support", "email": "support@example.com"})
         info.setdefault("license", {"name": "Apache-2.0"})
         schema.setdefault("servers", [{"url": "/"}])
 
-        # Problem schema + reusable responses
+        # Problem + reusable responses
         schemas.setdefault("Problem", PROBLEM_SCHEMA)
         for k, v in STANDARD_RESPONSES.items():
             responses.setdefault(k, v)
-
-        # (optional) normalize no-$ref-siblings, 200→204, etc… if you still want those
 
         app.openapi_schema = schema
         return schema
