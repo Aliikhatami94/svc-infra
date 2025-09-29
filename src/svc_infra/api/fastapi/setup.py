@@ -195,18 +195,13 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     return child
 
 
-def setup_service_api(
-    *,
+def _build_parent_app(
     service: ServiceInfo,
-    versions: Sequence[APIVersionSpec],
-    root_routers: list[str] | str | None = None,
-    public_cors_origins: list[str] | str | None = None,
+    *,
+    public_cors_origins: list[str] | str | None,
+    root_routers: list[str] | str | None,
+    root_server_url: str | None = None,
 ) -> FastAPI:
-    """
-    Build the service with:
-      - Root app (one set of root routers, incl. svc-infra /ping)
-      - One child app per APIVersionSpec mounted at /{tag}
-    """
     parent = FastAPI(
         title=service.name,
         version=service.release,
@@ -223,7 +218,13 @@ def setup_service_api(
     parent.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(parent)
 
-    # 1) root routers — svc-infra ping at '/', once
+    # OpenAPI pipeline on root (same cleansing as child)
+    mutators = [conventions_mutator(), info_mutator(service, None)]
+    if root_server_url:  # optional: only force if provided
+        mutators.append(servers_mutator(root_server_url))
+    apply_mutators(parent, *mutators)
+
+    # Root routers — svc-infra ping at '/', once
     register_all_routers(
         parent,
         base_package="svc_infra.api.fastapi.routers",
@@ -234,12 +235,31 @@ def setup_service_api(
     for pkg in _coerce_list(root_routers):
         register_all_routers(parent, base_package=pkg, prefix="", environment=CURRENT_ENVIRONMENT)
 
-    # 2) mount each version under /{tag}
+    return parent
+
+
+def setup_service_api(
+    *,
+    service: ServiceInfo,
+    versions: Sequence[APIVersionSpec],
+    root_routers: list[str] | str | None = None,
+    public_cors_origins: list[str] | str | None = None,
+    root_public_base_url: str | None = None,
+) -> FastAPI:
+    # Build parent with its own mutators applied
+    root_server = root_public_base_url.rstrip("/") if root_public_base_url else "/"
+    parent = _build_parent_app(
+        service,
+        public_cors_origins=public_cors_origins,
+        root_routers=root_routers,
+        root_server_url=root_server,
+    )
+
+    # Mount each version
     for spec in versions:
         child = _build_child_app(service, spec)
         mount_path = f"/{spec.tag.strip('/')}"
         parent.mount(mount_path, child, name=spec.tag.strip("/"))
-        _set_servers(child, spec.public_base_url, mount_path)
 
     @parent.get("/", include_in_schema=False)
     def index():
@@ -249,11 +269,7 @@ def setup_service_api(
         cards.append(
             CardSpec(
                 tag="",  # renders as "/"
-                docs=DocTargets(
-                    swagger="/docs",
-                    redoc="/redoc",
-                    openapi_json="/openapi.json",
-                ),
+                docs=DocTargets(swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"),
             )
         )
 
@@ -271,11 +287,7 @@ def setup_service_api(
                 )
             )
 
-        html = render_index_html(
-            service_name=service.name,
-            release=service.release,
-            cards=cards,
-        )
+        html = render_index_html(service_name=service.name, release=service.release, cards=cards)
         return HTMLResponse(html)
 
     return parent
