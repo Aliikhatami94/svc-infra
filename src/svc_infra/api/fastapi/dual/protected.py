@@ -44,7 +44,7 @@ def protected_router(
         default_security=[
             {"OAuth2PasswordBearer": []},
             {"SessionCookie": []},
-            {"ApiKeyHeader": []},
+            {"APIKeyHeader": []},
         ],
     )
     apply_default_responses(r, DEFAULT_PROTECTED)
@@ -64,7 +64,7 @@ def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) 
 # SERVICE-ONLY (API key required)
 def service_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
     r = DualAPIRouter(dependencies=_merge([RequireService()], dependencies), **kwargs)
-    apply_default_security(r, default_security=[{"ApiKeyHeader": []}])
+    apply_default_security(r, default_security=[{"APIKeyHeader": []}])
     apply_default_responses(r, DEFAULT_SERVICE)
     return r
 
@@ -77,7 +77,7 @@ def scopes_router(*scopes: str, **kwargs: Any) -> DualAPIRouter:
         default_security=[
             {"OAuth2PasswordBearer": []},
             {"SessionCookie": []},
-            {"ApiKeyHeader": []},
+            {"APIKeyHeader": []},
         ],
     )
     apply_default_responses(r, DEFAULT_PROTECTED)

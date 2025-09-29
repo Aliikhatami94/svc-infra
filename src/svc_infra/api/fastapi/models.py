@@ -3,11 +3,24 @@ from __future__ import annotations
 from pydantic import BaseModel, field_validator
 
 
-class ServiceInfo(BaseModel):
-    """Product identity (not URL)."""
+class Contact(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    url: str | None = None
 
+
+class License(BaseModel):
+    name: str | None = None
+    url: str | None = None
+
+
+class ServiceInfo(BaseModel):
     name: str = "Service Infrastructure App"
-    release: str = "0.1.0"  # your app/service version, not API URL tag
+    release: str = "0.1.0"
+    description: str | None = None
+    terms_of_service: str | None = None
+    contact: Contact | None = None
+    license: License | None = None
 
 
 class APIVersionSpec(BaseModel):

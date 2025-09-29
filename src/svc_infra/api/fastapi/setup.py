@@ -104,6 +104,10 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     child = FastAPI(
         title=service.name,
         version=service.release,
+        contact=service.contact,
+        license_info=service.license,
+        terms_of_service=service.terms_of_service,
+        description=service.description,
         generate_unique_id_function=_gen_operation_id_factory(),
     )
 
@@ -132,7 +136,6 @@ def setup_service_api(
     *,
     service: ServiceInfo,
     versions: Sequence[APIVersionSpec],
-    root_title: str | None = None,
     root_routers: list[str] | str | None = None,
     public_cors_origins: list[str] | str | None = None,
 ) -> FastAPI:
@@ -142,11 +145,15 @@ def setup_service_api(
       - One child app per APIVersionSpec mounted at /{tag}
     """
     parent = FastAPI(
-        title=root_title or service.name,
+        title=service.name,
+        version=service.release,
+        contact=service.contact,
+        license_info=service.license,
+        terms_of_service=service.terms_of_service,
+        description=service.description,
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
-        version=service.release,
     )
 
     _setup_cors(parent, public_cors_origins)

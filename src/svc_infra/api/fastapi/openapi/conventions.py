@@ -199,87 +199,30 @@ STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
 def install_openapi_conventions(app: FastAPI) -> None:
     previous = getattr(app, "openapi", None)
 
-    def _strip_ref_siblings(obj: dict) -> dict:
-        if isinstance(obj, dict) and "$ref" in obj:
-            return {"$ref": obj["$ref"]}
-        return obj
-
-    def _is_effectively_empty_schema(s: dict | None) -> bool:
-        if not isinstance(s, dict):
-            return False
-        if s == {}:
-            return True
-        if s.get("type") == "object" and not s.get("properties"):
-            return True
-        return False
-
     def _openapi():
         base_schema = (
             previous()
             if callable(previous)
             else get_openapi(title=app.title, version=app.version, routes=app.routes)
         )
-
-        # Shallow copy
         schema = dict(base_schema)
+
         comps = schema.setdefault("components", {})
         schemas = comps.setdefault("schemas", {})
         responses = comps.setdefault("responses", {})
 
-        # --- Root-level hygiene Spectral likes ---
+        # Respect existing info / servers – only set defaults if missing
         info = schema.setdefault("info", {})
         info.setdefault("contact", {"name": "API Support", "email": "support@example.com"})
         info.setdefault("license", {"name": "Apache-2.0"})
         schema.setdefault("servers", [{"url": "/"}])
 
-        # Optional, but nice: tag descriptions dictionary -> OpenAPI tags array
-        # (only add if you want Spectral's tag rules happy)
-        tag_desc = {
-            "health": "Healthcheck endpoints",
-            "auth": "Authentication (username/password, registration, verification)",
-            "auth:apikeys": "Manage API keys",
-            "auth:mfa": "Multi-factor authentication",
-            "auth:oauth": "OAuth login and callbacks",
-            "auth:account": "Account lifecycle endpoints",
-            "users": "User profile and admin operations",
-        }
-        tags = [{"name": k, "description": v} for k, v in tag_desc.items()]
-        schema["tags"] = tags
-
-        # Schemas
+        # Problem schema + reusable responses
         schemas.setdefault("Problem", PROBLEM_SCHEMA)
-
-        # Responses (with examples)
         for k, v in STANDARD_RESPONSES.items():
             responses.setdefault(k, v)
 
-        # --- Convert “empty” 200s to 204 ---
-        for path_item in (schema.get("paths") or {}).values():
-            for method_obj in list(path_item.values()):
-                if not isinstance(method_obj, dict):
-                    continue
-                resp = method_obj.get("responses") or {}
-                if "200" in resp:
-                    content = resp["200"].get("content") or {}
-                    if not content:
-                        resp.pop("200", None)
-                        resp.setdefault("204", {"description": "No Content"})
-                    else:
-                        aj = content.get("application/json", {})
-                        sch = aj.get("schema") if isinstance(aj, dict) else None
-                        if _is_effectively_empty_schema(sch):
-                            resp.pop("200", None)
-                            resp.setdefault("204", {"description": "No Content"})
-
-        # --- Enforce Spectral no-$ref-siblings on operation responses ---
-        for path_item in (schema.get("paths") or {}).values():
-            for method_obj in list(path_item.values()):
-                if not isinstance(method_obj, dict):
-                    continue
-                resp_map = method_obj.get("responses") or {}
-                for code, resp in list(resp_map.items()):
-                    if isinstance(resp, dict) and "$ref" in resp and len(resp) > 1:
-                        resp_map[code] = {"$ref": resp["$ref"]}
+        # (optional) normalize no-$ref-siblings, 200→204, etc… if you still want those
 
         app.openapi_schema = schema
         return schema
