@@ -201,6 +201,7 @@ def _build_parent_app(
     public_cors_origins: list[str] | str | None,
     root_routers: list[str] | str | None,
     root_server_url: str | None = None,
+    root_include_api_key: bool = False,  # <-- NEW
 ) -> FastAPI:
     parent = FastAPI(
         title=service.name,
@@ -218,9 +219,12 @@ def _build_parent_app(
     parent.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(parent)
 
-    # OpenAPI pipeline on root (same cleansing as child)
-    mutators = [conventions_mutator(), info_mutator(service, None)]
-    if root_server_url:  # optional: only force if provided
+    mutators = [
+        conventions_mutator(),
+        auth_mutator(root_include_api_key),
+        info_mutator(service, None),
+    ]
+    if root_server_url:
         mutators.append(servers_mutator(root_server_url))
     apply_mutators(parent, *mutators)
 
@@ -245,14 +249,22 @@ def setup_service_api(
     root_routers: list[str] | str | None = None,
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
+    root_include_api_key: bool | None = None,
 ) -> FastAPI:
-    # Build parent with its own mutators applied
+    # infer if not explicitly provided
+    effective_root_include_api_key = (
+        any(bool(v.include_api_key) for v in versions)
+        if root_include_api_key is None
+        else bool(root_include_api_key)
+    )
+
     root_server = root_public_base_url.rstrip("/") if root_public_base_url else "/"
     parent = _build_parent_app(
         service,
         public_cors_origins=public_cors_origins,
         root_routers=root_routers,
         root_server_url=root_server,
+        root_include_api_key=effective_root_include_api_key,
     )
 
     # Mount each version

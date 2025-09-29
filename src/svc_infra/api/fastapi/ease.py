@@ -147,10 +147,8 @@ def easy_service_api(
     root_routers: list[str] | str | None = None,
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
+    root_include_api_key: bool | None = None,
 ) -> FastAPI:
-    """
-    Pure app factory (no logging/obs side-effects).
-    """
     service = ServiceInfo(name=name, release=release)
     specs = [
         APIVersionSpec(tag=str(tag), routers_package=pkg, public_base_url=base)
@@ -162,6 +160,7 @@ def easy_service_api(
         root_routers=root_routers,
         public_cors_origins=public_cors_origins,
         root_public_base_url=root_public_base_url,
+        root_include_api_key=root_include_api_key,
     )
 
 
@@ -173,6 +172,7 @@ def easy_service_app(
     root_routers: list[str] | str | None = None,
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
+    root_include_api_key: bool | None = None,
     options: EasyAppOptions | None = None,
     enable_logging: bool | None = None,
     enable_observability: bool | None = None,
@@ -225,6 +225,7 @@ def easy_service_app(
         root_routers=root_routers,
         public_cors_origins=public_cors_origins,
         root_public_base_url=root_public_base_url,
+        root_include_api_key=root_include_api_key,
     )
 
     # 5) Observability
