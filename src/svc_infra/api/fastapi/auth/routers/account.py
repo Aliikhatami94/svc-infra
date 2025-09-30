@@ -40,7 +40,7 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
     )
     async def delete_account(
         sess: SqlSessionDep,
-        p: Identity,
+        p,
         hard: bool = Query(False, description="Hard delete if true"),
     ):
         user = p.user
