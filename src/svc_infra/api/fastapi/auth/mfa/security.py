@@ -12,7 +12,7 @@ from .verify import verify_mfa_for_user
 def RequireMFAIfEnabled(body_field: str = "mfa"):
     async def _dep(
         p: Identity,
-        sess: SqlSessionDep = Depends(),
+        sess: SqlSessionDep,
         mfa: Optional[MFAProof] = Body(None, embed=True, alias=body_field),
         mfa_code: Optional[str] = Query(None, alias="mfa_code"),
         mfa_pre_token: Optional[str] = Query(None, alias="mfa_pre_token"),
