@@ -18,7 +18,11 @@ PROBLEM_SCHEMA: Dict[str, Any] = {
         "title": {"type": "string", "description": "Short, human-readable summary"},
         "status": {"type": "integer", "format": "int32", "description": "HTTP status code"},
         "detail": {"type": "string", "description": "Human-readable explanation"},
-        "instance": {"type": "string", "format": "uri", "description": "URI for this occurrence"},
+        "instance": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "URI reference for this occurrence",
+        },
         "code": {"type": "string", "description": "Stable application error code"},
         "errors": {
             "type": "array",
@@ -44,7 +48,7 @@ def _problem_example(**kw: Any) -> Dict[str, Any]:
         "title": "Internal Server Error",
         "status": 500,
         "detail": "Something went wrong. Please contact support.",
-        "instance": "/request/abc123",
+        "instance": "https://api.example.com/request/abc123",
         "code": "INTERNAL_ERROR",
         "trace_id": "00000000000000000000000000000000",
     }

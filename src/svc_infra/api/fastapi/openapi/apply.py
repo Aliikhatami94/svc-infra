@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from fastapi import APIRouter, FastAPI
-from fastapi.openapi.utils import get_openapi
+from fastapi import APIRouter
 
 
 def apply_default_security(router: APIRouter, *, default_security: list[dict] | None) -> None:
@@ -40,17 +39,3 @@ def apply_default_responses(router: APIRouter, defaults: dict[int, dict]) -> Non
         return original_add(path, endpoint, **kwargs)
 
     router.add_api_route = _wrapped_add_api_route  # type: ignore[attr-defined]
-
-
-def chain_openapi(app: FastAPI, mutator: Callable) -> None:
-    previous = getattr(app, "openapi", None)
-
-    def _openapi():
-        base = (
-            previous()
-            if callable(previous)
-            else get_openapi(title=app.title, version=app.version, routes=app.routes)
-        )
-        return mutator(base)
-
-    app.openapi = _openapi
