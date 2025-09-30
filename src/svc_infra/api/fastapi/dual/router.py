@@ -54,6 +54,15 @@ class DualAPIRouter(APIRouter):
 
         return decorator
 
+    def add_api_route(self, path, endpoint, **kwargs):
+        methods = set((kwargs.get("methods") or []))
+        for r in self.routes:
+            if getattr(r, "path", None) == path and methods & (
+                getattr(r, "methods", set()) or set()
+            ):
+                raise RuntimeError(f"Duplicate route in router: {methods} {path}")
+        return super().add_api_route(path, endpoint, **kwargs)
+
     # ---------- HTTP method shorthands ----------
 
     def get(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
