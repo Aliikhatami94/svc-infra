@@ -7,7 +7,6 @@ from typing import Iterable, Sequence
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRoute
 
@@ -20,6 +19,7 @@ from svc_infra.api.fastapi.openapi.mutators import (
     auth_mutator,
     conventions_mutator,
     drop_unused_components_mutator,
+    ensure_examples_for_json_mutator,
     ensure_global_tags_mutator,
     ensure_media_examples_mutator,
     ensure_media_type_schemas_mutator,
@@ -100,69 +100,6 @@ def _coerce_list(value: str | Iterable[str] | None) -> list[str]:
     return [v for v in value if v]
 
 
-def _apply_info_overrides(app: FastAPI, base: ServiceInfo, spec: APIVersionSpec | None = None):
-    """Apply base ServiceInfo + optional per-child overrides into OpenAPI.info."""
-    prev = getattr(app, "openapi", None)
-
-    def patched():
-        base_schema = (
-            prev()
-            if callable(prev)
-            else get_openapi(title=app.title, version=app.version, routes=app.routes)
-        )
-        schema = dict(base_schema)
-        info = schema.setdefault("info", {})
-        # Base service identity
-        info.setdefault("title", base.name)
-        info.setdefault("version", base.release)
-        if base.description is not None:
-            info["description"] = base.description
-        if base.terms_of_service is not None:
-            info["termsOfService"] = base.terms_of_service
-        if base.contact:
-            info["contact"] = {k: v for k, v in base.contact.model_dump().items() if v is not None}
-        if base.license:
-            info["license"] = {k: v for k, v in base.license.model_dump().items() if v is not None}
-        # Per-child overrides
-        if spec is not None:
-            if spec.description is not None:
-                info["description"] = spec.description
-            if spec.terms_of_service is not None:
-                info["termsOfService"] = spec.terms_of_service
-            if spec.contact is not None:
-                info["contact"] = {
-                    k: v for k, v in spec.contact.model_dump().items() if v is not None
-                }
-            if spec.license is not None:
-                info["license"] = {
-                    k: v for k, v in spec.license.model_dump().items() if v is not None
-                }
-
-        app.openapi_schema = schema
-        return schema
-
-    app.openapi = patched
-
-
-def _set_servers(app: FastAPI, public_base_url: str | None, mount_path: str):
-    """Install servers AFTER all other installers so it wins."""
-    base = mount_path if not public_base_url else f"{public_base_url.rstrip('/')}{mount_path}"
-    previous = getattr(app, "openapi", None)
-
-    def custom_openapi():
-        base_schema = (
-            previous()
-            if callable(previous)
-            else get_openapi(title=app.title, version=app.version, routes=app.routes)
-        )
-        schema = dict(base_schema)
-        schema["servers"] = [{"url": base}]
-        app.openapi_schema = schema
-        return schema
-
-    app.openapi = custom_openapi
-
-
 def _dump_or_none(model):
     return model.model_dump(exclude_none=True) if model is not None else None
 
@@ -193,22 +130,23 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     mutators = [
         conventions_mutator(),
         normalize_problem_and_examples_mutator(),
-        auth_mutator(include_api_key),
-        info_mutator(service, spec),
-        servers_mutator(server_url),
-        ensure_operation_descriptions_mutator(),
-        ensure_global_tags_mutator(),
         attach_standard_responses_mutator(),
-        drop_unused_components_mutator(),
-        ensure_response_descriptions_mutator(),
-        ensure_media_type_schemas_mutator(),
+        auth_mutator(include_api_key),
+        strip_ref_siblings_in_responses_mutator(),
+        prune_invalid_responses_keys_mutator(),
+        ensure_operation_descriptions_mutator(),
         ensure_request_body_descriptions_mutator(),
         ensure_parameter_metadata_mutator(),
+        ensure_media_type_schemas_mutator(),
+        ensure_examples_for_json_mutator(),
         normalize_no_content_204_mutator(),
-        prune_invalid_responses_keys_mutator(),
-        strip_ref_siblings_in_responses_mutator(),
-        ensure_media_examples_mutator(),
+        ensure_response_descriptions_mutator(),
         improve_success_response_descriptions_mutator(),
+        ensure_global_tags_mutator(),
+        drop_unused_components_mutator(),
+        info_mutator(service, spec),
+        ensure_media_examples_mutator(),
+        servers_mutator(server_url),
     ]
     apply_mutators(child, *mutators)
 
@@ -250,21 +188,22 @@ def _build_parent_app(
     mutators = [
         conventions_mutator(),
         normalize_problem_and_examples_mutator(),
-        auth_mutator(root_include_api_key),
-        info_mutator(service, None),
-        ensure_operation_descriptions_mutator(),
-        ensure_global_tags_mutator(),
         attach_standard_responses_mutator(),
-        drop_unused_components_mutator(),
-        ensure_response_descriptions_mutator(),
-        ensure_media_type_schemas_mutator(),
+        auth_mutator(root_include_api_key),
+        strip_ref_siblings_in_responses_mutator(),
+        prune_invalid_responses_keys_mutator(),
+        ensure_operation_descriptions_mutator(),
         ensure_request_body_descriptions_mutator(),
         ensure_parameter_metadata_mutator(),
+        ensure_media_type_schemas_mutator(),
+        ensure_examples_for_json_mutator(),
         normalize_no_content_204_mutator(),
-        prune_invalid_responses_keys_mutator(),
-        strip_ref_siblings_in_responses_mutator(),
-        ensure_media_examples_mutator(),
+        ensure_response_descriptions_mutator(),
         improve_success_response_descriptions_mutator(),
+        ensure_global_tags_mutator(),
+        drop_unused_components_mutator(),
+        info_mutator(service, None),
+        ensure_media_examples_mutator(),
     ]
     if root_server_url:
         mutators.append(servers_mutator(root_server_url))

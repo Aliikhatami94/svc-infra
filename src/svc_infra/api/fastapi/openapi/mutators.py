@@ -492,10 +492,66 @@ def strip_ref_siblings_in_responses_mutator():
             if not isinstance(resps, dict):
                 continue
             for code, resp in list(resps.items()):
-                if isinstance(resp, dict) and "$ref" in resp and (len(resp) > 1):
+                if isinstance(resp, dict) and "$ref" in resp and len(resp) > 1:
                     ref = resp["$ref"]
                     resp.clear()
                     resp["$ref"] = ref
+        return schema
+
+    return m
+
+
+def ensure_examples_for_json_mutator(example_by_type=None):
+    example_by_type = example_by_type or {
+        "object": {},
+        "array": [],
+        "string": "string",
+        "integer": 0,
+        "number": 0,
+        "boolean": True,
+    }
+
+    def _infer_example(schema: dict):
+        if not isinstance(schema, dict):
+            return {}
+        t = schema.get("type")
+        if t in example_by_type:
+            return example_by_type[t]
+        if "$ref" in schema or "properties" in schema or "additionalProperties" in schema:
+            return {}
+        return {}
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            # responses
+            resps = op.get("responses") or {}
+            for resp in resps.values():
+                if not isinstance(resp, dict):
+                    continue
+                content = resp.get("content") or {}
+                for mt, mt_obj in content.items():
+                    if not isinstance(mt_obj, dict) or not mt.startswith("application/"):
+                        continue
+                    if "example" in mt_obj or "examples" in mt_obj:
+                        continue
+                    sch = mt_obj.get("schema") or {}
+                    ex = _infer_example(sch)
+                    if ex != {}:
+                        mt_obj["example"] = ex
+            # request bodies
+            rb = op.get("requestBody")
+            if isinstance(rb, dict):
+                content = rb.get("content") or {}
+                for mt, mt_obj in content.items():
+                    if not isinstance(mt_obj, dict) or not mt.startswith("application/"):
+                        continue
+                    if "example" in mt_obj or "examples" in mt_obj:
+                        continue
+                    sch = mt_obj.get("schema") or {}
+                    ex = _infer_example(sch)
+                    if ex != {}:
+                        mt_obj["example"] = ex
         return schema
 
     return m

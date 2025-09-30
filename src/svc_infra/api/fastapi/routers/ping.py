@@ -6,9 +6,7 @@ from fastapi import Response, status
 
 from svc_infra.api.fastapi.dual.public import public_router
 
-router = public_router(
-    tags=["health"], description="Health check endpoints to verify service status"
-)
+router = public_router(tags=["health"])
 
 
 @router.get(
