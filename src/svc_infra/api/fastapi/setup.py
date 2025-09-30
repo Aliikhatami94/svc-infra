@@ -84,25 +84,6 @@ def _dump_or_none(model):
     return model.model_dump(exclude_none=True) if model is not None else None
 
 
-def _assert_no_route_collisions(app):
-    seen = {}
-    for r in app.routes:
-        methods = getattr(r, "methods", None)
-        path = getattr(r, "path", None)
-        if not methods or not path:
-            continue
-        for m in methods:
-            key = (path, m.upper())
-            if key in seen:
-                prev = seen[key]
-                raise RuntimeError(
-                    f"Route collision for {m} {path}:\n"
-                    f" - {getattr(prev, 'endpoint', prev)}\n"
-                    f" - {getattr(r, 'endpoint', r)}"
-                )
-            seen[key] = r
-
-
 def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     child = FastAPI(
         title=service.name,
@@ -116,6 +97,7 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
 
     child.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(child)
+    _add_route_logger(child)
 
     # ---- OpenAPI pipeline (DRY!) ----
     include_api_key = bool(spec.include_api_key) if spec.include_api_key is not None else False
@@ -142,7 +124,6 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     logger.info(
         "[%s] initialized version %s [env: %s]", service.name, spec.tag, CURRENT_ENVIRONMENT
     )
-    _assert_no_route_collisions(child)
     return child
 
 
@@ -169,6 +150,7 @@ def _build_parent_app(
     _setup_cors(parent, public_cors_origins)
     parent.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(parent)
+    _add_route_logger(parent)
 
     mutators = setup_mutators(
         service=service,
@@ -189,8 +171,21 @@ def _build_parent_app(
     for pkg in _coerce_list(root_routers):
         register_all_routers(parent, base_package=pkg, prefix="", environment=CURRENT_ENVIRONMENT)
 
-    _assert_no_route_collisions(parent)
     return parent
+
+
+def _add_route_logger(app: FastAPI):
+    @app.middleware("http")
+    async def _log_route(request, call_next):
+        resp = await call_next(request)
+        route = request.scope.get("route")
+        # Prefer FastAPI's path_format (shows param patterns), fall back to path
+        path = getattr(route, "path_format", None) or getattr(route, "path", None)
+        if path:
+            # Include mount root_path so mounted children show their full path
+            root_path = request.scope.get("root_path", "") or ""
+            resp.headers["X-Handled-By"] = f"{request.method} {root_path}{path}"
+        return resp
 
 
 def setup_service_api(

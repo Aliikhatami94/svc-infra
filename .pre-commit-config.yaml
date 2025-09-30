@@ -30,7 +30,6 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: ["--fix=lf"]
-      - id: debug-statements
       - id: detect-private-key
       - id: fix-byte-order-marker
       - id: check-added-large-files

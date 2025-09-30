@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, List
+from typing import Any, Callable
 
 from fastapi import APIRouter
 
@@ -22,29 +22,28 @@ class DualAPIRouter(APIRouter):
     # ---------- core helper ----------
 
     def _dual_decorator(
-        self,
-        path: str,
-        methods: List[str],
-        *,
-        show_in_schema: bool = True,
-        **kwargs: Any,
+        self, path: str, methods: list[str], *, show_in_schema: bool = True, **kwargs
     ):
-        # Special-case the router root: "", "/" → register both "" and "/"
         is_rootish = path in {"", "/"}
         primary = _norm_primary(path or "")
         alt = _alt_with_slash(path or "")
 
-        def decorator(func: Callable[..., Any]):
+        safe_methods = {"GET", "HEAD", "OPTIONS"}
+
+        def decorator(func):
             if is_rootish:
-                # /prefix  (no trailing slash)
+                # primary root
                 self.add_api_route(
                     "", func, methods=methods, include_in_schema=show_in_schema, **kwargs
                 )
-                # /prefix/ (with trailing slash; hidden)
-                self.add_api_route("/", func, methods=methods, include_in_schema=False, **kwargs)
+                # only add the "/" twin for *safe* methods
+                if set(m.upper() for m in methods) <= safe_methods:
+                    self.add_api_route(
+                        "/", func, methods=methods, include_in_schema=False, **kwargs
+                    )
                 return func
 
-            # Normal case: visible primary (no slash in docs) + hidden twin (with slash)
+            # non-root unchanged
             self.add_api_route(
                 primary, func, methods=methods, include_in_schema=show_in_schema, **kwargs
             )

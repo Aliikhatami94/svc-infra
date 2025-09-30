@@ -375,7 +375,7 @@ init_cache(prefix="test", version="v1")
 ```python
 import logging
 
-# Enable cache debug logs
+# Enable cache debug.py logs
 logging.getLogger("svc_infra.cache").setLevel(logging.DEBUG)
 
 # Check what's in cache
