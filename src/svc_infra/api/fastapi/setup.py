@@ -14,27 +14,7 @@ from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_inde
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
 from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
-from svc_infra.api.fastapi.openapi.mutators import (
-    attach_standard_responses_mutator,
-    auth_mutator,
-    conventions_mutator,
-    drop_unused_components_mutator,
-    ensure_examples_for_json_mutator,
-    ensure_global_tags_mutator,
-    ensure_media_examples_mutator,
-    ensure_media_type_schemas_mutator,
-    ensure_operation_descriptions_mutator,
-    ensure_parameter_metadata_mutator,
-    ensure_request_body_descriptions_mutator,
-    ensure_response_descriptions_mutator,
-    improve_success_response_descriptions_mutator,
-    info_mutator,
-    normalize_no_content_204_mutator,
-    normalize_problem_and_examples_mutator,
-    prune_invalid_responses_keys_mutator,
-    servers_mutator,
-    strip_ref_siblings_in_responses_mutator,
-)
+from svc_infra.api.fastapi.openapi.mutators import setup_mutators
 from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
 from svc_infra.api.fastapi.routers import register_all_routers
 from svc_infra.app.env import CURRENT_ENVIRONMENT
@@ -127,27 +107,12 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         else f"{spec.public_base_url.rstrip('/')}{mount_path}"
     )
 
-    mutators = [
-        conventions_mutator(),
-        normalize_problem_and_examples_mutator(),
-        attach_standard_responses_mutator(),
-        auth_mutator(include_api_key),
-        strip_ref_siblings_in_responses_mutator(),
-        prune_invalid_responses_keys_mutator(),
-        ensure_operation_descriptions_mutator(),
-        ensure_request_body_descriptions_mutator(),
-        ensure_parameter_metadata_mutator(),
-        ensure_media_type_schemas_mutator(),
-        ensure_examples_for_json_mutator(),
-        normalize_no_content_204_mutator(),
-        ensure_response_descriptions_mutator(),
-        improve_success_response_descriptions_mutator(),
-        ensure_global_tags_mutator(),
-        drop_unused_components_mutator(),
-        info_mutator(service, spec),
-        ensure_media_examples_mutator(),
-        servers_mutator(server_url),
-    ]
+    mutators = setup_mutators(
+        service=service,
+        spec=spec,
+        include_api_key=include_api_key,
+        server_url=server_url,
+    )
     apply_mutators(child, *mutators)
 
     if spec.routers_package:
@@ -185,28 +150,12 @@ def _build_parent_app(
     parent.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(parent)
 
-    mutators = [
-        conventions_mutator(),
-        normalize_problem_and_examples_mutator(),
-        attach_standard_responses_mutator(),
-        auth_mutator(root_include_api_key),
-        strip_ref_siblings_in_responses_mutator(),
-        prune_invalid_responses_keys_mutator(),
-        ensure_operation_descriptions_mutator(),
-        ensure_request_body_descriptions_mutator(),
-        ensure_parameter_metadata_mutator(),
-        ensure_media_type_schemas_mutator(),
-        ensure_examples_for_json_mutator(),
-        normalize_no_content_204_mutator(),
-        ensure_response_descriptions_mutator(),
-        improve_success_response_descriptions_mutator(),
-        ensure_global_tags_mutator(),
-        drop_unused_components_mutator(),
-        info_mutator(service, None),
-        ensure_media_examples_mutator(),
-    ]
-    if root_server_url:
-        mutators.append(servers_mutator(root_server_url))
+    mutators = setup_mutators(
+        service=service,
+        spec=None,
+        include_api_key=root_include_api_key,
+        server_url=root_server_url,
+    )
     apply_mutators(parent, *mutators)
 
     # Root routers — svc-infra ping at '/', once

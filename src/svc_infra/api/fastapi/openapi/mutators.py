@@ -650,3 +650,35 @@ def improve_success_response_descriptions_mutator():
         return schema
 
     return m
+
+
+def setup_mutators(
+    service: ServiceInfo,
+    spec: APIVersionSpec | None,
+    include_api_key: bool = False,
+    server_url: str | None = None,
+) -> list:
+    mutators = [
+        conventions_mutator(),
+        normalize_problem_and_examples_mutator(),
+        attach_standard_responses_mutator(),
+        auth_mutator(include_api_key),
+        strip_ref_siblings_in_responses_mutator(),
+        prune_invalid_responses_keys_mutator(),
+        ensure_operation_descriptions_mutator(),
+        ensure_request_body_descriptions_mutator(),
+        ensure_parameter_metadata_mutator(),
+        ensure_media_type_schemas_mutator(),
+        ensure_examples_for_json_mutator(),
+        normalize_no_content_204_mutator(),
+        ensure_response_descriptions_mutator(),
+        improve_success_response_descriptions_mutator(),
+        ensure_global_tags_mutator(),
+        drop_unused_components_mutator(),
+        info_mutator(service, spec),
+        ensure_media_examples_mutator(),
+    ]
+    if server_url:
+        mutators.append(servers_mutator(server_url))
+
+    return mutators
