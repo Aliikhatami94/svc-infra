@@ -264,12 +264,9 @@ def ensure_global_tags_mutator(default_desc: str = "Operations related to {tag}.
 def attach_standard_responses_mutator(
     codes: Dict[int, str] | None = None,
     per_method: Dict[str, Iterable[int]] | None = None,
+    exclude_tags: set[str] | None = None,
+    op_flag_disable: str = "x_disable_standard_responses",
 ):
-    """
-    Attach reusable responses by $ref if missing.
-    per_method lets you restrict which statuses apply to which HTTP methods.
-    """
-    # defaults: broadly useful, but you can narrow with per_method
     codes = codes or {
         400: "BadRequest",
         401: "Unauthorized",
@@ -281,18 +278,24 @@ def attach_standard_responses_mutator(
         500: "ServerError",
     }
     per_method = per_method or {}
+    exclude_tags = exclude_tags or set()
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
         for _, method, op in _iter_ops(schema):
+            if op.get(op_flag_disable) is True:
+                continue
+            if any(t in exclude_tags for t in (op.get("tags") or [])):
+                continue
+
+            allow = set(per_method.get(method.upper(), codes.keys()))
             responses = op.setdefault("responses", {})
-            method_allow = set(per_method.get(method.upper(), codes.keys()))
             for status, ref_name in codes.items():
-                if status not in method_allow:
+                if status not in allow:
                     continue
-                key = str(status)
-                if key not in responses:
-                    responses[key] = {"$ref": f"#/components/responses/{ref_name}"}
+                k = str(status)
+                if k not in responses:
+                    responses[k] = {"$ref": f"#/components/responses/{ref_name}"}
         return schema
 
     return m
@@ -503,55 +506,49 @@ def strip_ref_siblings_in_responses_mutator():
 
 def ensure_examples_for_json_mutator(example_by_type=None):
     example_by_type = example_by_type or {
-        "object": {},
-        "array": [],
         "string": "string",
         "integer": 0,
         "number": 0,
         "boolean": True,
     }
 
-    def _infer_example(schema: dict):
-        if not isinstance(schema, dict):
-            return {}
-        t = schema.get("type")
+    def _infer_example(sch: dict):
+        if not isinstance(sch, dict):
+            return None
+        t = sch.get("type")
         if t in example_by_type:
             return example_by_type[t]
-        if "$ref" in schema or "properties" in schema or "additionalProperties" in schema:
-            return {}
-        return {}
+        if t == "array":
+            item = sch.get("items") or {}
+            ex = _infer_example(item)
+            return [] if ex is None else [ex]
+        # for object/$ref/unknown → don’t auto-example
+        return None
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
         for _, _, op in _iter_ops(schema):
-            # responses
             resps = op.get("responses") or {}
-            for resp in resps.values():
+            for code, resp in resps.items():
                 if not isinstance(resp, dict):
                     continue
+                try:
+                    ic = int(code)
+                except Exception:
+                    continue
+                # Only touch 2xx, not 204, and only application/json
+                if not (200 <= ic < 300) or ic == 204:
+                    continue
                 content = resp.get("content") or {}
-                for mt, mt_obj in content.items():
-                    if not isinstance(mt_obj, dict) or not mt.startswith("application/"):
-                        continue
-                    if "example" in mt_obj or "examples" in mt_obj:
-                        continue
-                    sch = mt_obj.get("schema") or {}
-                    ex = _infer_example(sch)
-                    if ex != {}:
-                        mt_obj["example"] = ex
-            # request bodies
-            rb = op.get("requestBody")
-            if isinstance(rb, dict):
-                content = rb.get("content") or {}
-                for mt, mt_obj in content.items():
-                    if not isinstance(mt_obj, dict) or not mt.startswith("application/"):
-                        continue
-                    if "example" in mt_obj or "examples" in mt_obj:
-                        continue
-                    sch = mt_obj.get("schema") or {}
-                    ex = _infer_example(sch)
-                    if ex != {}:
-                        mt_obj["example"] = ex
+                mt_obj = content.get("application/json")
+                if not isinstance(mt_obj, dict):
+                    continue
+                if "example" in mt_obj or "examples" in mt_obj:
+                    continue
+                sch = mt_obj.get("schema") or {}
+                ex = _infer_example(sch)
+                if ex is not None:
+                    mt_obj["example"] = ex
         return schema
 
     return m
