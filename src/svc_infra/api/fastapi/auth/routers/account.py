@@ -3,7 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Query
 
 from svc_infra.api.fastapi.auth.mfa.models import DisableAccountIn
-from svc_infra.api.fastapi.auth.mfa.security import Identity, RequireMFAIfEnabled
+from svc_infra.api.fastapi.auth.mfa.security import RequireMFAIfEnabled
+from svc_infra.api.fastapi.auth.security import Identity
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.protected import user_router
 
