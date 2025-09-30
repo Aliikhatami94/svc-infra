@@ -54,4 +54,8 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
         await sess.commit()
         return
 
+    @r.get("/_whoami")
+    async def whoami(p: Identity):
+        return {"user_id": str(p.user.id), "via": p.via, "scopes": p.scopes}
+
     return r
