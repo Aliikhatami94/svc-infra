@@ -23,10 +23,8 @@ def RequireMFAIfEnabled(body_field: str = "mfa"):
             else None
         )
 
-        # Only force MFA if it's actually enabled for this user
-        enabled = bool(getattr(p.user, "mfa_enabled", False))
-        if not enabled:
-            return p  # no MFA required
+        if not getattr(p.user, "mfa_enabled", False):
+            return p
 
         res = await verify_mfa_for_user(
             user=p.user,
@@ -36,7 +34,7 @@ def RequireMFAIfEnabled(body_field: str = "mfa"):
         )
         if not res.ok:
             raise HTTPException(400, "Invalid code")
-
         return p
 
+    return Depends(_dep)
     return Depends(_dep)
