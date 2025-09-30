@@ -32,7 +32,9 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
         return {"ok": True, "status": "disabled"}
 
     @r.delete(
-        "", status_code=204, description="Delete account (soft by default, hard if specified)"
+        "/delete",
+        status_code=204,
+        description="Delete account (soft by default, hard if specified)",
     )
     async def delete_account(
         sess: SqlSessionDep,
