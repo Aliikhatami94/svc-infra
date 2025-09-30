@@ -42,6 +42,7 @@ def make_crud_router_plus_sql(
         prefix=router_prefix,
         tags=tags or [prefix.strip("/")],
         redirect_slashes=False,
+        description=f"CRUD endpoints for {model.__name__} model",
     )
 
     def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:

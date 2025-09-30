@@ -183,41 +183,22 @@ def _process_router_module(
     environment: Environment,
     force_include: bool,
 ) -> bool:
-    """Process a single router module. Returns True if router was included, False if skipped."""
-    if not _is_router_included_by_environment(module, environment, module_name):
-        return False
-
     router = getattr(module, "router", None)
     if router is None:
         return False
 
-    # Check for environment exclusions
     if _is_router_excluded_by_environment(module, environment, module_name):
         return False
-
-    # Check for never-in-schema opt-out
+    if not _is_router_included_by_environment(module, environment, module_name):
+        return False
     if _should_never_include_in_schema(module):
         return False
 
-    # Derive default docs for this module
-    default_summary, default_description = _derive_docs_from_module(module)
-
-    # Pre-fill missing per-route summaries/descriptions
-    _apply_default_docs_to_routes(router, default_summary, default_description)
-
-    # Build include kwargs
-    include_kwargs = _build_include_kwargs(module, prefix, force_include)
-
-    # Include the router
-    app.include_router(router, **include_kwargs)
-    logger.debug(
-        "Included router from module: %s (prefix=%s, tag=%s, include_in_schema=%s)",
-        module_name,
-        include_kwargs.get("prefix"),
-        include_kwargs.get("tags", [None])[0] if include_kwargs.get("tags") else None,
-        include_kwargs.get("include_in_schema"),
+    app.include_router(
+        router,
+        prefix=prefix,
+        include_in_schema=True if force_include else router.include_in_schema,
     )
-
     return True
 
 
