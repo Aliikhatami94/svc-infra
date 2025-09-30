@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Dict, Iterable, Iterator, Tuple
 
 from .models import APIVersionSpec, ServiceInfo, VersionInfo
@@ -556,42 +557,51 @@ def ensure_examples_for_json_mutator(example_by_type=None):
 
 def ensure_media_examples_mutator():
     """
-    If a media-type object has a schema but neither 'example' nor 'examples',
-    attach a minimal 'example' derived from the schema shape.
+    Add minimal examples only when they are guaranteed valid:
+    - primitives: string/integer/number/boolean
+    - arrays: []
+    Never add examples for object/$ref schemas (they usually have required fields).
+    Skip application/problem+json entirely.
     """
 
-    def _minimal_example(sch: dict) -> object:
+    PRIMITIVE_EX = {"string": "", "integer": 0, "number": 0, "boolean": False}
+
+    def _should_skip_media_type(mt: str) -> bool:
+        # don't touch problem+json (examples live in components.responses)
+        return mt == "application/problem+json"
+
+    def _minimal_example(sch: dict):
         if not isinstance(sch, dict):
-            return {}
+            return None
+        if "$ref" in sch:
+            return None
         t = sch.get("type")
+        # object-ish → skip (likely has required/properties)
+        if t == "object" or "properties" in sch or "required" in sch:
+            return None
         if t == "array":
+            # [] is always schema-valid regardless of items' required
             return []
-        if t == "string":
-            return ""
-        if t == "integer":
-            return 0
-        if t == "number":
-            return 0
-        if t == "boolean":
-            return False
-        # If it's an object or $ref or unknown -> {}
-        return {}
+        if t in PRIMITIVE_EX:
+            return PRIMITIVE_EX[t]
+        return None
+
+    def patch_content(node: dict):
+        content = node.get("content")
+        if not isinstance(content, dict):
+            return
+        for mt, mt_obj in content.items():
+            if not isinstance(mt_obj, dict) or _should_skip_media_type(mt):
+                continue
+            if "example" in mt_obj or "examples" in mt_obj:
+                continue
+            sch = mt_obj.get("schema")
+            ex = _minimal_example(sch if isinstance(sch, dict) else {})
+            if ex is not None:
+                mt_obj["example"] = ex
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
-
-        def patch_content(node: dict):
-            content = node.get("content")
-            if not isinstance(content, dict):
-                return
-            for mt, mt_obj in content.items():
-                if not isinstance(mt_obj, dict):
-                    continue
-                if "example" in mt_obj or "examples" in mt_obj:
-                    continue
-                sch = mt_obj.get("schema")
-                if isinstance(sch, dict):
-                    mt_obj["example"] = _minimal_example(sch)
 
         # responses
         for _, _, op in _iter_ops(schema):
@@ -601,7 +611,7 @@ def ensure_media_examples_mutator():
                     if isinstance(resp, dict):
                         patch_content(resp)
 
-            # request bodies (some “API doctors” also check these)
+            # request bodies
             rb = op.get("requestBody")
             if isinstance(rb, dict):
                 patch_content(rb)
@@ -649,6 +659,97 @@ def improve_success_response_descriptions_mutator():
     return m
 
 
+def scrub_invalid_object_examples_mutator():
+    """
+    If a media example is an object but schema has required fields and the example
+    is {} (or not a dict), remove the example so the validator won't fail.
+    """
+
+    def patch_content(node: dict):
+        content = node.get("content")
+        if not isinstance(content, dict):
+            return
+        for mt_obj in content.values():
+            if not isinstance(mt_obj, dict):
+                continue
+            if "example" not in mt_obj:
+                continue
+            sch = mt_obj.get("schema")
+            ex = mt_obj.get("example")
+            if not isinstance(sch, dict):
+                continue
+            # Follow $ref if you want; simplest is: only act on obvious object cases.
+            if (
+                sch.get("type") == "object"
+                or "properties" in sch
+                or "required" in sch
+                or "$ref" in sch
+            ):
+                if not isinstance(ex, dict) or ex == {}:
+                    mt_obj.pop("example", None)
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            resps = op.get("responses")
+            if isinstance(resps, dict):
+                for resp in resps.values():
+                    if isinstance(resp, dict):
+                        patch_content(resp)
+            rb = op.get("requestBody")
+            if isinstance(rb, dict):
+                patch_content(rb)
+        return schema
+
+    return m
+
+
+def drop_unused_components_mutator_auto(keep_schemas: set[str] | None = None):
+    keep_schemas = set(keep_schemas or {"Problem"})
+    REF_RE = re.compile(
+        r"#/components/(?P<section>schemas|responses|parameters|headers|requestBodies|securitySchemes|links|callbacks)/(?P<name>[^/\s]+)"
+    )
+
+    def collect_refs(node, out: dict[str, set[str]]):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k == "$ref" and isinstance(v, str):
+                    m = REF_RE.match(v)
+                    if m:
+                        out.setdefault(m.group("section"), set()).add(m.group("name"))
+                else:
+                    collect_refs(v, out)
+        elif isinstance(node, list):
+            for v in node:
+                collect_refs(v, out)
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        comps = schema.get("components") or {}
+        used: dict[str, set[str]] = {}
+        collect_refs(schema, used)
+
+        # schemas
+        sch = comps.get("schemas") or {}
+        to_drop = [
+            name
+            for name in sch.keys()
+            if name not in keep_schemas and name not in (used.get("schemas") or set())
+        ]
+        for name in to_drop:
+            sch.pop(name, None)
+
+        # responses (optional; usually all are used)
+        resps = comps.get("responses") or {}
+        to_drop_r = [name for name in resps.keys() if name not in (used.get("responses") or set())]
+        for name in to_drop_r:
+            resps.pop(name, None)
+
+        return schema
+
+    return m
+
+
 def setup_mutators(
     service: ServiceInfo,
     spec: APIVersionSpec | None,
@@ -667,13 +768,14 @@ def setup_mutators(
         ensure_parameter_metadata_mutator(),
         ensure_media_type_schemas_mutator(),
         ensure_examples_for_json_mutator(),
+        ensure_media_examples_mutator(),
+        scrub_invalid_object_examples_mutator(),
         normalize_no_content_204_mutator(),
         ensure_response_descriptions_mutator(),
         improve_success_response_descriptions_mutator(),
         ensure_global_tags_mutator(),
-        drop_unused_components_mutator(),
+        drop_unused_components_mutator_auto(),  # prefer this
         info_mutator(service, spec),
-        ensure_media_examples_mutator(),
     ]
     if server_url:
         mutators.append(servers_mutator(server_url))
