@@ -37,11 +37,11 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
         "",
         status_code=204,
         dependencies=[RequireMFAIfEnabled()],
-        description="Delete account (soft delete by default, use hard=true for permanent delete)",
+        description="Delete account ...",
     )
     async def delete_account(
         sess: SqlSessionDep,
-        p,
+        p: Identity,
         hard: bool = Query(False, description="Hard delete if true"),
     ):
         user = p.user
