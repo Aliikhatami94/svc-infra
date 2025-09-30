@@ -22,19 +22,13 @@ def RequireMFAIfEnabled(body_field: str = "mfa"):
             if (mfa_code or mfa_pre_token)
             else None
         )
-
         if not getattr(p.user, "mfa_enabled", False):
             return p
-
         res = await verify_mfa_for_user(
-            user=p.user,
-            session=sess,
-            proof=proof,
-            require_enabled=True,
+            user=p.user, session=sess, proof=proof, require_enabled=True
         )
         if not res.ok:
             raise HTTPException(400, "Invalid code")
         return p
 
-    return Depends(_dep)
     return Depends(_dep)

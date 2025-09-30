@@ -19,12 +19,12 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
     @r.patch(
         "/status",
         response_model=dict,
-        dependencies=[RequireMFAIfEnabled()],
         description="Get account status (active/disabled)",
     )
     async def disable_account(
         sess: SqlSessionDep,
         p: Identity,
+        _mfa=RequireMFAIfEnabled(),
         payload: DisableAccountIn = Body(..., description="reason + mfa (if enabled)"),
     ):
         user = p.user
@@ -36,22 +36,22 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
     @r.delete(
         "",
         status_code=204,
-        dependencies=[RequireMFAIfEnabled()],
         description="Delete account ...",
     )
     async def delete_account(
         sess: SqlSessionDep,
         p: Identity,
+        _mfa=RequireMFAIfEnabled(),
         hard: bool = Query(False, description="Hard delete if true"),
     ):
         user = p.user
         if hard:
             await sess.delete(user)
             await sess.commit()
-            return  # 204
+            return
         user.is_active = False
         user.disabled_reason = "user_soft_deleted"
         await sess.commit()
-        return  # 204
+        return
 
     return r
