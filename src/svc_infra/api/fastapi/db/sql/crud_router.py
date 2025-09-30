@@ -57,7 +57,11 @@ def make_crud_router_plus_sql(
         return fields
 
     # -------- LIST --------
-    @router.get("", response_model=cast(Any, Page[read_schema]))
+    @router.get(
+        "",
+        response_model=cast(Any, Page[read_schema]),
+        description=f"List items of type {model.__name__}",
+    )
     async def list_items(
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
@@ -86,7 +90,11 @@ def make_crud_router_plus_sql(
         )
 
     # -------- GET by id --------
-    @router.get("/{item_id}", response_model=cast(Any, read_schema))
+    @router.get(
+        "/{item_id}",
+        response_model=cast(Any, read_schema),
+        description=f"Get item of type {model.__name__}",
+    )
     async def get_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
         row = await service.get(session, item_id)
         if not row:
@@ -94,7 +102,12 @@ def make_crud_router_plus_sql(
         return row
 
     # -------- CREATE --------
-    @router.post("", response_model=cast(Any, read_schema), status_code=201)
+    @router.post(
+        "",
+        response_model=cast(Any, read_schema),
+        status_code=201,
+        description=f"Create item of type {model.__name__}",
+    )
     async def create_item(
         session: SqlSessionDep,  # type: ignore[name-defined]
         payload: create_schema = Body(...),
@@ -103,7 +116,11 @@ def make_crud_router_plus_sql(
         return await service.create(session, data)
 
     # -------- UPDATE --------
-    @router.patch("/{item_id}", response_model=cast(Any, read_schema))
+    @router.patch(
+        "/{item_id}",
+        response_model=cast(Any, read_schema),
+        description=f"Update item of type {model.__name__}",
+    )
     async def update_item(
         item_id: Any,
         session: SqlSessionDep,  # type: ignore[name-defined]
@@ -116,7 +133,9 @@ def make_crud_router_plus_sql(
         return row
 
     # -------- DELETE --------
-    @router.delete("/{item_id}", status_code=204)
+    @router.delete(
+        "/{item_id}", status_code=204, description=f"Delete item of type {model.__name__}"
+    )
     async def delete_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
         ok = await service.delete(session, item_id)
         if not ok:

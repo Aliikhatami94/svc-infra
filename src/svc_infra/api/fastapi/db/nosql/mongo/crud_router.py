@@ -54,7 +54,11 @@ def make_crud_router_plus_mongo(
     )
 
     # LIST
-    @router.get("", response_model=cast(Any, Page[read_schema]))
+    @router.get(
+        "",
+        response_model=cast(Any, Page[read_schema]),
+        description=f"List items in {prefix} collection",
+    )
     async def list_items(
         db: DBDep,
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
@@ -75,7 +79,11 @@ def make_crud_router_plus_mongo(
         )
 
     # GET by id
-    @router.get("/{item_id}", response_model=cast(Any, read_schema))
+    @router.get(
+        "/{item_id}",
+        response_model=cast(Any, read_schema),
+        description=f"Get item from {prefix} collection",
+    )
     async def get_item(db: DBDep, item_id: Any):
         row = await service.get(db, item_id)
         if not row:
@@ -83,13 +91,22 @@ def make_crud_router_plus_mongo(
         return row
 
     # CREATE
-    @router.post("", response_model=cast(Any, read_schema), status_code=201)
+    @router.post(
+        "",
+        response_model=cast(Any, read_schema),
+        status_code=201,
+        description=f"Create item in {prefix} collection",
+    )
     async def create_item(db: DBDep, payload: create_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
         return await service.create(db, data)
 
     # UPDATE
-    @router.patch("/{item_id}", response_model=cast(Any, read_schema))
+    @router.patch(
+        "/{item_id}",
+        response_model=cast(Any, read_schema),
+        description=f"Update item in {prefix} collection",
+    )
     async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):
         data = payload.model_dump(exclude_unset=True)
         row = await service.update(db, item_id, data)
@@ -98,7 +115,11 @@ def make_crud_router_plus_mongo(
         return row
 
     # DELETE
-    @router.delete("/{item_id}", status_code=204)
+    @router.delete(
+        "/{item_id}",
+        status_code=204,
+        description=f"Delete item from {prefix} collection",
+    )
     async def delete_item(db: DBDep, item_id: Any):
         ok = await service.delete(db, item_id)
         if not ok:

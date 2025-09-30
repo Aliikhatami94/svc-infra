@@ -318,6 +318,8 @@ def ensure_response_descriptions_mutator():
             for code, resp in list(resps.items()):
                 if not isinstance(resp, dict):
                     continue
+                if "$ref" in resp:
+                    continue
                 desc = resp.get("description")
                 if not isinstance(desc, str) or not desc.strip():
                     # sensible defaults by class
@@ -465,6 +467,35 @@ def prune_invalid_responses_keys_mutator():
                     continue
                 # stray keys like 'description' under responses -> drop
                 resps.pop(k, None)
+        return schema
+
+    return m
+
+
+def strip_ref_siblings_in_responses_mutator():
+    """
+    If a response object uses $ref, remove all sibling keys (description, content, etc.).
+    Keeps the spec clean and avoids 'description-duplication' warnings.
+    """
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        paths = schema.get("paths") or {}
+        for path_item in paths.values():
+            if not isinstance(path_item, dict):
+                continue
+            for op in path_item.values():
+                if not isinstance(op, dict):
+                    continue
+                resps = op.get("responses")
+                if not isinstance(resps, dict):
+                    continue
+                for code, resp in list(resps.items()):
+                    if isinstance(resp, dict) and "$ref" in resp:
+                        ref = resp["$ref"]
+                        # Replace in-place to keep the same dict object
+                        resp.clear()
+                        resp["$ref"] = ref
         return schema
 
     return m

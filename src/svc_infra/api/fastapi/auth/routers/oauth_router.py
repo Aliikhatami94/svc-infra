@@ -540,7 +540,10 @@ def _create_oauth_router(
 
     router = public_router(prefix=prefix, tags=["auth:oauth"])
 
-    @router.get("/{provider}/login")
+    @router.get(
+        "/{provider}/login",
+        description="Login with OAuth provider",
+    )
     async def oauth_login(request: Request, provider: str):
         """Initiate OAuth login flow."""
         client = oauth.create_client(provider)
@@ -574,6 +577,7 @@ def _create_oauth_router(
         "/{provider}/callback",
         name="oauth_callback",
         responses={302: {"description": "Redirect to app (or MFA redirect)."}},
+        description="OAuth callback endpoint.",
     )
     async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
         """Handle OAuth callback and complete authentication."""
@@ -655,6 +659,7 @@ def _create_oauth_router(
         "/refresh",
         status_code=status.HTTP_204_NO_CONTENT,
         responses={204: {"description": "Cookie refreshed"}},
+        description="Refresh authentication token.",
     )
     async def refresh(request: Request, session: SqlSessionDep):
         """Refresh authentication token."""

@@ -8,6 +8,7 @@ from svc_infra.api.fastapi.dual.public import public_router
 
 router = public_router()
 ROUTER_TAG = "health"
+DESCRIPTION = "Operation to check if the service is up and running."
 
 
 @router.get("/ping", status_code=status.HTTP_200_OK)

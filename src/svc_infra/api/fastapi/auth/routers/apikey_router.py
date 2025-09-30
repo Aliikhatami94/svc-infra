@@ -46,9 +46,8 @@ def apikey_router(prefix: str = "/auth/keys"):
         "",
         response_model=ApiKeyOut,
         status_code=201,
-        responses={
-            409: CONFLICT,  # if you ever raise conflict in this handler later
-        },
+        responses={409: CONFLICT},
+        description="Create a new API key. The plaintext key is shown only once, at creation time.",
     )
     async def create_key(sess: SqlSessionDep, payload: ApiKeyCreateIn, p: Identity):
         caller_id: UUID = getattr(p.user, "id")
@@ -87,7 +86,11 @@ def apikey_router(prefix: str = "/auth/keys"):
             last_used_at=row.last_used_at,
         )
 
-    @r.get("", response_model=list[ApiKeyOut])
+    @r.get(
+        "",
+        response_model=list[ApiKeyOut],
+        description="List API keys. Non-superusers see only their own keys.",
+    )
     async def list_keys(sess: SqlSessionDep, p: Identity):
         q = select(ApiKey)
         if not getattr(p.user, "is_superuser", False):
@@ -108,7 +111,12 @@ def apikey_router(prefix: str = "/auth/keys"):
             for x in rows
         ]
 
-    @r.post("/{key_id}/revoke", status_code=204, responses={404: NOT_FOUND})
+    @r.post(
+        "/{key_id}/revoke",
+        status_code=204,
+        responses={404: NOT_FOUND},
+        description="Revoke an API key",
+    )
     async def revoke_key(key_id: str, sess: SqlSessionDep, p: Identity):
         row = await sess.get(ApiKey, key_id)
         if not row:
@@ -122,7 +130,12 @@ def apikey_router(prefix: str = "/auth/keys"):
         await sess.commit()
         return  # 204
 
-    @r.delete("/{key_id}", status_code=204, responses={404: NOT_FOUND})
+    @r.delete(
+        "/{key_id}",
+        status_code=204,
+        responses={404: NOT_FOUND},
+        description="Delete an API key. If the key is active, you must first revoke it or pass force=true.",
+    )
     async def delete_key(
         key_id: str,
         sess: SqlSessionDep,

@@ -10,12 +10,16 @@ from svc_infra.api.fastapi.dual.protected import user_router
 
 # ---------- Router ----------
 def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter:
-    r = user_router(prefix=f"{auth_prefix}/account", tags=["auth:account"])
+    r = user_router(
+        prefix=f"{auth_prefix}/account",
+        tags=["auth:account"],
+    )
 
     @r.patch(
         "/status",
         response_model=dict,
-        dependencies=[RequireMFAIfEnabled()],  # reads payload.mfa (or ?mfa_code=)
+        dependencies=[RequireMFAIfEnabled()],
+        description="Get account status (active/disabled)",
     )
     async def disable_account(
         sess: SqlSessionDep,
@@ -31,7 +35,8 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
     @r.delete(
         "",
         status_code=204,
-        dependencies=[RequireMFAIfEnabled()],  # reads body.mfa or ?mfa_code=&mfa_pre_token=
+        dependencies=[RequireMFAIfEnabled()],
+        description="Delete account (soft delete by default, use hard=true for permanent delete)",
     )
     async def delete_account(
         sess: SqlSessionDep,

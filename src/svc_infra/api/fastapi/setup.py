@@ -31,6 +31,7 @@ from svc_infra.api.fastapi.openapi.mutators import (
     normalize_problem_and_examples_mutator,
     prune_invalid_responses_keys_mutator,
     servers_mutator,
+    strip_ref_siblings_in_responses_mutator,
 )
 from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
 from svc_infra.api.fastapi.routers import register_all_routers
@@ -203,6 +204,7 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         ensure_parameter_metadata_mutator(),
         normalize_no_content_204_mutator(),
         prune_invalid_responses_keys_mutator(),
+        strip_ref_siblings_in_responses_mutator(),
     ]
     apply_mutators(child, *mutators)
 
@@ -256,6 +258,7 @@ def _build_parent_app(
         ensure_parameter_metadata_mutator(),
         normalize_no_content_204_mutator(),
         prune_invalid_responses_keys_mutator(),
+        strip_ref_siblings_in_responses_mutator(),
     ]
     if root_server_url:
         mutators.append(servers_mutator(root_server_url))

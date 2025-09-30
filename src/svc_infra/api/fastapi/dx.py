@@ -28,21 +28,20 @@ Usage:
     )
 """
 
-from svc_infra.api.fastapi.auth.account import account_router
-
 # ----------------
 # Auth bootstrap / config
 # ----------------
 from svc_infra.api.fastapi.auth.add import add_auth
+from svc_infra.api.fastapi.auth.mfa.router import mfa_router
+from svc_infra.api.fastapi.auth.mfa.security import RequireMFAIfEnabled
+from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
+from svc_infra.api.fastapi.auth.routers.account import account_router
 
 # ----------------
 # Turnkey feature routers (opt-in)
 # ----------------
-from svc_infra.api.fastapi.auth.apikey_router import apikey_router
-from svc_infra.api.fastapi.auth.mfa.router import mfa_router
-from svc_infra.api.fastapi.auth.mfa.security import RequireMFAIfEnabled
-from svc_infra.api.fastapi.auth.oauth_router import oauth_router_with_backend
-from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
+from svc_infra.api.fastapi.auth.routers.apikey_router import apikey_router
+from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_backend
 
 # ----------------
 # Identity primitives (endpoint params + router-level deps + guard factories)

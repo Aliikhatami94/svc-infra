@@ -8,14 +8,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from svc_infra.api.fastapi.auth.gaurd import auth_session_router, login_client_guard
 from svc_infra.api.fastapi.auth.mfa.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.mfa.router import mfa_router
+from svc_infra.api.fastapi.auth.routers.account import account_router
+from svc_infra.api.fastapi.auth.routers.apikey_router import apikey_router
+from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_backend
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
 
 from .. import Require
-from .account import account_router
-from .apikey_router import apikey_router
-from .oauth_router import oauth_router_with_backend
 from .policy import AuthPolicy, DefaultAuthPolicy
 from .providers import providers_from_settings
 from .settings import get_auth_settings
