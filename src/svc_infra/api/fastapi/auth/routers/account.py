@@ -3,7 +3,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Query
 
 from svc_infra.api.fastapi.auth.mfa.models import DisableAccountIn
-from svc_infra.api.fastapi.auth.mfa.security import RequireMFAIfEnabled
 from svc_infra.api.fastapi.auth.security import Identity
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.protected import user_router
@@ -24,7 +23,6 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
     async def disable_account(
         sess: SqlSessionDep,
         p: Identity,
-        _mfa=RequireMFAIfEnabled(),
         payload: DisableAccountIn = Body(..., description="reason + mfa (if enabled)"),
     ):
         user = p.user
@@ -34,14 +32,11 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
         return {"ok": True, "status": "disabled"}
 
     @r.delete(
-        "",
-        status_code=204,
-        description="Delete account ...",
+        "", status_code=204, description="Delete account (soft by default, hard if specified)"
     )
     async def delete_account(
         sess: SqlSessionDep,
         p: Identity,
-        _mfa=RequireMFAIfEnabled(),
         hard: bool = Query(False, description="Hard delete if true"),
     ):
         user = p.user
@@ -53,9 +48,5 @@ def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter
         user.disabled_reason = "user_soft_deleted"
         await sess.commit()
         return
-
-    @r.get("/_whoami")
-    async def whoami(p: Identity):
-        return {"user_id": str(p.user.id), "via": p.via, "scopes": p.scopes}
 
     return r
