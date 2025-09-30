@@ -4,12 +4,10 @@ from typing import Dict, Iterable, Iterator, Tuple
 
 from .models import APIVersionSpec, ServiceInfo, VersionInfo
 
-# ------- small shared helpers -------
-
 _HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
 
 
-def _iter_operations(schema: dict) -> Iterator[Tuple[str, str, dict]]:
+def _iter_ops(schema: dict) -> Iterator[Tuple[str, str, dict]]:
     """Yield (path, method, op) for each operation object."""
     paths = schema.get("paths") or {}
     for path, methods in paths.items():
@@ -18,6 +16,13 @@ def _iter_operations(schema: dict) -> Iterator[Tuple[str, str, dict]]:
         for method, op in methods.items():
             if method.lower() in _HTTP_METHODS and isinstance(op, dict):
                 yield path, method.lower(), op
+
+
+def _ensure_schema(node: dict, default: dict | None = None):
+    default = default or {"type": "object", "additionalProperties": True}
+    sch = node.get("schema")
+    if not isinstance(sch, dict) or not sch:
+        node["schema"] = dict(default)
 
 
 # ------- conventions / seeds -------
@@ -38,9 +43,6 @@ def conventions_mutator():
         return schema
 
     return m
-
-
-#  ----- problem+json / RFC 7807 -------
 
 
 def normalize_problem_and_examples_mutator():
@@ -118,9 +120,6 @@ def normalize_problem_and_examples_mutator():
     return m
 
 
-# ------- auth / security -------
-
-
 def auth_mutator(include_api_key: bool):
     def _normalize_security_list(sec: list | None, drop: set[str]) -> list:
         if not sec:
@@ -165,15 +164,12 @@ def auth_mutator(include_api_key: bool):
             )
 
         drop = {"SessionCookie"}
-        for _, _, op in _iter_operations(schema):
+        for _, _, op in _iter_ops(schema):
             op["security"] = _normalize_security_list(op.get("security"), drop)
 
         return schema
 
     return _m
-
-
-# ------- info layering -------
 
 
 def info_mutator(base: ServiceInfo, spec: APIVersionSpec | None):
@@ -210,9 +206,6 @@ def info_mutator(base: ServiceInfo, spec: APIVersionSpec | None):
     return m
 
 
-# ------- servers -------
-
-
 def servers_mutator(url: str):
     def m(schema: dict) -> dict:
         schema = dict(schema)
@@ -222,13 +215,10 @@ def servers_mutator(url: str):
     return m
 
 
-# ------- spectral helpers -------
-
-
 def ensure_operation_descriptions_mutator(template: str = "{method} {path}."):
     def m(schema: dict) -> dict:
         schema = dict(schema)
-        for path, method, op in _iter_operations(schema):
+        for path, method, op in _iter_ops(schema):
             desc = op.get("description")
             if not isinstance(desc, str) or not desc.strip():
                 op["description"] = template.format(method=method.upper(), path=path)
@@ -241,7 +231,7 @@ def ensure_global_tags_mutator(default_desc: str = "Operations related to {tag}.
     def m(schema: dict) -> dict:
         schema = dict(schema)
         used: set[str] = set()
-        for _, _, op in _iter_operations(schema):
+        for _, _, op in _iter_ops(schema):
             for t in op.get("tags") or []:
                 if isinstance(t, str):
                     used.add(t)
@@ -282,7 +272,7 @@ def attach_standard_responses_mutator(
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
-        for _, method, op in _iter_operations(schema):
+        for _, method, op in _iter_ops(schema):
             responses = op.setdefault("responses", {})
             method_allow = set(per_method.get(method.upper(), codes.keys()))
             for status, ref_name in codes.items():
@@ -294,9 +284,6 @@ def attach_standard_responses_mutator(
         return schema
 
     return m
-
-
-# ------- pruning -------
 
 
 def drop_unused_components_mutator(
@@ -314,6 +301,170 @@ def drop_unused_components_mutator(
         if drop_schemas and "schemas" in comps:
             for k in drop_schemas:
                 comps["schemas"].pop(k, None)
+        return schema
+
+    return m
+
+
+def ensure_response_descriptions_mutator():
+    """Ensure every response has a non-empty description."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            resps = op.get("responses")
+            if not isinstance(resps, dict):
+                continue
+            for code, resp in list(resps.items()):
+                if not isinstance(resp, dict):
+                    continue
+                desc = resp.get("description")
+                if not isinstance(desc, str) or not desc.strip():
+                    # sensible defaults by class
+                    try:
+                        ic = int(code) if code != "default" else 200
+                    except Exception:
+                        ic = 200
+                    if 200 <= ic < 300:
+                        resp["description"] = "Successful response"
+                    elif ic == 204:
+                        resp["description"] = "No Content"
+                    elif ic == 400:
+                        resp["description"] = "Bad Request"
+                    elif ic == 401:
+                        resp["description"] = "Unauthorized"
+                    elif ic == 403:
+                        resp["description"] = "Forbidden"
+                    elif ic == 404:
+                        resp["description"] = "Not Found"
+                    elif ic == 409:
+                        resp["description"] = "Conflict"
+                    elif ic == 422:
+                        resp["description"] = "Unprocessable Entity"
+                    elif ic == 429:
+                        resp["description"] = "Too Many Requests"
+                    elif 500 <= ic < 600:
+                        resp["description"] = "Internal Server Error"
+                    else:
+                        resp["description"] = f"HTTP {code}"
+        return schema
+
+    return m
+
+
+def ensure_media_type_schemas_mutator():
+    """Make sure every content media type has a non-empty schema."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            # responses
+            resps = op.get("responses")
+            if isinstance(resps, dict):
+                for resp in resps.values():
+                    if not isinstance(resp, dict):
+                        continue
+                    content = resp.get("content")
+                    if isinstance(content, dict):
+                        for mt, mt_obj in content.items():
+                            if isinstance(mt_obj, dict):
+                                _ensure_schema(mt_obj)
+            # requestBody
+            rb = op.get("requestBody")
+            if isinstance(rb, dict):
+                content = rb.get("content")
+                if isinstance(content, dict):
+                    for mt, mt_obj in content.items():
+                        if isinstance(mt_obj, dict):
+                            _ensure_schema(mt_obj)
+            # no special casing of text/plain etc.; adjust if needed
+        return schema
+
+    return m
+
+
+# ---------- 3) Request body descriptions ----------
+def ensure_request_body_descriptions_mutator(default_template="Request body for {method} {path}."):
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for path, method, op in _iter_ops(schema):
+            rb = op.get("requestBody")
+            if isinstance(rb, dict):
+                desc = rb.get("description")
+                if not isinstance(desc, str) or not desc.strip():
+                    rb["description"] = default_template.format(method=method.upper(), path=path)
+        return schema
+
+    return m
+
+
+def ensure_parameter_metadata_mutator(param_desc_template="{name} parameter."):
+    """Add missing descriptions; enforce required for path params; ensure schema exists."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for path, _, op in _iter_ops(schema):
+            params = op.get("parameters")
+            if not isinstance(params, list):
+                continue
+            for p in params:
+                if not isinstance(p, dict):
+                    continue
+                name = p.get("name", "")
+                where = p.get("in", "")
+                # description
+                desc = p.get("description")
+                if not isinstance(desc, str) or not desc.strip():
+                    p["description"] = param_desc_template.format(name=name)
+                # required for path params
+                if where == "path":
+                    p["required"] = True
+                # ensure schema
+                sch = p.get("schema")
+                if not isinstance(sch, dict) or not sch.get("type"):
+                    p["schema"] = sch if isinstance(sch, dict) else {}
+                    p["schema"].setdefault("type", "string")
+        return schema
+
+    return m
+
+
+def normalize_no_content_204_mutator():
+    """Ensure 204 responses have description and no content."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            resps = op.get("responses")
+            if not isinstance(resps, dict):
+                continue
+            r204 = resps.get("204")
+            if isinstance(r204, dict):
+                r204.setdefault("description", "No Content")
+                # many validators prefer no 'content' for 204
+                if "content" in r204:
+                    r204.pop("content", None)
+        return schema
+
+    return m
+
+
+def prune_invalid_responses_keys_mutator():
+    """In an operation's responses object, only status codes or 'default' are allowed."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            resps = op.get("responses")
+            if not isinstance(resps, dict):
+                continue
+            for k in list(resps.keys()):
+                if k == "default":
+                    continue
+                if k.isdigit() and 100 <= int(k) <= 599:
+                    continue
+                # stray keys like 'description' under responses -> drop
+                resps.pop(k, None)
         return schema
 
     return m

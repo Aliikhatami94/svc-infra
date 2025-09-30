@@ -21,9 +21,15 @@ from svc_infra.api.fastapi.openapi.mutators import (
     conventions_mutator,
     drop_unused_components_mutator,
     ensure_global_tags_mutator,
+    ensure_media_type_schemas_mutator,
     ensure_operation_descriptions_mutator,
+    ensure_parameter_metadata_mutator,
+    ensure_request_body_descriptions_mutator,
+    ensure_response_descriptions_mutator,
     info_mutator,
+    normalize_no_content_204_mutator,
     normalize_problem_and_examples_mutator,
+    prune_invalid_responses_keys_mutator,
     servers_mutator,
 )
 from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
@@ -191,6 +197,12 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         ensure_operation_descriptions_mutator(),
         attach_standard_responses_mutator(),
         drop_unused_components_mutator(),
+        ensure_response_descriptions_mutator(),
+        ensure_media_type_schemas_mutator(),
+        ensure_request_body_descriptions_mutator(),
+        ensure_parameter_metadata_mutator(),
+        normalize_no_content_204_mutator(),
+        prune_invalid_responses_keys_mutator(),
     ]
     apply_mutators(child, *mutators)
 
@@ -238,6 +250,12 @@ def _build_parent_app(
         ensure_operation_descriptions_mutator(),
         attach_standard_responses_mutator(),
         drop_unused_components_mutator(),
+        ensure_response_descriptions_mutator(),
+        ensure_media_type_schemas_mutator(),
+        ensure_request_body_descriptions_mutator(),
+        ensure_parameter_metadata_mutator(),
+        normalize_no_content_204_mutator(),
+        prune_invalid_responses_keys_mutator(),
     ]
     if root_server_url:
         mutators.append(servers_mutator(root_server_url))
