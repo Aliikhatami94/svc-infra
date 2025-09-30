@@ -11,8 +11,8 @@ from svc_infra.api.fastapi.dual.protected import user_router
 # ---------- Router ----------
 def account_router(*, user_model: type, auth_prefix: str = "/auth") -> APIRouter:
     r = user_router(
-        prefix=f"{auth_prefix}/account",
-        tags=["auth:account"],
+        prefix=f"{auth_prefix}/users",
+        tags=["auth:users"],
     )
 
     @r.patch(
