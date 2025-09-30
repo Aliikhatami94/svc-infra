@@ -19,9 +19,11 @@ from svc_infra.api.fastapi.openapi.mutators import (
     attach_standard_responses_mutator,
     auth_mutator,
     conventions_mutator,
+    drop_unused_components_mutator,
     ensure_global_tags_mutator,
     ensure_operation_descriptions_mutator,
     info_mutator,
+    normalize_problem_and_examples_mutator,
     servers_mutator,
 )
 from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
@@ -181,12 +183,14 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
 
     mutators = [
         conventions_mutator(),
+        normalize_problem_and_examples_mutator(),
         ensure_global_tags_mutator(),
         auth_mutator(include_api_key),
         info_mutator(service, spec),
         servers_mutator(server_url),
         ensure_operation_descriptions_mutator(),
         attach_standard_responses_mutator(),
+        drop_unused_components_mutator(),
     ]
     apply_mutators(child, *mutators)
 
@@ -227,11 +231,13 @@ def _build_parent_app(
 
     mutators = [
         conventions_mutator(),
+        normalize_problem_and_examples_mutator(),
         ensure_global_tags_mutator(),
         auth_mutator(root_include_api_key),
         info_mutator(service, None),
         ensure_operation_descriptions_mutator(),
         attach_standard_responses_mutator(),
+        drop_unused_components_mutator(),
     ]
     if root_server_url:
         mutators.append(servers_mutator(root_server_url))

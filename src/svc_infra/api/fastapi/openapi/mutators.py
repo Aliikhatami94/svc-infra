@@ -40,6 +40,84 @@ def conventions_mutator():
     return m
 
 
+#  ----- problem+json / RFC 7807 -------
+
+
+def normalize_problem_and_examples_mutator():
+    """
+    1) Force components.schemas.Problem.properties.instance.format = "uri-reference".
+    2) Walk all responses content for application/problem+json and ensure example "instance" is absolute.
+       If you prefer to keep uri-reference, this also allows relative. Pick ONE:
+       - Either keep schema as 'uri-reference' (more permissive, allows relative + absolute)
+       - Or keep schema as 'uri' and make all examples absolute.
+    """
+    ABSOLUTE_INSTANCE = "https://api.example.com/request/abc123"
+
+    def _patch_example_val(val: dict):
+        if not isinstance(val, dict):
+            return
+        inst = val.get("instance")
+        if isinstance(inst, str) and (inst.startswith("/") or inst.startswith("about:")):
+            # make absolute to satisfy format: uri
+            val["instance"] = ABSOLUTE_INSTANCE
+
+    def _walk_examples(node: dict):
+        if not isinstance(node, dict):
+            return
+        content = node.get("content")
+        if isinstance(content, dict):
+            prob = content.get("application/problem+json")
+            if isinstance(prob, dict):
+                examples = prob.get("examples")
+                if isinstance(examples, dict):
+                    for ex in examples.values():
+                        if isinstance(ex, dict):
+                            val = ex.get("value")
+                            if isinstance(val, dict):
+                                _patch_example_val(val)
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        comps = schema.setdefault("components", {})
+        # 1) Force Problem.instance to uri-reference (wins even if it exists)
+        p = comps.setdefault("schemas", {}).get("Problem")
+        if isinstance(p, dict):
+            props = p.setdefault("properties", {})
+            inst = props.setdefault("instance", {})
+            inst["type"] = "string"
+            inst["format"] = "uri-reference"  # <-- key bit
+            inst.setdefault("description", "URI reference for this occurrence")
+        else:
+            # If somehow missing, inject your canonical Problem
+            from .conventions import PROBLEM_SCHEMA
+
+            comps.setdefault("schemas", {})["Problem"] = PROBLEM_SCHEMA
+
+        # 2) Fix all examples under components.responses
+        responses = comps.get("responses") or {}
+        for r in responses.values():
+            if isinstance(r, dict):
+                _walk_examples(r)
+
+        # 3) Fix inline responses under paths
+        for path_item in (schema.get("paths") or {}).values():
+            if not isinstance(path_item, dict):
+                continue
+            for op in path_item.values():
+                if not isinstance(op, dict):
+                    continue
+                resps = op.get("responses")
+                if not isinstance(resps, dict):
+                    continue
+                for r in resps.values():
+                    if isinstance(r, dict):
+                        _walk_examples(r)
+
+        return schema
+
+    return m
+
+
 # ------- auth / security -------
 
 
@@ -213,6 +291,29 @@ def attach_standard_responses_mutator(
                 key = str(status)
                 if key not in responses:
                     responses[key] = {"$ref": f"#/components/responses/{ref_name}"}
+        return schema
+
+    return m
+
+
+# ------- pruning -------
+
+
+def drop_unused_components_mutator(
+    drop_responses: list[str] = None, drop_schemas: list[str] = None
+):
+    drop_responses = drop_responses or []
+    drop_schemas = drop_schemas or []
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        comps = schema.get("components") or {}
+        if drop_responses and "responses" in comps:
+            for k in drop_responses:
+                comps["responses"].pop(k, None)
+        if drop_schemas and "schemas" in comps:
+            for k in drop_schemas:
+                comps["schemas"].pop(k, None)
         return schema
 
     return m
