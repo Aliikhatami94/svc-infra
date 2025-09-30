@@ -230,20 +230,32 @@ def ensure_operation_descriptions_mutator(template: str = "{method} {path}."):
 def ensure_global_tags_mutator(default_desc: str = "Operations related to {tag}."):
     def m(schema: dict) -> dict:
         schema = dict(schema)
+
+        # collect all tags used by operations
         used: set[str] = set()
         for _, _, op in _iter_ops(schema):
             for t in op.get("tags") or []:
                 if isinstance(t, str):
                     used.add(t)
 
-        existing = [t for t in (schema.get("tags") or []) if isinstance(t, dict) and "name" in t]
-        names = {t["name"] for t in existing}
-        for t in sorted(used):
-            if t not in names:
-                existing.append({"name": t, "description": default_desc.format(tag=t)})
-        if existing:
-            # keep alphabetical to satisfy Spectral’s alphabetical rule even after merges
-            schema["tags"] = sorted(existing, key=lambda x: x.get("name", ""))
+        # map existing tags by name and preserve their fields
+        existing_list = schema.get("tags") or []
+        existing_map: Dict[str, dict] = {}
+        for item in existing_list:
+            if isinstance(item, dict) and "name" in item:
+                existing_map[item["name"]] = dict(item)
+
+        # add missing tags; do NOT override existing descriptions
+        for name in sorted(used):
+            if name not in existing_map:
+                existing_map[name] = {"name": name, "description": default_desc.format(tag=name)}
+            else:
+                if not existing_map[name].get("description"):
+                    existing_map[name]["description"] = default_desc.format(tag=name)
+
+        if existing_map:
+            schema["tags"] = sorted(existing_map.values(), key=lambda x: x.get("name", ""))
+
         return schema
 
     return m
@@ -473,29 +485,112 @@ def prune_invalid_responses_keys_mutator():
 
 
 def strip_ref_siblings_in_responses_mutator():
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            resps = op.get("responses")
+            if not isinstance(resps, dict):
+                continue
+            for code, resp in list(resps.items()):
+                if isinstance(resp, dict) and "$ref" in resp and (len(resp) > 1):
+                    ref = resp["$ref"]
+                    resp.clear()
+                    resp["$ref"] = ref
+        return schema
+
+    return m
+
+
+def ensure_media_examples_mutator():
     """
-    If a response object uses $ref, remove all sibling keys (description, content, etc.).
-    Keeps the spec clean and avoids 'description-duplication' warnings.
+    If a media-type object has a schema but neither 'example' nor 'examples',
+    attach a minimal 'example' derived from the schema shape.
+    """
+
+    def _minimal_example(sch: dict) -> object:
+        if not isinstance(sch, dict):
+            return {}
+        t = sch.get("type")
+        if t == "array":
+            return []
+        if t == "string":
+            return ""
+        if t == "integer":
+            return 0
+        if t == "number":
+            return 0
+        if t == "boolean":
+            return False
+        # If it's an object or $ref or unknown -> {}
+        return {}
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+
+        def patch_content(node: dict):
+            content = node.get("content")
+            if not isinstance(content, dict):
+                return
+            for mt, mt_obj in content.items():
+                if not isinstance(mt_obj, dict):
+                    continue
+                if "example" in mt_obj or "examples" in mt_obj:
+                    continue
+                sch = mt_obj.get("schema")
+                if isinstance(sch, dict):
+                    mt_obj["example"] = _minimal_example(sch)
+
+        # responses
+        for _, _, op in _iter_ops(schema):
+            resps = op.get("responses")
+            if isinstance(resps, dict):
+                for resp in resps.values():
+                    if isinstance(resp, dict):
+                        patch_content(resp)
+
+            # request bodies (some “API doctors” also check these)
+            rb = op.get("requestBody")
+            if isinstance(rb, dict):
+                patch_content(rb)
+
+        return schema
+
+    return m
+
+
+def improve_success_response_descriptions_mutator():
+    """
+    If a 2xx response description is the generic 'Successful Response' or empty,
+    replace with a more specific, deterministic description based on summary/method/path.
+    Never touch non-2xx or custom texts.
     """
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
-        paths = schema.get("paths") or {}
-        for path_item in paths.values():
-            if not isinstance(path_item, dict):
+        for path, method, op in _iter_ops(schema):
+            summary = (op.get("summary") or "").strip()
+            resps = op.get("responses")
+            if not isinstance(resps, dict):
                 continue
-            for op in path_item.values():
-                if not isinstance(op, dict):
+            for code, resp in resps.items():
+                if not isinstance(resp, dict) or "$ref" in resp:
                     continue
-                resps = op.get("responses")
-                if not isinstance(resps, dict):
+                if code == "default":
                     continue
-                for code, resp in list(resps.items()):
-                    if isinstance(resp, dict) and "$ref" in resp:
-                        ref = resp["$ref"]
-                        # Replace in-place to keep the same dict object
-                        resp.clear()
-                        resp["$ref"] = ref
+                try:
+                    ic = int(code)
+                except Exception:
+                    continue
+                if ic == 204:
+                    # will be handled by your 204 mutator; do nothing here
+                    continue
+                if 200 <= ic < 300:
+                    desc = (resp.get("description") or "").strip()
+                    if not desc or desc.lower() == "successful response":
+                        if summary:
+                            resp["description"] = f"{summary} success"
+                        else:
+                            resp["description"] = f"{method.upper()} {path} success"
         return schema
 
     return m

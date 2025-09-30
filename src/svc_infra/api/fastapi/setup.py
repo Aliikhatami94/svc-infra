@@ -21,11 +21,13 @@ from svc_infra.api.fastapi.openapi.mutators import (
     conventions_mutator,
     drop_unused_components_mutator,
     ensure_global_tags_mutator,
+    ensure_media_examples_mutator,
     ensure_media_type_schemas_mutator,
     ensure_operation_descriptions_mutator,
     ensure_parameter_metadata_mutator,
     ensure_request_body_descriptions_mutator,
     ensure_response_descriptions_mutator,
+    improve_success_response_descriptions_mutator,
     info_mutator,
     normalize_no_content_204_mutator,
     normalize_problem_and_examples_mutator,
@@ -191,11 +193,11 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
     mutators = [
         conventions_mutator(),
         normalize_problem_and_examples_mutator(),
-        ensure_global_tags_mutator(),
         auth_mutator(include_api_key),
         info_mutator(service, spec),
         servers_mutator(server_url),
         ensure_operation_descriptions_mutator(),
+        ensure_global_tags_mutator(),
         attach_standard_responses_mutator(),
         drop_unused_components_mutator(),
         ensure_response_descriptions_mutator(),
@@ -205,6 +207,8 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         normalize_no_content_204_mutator(),
         prune_invalid_responses_keys_mutator(),
         strip_ref_siblings_in_responses_mutator(),
+        ensure_media_examples_mutator(),
+        improve_success_response_descriptions_mutator(),
     ]
     apply_mutators(child, *mutators)
 
@@ -246,10 +250,10 @@ def _build_parent_app(
     mutators = [
         conventions_mutator(),
         normalize_problem_and_examples_mutator(),
-        ensure_global_tags_mutator(),
         auth_mutator(root_include_api_key),
         info_mutator(service, None),
         ensure_operation_descriptions_mutator(),
+        ensure_global_tags_mutator(),
         attach_standard_responses_mutator(),
         drop_unused_components_mutator(),
         ensure_response_descriptions_mutator(),
@@ -259,6 +263,8 @@ def _build_parent_app(
         normalize_no_content_204_mutator(),
         prune_invalid_responses_keys_mutator(),
         strip_ref_siblings_in_responses_mutator(),
+        ensure_media_examples_mutator(),
+        improve_success_response_descriptions_mutator(),
     ]
     if root_server_url:
         mutators.append(servers_mutator(root_server_url))
