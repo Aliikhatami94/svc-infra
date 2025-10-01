@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Dict, Iterable, Iterator, Tuple
 
+from ..auth.security import auth_login_path
 from .models import APIVersionSpec, ServiceInfo, VersionInfo
 
 _HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
@@ -159,7 +160,7 @@ def auth_mutator(include_api_key: bool):
             "OAuth2PasswordBearer",
             {
                 "type": "oauth2",
-                "flows": {"password": {"tokenUrl": "/auth/session/login", "scopes": {}}},
+                "flows": {"password": {"tokenUrl": auth_login_path, "scopes": {}}},
             },
         )
         if include_api_key:

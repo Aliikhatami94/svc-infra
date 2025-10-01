@@ -13,7 +13,8 @@ from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.db.sql.apikey import get_apikey_model
 
 # ---------- OpenAPI security schemes (appear in docs) ----------
-oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/session/login", auto_error=False)
+auth_login_path = "/auth/session/login"
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl=auth_login_path, auto_error=False)
 cookie_auth_optional = APIKeyCookie(name=get_auth_settings().auth_cookie_name, auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 

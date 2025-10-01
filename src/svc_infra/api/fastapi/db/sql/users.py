@@ -13,6 +13,7 @@ from svc_infra.api.fastapi.dual.dualize import dualize_public, dualize_user
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
+from ...auth.security import auth_login_path
 from ...auth.sender import get_sender
 from .session import SqlSessionDep
 
@@ -95,7 +96,7 @@ def get_fastapi_users(
             lifetime = 3600
         return JWTStrategy(secret=secret, lifetime_seconds=lifetime)
 
-    bearer_transport = BearerTransport(tokenUrl=f"{public_auth_prefix}/login")
+    bearer_transport = BearerTransport(tokenUrl=auth_login_path)
     auth_backend = AuthenticationBackend(
         name="jwt", transport=bearer_transport, get_strategy=get_jwt_strategy
     )
