@@ -157,7 +157,10 @@ def auth_mutator(include_api_key: bool):
         comps = schema.setdefault("components", {}).setdefault("securitySchemes", {})
         comps.setdefault(
             "OAuth2PasswordBearer",
-            {"type": "oauth2", "flows": {"password": {"tokenUrl": "/auth/login", "scopes": {}}}},
+            {
+                "type": "oauth2",
+                "flows": {"password": {"tokenUrl": "/auth/session/login", "scopes": {}}},
+            },
         )
         if include_api_key:
             comps.setdefault(
@@ -659,6 +662,63 @@ def improve_success_response_descriptions_mutator():
     return m
 
 
+def ensure_success_examples_mutator():
+    """Ensure 2xx application/json responses have an example."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            summary = op.get("summary") or ""
+            resps = op.get("responses") or {}
+            for code, resp in resps.items():
+                if not isinstance(resp, dict):
+                    continue
+                try:
+                    ic = int(code)
+                except Exception:
+                    continue
+                if not (200 <= ic < 300) or ic == 204:
+                    continue
+                content = resp.get("content") or {}
+                mt_obj = content.get("application/json")
+                if not isinstance(mt_obj, dict):
+                    continue
+                if "example" in mt_obj or "examples" in mt_obj:
+                    continue
+                sch = mt_obj.get("schema") or {}
+                # give minimal but deterministic examples
+                if sch.get("type") == "string":
+                    mt_obj["example"] = "example"
+                elif sch.get("type") == "boolean":
+                    mt_obj["example"] = True
+                elif sch.get("type") == "integer":
+                    mt_obj["example"] = 0
+                elif sch.get("type") == "array":
+                    mt_obj["example"] = []
+                elif sch.get("type") == "object":
+                    # just put {} if no requireds
+                    if not sch.get("required"):
+                        mt_obj["example"] = {}
+                # fallback
+                if "example" not in mt_obj:
+                    mt_obj["example"] = {"status": "ok", "summary": summary}
+        return schema
+
+    return m
+
+
+def dedupe_tags_mutator():
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            tags = op.get("tags")
+            if isinstance(tags, list):
+                op["tags"] = list(dict.fromkeys(tags))  # preserve order, drop dups
+        return schema
+
+    return m
+
+
 def scrub_invalid_object_examples_mutator():
     """
     If a media example is an object but schema has required fields and the example
@@ -768,13 +828,15 @@ def setup_mutators(
         ensure_parameter_metadata_mutator(),
         ensure_media_type_schemas_mutator(),
         ensure_examples_for_json_mutator(),
+        ensure_success_examples_mutator(),
         ensure_media_examples_mutator(),
         scrub_invalid_object_examples_mutator(),
         normalize_no_content_204_mutator(),
         ensure_response_descriptions_mutator(),
         improve_success_response_descriptions_mutator(),
+        dedupe_tags_mutator(),
         ensure_global_tags_mutator(),
-        drop_unused_components_mutator_auto(),  # prefer this
+        drop_unused_components_mutator_auto(),
         info_mutator(service, spec),
     ]
     if server_url:
