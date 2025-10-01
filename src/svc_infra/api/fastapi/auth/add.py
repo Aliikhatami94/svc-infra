@@ -99,7 +99,8 @@ def add_auth(
                 get_mfa_pre_writer=get_mfa_pre_jwt_writer,
                 auth_policy=policy,
             ),
-            prefix=auth_prefix,
+            prefix=manage_prefix,
+            tags=["manage:users"],
             include_in_schema=include_in_docs,
             dependencies=[Require(login_client_guard)],
         )
