@@ -60,10 +60,10 @@ def auth_session_router(
     auth_backend: AuthenticationBackend,
     user_model: type,
     get_mfa_pre_writer,
-    public_auth_prefix: str = "/auth",
+    session_prefix: str = "/session",
     auth_policy: AuthPolicy | None = None,
 ) -> APIRouter:
-    router = public_router(prefix=public_auth_prefix, tags=["auth:session"])
+    router = public_router(prefix=session_prefix, tags=["auth:session"])
     policy = auth_policy or DefaultAuthPolicy(get_auth_settings())
 
     @router.post("/login", name="auth:jwt.login")

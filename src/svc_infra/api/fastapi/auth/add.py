@@ -32,6 +32,7 @@ def add_auth(
     post_login_redirect: str | None = None,
     auth_prefix: str = "/auth",
     oauth_prefix: str = "/auth/oauth",
+    manage_prefix: str = "/manage",
     enable_password: bool = True,
     enable_oauth: bool = True,
     enable_api_keys: bool = False,
@@ -96,9 +97,9 @@ def add_auth(
                 auth_backend=auth_backend,
                 user_model=user_model,
                 get_mfa_pre_writer=get_mfa_pre_jwt_writer,
-                public_auth_prefix=auth_prefix,
                 auth_policy=policy,
             ),
+            prefix=auth_prefix,
             include_in_schema=include_in_docs,
             dependencies=[Require(login_client_guard)],
         )
@@ -107,25 +108,25 @@ def add_auth(
         app.include_router(
             users_router,
             prefix=auth_prefix,
-            tags=["users"],
+            tags=["auth:users"],
             include_in_schema=include_in_docs,
         )
         app.include_router(
             register_router,
-            prefix=auth_prefix,
-            tags=["auth"],
+            prefix=manage_prefix,
+            tags=["manage:users"],
             include_in_schema=include_in_docs,
         )
         app.include_router(
             verify_router,
-            prefix=auth_prefix,
-            tags=["auth"],
+            prefix=manage_prefix,
+            tags=["manage:users"],
             include_in_schema=include_in_docs,
         )
         app.include_router(
             reset_router,
-            prefix=auth_prefix,
-            tags=["auth"],
+            prefix=manage_prefix,
+            tags=["manage:users"],
             include_in_schema=include_in_docs,
         )
 
@@ -135,14 +136,16 @@ def add_auth(
                 user_model=user_model,
                 get_strategy=get_strategy,
                 fapi=fapi,
-                auth_prefix=auth_prefix,
             ),
+            prefix=auth_prefix,
+            tags=["auth:users"],
             include_in_schema=include_in_docs,
         )
 
         # Account management
         app.include_router(
-            account_router(user_model=user_model, auth_prefix=auth_prefix),
+            account_router(user_model=user_model, manage_prefix=manage_prefix),
+            tags=["manage:users"],
             include_in_schema=include_in_docs,
         )
 
