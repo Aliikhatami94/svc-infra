@@ -46,8 +46,8 @@ def mfa_router(
     fapi: FastAPIUsers,
     mfa_prefix: str = "/mfa",
 ) -> APIRouter:
-    u = user_router(prefix=mfa_prefix, tags=["auth:mfa"])
-    p = public_router(prefix=mfa_prefix, tags=["auth:mfa"])
+    u = user_router(prefix=mfa_prefix)
+    p = public_router(prefix=mfa_prefix)
 
     # Resolve current user via cookie OR bearer, using fastapi-users v10 strategy.read_token(..., user_manager)
     async def _get_user_and_session(

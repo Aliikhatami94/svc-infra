@@ -32,7 +32,7 @@ def add_auth(
     post_login_redirect: str | None = None,
     auth_prefix: str = "/auth",
     oauth_prefix: str = "/auth/oauth",
-    manage_prefix: str = "/manage",
+    manage_prefix: str = "/user",
     enable_password: bool = True,
     enable_oauth: bool = True,
     enable_api_keys: bool = False,
@@ -138,7 +138,7 @@ def add_auth(
                 fapi=fapi,
             ),
             prefix=auth_prefix,
-            tags=["auth:users"],
+            tags=["auth:mfa"],
             include_in_schema=include_in_docs,
         )
 
