@@ -12,6 +12,7 @@ from svc_infra.api.fastapi.auth.routers.account import account_router
 from svc_infra.api.fastapi.auth.routers.apikey_router import apikey_router
 from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_backend
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
+from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, OAUTH_PREFIX, USER_PREFIX
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
 
@@ -22,6 +23,207 @@ from .settings import get_auth_settings
 from .state import set_auth_state
 
 
+def install_auth_routers(
+    app: FastAPI,
+    *,
+    auth_prefix: str,
+    users_router,
+    mfa_router_instance,
+    include_in_docs: bool,
+    enable_api_keys: bool = False,
+    user_model=None,
+    apikey_table_name: str = "api_keys",
+) -> None:
+    """Install routers that use the auth prefix."""
+    if enable_api_keys and user_model:
+        bind_apikey_model(user_model, table_name=apikey_table_name)
+        app.include_router(
+            apikey_router(),
+            prefix=auth_prefix,
+            tags=["API Keys"],
+            include_in_schema=include_in_docs,
+        )
+
+    # Users & auth management
+    app.include_router(
+        users_router,
+        prefix=auth_prefix,
+        tags=["Authentication"],
+        include_in_schema=include_in_docs,
+    )
+
+    # MFA endpoints
+    app.include_router(
+        mfa_router_instance,
+        prefix=auth_prefix,
+        tags=["Multi-Factor Authentication"],
+        include_in_schema=include_in_docs,
+    )
+
+
+def install_user_routers(
+    app: FastAPI,
+    *,
+    user_prefix: str,
+    auth_session_router_instance,
+    register_router,
+    verify_router,
+    reset_router,
+    account_router_instance,
+    include_in_docs: bool,
+) -> None:
+    """Install routers that use the user prefix."""
+    # Auth session endpoints (login/logout)
+    app.include_router(
+        auth_session_router_instance,
+        prefix=user_prefix,
+        tags=["Authentication"],
+        include_in_schema=include_in_docs,
+        dependencies=[Require(login_client_guard)],
+    )
+
+    # User management routers
+    app.include_router(
+        register_router,
+        prefix=user_prefix,
+        tags=["User Registration"],
+        include_in_schema=include_in_docs,
+    )
+    app.include_router(
+        verify_router,
+        prefix=user_prefix,
+        tags=["User Verification"],
+        include_in_schema=include_in_docs,
+    )
+    app.include_router(
+        reset_router,
+        prefix=user_prefix,
+        tags=["Password Reset"],
+        include_in_schema=include_in_docs,
+    )
+
+    # Account management
+    app.include_router(
+        account_router_instance,
+        prefix=user_prefix,
+        tags=["User Management"],
+        include_in_schema=include_in_docs,
+    )
+
+
+def setup_oauth_authentication(
+    app: FastAPI,
+    *,
+    user_model,
+    auth_backend,
+    settings_obj,
+    oauth_prefix: str,
+    post_login_redirect: str | None,
+    provider_account_model=None,
+    auth_policy: AuthPolicy,
+    include_in_docs: bool,
+) -> None:
+    """Set up OAuth authentication if providers are available."""
+    providers = providers_from_settings(settings_obj)
+    if not providers:
+        return
+
+    oauth_router_instance = oauth_router_with_backend(
+        user_model=user_model,
+        auth_backend=auth_backend,
+        providers=providers,
+        post_login_redirect=post_login_redirect
+        or getattr(settings_obj, "post_login_redirect", "/"),
+        provider_account_model=provider_account_model,
+        auth_policy=auth_policy,
+    )
+
+    # Install oauth prefix routers
+    install_oauth_routers(
+        app,
+        oauth_prefix=oauth_prefix,
+        oauth_router_instance=oauth_router_instance,
+        include_in_docs=include_in_docs,
+    )
+
+
+def setup_password_authentication(
+    app: FastAPI,
+    *,
+    fapi,
+    auth_backend,
+    user_model,
+    get_strategy,
+    users_router,
+    register_router,
+    verify_router,
+    reset_router,
+    auth_prefix: str,
+    user_prefix: str,
+    policy: AuthPolicy,
+    include_in_docs: bool,
+    enable_api_keys: bool,
+    apikey_table_name: str,
+) -> None:
+    """Set up password-based authentication routers."""
+    # Create router instances
+    auth_session_router_instance = auth_session_router(
+        fapi=fapi,
+        auth_backend=auth_backend,
+        user_model=user_model,
+        get_mfa_pre_writer=get_mfa_pre_jwt_writer,
+        auth_policy=policy,
+    )
+
+    mfa_router_instance = mfa_router(
+        user_model=user_model,
+        get_strategy=get_strategy,
+        fapi=fapi,
+    )
+
+    account_router_instance = account_router(user_model=user_model)
+
+    # Install auth prefix routers
+    install_auth_routers(
+        app,
+        auth_prefix=auth_prefix,
+        users_router=users_router,
+        mfa_router_instance=mfa_router_instance,
+        include_in_docs=include_in_docs,
+        enable_api_keys=enable_api_keys,
+        user_model=user_model,
+        apikey_table_name=apikey_table_name,
+    )
+
+    # Install user prefix routers
+    install_user_routers(
+        app,
+        user_prefix=user_prefix,
+        auth_session_router_instance=auth_session_router_instance,
+        register_router=register_router,
+        verify_router=verify_router,
+        reset_router=reset_router,
+        account_router_instance=account_router_instance,
+        include_in_docs=include_in_docs,
+    )
+
+
+def install_oauth_routers(
+    app: FastAPI,
+    *,
+    oauth_prefix: str,
+    oauth_router_instance,
+    include_in_docs: bool,
+) -> None:
+    """Install routers that use the oauth prefix."""
+    app.include_router(
+        oauth_router_instance,
+        prefix=oauth_prefix,
+        tags=["OAuth Authentication"],
+        include_in_schema=include_in_docs,
+    )
+
+
 def add_auth(
     app: FastAPI,
     *,
@@ -30,9 +232,9 @@ def add_auth(
     schema_create,
     schema_update,
     post_login_redirect: str | None = None,
-    auth_prefix: str = "/auth",
-    oauth_prefix: str = "/auth/oauth",
-    manage_prefix: str = "/user",
+    auth_prefix: str = AUTH_PREFIX,
+    oauth_prefix: str = OAUTH_PREFIX,
+    user_prefix: str = USER_PREFIX,
     enable_password: bool = True,
     enable_oauth: bool = True,
     enable_api_keys: bool = False,
@@ -85,84 +287,33 @@ def add_auth(
         )
 
     if enable_password:
-        # Bind + mount (optional) API keys BEFORE adding the keys router
-        if enable_api_keys:
-            bind_apikey_model(user_model, table_name=apikey_table_name)
-            app.include_router(apikey_router(), include_in_schema=include_in_docs)
-
-        # Auth session endpoints (login/logout)
-        app.include_router(
-            auth_session_router(
-                fapi=fapi,
-                auth_backend=auth_backend,
-                user_model=user_model,
-                get_mfa_pre_writer=get_mfa_pre_jwt_writer,
-                auth_policy=policy,
-            ),
-            prefix=manage_prefix,
-            tags=["manage:users"],
-            include_in_schema=include_in_docs,
-            dependencies=[Require(login_client_guard)],
-        )
-
-        # Users & auth management
-        app.include_router(
-            users_router,
-            prefix=auth_prefix,
-            tags=["auth:users"],
-            include_in_schema=include_in_docs,
-        )
-        app.include_router(
-            register_router,
-            prefix=manage_prefix,
-            tags=["manage:users"],
-            include_in_schema=include_in_docs,
-        )
-        app.include_router(
-            verify_router,
-            prefix=manage_prefix,
-            tags=["manage:users"],
-            include_in_schema=include_in_docs,
-        )
-        app.include_router(
-            reset_router,
-            prefix=manage_prefix,
-            tags=["manage:users"],
-            include_in_schema=include_in_docs,
-        )
-
-        # MFA endpoints
-        app.include_router(
-            mfa_router(
-                user_model=user_model,
-                get_strategy=get_strategy,
-                fapi=fapi,
-            ),
-            prefix=auth_prefix,
-            tags=["auth:mfa"],
-            include_in_schema=include_in_docs,
-        )
-
-        # Account management
-        app.include_router(
-            account_router(user_model=user_model, manage_prefix=manage_prefix),
-            tags=["manage:users"],
-            include_in_schema=include_in_docs,
+        setup_password_authentication(
+            app,
+            fapi=fapi,
+            auth_backend=auth_backend,
+            user_model=user_model,
+            get_strategy=get_strategy,
+            users_router=users_router,
+            register_router=register_router,
+            verify_router=verify_router,
+            reset_router=reset_router,
+            auth_prefix=auth_prefix,
+            user_prefix=user_prefix,
+            policy=policy,
+            include_in_docs=include_in_docs,
+            enable_api_keys=enable_api_keys,
+            apikey_table_name=apikey_table_name,
         )
 
     if enable_oauth:
-        providers = providers_from_settings(settings_obj)
-        if providers:
-            app.include_router(
-                oauth_router_with_backend(
-                    user_model=user_model,
-                    auth_backend=auth_backend,
-                    providers=providers,
-                    post_login_redirect=post_login_redirect
-                    or getattr(settings_obj, "post_login_redirect", "/"),
-                    prefix=oauth_prefix,
-                    provider_account_model=provider_account_model,
-                    auth_policy=policy,
-                ),
-                include_in_schema=include_in_docs,
-            )
+        setup_oauth_authentication(
+            app,
+            user_model=user_model,
+            auth_backend=auth_backend,
+            settings_obj=settings_obj,
+            oauth_prefix=oauth_prefix,
+            post_login_redirect=post_login_redirect,
+            provider_account_model=provider_account_model,
+            auth_policy=policy,
+            include_in_docs=include_in_docs,
+        )

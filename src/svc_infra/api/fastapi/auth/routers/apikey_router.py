@@ -38,8 +38,8 @@ def _to_uuid(val):
     return val if isinstance(val, UUID) else UUID(str(val))
 
 
-def apikey_router(prefix: str = "/auth/keys"):
-    r = user_router(prefix=prefix, tags=["auth:apikeys"])
+def apikey_router():
+    r = user_router(prefix="/keys", tags=["auth:apikeys"])
     ApiKey = get_apikey_model()
 
     @r.post(

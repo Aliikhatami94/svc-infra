@@ -9,11 +9,8 @@ from svc_infra.api.fastapi.dual.protected import user_router
 
 
 # ---------- Router ----------
-def account_router(*, user_model: type, manage_prefix: str = "/user") -> APIRouter:
-    r = user_router(
-        prefix=manage_prefix,
-        tags=["manage:users"],
-    )
+def account_router(*, user_model: type) -> APIRouter:
+    r = user_router()
 
     @r.patch(
         "/status",

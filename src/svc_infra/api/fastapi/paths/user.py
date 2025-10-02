@@ -1,0 +1,10 @@
+# --- AUTH / SESSION ---
+LOGIN_PATH = "/login"
+LOGOUT_PATH = "/logout"
+REGISTER_PATH = "/register"
+REQUEST_VERIFY_TOKEN_PATH = "/request-verify-token"
+VERIFY_PATH = "/verify"
+FORGOT_PASSWORD_PATH = "/forgot-password"
+RESET_PASSWORD_PATH = "/reset-password"
+DISABLE_ACCOUNT_PATH = "/status"
+DELETE_ACCOUNT_PATH = "/delete"

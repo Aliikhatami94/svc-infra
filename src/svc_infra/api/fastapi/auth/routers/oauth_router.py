@@ -507,7 +507,6 @@ def oauth_router_with_backend(
     auth_backend: AuthenticationBackend,
     providers: Dict[str, Dict[str, Any]],
     post_login_redirect: str = "/",
-    prefix: str = "/auth/oauth",
     provider_account_model: type | None = None,
     auth_policy: AuthPolicy | None = None,
 ) -> APIRouter:
@@ -516,7 +515,6 @@ def oauth_router_with_backend(
         auth_backend,
         providers,
         post_login_redirect,
-        prefix,
         provider_account_model,
         auth_policy,
     )
@@ -527,7 +525,6 @@ def _create_oauth_router(
     auth_backend: AuthenticationBackend,
     providers: Dict[str, Dict[str, Any]],
     post_login_redirect: str = "/",
-    prefix: str = "/auth/oauth",
     provider_account_model: type | None = None,
     auth_policy: AuthPolicy | None = None,
 ) -> APIRouter:
@@ -538,7 +535,7 @@ def _create_oauth_router(
     # Register all providers
     _register_oauth_providers(oauth, providers)
 
-    router = public_router(prefix=prefix, tags=["auth:oauth"])
+    router = public_router()
 
     @router.get(
         "/{provider}/login",

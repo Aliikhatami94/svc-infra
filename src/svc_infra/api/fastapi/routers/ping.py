@@ -5,12 +5,13 @@ import logging
 from fastapi import Response, status
 
 from svc_infra.api.fastapi.dual.public import public_router
+from svc_infra.api.fastapi.paths.generic import PING_PATH
 
-router = public_router(tags=["health"])
+router = public_router(tags=["Health Check"])
 
 
 @router.get(
-    "/ping",
+    PING_PATH,
     status_code=status.HTTP_200_OK,
     description="Operation to check if the service is up and running",
 )
