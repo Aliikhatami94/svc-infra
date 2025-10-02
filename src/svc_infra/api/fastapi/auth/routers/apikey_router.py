@@ -39,7 +39,7 @@ def _to_uuid(val):
 
 
 def apikey_router():
-    r = user_router(prefix="/keys", tags=["auth:apikeys"])
+    r = user_router()
     ApiKey = get_apikey_model()
 
     @r.post(
