@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Type
 
 from fastapi import APIRouter
+from fastapi.params import Depends
+from pydantic import BaseModel
 
+from ..pagination import Paginated, make_pagination_injector
 from .utils import _alt_with_slash, _norm_primary
 
 
@@ -84,6 +87,50 @@ class DualAPIRouter(APIRouter):
 
     def head(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
         return self._dual_decorator(path, ["HEAD"], show_in_schema=show_in_schema, **kwargs)
+
+    def list(
+        self,
+        path: str,
+        *,
+        model: Type[BaseModel],
+        envelope: bool = False,
+        cursor: bool = True,
+        page: bool = True,
+        default_limit: int = 50,
+        max_limit: int = 200,
+        show_in_schema: bool = True,
+        **kwargs: Any,
+    ):
+        """
+        Sugar for list endpoints.
+
+        - Auto-inject pagination/filter context (no Depends in your signature).
+        - Auto-picks response_model: list[model] or Paginated[model].
+        - Works with your OpenAPI mutators which already attach the shared params.
+        - Per-route opt-out of OpenAPI param auto-attach: openapi_extra={"x_no_auto_pagination": True}
+        """
+        # pick response model
+        if envelope:
+            response_model = Paginated[model]  # type: ignore[index]
+        else:
+            response_model = list[model]  # type: ignore[index]
+
+        injector = make_pagination_injector(
+            envelope=envelope,
+            allow_cursor=cursor,
+            allow_page=page,
+            default_limit=default_limit,
+            max_limit=max_limit,
+        )
+
+        # ensure our injector runs; don't mutate caller's dependencies
+        deps = list(kwargs.get("dependencies") or [])
+        deps.append(Depends(injector))
+        kwargs["dependencies"] = deps
+        kwargs["response_model"] = kwargs.get("response_model") or response_model
+
+        # we still want the dual-registration behavior
+        return self._dual_decorator(path, ["GET"], show_in_schema=show_in_schema, **kwargs)
 
     # ---------- WebSocket ----------
 

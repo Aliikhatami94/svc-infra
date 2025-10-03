@@ -1,0 +1,192 @@
+from __future__ import annotations
+
+import base64
+import contextvars
+import json
+from typing import Callable, Generic, List, Optional, Sequence, TypeVar
+
+from fastapi import Query
+from pydantic import BaseModel, Field
+from pydantic.generics import GenericModel
+
+T = TypeVar("T")
+
+
+# ---------- Core query models ----------
+class CursorParams(BaseModel):
+    cursor: Optional[str] = None
+    limit: int = 50
+
+
+class PageParams(BaseModel):
+    page: int = 1
+    page_size: int = 50
+
+
+class FilterParams(BaseModel):
+    q: Optional[str] = None
+    sort: Optional[str] = None
+    created_after: Optional[str] = None
+    created_before: Optional[str] = None
+    updated_after: Optional[str] = None
+    updated_before: Optional[str] = None
+
+
+# ---------- Envelope model ----------
+class Paginated(GenericModel, Generic[T]):
+    items: List[T]
+    next_cursor: Optional[str] = Field(None, description="Opaque cursor for next page")
+    total: Optional[int] = Field(None, description="Total items (optional)")
+
+
+# ---------- Cursor helpers ----------
+def _encode_cursor(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+# public; handy if you need to decode an incoming cursor
+def decode_cursor(token: Optional[str]) -> dict:
+    if not token:
+        return {}
+    s = token + "=" * (-len(token) % 4)
+    raw = base64.urlsafe_b64decode(s.encode("ascii")).decode("utf-8")
+    return json.loads(raw)
+
+
+# ---------- Context ----------
+class PaginationContext(Generic[T]):
+    # mode config
+    envelope: bool
+    allow_cursor: bool
+    allow_page: bool
+
+    # values
+    cursor_params: CursorParams | None
+    page_params: PageParams | None
+    filters: FilterParams | None
+
+    def __init__(
+        self,
+        *,
+        envelope: bool,
+        allow_cursor: bool,
+        allow_page: bool,
+        cursor_params: CursorParams | None,
+        page_params: PageParams | None,
+        filters: FilterParams | None,
+    ):
+        self.envelope = envelope
+        self.allow_cursor = allow_cursor
+        self.allow_page = allow_page
+        self.cursor_params = cursor_params
+        self.page_params = page_params
+        self.filters = filters
+
+    # unified accessors
+    @property
+    def cursor(self) -> Optional[str]:
+        return (self.cursor_params or CursorParams()).cursor if self.allow_cursor else None
+
+    @property
+    def limit(self) -> int:
+        if self.allow_cursor and self.cursor_params:
+            return self.cursor_params.limit
+        if self.allow_page and self.page_params:
+            return self.page_params.page_size
+        # fallback sensible default
+        return 50
+
+    @property
+    def page(self) -> Optional[int]:
+        return self.page_params.page if (self.allow_page and self.page_params) else None
+
+    @property
+    def page_size(self) -> Optional[int]:
+        return self.page_params.page_size if (self.allow_page and self.page_params) else None
+
+    # returns either plain list (array) or an envelope, matching the route config
+    def wrap(
+        self, items: list[T], *, next_cursor: Optional[str] = None, total: Optional[int] = None
+    ):
+        if self.envelope:
+            return Paginated[T](items=items, next_cursor=next_cursor, total=total)
+        return items
+
+    # convenience: derive a naive next_cursor from the last item
+    def next_cursor_from_last(
+        self, items: Sequence[T], *, key: Callable[[T], str | int]
+    ) -> Optional[str]:
+        if not items:
+            return None
+        last_key = key(items[-1])
+        return _encode_cursor({"after": last_key})
+
+
+_pagination_ctx: contextvars.ContextVar[PaginationContext] = contextvars.ContextVar(
+    "pagination_ctx", default=None
+)
+
+
+def use_pagination() -> PaginationContext:
+    ctx = _pagination_ctx.get()
+    if ctx is None:
+        # Safe defaults; this happens if a route forgot to install the injector
+        ctx = PaginationContext(
+            envelope=False,
+            allow_cursor=True,
+            allow_page=True,
+            cursor_params=CursorParams(),
+            page_params=PageParams(),
+            filters=FilterParams(),
+        )
+    return ctx
+
+
+# ---------- Dependency factory (used by the router decorator) ----------
+def make_pagination_injector(
+    *,
+    envelope: bool,
+    allow_cursor: bool,
+    allow_page: bool,
+    default_limit: int = 50,
+    max_limit: int = 200,
+):
+    # NOTE: these Query(...) defaults are only used to parse incoming params;
+    # OpenAPI parameter listing is handled by the OpenAPI mutator layer.
+    async def _inject(
+        cursor: str | None = Query(None),
+        limit: int = Query(default_limit, ge=1, le=max_limit),
+        page: int = Query(1, ge=1),
+        page_size: int = Query(default_limit, ge=1, le=max_limit),
+        q: str | None = Query(None),
+        sort: str | None = Query(None),
+        created_after: str | None = Query(None),
+        created_before: str | None = Query(None),
+        updated_after: str | None = Query(None),
+        updated_before: str | None = Query(None),
+    ):
+        cur = CursorParams(cursor=cursor, limit=limit) if allow_cursor else None
+        pag = PageParams(page=page, page_size=page_size) if allow_page else None
+        flt = FilterParams(
+            q=q,
+            sort=sort,
+            created_after=created_after,
+            created_before=created_before,
+            updated_after=updated_after,
+            updated_before=updated_before,
+        )
+        _pagination_ctx.set(
+            PaginationContext(
+                envelope=envelope,
+                allow_cursor=allow_cursor,
+                allow_page=allow_page,
+                cursor_params=cur,
+                page_params=pag,
+                filters=flt,
+            )
+        )
+        # return None; this dependency only seeds context
+        return None
+
+    return _inject

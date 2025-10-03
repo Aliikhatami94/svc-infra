@@ -47,6 +47,218 @@ def conventions_mutator():
     return m
 
 
+def pagination_components_mutator(
+    *,
+    default_limit: int = 50,
+    max_limit: int = 200,
+) -> callable:
+    """
+    Adds reusable pagination/filtering parameters & paginated envelope schemas.
+    - Cursor: cursor/limit
+    - Page: page/page_size
+    - Common filters: q, sort, created_[after|before], updated_[after|before]
+    - Envelope: PaginatedList<T>
+    """
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        comps = schema.setdefault("components", {})
+        params = comps.setdefault("parameters", {})
+        schemas = comps.setdefault("schemas", {})
+
+        # ---- Parameters (reusable) ----
+        params.setdefault(
+            "cursor",
+            {
+                "name": "cursor",
+                "in": "query",
+                "required": False,
+                "schema": {"type": "string"},
+                "description": "Opaque cursor for forward pagination.",
+            },
+        )
+        params.setdefault(
+            "limit",
+            {
+                "name": "limit",
+                "in": "query",
+                "required": False,
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": max_limit,
+                    "default": default_limit,
+                },
+                "description": f"Max items to return (1..{max_limit}).",
+            },
+        )
+        params.setdefault(
+            "page",
+            {
+                "name": "page",
+                "in": "query",
+                "required": False,
+                "schema": {"type": "integer", "minimum": 1, "default": 1},
+                "description": "1-based page index (alternative to cursor).",
+            },
+        )
+        params.setdefault(
+            "page_size",
+            {
+                "name": "page_size",
+                "in": "query",
+                "required": False,
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": max_limit,
+                    "default": default_limit,
+                },
+                "description": f"Number of items per page (1..{max_limit}).",
+            },
+        )
+        params.setdefault(
+            "q",
+            {
+                "name": "q",
+                "in": "query",
+                "required": False,
+                "schema": {"type": "string"},
+                "description": "Free-text filter query.",
+            },
+        )
+        params.setdefault(
+            "sort",
+            {
+                "name": "sort",
+                "in": "query",
+                "required": False,
+                "schema": {
+                    "type": "string",
+                    "examples": ["created_at", "-created_at", "name", "-name"],
+                },
+                "description": "Sort field, prefix '-' for descending.",
+            },
+        )
+        for fld in ("created", "updated"):
+            params.setdefault(
+                f"{fld}_after",
+                {
+                    "name": f"{fld}_after",
+                    "in": "query",
+                    "required": False,
+                    "schema": {"type": "string", "format": "date-time"},
+                    "description": f"Only items with {fld}_at strictly after this timestamp.",
+                },
+            )
+            params.setdefault(
+                f"{fld}_before",
+                {
+                    "name": f"{fld}_before",
+                    "in": "query",
+                    "required": False,
+                    "schema": {"type": "string", "format": "date-time"},
+                    "description": f"Only items with {fld}_at strictly before this timestamp.",
+                },
+            )
+
+        # ---- Envelope schema (generic pattern) ----
+        # This is a non-generic "template" envelope; concrete versions are produced per endpoint, if desired.
+        schemas.setdefault(
+            "PaginatedList",
+            {
+                "type": "object",
+                "properties": {
+                    "items": {"type": "array", "items": {"type": "object"}},
+                    "next_cursor": {
+                        "type": "string",
+                        "nullable": True,
+                        "description": "Opaque cursor for next page (null when no more).",
+                    },
+                    "total": {
+                        "type": "integer",
+                        "nullable": True,
+                        "description": "Total items (may be null if not computed).",
+                    },
+                },
+                "required": ["items"],
+            },
+        )
+
+        return schema
+
+    return m
+
+
+def auto_attach_pagination_params_mutator(
+    *,
+    mode: str = "cursor_or_page",
+    attach_filters: bool = True,
+    apply_when: str = "array_200",
+    flag_disable: str = "x_no_auto_pagination",
+) -> callable:
+    """
+    Attaches reusable pagination/filter parameters to GET "listy" operations.
+
+    - mode:
+        "cursor_or_page" -> attach cursor+limit and page+page_size (clients use either)
+        "cursor_only"    -> attach cursor+limit
+        "page_only"      -> attach page+page_size
+    - apply_when:
+        "array_200" -> only when response 200 schema is an array
+        "all_get"   -> for every GET op
+    - Per-op opt-out: set operation's openapi_extra[flag_disable] = True
+    """
+
+    def _should_apply(op: dict) -> bool:
+        if op.get(flag_disable) is True:
+            return False
+        if apply_when == "all_get":
+            return True
+        # array_200: inspect 200->application/json->schema
+        resps = op.get("responses") or {}
+        r200 = resps.get("200")
+        if not isinstance(r200, dict):
+            return False
+        content = r200.get("content") or {}
+        mt = content.get("application/json")
+        if not isinstance(mt, dict):
+            return False
+        sch = mt.get("schema") or {}
+        return isinstance(sch, dict) and sch.get("type") == "array"
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, method, op in _iter_ops(schema):
+            if method != "get":
+                continue
+            if not _should_apply(op):
+                continue
+
+            params = op.setdefault("parameters", [])
+
+            def _add_ref(name: str):
+                params.append({"$ref": f"#/components/parameters/{name}"})
+
+            if mode in ("cursor_only", "cursor_or_page"):
+                _add_ref("cursor")
+                _add_ref("limit")
+            if mode in ("page_only", "cursor_or_page"):
+                _add_ref("page")
+                _add_ref("page_size")
+            if attach_filters:
+                _add_ref("q")
+                _add_ref("sort")
+                _add_ref("created_after")
+                _add_ref("created_before")
+                _add_ref("updated_after")
+                _add_ref("updated_before")
+
+        return schema
+
+    return m
+
+
 def normalize_problem_and_examples_mutator():
     """
     1) Force components.schemas.Problem.properties.instance.format = "uri-reference".
@@ -860,6 +1072,8 @@ def setup_mutators(
 ) -> list:
     mutators = [
         conventions_mutator(),
+        pagination_components_mutator(default_limit=50, max_limit=200),
+        auto_attach_pagination_params_mutator(mode="cursor_or_page"),
         normalize_problem_and_examples_mutator(),
         attach_standard_responses_mutator(),
         auth_mutator(include_api_key),
