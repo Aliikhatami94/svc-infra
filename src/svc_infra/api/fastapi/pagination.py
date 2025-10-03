@@ -7,7 +7,6 @@ from typing import Callable, Generic, List, Optional, Sequence, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
 
 T = TypeVar("T")
 
@@ -33,7 +32,7 @@ class FilterParams(BaseModel):
 
 
 # ---------- Envelope model ----------
-class Paginated(GenericModel, Generic[T]):
+class Paginated(BaseModel, Generic[T]):
     items: List[T]
     next_cursor: Optional[str] = Field(None, description="Opaque cursor for next page")
     total: Optional[int] = Field(None, description="Total items (optional)")
