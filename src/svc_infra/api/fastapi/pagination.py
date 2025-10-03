@@ -5,7 +5,7 @@ import contextvars
 import json
 from typing import Callable, Generic, List, Optional, Sequence, TypeVar
 
-from fastapi import Query
+from fastapi import Query, Request
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
@@ -74,6 +74,7 @@ class PaginationContext(Generic[T]):
         cursor_params: CursorParams | None,
         page_params: PageParams | None,
         filters: FilterParams | None,
+        limit_override: int | None = None,
     ):
         self.envelope = envelope
         self.allow_cursor = allow_cursor
@@ -81,8 +82,8 @@ class PaginationContext(Generic[T]):
         self.cursor_params = cursor_params
         self.page_params = page_params
         self.filters = filters
+        self.limit_override = limit_override
 
-    # unified accessors
     @property
     def cursor(self) -> Optional[str]:
         return (self.cursor_params or CursorParams()).cursor if self.allow_cursor else None
@@ -92,7 +93,7 @@ class PaginationContext(Generic[T]):
         if self.allow_cursor and self.cursor_params and self.cursor_params.cursor is not None:
             return self.cursor_params.limit
         if self.allow_page and self.page_params:
-            return self.page_params.page_size
+            return self.limit_override or self.page_params.page_size
         return 50
 
     @property
@@ -155,9 +156,8 @@ def make_pagination_injector(
     default_limit: int = 50,
     max_limit: int = 200,
 ):
-    # NOTE: these Query(...) defaults are only used to parse incoming params;
-    # OpenAPI parameter listing is handled by the OpenAPI mutator layer.
     async def _inject(
+        request: Request,
         cursor: str | None = Query(None),
         limit: int = Query(default_limit, ge=1, le=max_limit),
         page: int = Query(1, ge=1),
@@ -179,6 +179,10 @@ def make_pagination_injector(
             updated_after=updated_after,
             updated_before=updated_before,
         )
+
+        # detect if 'limit' was explicitly provided
+        limit_override = limit if ("limit" in request.query_params and cursor is None) else None
+
         _pagination_ctx.set(
             PaginationContext(
                 envelope=envelope,
@@ -187,9 +191,9 @@ def make_pagination_injector(
                 cursor_params=cur,
                 page_params=pag,
                 filters=flt,
+                limit_override=limit_override,
             )
         )
-        # return None; this dependency only seeds context
         return None
 
     return _inject
