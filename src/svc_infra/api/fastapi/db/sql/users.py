@@ -107,7 +107,7 @@ def get_fastapi_users(
         fastapi_users.get_auth_router(auth_backend, requires_verification=True)
     )
     users_router = dualize_user(
-        fastapi_users.get_users_router(user_schema_read, user_schema_create, user_schema_update)
+        fastapi_users.get_users_router(user_schema_read, user_schema_update)
     )
     register_router = dualize_public(
         fastapi_users.get_register_router(user_schema_read, user_schema_create)
