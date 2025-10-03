@@ -89,11 +89,10 @@ class PaginationContext(Generic[T]):
 
     @property
     def limit(self) -> int:
-        if self.allow_cursor and self.cursor_params:
+        if self.allow_cursor and self.cursor_params and self.cursor_params.cursor is not None:
             return self.cursor_params.limit
         if self.allow_page and self.page_params:
             return self.page_params.page_size
-        # fallback sensible default
         return 50
 
     @property
@@ -104,7 +103,12 @@ class PaginationContext(Generic[T]):
     def page_size(self) -> Optional[int]:
         return self.page_params.page_size if (self.allow_page and self.page_params) else None
 
-    # returns either plain list (array) or an envelope, matching the route config
+    @property
+    def offset(self) -> int:
+        if self.cursor is None and self.allow_page and self.page and self.page_size:
+            return (self.page - 1) * self.page_size
+        return 0
+
     def wrap(
         self, items: list[T], *, next_cursor: Optional[str] = None, total: Optional[int] = None
     ):
