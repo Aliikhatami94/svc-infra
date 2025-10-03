@@ -17,6 +17,15 @@ from svc_infra.api.fastapi.dual.protected import user_router
 from svc_infra.api.fastapi.dual.public import public_router
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
 
+from ...paths.auth import (
+    MFA_CONFIRM_PATH,
+    MFA_DISABLE_PATH,
+    MFA_REGENERATE_RECOVERY_PATH,
+    MFA_SEND_CODE_PATH,
+    MFA_START_PATH,
+    MFA_STATUS_PATH,
+    MFA_VERIFY_PATH,
+)
 from .models import (
     EMAIL_OTP_STORE,
     ConfirmSetupIn,
@@ -45,8 +54,8 @@ def mfa_router(
     get_strategy,  # from get_fastapi_users()
     fapi: FastAPIUsers,
 ) -> APIRouter:
-    u = user_router(prefix="/mfa")
-    p = public_router(prefix="/mfa")
+    u = user_router()
+    p = public_router()
 
     # Resolve current user via cookie OR bearer, using fastapi-users v10 strategy.read_token(..., user_manager)
     async def _get_user_and_session(
@@ -77,7 +86,7 @@ def mfa_router(
         return db_user, session
 
     @u.post(
-        "/start",
+        MFA_START_PATH,
         response_model=StartSetupOut,
     )
     async def start_setup(user_sess=Depends(_get_user_and_session)):
@@ -107,7 +116,7 @@ def mfa_router(
         return StartSetupOut(otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri))
 
     @u.post(
-        "/confirm",
+        MFA_CONFIRM_PATH,
         response_model=RecoveryCodesOut,
     )
     async def confirm_setup(
@@ -138,7 +147,7 @@ def mfa_router(
         return RecoveryCodesOut(codes=codes)
 
     @u.post(
-        "/disable",
+        MFA_DISABLE_PATH,
         status_code=status.HTTP_204_NO_CONTENT,
     )
     async def disable_mfa(
@@ -170,7 +179,7 @@ def mfa_router(
         await session.commit()
         return JSONResponse(status_code=204, content={})
 
-    @p.post("/verify")
+    @p.post(MFA_VERIFY_PATH)
     async def verify_mfa(
         request: Request,
         session: SqlSessionDep,
@@ -244,7 +253,7 @@ def mfa_router(
         return resp
 
     @p.post(
-        "/send_code",
+        MFA_SEND_CODE_PATH,
         response_model=SendEmailCodeOut,
         description="Sends a 6-digit email OTP tied to the `pre_token`. Returns a resend cooldown.",
     )
@@ -302,7 +311,7 @@ def mfa_router(
         return SendEmailCodeOut(sent=True, cooldown_seconds=cooldown)
 
     @u.get(
-        "/status",
+        MFA_STATUS_PATH,
         response_model=MFAStatusOut,
     )
     async def mfa_status(user_sess=Depends(_get_user_and_session)):
@@ -340,7 +349,7 @@ def mfa_router(
         )
 
     @u.post(
-        "/recovery/regenerate",
+        MFA_REGENERATE_RECOVERY_PATH,
         response_model=RecoveryCodesOut,
     )
     async def regenerate_recovery_codes(user_sess=Depends(_get_user_and_session)):

@@ -12,6 +12,12 @@ from svc_infra.api.fastapi.auth.security import Identity
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.protected import user_router
 from svc_infra.api.fastapi.openapi.responses import CONFLICT, NOT_FOUND
+from svc_infra.api.fastapi.paths.auth import (
+    CREATE_KEY_PATH,
+    DELETE_KEY_PATH,
+    LIST_KEYS_PATH,
+    REVOKE_KEY_PATH,
+)
 from svc_infra.db.sql.apikey import get_apikey_model
 
 
@@ -39,11 +45,11 @@ def _to_uuid(val):
 
 
 def apikey_router():
-    r = user_router(prefix="/keys")
+    r = user_router()
     ApiKey = get_apikey_model()
 
     @r.post(
-        "",
+        CREATE_KEY_PATH,
         response_model=ApiKeyOut,
         status_code=201,
         responses={409: CONFLICT},
@@ -87,7 +93,7 @@ def apikey_router():
         )
 
     @r.get(
-        "",
+        LIST_KEYS_PATH,
         response_model=list[ApiKeyOut],
         description="List API keys. Non-superusers see only their own keys.",
     )
@@ -112,7 +118,7 @@ def apikey_router():
         ]
 
     @r.post(
-        "/{key_id}/revoke",
+        REVOKE_KEY_PATH,
         status_code=204,
         responses={404: NOT_FOUND},
         description="Revoke an API key",
@@ -131,7 +137,7 @@ def apikey_router():
         return  # 204
 
     @r.delete(
-        "/{key_id}",
+        DELETE_KEY_PATH,
         status_code=204,
         responses={404: NOT_FOUND},
         description="Delete an API key. If the key is active, you must first revoke it or pass force=true.",

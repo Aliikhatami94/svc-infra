@@ -23,6 +23,11 @@ from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
 from svc_infra.api.fastapi.auth.settings import get_auth_settings, parse_redirect_allow_hosts
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.public import public_router
+from svc_infra.api.fastapi.paths.auth import (
+    OAUTH_CALLBACK_PATH,
+    OAUTH_LOGIN_PATH,
+    OAUTH_REFRESH_PATH,
+)
 
 
 def _gen_pkce_pair() -> tuple[str, str]:
@@ -538,7 +543,7 @@ def _create_oauth_router(
     router = public_router()
 
     @router.get(
-        "/{provider}/login",
+        OAUTH_LOGIN_PATH,
         description="Login with OAuth provider",
     )
     async def oauth_login(request: Request, provider: str):
@@ -571,7 +576,7 @@ def _create_oauth_router(
         )
 
     @router.get(
-        "/{provider}/callback",
+        OAUTH_CALLBACK_PATH,
         name="oauth_callback",
         responses={302: {"description": "Redirect to app (or MFA redirect)."}},
         description="OAuth callback endpoint.",
@@ -653,7 +658,7 @@ def _create_oauth_router(
         return resp
 
     @router.post(
-        "/refresh",
+        OAUTH_REFRESH_PATH,
         status_code=status.HTTP_204_NO_CONTENT,
         responses={204: {"description": "Cookie refreshed"}},
         description="Refresh authentication token.",

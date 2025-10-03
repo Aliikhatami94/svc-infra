@@ -10,10 +10,12 @@ from sqlalchemy import select
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.auth.state import get_auth_state, get_user_scope_resolver
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
+from svc_infra.api.fastapi.paths.prefix import USER_PREFIX
+from svc_infra.api.fastapi.paths.user import LOGIN_PATH
 from svc_infra.db.sql.apikey import get_apikey_model
 
 # ---------- OpenAPI security schemes (appear in docs) ----------
-auth_login_path = "/users/login"
+auth_login_path = USER_PREFIX + LOGIN_PATH
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl=auth_login_path, auto_error=False)
 cookie_auth_optional = APIKeyCookie(name=get_auth_settings().auth_cookie_name, auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)

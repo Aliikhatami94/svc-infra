@@ -6,6 +6,7 @@ from svc_infra.api.fastapi.auth.mfa.models import DisableAccountIn
 from svc_infra.api.fastapi.auth.security import Identity
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.protected import user_router
+from svc_infra.api.fastapi.paths.user import DELETE_ACCOUNT_PATH, DISABLE_ACCOUNT_PATH
 
 
 # ---------- Router ----------
@@ -13,7 +14,7 @@ def account_router(*, user_model: type) -> APIRouter:
     r = user_router()
 
     @r.patch(
-        "/status",
+        DISABLE_ACCOUNT_PATH,
         response_model=dict,
         description="Get account status (active/disabled)",
     )
@@ -29,7 +30,7 @@ def account_router(*, user_model: type) -> APIRouter:
         return {"ok": True, "status": "disabled"}
 
     @r.delete(
-        "/delete",
+        DELETE_ACCOUNT_PATH,
         status_code=204,
         description="Delete account (soft by default, hard if specified)",
     )
