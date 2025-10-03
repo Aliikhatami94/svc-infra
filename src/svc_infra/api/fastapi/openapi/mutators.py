@@ -664,12 +664,11 @@ def improve_success_response_descriptions_mutator():
 
 
 def ensure_success_examples_mutator():
-    """Ensure 2xx application/json responses have an example."""
+    """Ensure 2xx application/json responses have an example (but only when safe)."""
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
         for _, _, op in _iter_ops(schema):
-            summary = op.get("summary") or ""
             resps = op.get("responses") or {}
             for code, resp in resps.items():
                 if not isinstance(resp, dict):
@@ -680,29 +679,22 @@ def ensure_success_examples_mutator():
                     continue
                 if not (200 <= ic < 300) or ic == 204:
                     continue
-                content = resp.get("content") or {}
-                mt_obj = content.get("application/json")
-                if not isinstance(mt_obj, dict):
-                    continue
-                if "example" in mt_obj or "examples" in mt_obj:
+                mt_obj = (resp.get("content") or {}).get("application/json")
+                if not isinstance(mt_obj, dict) or "example" in mt_obj or "examples" in mt_obj:
                     continue
                 sch = mt_obj.get("schema") or {}
-                # give minimal but deterministic examples
-                if sch.get("type") == "string":
+
+                # Only set examples for primitives/arrays. Never for object/$ref.
+                t = sch.get("type")
+                if t == "string":
                     mt_obj["example"] = "example"
-                elif sch.get("type") == "boolean":
+                elif t == "boolean":
                     mt_obj["example"] = True
-                elif sch.get("type") == "integer":
+                elif t == "integer":
                     mt_obj["example"] = 0
-                elif sch.get("type") == "array":
+                elif t == "array":
                     mt_obj["example"] = []
-                elif sch.get("type") == "object":
-                    # just put {} if no requireds
-                    if not sch.get("required"):
-                        mt_obj["example"] = {}
-                # fallback
-                if "example" not in mt_obj:
-                    mt_obj["example"] = {"status": "ok", "summary": summary}
+                # NOTE: no else/fallback for object/$ref
         return schema
 
     return m
@@ -722,32 +714,33 @@ def dedupe_tags_mutator():
 
 def scrub_invalid_object_examples_mutator():
     """
-    If a media example is an object but schema has required fields and the example
-    is {} (or not a dict), remove the example so the validator won't fail.
+    Remove media examples that are objects but don't satisfy required keys
+    (or when schema is a $ref/object). Keeps primitives/arrays.
     """
 
-    def patch_content(node: dict):
+    def _invalid_object_example(sch: dict, ex: dict) -> bool:
+        if not isinstance(sch, dict) or not isinstance(ex, dict):
+            return False
+        if "$ref" in sch:
+            return True  # can't validate here → drop
+        if sch.get("type") == "object" or "properties" in sch or "required" in sch:
+            req = set(sch.get("required") or [])
+            return bool(req) and not req.issubset(ex.keys())
+        return False
+
+    def _patch(node: dict):
         content = node.get("content")
         if not isinstance(content, dict):
             return
         for mt_obj in content.values():
             if not isinstance(mt_obj, dict):
                 continue
-            if "example" not in mt_obj:
-                continue
             sch = mt_obj.get("schema")
             ex = mt_obj.get("example")
-            if not isinstance(sch, dict):
-                continue
-            # Follow $ref if you want; simplest is: only act on obvious object cases.
-            if (
-                sch.get("type") == "object"
-                or "properties" in sch
-                or "required" in sch
-                or "$ref" in sch
+            if "example" in mt_obj and _invalid_object_example(
+                sch if isinstance(sch, dict) else {}, ex
             ):
-                if not isinstance(ex, dict) or ex == {}:
-                    mt_obj.pop("example", None)
+                mt_obj.pop("example", None)
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
@@ -756,10 +749,10 @@ def scrub_invalid_object_examples_mutator():
             if isinstance(resps, dict):
                 for resp in resps.values():
                     if isinstance(resp, dict):
-                        patch_content(resp)
+                        _patch(resp)
             rb = op.get("requestBody")
             if isinstance(rb, dict):
-                patch_content(rb)
+                _patch(rb)
         return schema
 
     return m
