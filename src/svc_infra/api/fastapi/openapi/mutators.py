@@ -452,7 +452,7 @@ def ensure_parameter_metadata_mutator(param_desc_template="{name} parameter."):
 
 
 def normalize_no_content_204_mutator():
-    """Ensure 204 responses have description and no content."""
+    """Ensure 204 responses have 'No Content' description and no content."""
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
@@ -462,10 +462,58 @@ def normalize_no_content_204_mutator():
                 continue
             r204 = resps.get("204")
             if isinstance(r204, dict):
-                r204.setdefault("description", "No Content")
-                # many validators prefer no 'content' for 204
+                # Always normalize text to the conventional phrasing
+                r204["description"] = "No Content"
+                # Many validators prefer no 'content' for 204
                 if "content" in r204:
                     r204.pop("content", None)
+        return schema
+
+    return m
+
+
+def inject_safe_examples_mutator():
+    """
+    Inject a couple of specific, schema-safe examples:
+      - If a 2xx application/json response uses #/components/schemas/SendEmailCodeOut
+        and has no example(s), set {"sent": true, "cooldown_seconds": 60}.
+      - For GET/any 2xx on /ping, add {"status": "ok"} if example(s) are missing.
+    Never overwrites existing example/examples.
+    """
+
+    def _has_examples(mt_obj: dict) -> bool:
+        return isinstance(mt_obj, dict) and ("example" in mt_obj or "examples" in mt_obj)
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for path, method, op in _iter_ops(schema):
+            resps = op.get("responses") or {}
+            for code, resp in resps.items():
+                if not isinstance(resp, dict):
+                    continue
+                try:
+                    ic = int(code)
+                except Exception:
+                    continue
+                if not (200 <= ic < 300):
+                    continue
+
+                content = resp.get("content") or {}
+                mt_obj = content.get("application/json")
+                if not isinstance(mt_obj, dict) or _has_examples(mt_obj):
+                    continue
+
+                # Special-case: SendEmailCodeOut by $ref
+                sch = mt_obj.get("schema") or {}
+                ref = sch.get("$ref") if isinstance(sch, dict) else None
+                if isinstance(ref, str) and ref.endswith("/SendEmailCodeOut"):
+                    mt_obj["example"] = {"sent": True, "cooldown_seconds": 60}
+                    continue
+
+                # Special-case: /ping success body
+                if path == "/ping":
+                    mt_obj["example"] = {"status": "ok"}
+
         return schema
 
     return m
@@ -828,6 +876,7 @@ def setup_mutators(
         normalize_no_content_204_mutator(),
         ensure_response_descriptions_mutator(),
         improve_success_response_descriptions_mutator(),
+        inject_safe_examples_mutator(),
         dedupe_tags_mutator(),
         ensure_global_tags_mutator(),
         drop_unused_components_mutator_auto(),
@@ -835,5 +884,4 @@ def setup_mutators(
     ]
     if server_url:
         mutators.append(servers_mutator(server_url))
-
     return mutators
