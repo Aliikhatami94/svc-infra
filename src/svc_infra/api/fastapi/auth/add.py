@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Literal, cast
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
-from svc_infra.api.fastapi.auth.gaurd import auth_session_router, login_client_guard
+from svc_infra.api.fastapi.auth.gaurd import auth_session_router, login_client_gaurd
 from svc_infra.api.fastapi.auth.mfa.pre_auth import get_mfa_pre_jwt_writer
 from svc_infra.api.fastapi.auth.mfa.router import mfa_router
 from svc_infra.api.fastapi.auth.routers.account import account_router
@@ -16,7 +16,6 @@ from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, OAUTH_PREFIX, USER_P
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
 
-from .. import Require
 from .policy import AuthPolicy, DefaultAuthPolicy
 from .providers import providers_from_settings
 from .settings import get_auth_settings
@@ -27,7 +26,6 @@ def install_auth_routers(
     app: FastAPI,
     *,
     auth_prefix: str,
-    users_router,
     mfa_router_instance,
     include_in_docs: bool,
     enable_api_keys: bool = False,
@@ -43,14 +41,6 @@ def install_auth_routers(
             tags=["API Keys"],
             include_in_schema=include_in_docs,
         )
-
-    # Users & auth management
-    app.include_router(
-        users_router,
-        prefix=auth_prefix,
-        tags=["Authentication"],
-        include_in_schema=include_in_docs,
-    )
 
     # MFA endpoints
     app.include_router(
@@ -69,36 +59,43 @@ def install_user_routers(
     register_router,
     verify_router,
     reset_router,
+    users_router,
     account_router_instance,
     include_in_docs: bool,
 ) -> None:
     """Install routers that use the user prefix."""
-    # Auth session endpoints (login/logout)
+    # Session management
     app.include_router(
         auth_session_router_instance,
         prefix=user_prefix,
-        tags=["Authentication"],
+        tags=["Session / Registration"],
         include_in_schema=include_in_docs,
-        dependencies=[Require(login_client_guard)],
+        dependencies=[Depends(login_client_gaurd)],
     )
-
-    # User management routers
     app.include_router(
         register_router,
         prefix=user_prefix,
-        tags=["User Registration"],
+        tags=["Session / Registration"],
         include_in_schema=include_in_docs,
     )
     app.include_router(
         verify_router,
         prefix=user_prefix,
-        tags=["User Verification"],
+        tags=["Session / Registration"],
         include_in_schema=include_in_docs,
     )
     app.include_router(
         reset_router,
         prefix=user_prefix,
-        tags=["Password Reset"],
+        tags=["Session / Registration"],
+        include_in_schema=include_in_docs,
+    )
+
+    # Users
+    app.include_router(
+        users_router,
+        prefix=user_prefix,
+        tags=["Users"],
         include_in_schema=include_in_docs,
     )
 
@@ -106,7 +103,7 @@ def install_user_routers(
     app.include_router(
         account_router_instance,
         prefix=user_prefix,
-        tags=["User Management"],
+        tags=["Account Management"],
         include_in_schema=include_in_docs,
     )
 
@@ -187,7 +184,6 @@ def setup_password_authentication(
     install_auth_routers(
         app,
         auth_prefix=auth_prefix,
-        users_router=users_router,
         mfa_router_instance=mfa_router_instance,
         include_in_docs=include_in_docs,
         enable_api_keys=enable_api_keys,
@@ -203,6 +199,7 @@ def setup_password_authentication(
         register_router=register_router,
         verify_router=verify_router,
         reset_router=reset_router,
+        users_router=users_router,
         account_router_instance=account_router_instance,
         include_in_docs=include_in_docs,
     )

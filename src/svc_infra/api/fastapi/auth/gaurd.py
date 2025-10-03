@@ -17,7 +17,7 @@ _pwd = PasswordHelper()
 _DUMMY_BCRYPT = _pwd.hash("dummy-password")
 
 
-async def login_client_guard(request: Request):
+async def login_client_gaurd(request: Request):
     """
     If AUTH_REQUIRE_CLIENT_SECRET_ON_PASSWORD_LOGIN is True,
     require client_id/client_secret on POST .../login requests.
