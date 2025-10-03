@@ -633,7 +633,9 @@ def ensure_request_body_descriptions_mutator(default_template="Request body for 
 
 
 def ensure_parameter_metadata_mutator(param_desc_template="{name} parameter."):
-    """Add missing descriptions; enforce required for path params; ensure schema exists."""
+    """Add missing descriptions; enforce required for path params; ensure schema exists.
+    NOTE: Never touch $ref parameters here.
+    """
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
@@ -643,6 +645,9 @@ def ensure_parameter_metadata_mutator(param_desc_template="{name} parameter."):
                 continue
             for p in params:
                 if not isinstance(p, dict):
+                    continue
+                if "$ref" in p:
+                    # leave component parameters untouched
                     continue
                 name = p.get("name", "")
                 where = p.get("in", "")
@@ -658,6 +663,87 @@ def ensure_parameter_metadata_mutator(param_desc_template="{name} parameter."):
                 if not isinstance(sch, dict) or not sch.get("type"):
                     p["schema"] = sch if isinstance(sch, dict) else {}
                     p["schema"].setdefault("type", "string")
+        return schema
+
+    return m
+
+
+def strip_ref_siblings_in_parameters_mutator():
+    """Normalize parameters: if an item has $ref, remove all other keys."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            params = op.get("parameters")
+            if not isinstance(params, list):
+                continue
+            for p in params:
+                if isinstance(p, dict) and "$ref" in p and len(p) > 1:
+                    ref = p["$ref"]
+                    p.clear()
+                    p["$ref"] = ref
+        return schema
+
+    return m
+
+
+def dedupe_parameters_mutator():
+    """
+    Deduplicate operation.parameters:
+      - Prefer $ref entries over inline params with the same name.
+      - Deduplicate repeated $ref entries (same target).
+      - Deduplicate repeated inline entries by (name, in).
+    """
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            params = op.get("parameters")
+            if not isinstance(params, list) or not params:
+                continue
+
+            # First, collect all $ref target names: "#/components/parameters/<NAME>"
+            ref_targets: list[str] = []
+            for p in params:
+                if isinstance(p, dict) and "$ref" in p and isinstance(p["$ref"], str):
+                    ref_targets.append(p["$ref"].rsplit("/", 1)[-1])
+
+            seen_refs: set[str] = set()
+            seen_inline_keys: set[tuple[str, str]] = set()
+            result: list[dict] = []
+
+            for p in params:
+                if not isinstance(p, dict):
+                    continue
+
+                # Handle $ref params
+                if "$ref" in p and isinstance(p["$ref"], str):
+                    ref_name = p["$ref"].rsplit("/", 1)[-1]
+                    if ref_name in seen_refs:
+                        continue
+                    seen_refs.add(ref_name)
+                    # ensure no siblings (if upstream didn't strip)
+                    if len(p) > 1:
+                        p = {"$ref": p["$ref"]}
+                    result.append(p)
+                    continue
+
+                # Inline params: drop if a ref with the same name already exists
+                name = p.get("name")
+                where = p.get("in")
+                if isinstance(name, str) and name in ref_targets:
+                    # There is a component param with the same name; prefer the $ref
+                    continue
+
+                # Deduplicate inline params by (name, in)
+                key = (str(name), str(where))
+                if key in seen_inline_keys:
+                    continue
+                seen_inline_keys.add(key)
+                result.append(p)
+
+            op["parameters"] = result
+
         return schema
 
     return m
@@ -1072,13 +1158,13 @@ def setup_mutators(
 ) -> list:
     mutators = [
         conventions_mutator(),
-        pagination_components_mutator(default_limit=50, max_limit=200),
-        auto_attach_pagination_params_mutator(mode="cursor_or_page"),
         normalize_problem_and_examples_mutator(),
         attach_standard_responses_mutator(),
         auth_mutator(include_api_key),
         strip_ref_siblings_in_responses_mutator(),
         prune_invalid_responses_keys_mutator(),
+        strip_ref_siblings_in_parameters_mutator(),
+        dedupe_parameters_mutator(),
         ensure_operation_descriptions_mutator(),
         ensure_request_body_descriptions_mutator(),
         ensure_parameter_metadata_mutator(),
