@@ -1242,15 +1242,6 @@ def hardening_components_mutator():
 
 
 def attach_header_params_mutator():
-    HYDR = {
-        "ETag": "ETag",
-        "Last-Modified": "LastModified",
-        "X-Request-Id": "XRequestId",
-        "X-RateLimit-Limit": "XRateLimitLimit",
-        "X-RateLimit-Remaining": "XRateLimitRemaining",
-        "X-RateLimit-Reset": "XRateLimitReset",
-    }
-
     def m(schema: dict) -> dict:
         schema = dict(schema)
         for _, method, op in _iter_ops(schema):
@@ -1259,51 +1250,64 @@ def attach_header_params_mutator():
             def add_ref(name):
                 params.append({"$ref": f"#/components/parameters/{name}"})
 
-            # Request headers (parameters)
-            if method in ("post", "patch", "delete", "put"):
-                params.append({"$ref": "#/components/parameters/IdempotencyKey"})
+            if method in ("post", "patch", "delete"):
+                add_ref("IdempotencyKey")
                 if method in ("patch", "put"):
-                    params.append({"$ref": "#/components/parameters/IfMatch"})
+                    add_ref("IfMatch")
             if method == "get":
-                params.append({"$ref": "#/components/parameters/IfNoneMatch"})
-                params.append({"$ref": "#/components/parameters/IfModifiedSince"})
+                add_ref("IfNoneMatch")
+                add_ref("IfModifiedSince")
 
-            # Response headers
+            # RESPONSE HEADERS — use *hyphenated* header names as keys
             resps = op.get("responses") or {}
             for code, resp in resps.items():
                 try:
                     ic = int(code)
                 except Exception:
                     continue
-
-                # 2xx responses → standard headers
                 if 200 <= ic < 300:
                     hdrs = resp.setdefault("headers", {})
-                    for display, comp_id in HYDR.items():
-                        hdrs.setdefault(display, {"$ref": f"#/components/headers/{comp_id}"})
-
-                # 429 → Retry-After
-                if ic == 429:
+                    hdrs.setdefault("ETag", {"$ref": "#/components/headers/ETag"})
+                    hdrs.setdefault("Last-Modified", {"$ref": "#/components/headers/LastModified"})
+                    hdrs.setdefault("X-Request-Id", {"$ref": "#/components/headers/XRequestId"})
+                    hdrs.setdefault(
+                        "X-RateLimit-Limit", {"$ref": "#/components/headers/XRateLimitLimit"}
+                    )
+                    hdrs.setdefault(
+                        "X-RateLimit-Remaining",
+                        {"$ref": "#/components/headers/XRateLimitRemaining"},
+                    )
+                    hdrs.setdefault(
+                        "X-RateLimit-Reset", {"$ref": "#/components/headers/XRateLimitReset"}
+                    )
+                if code == "429":
                     resp.setdefault("headers", {})["Retry-After"] = {
                         "schema": {"type": "integer"},
                         "description": "Seconds until next allowed request.",
                     }
+        return schema
 
-            # Ensure GET has a 304 response with the right headers
-            if method == "get":
-                responses = op.setdefault("responses", {})
-                responses.setdefault(
-                    "304",
-                    {
-                        "description": "Not Modified",
-                        "headers": {
-                            "ETag": {"$ref": "#/components/headers/ETag"},
-                            "Last-Modified": {"$ref": "#/components/headers/LastModified"},
-                            "X-Request-Id": {"$ref": "#/components/headers/XRequestId"},
-                        },
+    return m
+
+
+def attach_conditional_get_304_mutator():
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, method, op in _iter_ops(schema):
+            if method != "get":
+                continue
+            resps = op.setdefault("responses", {})
+            resps.setdefault(
+                "304",
+                {
+                    "description": "Not Modified",
+                    "headers": {
+                        "ETag": {"$ref": "#/components/headers/ETag"},
+                        "Last-Modified": {"$ref": "#/components/headers/LastModified"},
+                        "X-Request-Id": {"$ref": "#/components/headers/XRequestId"},
                     },
-                )
-
+                },
+            )
         return schema
 
     return m
@@ -1321,6 +1325,7 @@ def setup_mutators(
         attach_header_params_mutator(),
         normalize_problem_and_examples_mutator(),
         attach_standard_responses_mutator(),
+        attach_conditional_get_304_mutator(),
         auth_mutator(include_api_key),
         strip_ref_siblings_in_responses_mutator(),
         prune_invalid_responses_keys_mutator(),
