@@ -8,6 +8,7 @@ from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
 
 from .cache.add import setup_caching
 from .ease import easy_service_api, easy_service_app
+from .pagination import cursor_window, sort_by, text_filter, use_pagination
 from .setup import setup_service_api
 
 __all__ = [
@@ -22,4 +23,9 @@ __all__ = [
     "easy_service_api",
     "easy_service_app",
     "setup_caching",
+    # Pagination
+    "use_pagination",
+    "text_filter",
+    "sort_by",
+    "cursor_window",
 ]

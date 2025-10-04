@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import contextvars
 import json
-from typing import Callable, Generic, List, Optional, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, List, Optional, Sequence, TypeVar
 
 from fastapi import Query, Request
 from pydantic import BaseModel, Field
@@ -145,6 +145,70 @@ def use_pagination() -> PaginationContext:
             filters=FilterParams(),
         )
     return ctx
+
+
+def text_filter[T](items: Iterable[T], q: Optional[str], *getters: Callable[[T], str]) -> list[T]:
+    """Simple contains filter across one or more string fields."""
+    if not q:
+        return list(items)
+    ql = q.lower()
+    out: list[T] = []
+    for it in items:
+        for g in getters:
+            try:
+                if ql in (g(it) or "").lower():
+                    out.append(it)
+                    break
+            except Exception:
+                # ignore faulty getter
+                pass
+    return out
+
+
+def sort_by[
+    T
+](items: Iterable[T], *, key: Callable[[T], Any], desc: bool = False,) -> list[T]:
+    """Stable sort with a key func."""
+    return sorted(list(items), key=key, reverse=desc)
+
+
+def cursor_window[
+    T
+](
+    items: Sequence[T],
+    *,
+    cursor: Optional[str],
+    limit: int,
+    key: Callable[[T], Any],
+    descending: bool = False,
+    offset: int = 0,
+) -> tuple[list[T], Optional[str]]:
+    """
+    Generic keyset windowing for already-filtered/sorted sequences.
+    - If `cursor` present, expects {"after": <key>}; returns the slice after it.
+    - Else uses `offset` (e.g., computed from page/page_size).
+    Always returns (window_items, next_cursor).
+    """
+    n = len(items)
+    if cursor:
+        payload = decode_cursor(cursor)  # {"after": value}
+        after = payload.get("after")
+        if after is not None:
+            ks = [key(x) for x in items]
+            if descending:
+                start = next((i for i, k in enumerate(ks) if k < after), n)
+            else:
+                start = next((i for i, k in enumerate(ks) if k > after), n)
+        else:
+            start = offset
+    else:
+        start = offset
+
+    window = list(items[start : start + limit])
+    next_cur = None
+    if window:
+        next_cur = _encode_cursor({"after": key(window[-1])})
+    return window, next_cur
 
 
 # ---------- Dependency factory (used by the router decorator) ----------
