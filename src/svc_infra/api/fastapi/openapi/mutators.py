@@ -1131,19 +1131,23 @@ def drop_unused_components_mutator_auto(keep_schemas: set[str] | None = None):
 
         # schemas
         sch = comps.get("schemas") or {}
-        to_drop = [
-            name
-            for name in sch.keys()
-            if name not in keep_schemas and name not in (used.get("schemas") or set())
-        ]
-        for name in to_drop:
-            sch.pop(name, None)
+        for name in list(sch.keys()):
+            if name not in keep_schemas and name not in (used.get("schemas") or set()):
+                sch.pop(name, None)
 
-        # responses (optional; usually all are used)
+        # responses
         resps = comps.get("responses") or {}
-        to_drop_r = [name for name in resps.keys() if name not in (used.get("responses") or set())]
-        for name in to_drop_r:
-            resps.pop(name, None)
+        for name in list(resps.keys()):
+            if name not in (used.get("responses") or set()):
+                resps.pop(name, None)
+
+        # NEW: headers
+        hdrs = comps.get("headers") or {}
+        for name in list(hdrs.keys()):
+            if name not in (used.get("headers") or set()):
+                hdrs.pop(name, None)
+
+        # (Optional: parameters/requestBodies/etc. same pattern)
 
         return schema
 
