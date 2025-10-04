@@ -174,40 +174,31 @@ def sort_by(
     return sorted(list(items), key=key, reverse=desc)
 
 
-def cursor_window(
-    items: Sequence[T],
-    *,
-    cursor: Optional[str],
-    limit: int,
-    key: Callable[[T], Any],
-    descending: bool = False,
-    offset: int = 0,
-) -> tuple[list[T], Optional[str]]:
-    """
-    Generic keyset windowing for already-filtered/sorted sequences.
-    - If `cursor` present, expects {"after": <key>}; returns the slice after it.
-    - Else uses `offset`.
-    Always returns (window_items, next_cursor).
-    """
-    n = len(items)
+def cursor_window(items, *, cursor, limit, key, descending: bool, offset: int = 0):
+    # items must already be filtered/sorted
+
+    # compute start_index
     if cursor:
         payload = decode_cursor(cursor)
         after = payload.get("after")
-        if after is not None:
-            ks = [key(x) for x in items]
-            if descending:
-                start = next((i for i, k in enumerate(ks) if k < after), n)
-            else:
-                start = next((i for i, k in enumerate(ks) if k > after), n)
+        ids = [key(x) for x in items]
+        if descending:
+            start_index = next((i for i, v in enumerate(ids) if v < after), len(items))
         else:
-            start = offset
+            start_index = next((i for i, v in enumerate(ids) if v > after), len(items))
     else:
-        start = offset
+        start_index = offset
 
-    window = list(items[start : start + limit])
+    # take limit+1 to see if there’s another page
+    slice_ = items[start_index : start_index + limit + 1]
+    has_more = len(slice_) > limit
+    window = slice_[:limit]
+
     next_cur = None
-    if window:
-        next_cur = _encode_cursor({"after": key(window[-1])})
+    if has_more:
+        last_key = key(window[-1])
+        next_cur = _encode_cursor({"after": last_key})
+
     return window, next_cur
 
 
