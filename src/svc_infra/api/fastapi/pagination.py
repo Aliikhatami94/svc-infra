@@ -181,7 +181,15 @@ def make_pagination_injector(
         )
 
         # detect if 'limit' was explicitly provided
-        limit_override = limit if ("limit" in request.query_params and cursor is None) else None
+        limit_override = (
+            limit
+            if (
+                "limit" in request.query_params
+                and "page_size" not in request.query_params
+                and cursor is None
+            )
+            else None
+        )
 
         _pagination_ctx.set(
             PaginationContext(
