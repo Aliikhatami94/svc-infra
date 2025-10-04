@@ -147,8 +147,8 @@ def pagination_components_mutator(
                     "name": f"{fld}_after",
                     "in": "query",
                     "required": False,
-                    "schema": {"type": "string", "format": "date-time"},
-                    "description": f"Only items with {fld}_at strictly after this timestamp.",
+                    "schema": {"type": "string"},
+                    "description": f"Only items with {fld}_at strictly after this HTTP-date (RFC 9110).",
                 },
             )
             params.setdefault(
@@ -157,8 +157,8 @@ def pagination_components_mutator(
                     "name": f"{fld}_before",
                     "in": "query",
                     "required": False,
-                    "schema": {"type": "string", "format": "date-time"},
-                    "description": f"Only items with {fld}_at strictly before this timestamp.",
+                    "schema": {"type": "string"},
+                    "description": f"Only items with {fld}_at strictly before this HTTP-date (RFC 9110).",
                 },
             )
 
@@ -1183,8 +1183,8 @@ def hardening_components_mutator():
                 "name": "If-Modified-Since",
                 "in": "header",
                 "required": False,
-                "schema": {"type": "string", "format": "date-time"},
-                "description": "Conditional GET.",
+                "schema": {"type": "string"},
+                "description": "Conditional GET. HTTP-date per RFC 9110 (e.g. 'Wed, 01 Jan 2025 00:00:00 GMT').",
             },
         )
         params.setdefault(
@@ -1204,8 +1204,8 @@ def hardening_components_mutator():
         headers.setdefault(
             "LastModified",
             {
-                "schema": {"type": "string", "format": "date-time"},
-                "description": "Last modification time (UTC).",
+                "schema": {"type": "string"},  # HTTP-date string
+                "description": "Last modification time, HTTP-date per RFC 9110.",
             },
         )
         headers.setdefault(
@@ -1238,6 +1238,15 @@ def hardening_components_mutator():
 
 
 def attach_header_params_mutator():
+    HYDR = {
+        "ETag": "ETag",
+        "Last-Modified": "LastModified",
+        "X-Request-Id": "XRequestId",
+        "X-RateLimit-Limit": "XRateLimitLimit",
+        "X-RateLimit-Remaining": "XRateLimitRemaining",
+        "X-RateLimit-Reset": "XRateLimitReset",
+    }
+
     def m(schema: dict) -> dict:
         schema = dict(schema)
         for _, method, op in _iter_ops(schema):
@@ -1246,38 +1255,51 @@ def attach_header_params_mutator():
             def add_ref(name):
                 params.append({"$ref": f"#/components/parameters/{name}"})
 
-            if method in ("post", "patch", "delete"):
-                add_ref("IdempotencyKey")
-                # updates → If-Match optional (your handlers can enforce)
+            # Request headers (parameters)
+            if method in ("post", "patch", "delete", "put"):
+                params.append({"$ref": "#/components/parameters/IdempotencyKey"})
                 if method in ("patch", "put"):
-                    add_ref("IfMatch")
+                    params.append({"$ref": "#/components/parameters/IfMatch"})
             if method == "get":
-                add_ref("IfNoneMatch")
-                add_ref("IfModifiedSince")
+                params.append({"$ref": "#/components/parameters/IfNoneMatch"})
+                params.append({"$ref": "#/components/parameters/IfModifiedSince"})
 
-            # Attach response headers
+            # Response headers
             resps = op.get("responses") or {}
             for code, resp in resps.items():
                 try:
                     ic = int(code)
                 except Exception:
                     continue
+
+                # 2xx responses → standard headers
                 if 200 <= ic < 300:
                     hdrs = resp.setdefault("headers", {})
-                    for n in (
-                        "ETag",
-                        "LastModified",
-                        "XRequestId",
-                        "XRateLimitLimit",
-                        "XRateLimitRemaining",
-                        "XRateLimitReset",
-                    ):
-                        hdrs.setdefault(n, {"$ref": f"#/components/headers/{n}"})
-                if code == "429":
+                    for display, comp_id in HYDR.items():
+                        hdrs.setdefault(display, {"$ref": f"#/components/headers/{comp_id}"})
+
+                # 429 → Retry-After
+                if ic == 429:
                     resp.setdefault("headers", {})["Retry-After"] = {
                         "schema": {"type": "integer"},
                         "description": "Seconds until next allowed request.",
                     }
+
+            # Ensure GET has a 304 response with the right headers
+            if method == "get":
+                responses = op.setdefault("responses", {})
+                responses.setdefault(
+                    "304",
+                    {
+                        "description": "Not Modified",
+                        "headers": {
+                            "ETag": {"$ref": "#/components/headers/ETag"},
+                            "Last-Modified": {"$ref": "#/components/headers/LastModified"},
+                            "X-Request-Id": {"$ref": "#/components/headers/XRequestId"},
+                        },
+                    },
+                )
+
         return schema
 
     return m

@@ -75,6 +75,15 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
+def _setup_middlewares(app: FastAPI):
+    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(CatchAllExceptionMiddleware)
+    app.add_middleware(IdempotencyMiddleware)
+    app.add_middleware(SimpleRateLimitMiddleware)
+    register_error_handlers(app)
+    _add_route_logger(app)
+
+
 def _coerce_list(value: str | Iterable[str] | None) -> list[str]:
     if value is None:
         return []
@@ -98,10 +107,7 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         generate_unique_id_function=_gen_operation_id_factory(),
     )
 
-    child.add_middleware(RequestIdMiddleware)
-    child.add_middleware(CatchAllExceptionMiddleware)
-    register_error_handlers(child)
-    _add_route_logger(child)
+    _setup_middlewares(child)
 
     # ---- OpenAPI pipeline (DRY!) ----
     include_api_key = bool(spec.include_api_key) if spec.include_api_key is not None else False
@@ -152,13 +158,7 @@ def _build_parent_app(
     )
 
     _setup_cors(parent, public_cors_origins)
-
-    parent.add_middleware(IdempotencyMiddleware)
-    parent.add_middleware(SimpleRateLimitMiddleware)
-    parent.add_middleware(RequestIdMiddleware)
-    parent.add_middleware(CatchAllExceptionMiddleware)
-    register_error_handlers(parent)
-    _add_route_logger(parent)
+    _setup_middlewares(parent)
 
     mutators = setup_mutators(
         service=service,
