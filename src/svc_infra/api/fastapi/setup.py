@@ -13,6 +13,9 @@ from fastapi.routing import APIRoute
 from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_index_html
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
+from svc_infra.api.fastapi.middleware.idempotency import IdempotencyMiddleware
+from svc_infra.api.fastapi.middleware.ratelimit import SimpleRateLimitMiddleware
+from svc_infra.api.fastapi.middleware.request_id import RequestIdMiddleware
 from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.openapi.mutators import setup_mutators
 from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
@@ -95,6 +98,7 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         generate_unique_id_function=_gen_operation_id_factory(),
     )
 
+    child.add_middleware(RequestIdMiddleware)
     child.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(child)
     _add_route_logger(child)
@@ -148,6 +152,10 @@ def _build_parent_app(
     )
 
     _setup_cors(parent, public_cors_origins)
+
+    parent.add_middleware(IdempotencyMiddleware)
+    parent.add_middleware(SimpleRateLimitMiddleware)
+    parent.add_middleware(RequestIdMiddleware)
     parent.add_middleware(CatchAllExceptionMiddleware)
     register_error_handlers(parent)
     _add_route_logger(parent)

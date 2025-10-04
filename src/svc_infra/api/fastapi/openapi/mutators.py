@@ -1150,6 +1150,139 @@ def drop_unused_components_mutator_auto(keep_schemas: set[str] | None = None):
     return m
 
 
+def hardening_components_mutator():
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        comps = schema.setdefault("components", {})
+        params = comps.setdefault("parameters", {})
+        headers = comps.setdefault("headers", {})
+
+        params.setdefault(
+            "IdempotencyKey",
+            {
+                "name": "Idempotency-Key",
+                "in": "header",
+                "required": False,
+                "schema": {"type": "string"},
+                "description": "Provide to make the request idempotent for 24h.",
+            },
+        )
+        params.setdefault(
+            "IfNoneMatch",
+            {
+                "name": "If-None-Match",
+                "in": "header",
+                "required": False,
+                "schema": {"type": "string"},
+                "description": "Conditional GET (ETag).",
+            },
+        )
+        params.setdefault(
+            "IfModifiedSince",
+            {
+                "name": "If-Modified-Since",
+                "in": "header",
+                "required": False,
+                "schema": {"type": "string", "format": "date-time"},
+                "description": "Conditional GET.",
+            },
+        )
+        params.setdefault(
+            "IfMatch",
+            {
+                "name": "If-Match",
+                "in": "header",
+                "required": False,
+                "schema": {"type": "string"},
+                "description": "Optimistic concurrency for updates.",
+            },
+        )
+
+        headers.setdefault(
+            "ETag", {"schema": {"type": "string"}, "description": "Opaque entity tag."}
+        )
+        headers.setdefault(
+            "LastModified",
+            {
+                "schema": {"type": "string", "format": "date-time"},
+                "description": "Last modification time (UTC).",
+            },
+        )
+        headers.setdefault(
+            "XRateLimitLimit", {"schema": {"type": "integer"}, "description": "Tokens in window."}
+        )
+        headers.setdefault(
+            "XRateLimitRemaining",
+            {"schema": {"type": "integer"}, "description": "Remaining tokens."},
+        )
+        headers.setdefault(
+            "XRateLimitReset", {"schema": {"type": "integer"}, "description": "Unix reset time."}
+        )
+        headers.setdefault(
+            "XRequestId", {"schema": {"type": "string"}, "description": "Correlation id."}
+        )
+        headers.setdefault(
+            "Deprecation",
+            {
+                "schema": {"type": "string"},
+                "description": "Set to 'true' for deprecated endpoints.",
+            },
+        )
+        headers.setdefault(
+            "Sunset",
+            {"schema": {"type": "string"}, "description": "HTTP-date for deprecation sunset."},
+        )
+        return schema
+
+    return m
+
+
+def attach_header_params_mutator():
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, method, op in _iter_ops(schema):
+            params = op.setdefault("parameters", [])
+
+            def add_ref(name):
+                params.append({"$ref": f"#/components/parameters/{name}"})
+
+            if method in ("post", "patch", "delete"):
+                add_ref("IdempotencyKey")
+                # updates → If-Match optional (your handlers can enforce)
+                if method in ("patch", "put"):
+                    add_ref("IfMatch")
+            if method == "get":
+                add_ref("IfNoneMatch")
+                add_ref("IfModifiedSince")
+
+            # Attach response headers
+            resps = op.get("responses") or {}
+            for code, resp in resps.items():
+                try:
+                    ic = int(code)
+                except Exception:
+                    continue
+                if 200 <= ic < 300:
+                    hdrs = resp.setdefault("headers", {})
+                    for n in (
+                        "ETag",
+                        "LastModified",
+                        "XRequestId",
+                        "XRateLimitLimit",
+                        "XRateLimitRemaining",
+                        "XRateLimitReset",
+                    ):
+                        hdrs.setdefault(n, {"$ref": f"#/components/headers/{n}"})
+                if code == "429":
+                    resp.setdefault("headers", {})["Retry-After"] = {
+                        "schema": {"type": "integer"},
+                        "description": "Seconds until next allowed request.",
+                    }
+        return schema
+
+    return m
+
+
 def setup_mutators(
     service: ServiceInfo,
     spec: APIVersionSpec | None,
@@ -1158,6 +1291,8 @@ def setup_mutators(
 ) -> list:
     mutators = [
         conventions_mutator(),
+        hardening_components_mutator(),
+        attach_header_params_mutator(),
         normalize_problem_and_examples_mutator(),
         attach_standard_responses_mutator(),
         auth_mutator(include_api_key),
