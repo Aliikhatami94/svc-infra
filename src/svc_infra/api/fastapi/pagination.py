@@ -147,7 +147,7 @@ def use_pagination() -> PaginationContext:
     return ctx
 
 
-def text_filter[T](items: Iterable[T], q: Optional[str], *getters: Callable[[T], str]) -> list[T]:
+def text_filter(items: Iterable[T], q: Optional[str], *getters: Callable[[T], str]) -> list[T]:
     """Simple contains filter across one or more string fields."""
     if not q:
         return list(items)
@@ -160,21 +160,21 @@ def text_filter[T](items: Iterable[T], q: Optional[str], *getters: Callable[[T],
                     out.append(it)
                     break
             except Exception:
-                # ignore faulty getter
                 pass
     return out
 
 
-def sort_by[
-    T
-](items: Iterable[T], *, key: Callable[[T], Any], desc: bool = False,) -> list[T]:
+def sort_by(
+    items: Iterable[T],
+    *,
+    key: Callable[[T], Any],
+    desc: bool = False,
+) -> list[T]:
     """Stable sort with a key func."""
     return sorted(list(items), key=key, reverse=desc)
 
 
-def cursor_window[
-    T
-](
+def cursor_window(
     items: Sequence[T],
     *,
     cursor: Optional[str],
@@ -186,12 +186,12 @@ def cursor_window[
     """
     Generic keyset windowing for already-filtered/sorted sequences.
     - If `cursor` present, expects {"after": <key>}; returns the slice after it.
-    - Else uses `offset` (e.g., computed from page/page_size).
+    - Else uses `offset`.
     Always returns (window_items, next_cursor).
     """
     n = len(items)
     if cursor:
-        payload = decode_cursor(cursor)  # {"after": value}
+        payload = decode_cursor(cursor)
         after = payload.get("after")
         if after is not None:
             ks = [key(x) for x in items]
