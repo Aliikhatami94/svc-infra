@@ -310,6 +310,7 @@ def setup_and_migrate(
     initial_message: str = "initial schema",
     followup_message: str = "autogen",
     database_url: Optional[str] = None,
+    discover_packages: Optional[Sequence[str]] = None,
 ) -> dict:
     """
     Ensure DB + Alembic are ready and up-to-date.
@@ -318,12 +319,11 @@ def setup_and_migrate(
     """
     resolved_url = database_url or get_database_url_from_env(required=True)
     root = prepare_env()
-
     if create_db_if_missing:
         ensure_database_exists(resolved_url)
 
     mig_dir = init_alembic(
-        discover_packages=None,
+        discover_packages=discover_packages,
         overwrite=overwrite_scaffold,
     )
     versions_dir = mig_dir / "versions"

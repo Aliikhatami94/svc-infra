@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import typer
 
+from svc_infra.apf_payments.alembic import discover_packages as payments_pkgs
 from svc_infra.db.sql.core import current as core_current
 from svc_infra.db.sql.core import downgrade as core_downgrade
 from svc_infra.db.sql.core import history as core_history
@@ -22,6 +23,23 @@ def apply_database_url(database_url: Optional[str]) -> None:
         os.environ["SQL_URL"] = database_url
 
 
+def _find_pkgs(with_payments, discover_packages) -> List[str]:
+    from os import getenv
+
+    payments_enabled = (
+        with_payments
+        if with_payments is not None
+        else str(getenv("APF_ENABLE_PAYMENTS", "")).lower() in {"1", "true", "yes"}
+    )
+    final_pkgs = list(discover_packages or [])
+    if payments_enabled:
+        for p in payments_pkgs():
+            if p not in final_pkgs:
+                final_pkgs.append(p)
+
+    return final_pkgs
+
+
 def cmd_init(
     database_url: Optional[str] = typer.Option(
         None,
@@ -34,14 +52,20 @@ def cmd_init(
         "If omitted, automatic discovery is used.",
     ),
     overwrite: bool = typer.Option(False, help="Overwrite existing files if present."),
+    with_payments: bool = typer.Option(
+        None,
+        help="Include svc-infra payments models when rendering env.py. "
+        "Defaults from env APF_ENABLE_PAYMENTS.",
+    ),
 ):
     """
     Initialize Alembic scaffold. The env.py variant (async vs. sync) is
     auto-detected from SQL_URL (if available at init time).
     """
+    final_pkgs = _find_pkgs(with_payments, discover_packages)
     apply_database_url(database_url)
     core_init_alembic(
-        discover_packages=discover_packages,
+        discover_packages=final_pkgs or None,
         overwrite=overwrite,
     )
 
@@ -147,18 +171,31 @@ def cmd_setup_and_migrate(
     ),
     initial_message: str = typer.Option("initial schema"),
     followup_message: str = typer.Option("autogen"),
+    # NEW:
+    discover_packages: Optional[List[str]] = typer.Option(
+        None,
+        help="Packages Alembic should import to discover models "
+        "(e.g. app.models,svc_infra.apf_payments.models).",
+    ),
+    with_payments: bool = typer.Option(
+        None,  # None = read env
+        help="Include svc-infra payments models in migrations. "
+        "If omitted, falls back to env APF_ENABLE_PAYMENTS=true/1.",
+    ),
 ):
     """
-    End-to-end: ensure DB exists, scaffold Alembic, create/upgrade revisions.
+    End-to-end: ensure DB exists, scaffold Alembic, create/upgrade, all in one command.
     Async vs. sync is inferred from SQL_URL.
     """
-    apply_database_url(database_url)
+    final_pkgs = _find_pkgs(with_payments, discover_packages)
     core_setup_and_migrate(
         overwrite_scaffold=overwrite_scaffold,
         create_db_if_missing=create_db_if_missing,
         create_followup_revision=create_followup_revision,
         initial_message=initial_message,
         followup_message=followup_message,
+        discover_packages=final_pkgs or None,
+        database_url=database_url,
     )
 
 

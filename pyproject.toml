@@ -86,6 +86,7 @@ redis = "^6.4.0"
 cashews = {extras = ["redis"], version = "^7.4.1"}
 itsdangerous = "^2.2.0"
 pyotp = "^2.9.0"
+stripe = "^13.0.1"
 
 [tool.poetry.extras]
 # Postgres v3
