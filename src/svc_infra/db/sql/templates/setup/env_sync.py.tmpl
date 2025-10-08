@@ -41,26 +41,26 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-# ---- sys.path bootstrap ----
+# ---- sys.path bootstrap (append; do NOT shadow site-packages) ----
 prepend = config.get_main_option("prepend_sys_path") or ""
 script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
 migrations_dir = pathlib.Path(script_loc).resolve()
 project_root = migrations_dir.parent
 
-def _ensure_on_syspath(p: pathlib.Path) -> None:
+def _ensure_on_syspath_end(p: pathlib.Path) -> None:
     s = str(p)
     if s and s not in sys.path:
-        sys.path.insert(0, s)
+        sys.path.append(s)  # append instead of insert(0) to avoid shadowing installed packages
 
 if prepend:
-    _ensure_on_syspath(pathlib.Path(prepend))
+    _ensure_on_syspath_end(pathlib.Path(prepend))
     src_path = pathlib.Path(prepend) / "src"
     if src_path.exists():
-        _ensure_on_syspath(src_path)
+        _ensure_on_syspath_end(src_path)
 
-_ensure_on_syspath(project_root)
+_ensure_on_syspath_end(project_root)
 if (project_root / "src").exists():
-    _ensure_on_syspath(project_root / "src")
+    _ensure_on_syspath_end(project_root / "src")
 
 
 # ---- x-args ----
@@ -116,12 +116,13 @@ if ENV_DISCOVER:
 def _collect_metadata() -> list[object]:
     """
     Strategy:
-      1) Force-import infra packages + ALEMBIC_DISCOVER_PACKAGES.
-      2) ALSO import top-level packages under project root and src/.
-      3) Import common model-bearing submodules.
-      4) Prefer ModelBase.metadata after imports.
-      5) Collect ANY object whose `.metadata` has tables (scan ALL attrs).
-      6) De-dup and keep only those with at least one table.
+      1) (If APF_ENABLE_PAYMENTS) force-import payments module and log result.
+      2) Import infra packages + ALEMBIC_DISCOVER_PACKAGES.
+      3) ALSO import top-level packages under project root and src/.
+      4) Import common model-bearing submodules.
+      5) Prefer ModelBase.metadata after imports.
+      6) Collect ANY object whose `.metadata` has tables (scan ALL attrs).
+      7) De-dup and keep only those with at least one table.
     """
     tried: list[Tuple[str, str]] = []
     errors: list[Tuple[str, str]] = []
@@ -134,12 +135,10 @@ def _collect_metadata() -> list[object]:
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        # must have a dict-like .tables attribute for MetaData
         if hasattr(md, "tables") and getattr(md, "tables"):
             found.append(md)
 
     def _scan_module_objects(mod: object) -> None:
-        # NEW: scan every attribute on the module and add anything that exposes a MetaData with tables
         try:
             for val in vars(mod).values():
                 md = getattr(val, "metadata", None) or None
@@ -148,7 +147,16 @@ def _collect_metadata() -> list[object]:
         except Exception:
             pass
 
-    # 1) seed list
+    # (1) Force-load payments when enabled and log explicit outcome
+    if os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}:
+        try:
+            importlib.import_module("svc_infra.apf_payments.models")
+            context.config.print_stdout("[alembic env] payments module import: ok (svc_infra.apf_payments.models)")
+        except Exception:
+            context.config.print_stdout("[alembic env] payments module import: ERR (svc_infra.apf_payments.models)")
+            context.config.print_stdout(traceback.format_exc())
+
+    # (2) seed list
     pkgs: list[str] = []
     for p in list(DISCOVER_PACKAGES or []):
         if p and p not in pkgs:
@@ -159,7 +167,7 @@ def _collect_metadata() -> list[object]:
             if p not in pkgs:
                 pkgs.append(p)
 
-    # 2) filesystem discovery (root + src)
+    # (3) filesystem discovery (root + src) – appended, not shadowing site-packages
     fs_roots: list[pathlib.Path] = []
     for candidate in {project_root, project_root / "src"}:
         if candidate.exists():
@@ -175,7 +183,6 @@ def _collect_metadata() -> list[object]:
     if "models" not in pkgs:
         pkgs.append("models")
 
-    # import each package and scan
     def _import_and_collect(modname: str):
         try:
             mod = importlib.import_module(modname)
@@ -183,12 +190,10 @@ def _collect_metadata() -> list[object]:
         except Exception:
             _note(modname, False, traceback.format_exc())
             return None
-        # common top-level attrs
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(mod, attr, None)
             if obj is not None:
                 _maybe_add(obj)
-        # scan ALL attributes for hidden bases/metadatas
         _scan_module_objects(mod)
         return mod
 
@@ -197,12 +202,9 @@ def _collect_metadata() -> list[object]:
         if pkg is None:
             continue
 
-        # typical submodules
         for subname in ("models", "db", "orm", "entities"):
-            # import <pkg>.models etc.
-            submod = _import_and_collect(f"{pkg_name}.{subname}")
+            _import_and_collect(f"{pkg_name}.{subname}")
 
-        # walk down and only load modules with model-ish names
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
@@ -256,16 +258,13 @@ def _collect_metadata() -> list[object]:
         f"[alembic env] discovered {len(uniq)} metadata objects with {total_tables} tables total"
     )
 
-    # If payments is expected but didn’t contribute, emit a hint
     want_payments = os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}
     if want_payments:
-        # naive check: any table named like pay_* or any module import success?
         saw_pay = any(any(tn.startswith("pay_") for tn in md.tables.keys()) for md in uniq) if uniq else False
         if not saw_pay:
             context.config.print_stdout(
                 "[alembic env] WARNING: APF_ENABLE_PAYMENTS is set but no payments tables were discovered. "
-                "The env now scans all module attributes; if payments models are gated behind runtime init, "
-                "ensure importing `svc_infra.apf_payments.models` registers tables on a declarative base."
+                "If you still see this, a local package named 'svc_infra' may be shadowing the installed one."
             )
 
     # If nothing, dump import attempts / first 10 tracebacks

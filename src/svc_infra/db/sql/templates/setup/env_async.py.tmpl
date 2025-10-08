@@ -37,26 +37,26 @@ if config.config_file_name is not None:
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# sys.path bootstrap
+# sys.path bootstrap (append)
 prepend = config.get_main_option("prepend_sys_path") or ""
 script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
 migrations_dir = pathlib.Path(script_loc).resolve()
 project_root = migrations_dir.parent
 
-def _ensure_on_syspath(p: pathlib.Path) -> None:
+def _ensure_on_syspath_end(p: pathlib.Path) -> None:
     s = str(p)
     if s and s not in sys.path:
-        sys.path.insert(0, s)
+        sys.path.append(s)
 
 if prepend:
-    _ensure_on_syspath(pathlib.Path(prepend))
+    _ensure_on_syspath_end(pathlib.Path(prepend))
     src_path = pathlib.Path(prepend) / "src"
     if src_path.exists():
-        _ensure_on_syspath(src_path)
+        _ensure_on_syspath_end(src_path)
 
-_ensure_on_syspath(project_root)
+_ensure_on_syspath_end(project_root)
 if (project_root / "src").exists():
-    _ensure_on_syspath(project_root / "src")
+    _ensure_on_syspath_end(project_root / "src")
 
 # x-args
 def _x_args_dict() -> dict:
@@ -108,7 +108,7 @@ u = _coerce_to_async(u)
 u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
-# metadata discovery (scan ALL attrs)
+# metadata discovery (scan ALL attrs; do not shadow site-packages)
 DISCOVER_PACKAGES: List[str] = ['svc_infra.apf_payments.models']
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
@@ -137,6 +137,15 @@ def _collect_metadata() -> list[object]:
                     found.append(md)
         except Exception:
             pass
+
+    # Force-load payments when enabled and log
+    if os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}:
+        try:
+            importlib.import_module("svc_infra.apf_payments.models")
+            context.config.print_stdout("[alembic env (async)] payments module import: ok (svc_infra.apf_payments.models)")
+        except Exception:
+            context.config.print_stdout("[alembic env (async)] payments module import: ERR (svc_infra.apf_payments.models)")
+            context.config.print_stdout(traceback.format_exc())
 
     pkgs: list[str] = []
     for p in list(DISCOVER_PACKAGES or []):
@@ -238,8 +247,7 @@ def _collect_metadata() -> list[object]:
         if not saw_pay:
             context.config.print_stdout(
                 "[alembic env (async)] WARNING: APF_ENABLE_PAYMENTS is set but no payments tables were discovered. "
-                "Import scanning now inspects all module attributes; if models are gated behind runtime init, "
-                "ensure importing `svc_infra.apf_payments.models` registers tables."
+                "If you still see this, a local package named 'svc_infra' may be shadowing the installed one."
             )
 
     if total_tables == 0:
