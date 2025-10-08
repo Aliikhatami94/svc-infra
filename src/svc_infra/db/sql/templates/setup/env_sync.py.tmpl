@@ -227,8 +227,20 @@ target_metadata = _collect_metadata()
 
 
 def _want_include_schemas() -> bool:
+    # explicit opt-in always wins
     val = _x.get("include_schemas", "") or os.getenv("ALEMBIC_INCLUDE_SCHEMAS", "")
-    return str(val).strip() in {"1", "true", "True", "yes"}
+    if str(val).strip() in {"1", "true", "True", "yes"}:
+        return True
+
+    # auto: if any collected metadata has tables with a non-default schema, include schemas
+    try:
+        for md in (target_metadata or []):
+            for t in getattr(md, "tables", {}).values():
+                if getattr(t, "schema", None):
+                    return True
+    except Exception:
+        pass
+    return False
 
 
 def _system_schemas_for(url: str) -> set[str]:
