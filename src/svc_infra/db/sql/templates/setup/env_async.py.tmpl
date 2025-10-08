@@ -2,7 +2,8 @@
 from __future__ import annotations
 import os
 import logging
-from typing import List
+from typing import List, Tuple
+import sys, pathlib, importlib, pkgutil, traceback
 
 from alembic import context
 from sqlalchemy.engine import make_url, URL
@@ -32,10 +33,11 @@ config = context.config
 if config.config_file_name is not None:
     import logging.config as _lc
     _lc.fileConfig(config.config_file_name)
-logger = logging.getLogger(__name__)
 
-# ---- sys.path bootstrap (WORKS WITHOUT alembic.ini) ----
-import sys, pathlib, importlib.util
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# ---- sys.path bootstrap (works without alembic.ini) ----
 prepend = config.get_main_option("prepend_sys_path") or ""
 script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
 migrations_dir = pathlib.Path(script_loc).resolve()
@@ -56,7 +58,7 @@ _ensure_on_syspath(project_root)
 if (project_root / "src").exists():
     _ensure_on_syspath(project_root / "src")
 
-# --- robust x-arg parsing for all Alembic versions ---
+# --- x-args parsing ---
 def _x_args_dict() -> dict:
     try:
         return context.get_x_argument(as_dictionary=True)  # type: ignore[arg-type]
@@ -74,7 +76,7 @@ def _x_args_dict() -> dict:
             out[item] = ""
     return out
 
-# --- Resolve effective DB URL (priority: -x -> env -> helper -> ini) ---
+# --- DB URL resolution ---
 _x = _x_args_dict()
 cli_dburl = _x.get("dburl", "").strip()
 env_dburl = os.getenv("SQL_URL", "").strip()
@@ -106,16 +108,21 @@ u = _coerce_to_async(u)
 u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
-# --- metadata discovery (same strategy as sync) ---
+# --- metadata discovery (same strategy + diagnostics) ---
 DISCOVER_PACKAGES: List[str] = ['svc_infra.apf_payments.models']
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    import importlib, pkgutil
-
+    tried: list[Tuple[str, str]] = []
+    errors: list[Tuple[str, str]] = []
     found: list[object] = []
+
+    def _note(name: str, ok: bool, err: str | None = None):
+        tried.append((name, "ok" if ok else "err"))
+        if not ok and err:
+            errors.append((name, err))
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
@@ -143,11 +150,14 @@ def _collect_metadata() -> list[object]:
                 if name not in pkgs:
                     pkgs.append(name)
 
+    pkgs = pkgs + [m for m in ["models"] if m not in pkgs]
+
     for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
-        except Exception as e:
-            logger.debug("Failed to import %s: %s", pkg_name, e)
+            _note(pkg_name, True, None)
+        except Exception:
+            _note(pkg_name, False, traceback.format_exc())
             continue
 
         for attr in ("metadata", "MetaData", "Base", "base"):
@@ -156,9 +166,12 @@ def _collect_metadata() -> list[object]:
                 _maybe_add(obj)
 
         for subname in ("models", "db", "orm", "entities"):
+            modname = f"{pkg_name}.{subname}" if "." in pkg_name or pkg_name != "models" else subname
             try:
-                sub = importlib.import_module(f"{pkg_name}.{subname}")
+                sub = importlib.import_module(modname)
+                _note(modname, True, None)
             except Exception:
+                _note(modname, False, traceback.format_exc())
                 sub = None
             if sub is not None:
                 for attr in ("metadata", "MetaData", "Base", "base"):
@@ -176,7 +189,9 @@ def _collect_metadata() -> list[object]:
                 continue
             try:
                 mod = importlib.import_module(name)
+                _note(name, True, None)
             except Exception:
+                _note(name, False, traceback.format_exc())
                 continue
             for attr in ("metadata", "MetaData", "Base", "base"):
                 obj = getattr(mod, attr, None)
@@ -188,14 +203,18 @@ def _collect_metadata() -> list[object]:
         mb_md = getattr(ModelBase, "metadata", None)
         if mb_md is not None and hasattr(mb_md, "tables") and mb_md.tables:
             found.append(mb_md)
-    except Exception as e:
-        logger.debug("ModelBase not available or empty: %s", e)
+            _note("ModelBase.metadata", True, None)
+        else:
+            _note("ModelBase.metadata(empty)", True, None)
+    except Exception:
+        _note("ModelBase import", False, traceback.format_exc())
 
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model
         try_autobind_apikey_model(require_env=False)
-    except Exception as e:
-        logger.debug("svc-infra apikey autobind skipped: %s", e)
+        _note("svc_infra.db.sql.apikey.try_autobind_apikey_model", True, None)
+    except Exception:
+        _note("svc_infra.db.sql.apikey.try_autobind_apikey_model", False, traceback.format_exc())
 
     uniq: list[object] = []
     seen: set[int] = set()
@@ -209,11 +228,22 @@ def _collect_metadata() -> list[object]:
             seen.add(id(md))
             uniq.append(md)
 
+    total_tables = 0
     try:
         total_tables = sum(len(getattr(md, "tables", {})) for md in uniq)
-        logger.info("alembic env (async): discovered %s metadata objects with %s tables total", len(uniq), total_tables)
     except Exception:
         pass
+
+    context.config.print_stdout(
+        f"[alembic env (async)] discovered {len(uniq)} metadata objects with {total_tables} tables total"
+    )
+    if total_tables == 0:
+        context.config.print_stdout("[alembic env (async)] import attempts (ok/err):")
+        for name, status in tried:
+            context.config.print_stdout(f"  - {status:3s}  {name}")
+        for name, tb in errors[:10]:
+            context.config.print_stdout(f"  --- import error: {name} ---")
+            context.config.print_stdout(tb)
 
     return uniq
 
