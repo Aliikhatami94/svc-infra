@@ -108,10 +108,9 @@ def _collect_metadata() -> list[object]:
     Discover SQLAlchemy MetaData objects for Alembic autogenerate.
 
     Strategy:
-      1) Import packages from DISCOVER_PACKAGES and env ALEMBIC_DISCOVER_PACKAGES
-         (so model classes register on ModelBase).
-      2) If nothing specified, discover top-level packages under project root /src.
-      3) Prefer svc_infra.db.sql.base.ModelBase.metadata after imports.
+      1) Import packages from DISCOVER_PACKAGES and env ALEMBIC_DISCOVER_PACKAGES.
+      2) Also ALWAYS discover top-level packages under project root and /src (merge, not fallback).
+      3) Prefer ModelBase.metadata after imports.
       4) Also collect any per-module `metadata` / `Base` / `MetaData` objects.
       5) De-duplicate and return only those with tables.
     """
@@ -124,29 +123,32 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    # 1) Collect package names to import
+    # 1) Start with baked + env-provided packages (seed list)
     pkgs: list[str] = []
     for p in list(DISCOVER_PACKAGES or []):
         if p and p not in pkgs:
             pkgs.append(p)
+
     env_pkgs = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "")
     if env_pkgs:
         for p in (x.strip() for x in env_pkgs.split(",") if x.strip()):
             if p not in pkgs:
                 pkgs.append(p)
 
-    # 2) Filesystem discovery (src-layout) if none specified
-    if not pkgs:
-        roots: list[pathlib.Path] = []
-        if prepend:
-            roots.append(pathlib.Path(prepend))
-            roots.append(pathlib.Path(prepend) / "src")
-        for root in roots:
-            if not root or not root.exists():
-                continue
-            for p in root.iterdir():
-                if p.is_dir() and (p / "__init__.py").exists():
-                    pkgs.append(p.name)
+    # 2) ALWAYS merge filesystem discovery (project root + src/) to ensure app packages are imported
+    roots: list[pathlib.Path] = []
+    if prepend:
+        roots.append(pathlib.Path(prepend))
+        roots.append(pathlib.Path(prepend) / "src")
+    for root in roots:
+        if not root or not root.exists():
+            continue
+        for p in root.iterdir():
+            # add top-level python packages (dirs with __init__.py)
+            if p.is_dir() and (p / "__init__.py").exists():
+                name = p.name
+                if name not in pkgs:
+                    pkgs.append(name)
 
     # Import packages and common submodules to register models
     for pkg_name in pkgs:
@@ -192,7 +194,6 @@ def _collect_metadata() -> list[object]:
     # 3) Prefer ModelBase.metadata after imports (ensures tables are registered)
     try:
         from svc_infra.db.sql.base import ModelBase  # type: ignore
-
         mb_md = getattr(ModelBase, "metadata", None)
         if mb_md is not None and hasattr(mb_md, "tables") and mb_md.tables:
             found.append(mb_md)
@@ -202,7 +203,6 @@ def _collect_metadata() -> list[object]:
     # 4) Optional: autobind API key model (no-op if feature isn’t configured)
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model
-
         try_autobind_apikey_model(require_env=False)
     except Exception as e:
         logger.debug("svc-infra apikey autobind skipped: %s", e)
