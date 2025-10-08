@@ -100,39 +100,45 @@ if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    import importlib, pkgutil, pathlib
+    """
+    Discover SQLAlchemy MetaData objects for Alembic autogenerate.
+
+    Strategy:
+      1) Import packages specified by DISCOVER_PACKAGES and env ALEMBIC_DISCOVER_PACKAGES
+         (to ensure model classes register on ModelBase).
+      2) If nothing specified, discover top-level packages under project root /src.
+      3) After imports, prefer ModelBase.metadata if populated.
+      4) Also collect any per-module `metadata` / `Base` / `MetaData` objects.
+      5) De-duplicate and return.
+    """
+    import os, importlib, pkgutil, pathlib
+
     found: list[object] = []
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        if hasattr(md, "tables") and getattr(md, "tables", None) and hasattr(md, "schema"):
+        if hasattr(md, "tables") and hasattr(md, "schema"):
+            # only add if there is at least a potential tables mapping (may be empty pre-import)
             found.append(md)
 
-    # 1) Always import DISCOVER_PACKAGES up front so their models register on ModelBase
-    pkgs = list(DISCOVER_PACKAGES) or []
-    for pkg_name in pkgs:
-        try:
-            importlib.import_module(pkg_name)
-        except Exception as e:
-            logger.debug("Failed to import %s: %s", pkg_name, e)
-        # best-effort: common submodule where models live
-        try:
-            importlib.import_module(f"{pkg_name}.models")
-        except Exception:
-            pass
+    # ---- 1) Resolve packages to import
+    pkgs: list[str] = []
 
-    # 2) Prefer ModelBase after packages have been imported
-    try:
-        from svc_infra.db.sql.base import ModelBase  # type: ignore
-        md = getattr(ModelBase, "metadata", None)
-        if md is not None and getattr(md, "tables", None):
-            found.append(md)
-    except Exception as e:
-        logger.debug("ModelBase not available or empty: %s", e)
+    # CLI-rendered list baked into env.py (render_env_py) takes precedence
+    for p in list(DISCOVER_PACKAGES or []):
+        if p and p not in pkgs:
+            pkgs.append(p)
 
-    # 3) Optional discovery scan (kept from your original logic)
+    # Allow env override / additions without regenerating scaffold
+    env_pkgs = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "")
+    if env_pkgs:
+        for p in (x.strip() for x in env_pkgs.split(",") if x.strip()):
+            if p not in pkgs:
+                pkgs.append(p)
+
+    # ---- 2) Filesystem discovery if nothing explicit
     if not pkgs:
-        roots = []
+        roots: list[pathlib.Path] = []
         if prepend:
             roots.append(pathlib.Path(prepend))
             roots.append(pathlib.Path(prepend) / "src")
@@ -143,6 +149,7 @@ def _collect_metadata() -> list[object]:
                 if p.is_dir() and (p / "__init__.py").exists():
                     pkgs.append(p.name)
 
+    # ---- Import packages to populate ModelBase and locate module-level metadata
     for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
@@ -150,26 +157,31 @@ def _collect_metadata() -> list[object]:
             logger.debug("Failed to import %s: %s", pkg_name, e)
             continue
 
+        # common top-level attributes
         for attr in ("metadata", "MetaData", "Base", "base"):
             obj = getattr(pkg, attr, None)
             if obj is not None:
                 _maybe_add(obj)
 
-        for subname in ("models",):
+        # likely submodules that define models
+        for subname in ("models", "db", "orm", "entities"):
             try:
                 sub = importlib.import_module(f"{pkg_name}.{subname}")
-                for attr in ("metadata", "MetaData", "Base", "base"):
-                    obj = getattr(sub, attr, None)
-                    if obj is not None:
-                        _maybe_add(obj)
             except Exception:
-                pass
+                continue
+            for attr in ("metadata", "MetaData", "Base", "base"):
+                obj = getattr(sub, attr, None)
+                if obj is not None:
+                    _maybe_add(obj)
 
+        # walk deeper but only under common model-ish paths to avoid importing the world
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
         for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
-            if ispkg or not any(x in name for x in (".models", ".db", ".orm", ".entities")):
+            if ispkg:
+                continue
+            if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
                 continue
             try:
                 mod = importlib.import_module(name)
@@ -180,19 +192,36 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # 4) Autobind API key model (unchanged)
+    # ---- 3) Prefer ModelBase.metadata AFTER imports (so tables are registered)
+    try:
+        from svc_infra.db.sql.base import ModelBase  # type: ignore
+        mb_md = getattr(ModelBase, "metadata", None)
+        if mb_md is not None and hasattr(mb_md, "tables") and mb_md.tables:
+            found.append(mb_md)
+    except Exception as e:
+        logger.debug("ModelBase not available or empty: %s", e)
+
+    # ---- 4) Optional: autobind API key model if present (no-op if not configured)
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model
+        # Gate via env internally if you want: require_env=True and set AUTH_ENABLE_API_KEYS=1
         try_autobind_apikey_model(require_env=False)
     except Exception as e:
         logger.debug("svc-infra apikey autobind skipped: %s", e)
 
-    # 5) De-dup
-    uniq, seen = [], set()
+    # ---- 5) De-dup + only keep metadata with at least one table
+    uniq: list[object] = []
+    seen: set[int] = set()
     for md in found:
+        try:
+            if not (hasattr(md, "tables") and md.tables):
+                continue
+        except Exception:
+            continue
         if id(md) not in seen:
             seen.add(id(md))
             uniq.append(md)
+
     return uniq
 
 target_metadata = _collect_metadata()
