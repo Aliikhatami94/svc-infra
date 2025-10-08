@@ -15,9 +15,8 @@ from svc_infra.db.sql.utils import (
 
 try:
     from svc_infra.db.sql.types import GUID as _GUID  # type: ignore
-except Exception:  # keep env.py robust if package unavailable at import time
+except Exception:
     _GUID = None
-
 
 def _render_item(type_, obj, autogen_context):
     if type_ == "type" and (
@@ -28,30 +27,36 @@ def _render_item(type_, obj, autogen_context):
         return "GUID()"
     return False
 
-
-# ---- Logging ----
+# Logging
 config = context.config
 if config.config_file_name is not None:
     import logging.config as _lc
-
     _lc.fileConfig(config.config_file_name)
 logger = logging.getLogger(__name__)
 
-# ---- sys.path bootstrap for src-layout projects ----
+# ---- sys.path bootstrap (WORKS WITHOUT alembic.ini) ----
 import sys, pathlib, importlib.util
-
 prepend = config.get_main_option("prepend_sys_path") or ""
+script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
+migrations_dir = pathlib.Path(script_loc).resolve()
+project_root = migrations_dir.parent
+
+def _ensure_on_syspath(p: pathlib.Path) -> None:
+    s = str(p)
+    if s and s not in sys.path:
+        sys.path.insert(0, s)
+
 if prepend:
-    if prepend not in sys.path:
-        sys.path.insert(0, prepend)
+    _ensure_on_syspath(pathlib.Path(prepend))
     src_path = pathlib.Path(prepend) / "src"
     if src_path.exists():
-        s = str(src_path)
-        if s not in sys.path:
-            sys.path.insert(0, s)
+        _ensure_on_syspath(src_path)
 
+_ensure_on_syspath(project_root)
+if (project_root / "src").exists():
+    _ensure_on_syspath(project_root / "src")
 
-# ---- robust x-arg parsing for all Alembic versions ----
+# --- robust x-arg parsing for all Alembic versions ---
 def _x_args_dict() -> dict:
     try:
         return context.get_x_argument(as_dictionary=True)  # type: ignore[arg-type]
@@ -60,7 +65,7 @@ def _x_args_dict() -> dict:
             xs = context.get_x_argument()
         except TypeError:
             xs = []
-    out: dict = {}
+    out = {}
     for item in xs:
         if "=" in item:
             k, v = item.split("=", 1)
@@ -69,8 +74,7 @@ def _x_args_dict() -> dict:
             out[item] = ""
     return out
 
-
-# ---- Resolve effective DB URL (priority: -x -> env -> helper -> ini) ----
+# --- Resolve effective DB URL (priority: -x -> env -> helper -> ini) ---
 _x = _x_args_dict()
 cli_dburl = _x.get("dburl", "").strip()
 env_dburl = os.getenv("SQL_URL", "").strip()
@@ -83,7 +87,6 @@ ini_dburl = (config.get_main_option("sqlalchemy.url") or "").strip()
 effective_url = cli_dburl or env_dburl or helper_dburl or ini_dburl
 if not effective_url:
     raise RuntimeError("No database URL found (env/CLI/ini). Provide one.")
-
 
 def _coerce_to_async(u: URL) -> URL:
     dn = (u.drivername or "").lower()
@@ -98,31 +101,18 @@ def _coerce_to_async(u: URL) -> URL:
         return u.set(drivername="sqlite+aiosqlite")
     return u
 
-
 u = make_url(effective_url)
 u = _coerce_to_async(u)
 u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
-
-# ---- metadata discovery (same as sync) ----
-DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
+# --- metadata discovery (same strategy as sync) ---
+DISCOVER_PACKAGES: List[str] = ['svc_infra.apf_payments.models']
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
-    DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(",") if s.strip()]
-
+    DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    """
-    Discover SQLAlchemy MetaData objects for Alembic autogenerate.
-
-    Strategy:
-      1) Import packages from DISCOVER_PACKAGES and env ALEMBIC_DISCOVER_PACKAGES.
-      2) Also ALWAYS discover top-level packages under project root and /src (merge, not fallback).
-      3) Prefer ModelBase.metadata after imports.
-      4) Also collect any per-module `metadata` / `Base` / `MetaData` objects.
-      5) De-duplicate and return only those with tables.
-    """
     import importlib, pkgutil
 
     found: list[object] = []
@@ -132,34 +122,27 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    # 1) Start with baked + env-provided packages (seed list)
     pkgs: list[str] = []
     for p in list(DISCOVER_PACKAGES or []):
         if p and p not in pkgs:
             pkgs.append(p)
-
     env_pkgs = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "")
     if env_pkgs:
         for p in (x.strip() for x in env_pkgs.split(",") if x.strip()):
             if p not in pkgs:
                 pkgs.append(p)
 
-    # 2) ALWAYS merge filesystem discovery (project root + src/) to ensure app packages are imported
-    roots: list[pathlib.Path] = []
-    if prepend:
-        roots.append(pathlib.Path(prepend))
-        roots.append(pathlib.Path(prepend) / "src")
-    for root in roots:
-        if not root or not root.exists():
-            continue
+    fs_roots: list[pathlib.Path] = []
+    for candidate in {project_root, project_root / "src"}:
+        if candidate.exists():
+            fs_roots.append(candidate)
+    for root in fs_roots:
         for p in root.iterdir():
-            # add top-level python packages (dirs with __init__.py)
             if p.is_dir() and (p / "__init__.py").exists():
                 name = p.name
                 if name not in pkgs:
                     pkgs.append(name)
 
-    # Import packages and common submodules to register models
     for pkg_name in pkgs:
         try:
             pkg = importlib.import_module(pkg_name)
@@ -200,7 +183,6 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # 3) Prefer ModelBase.metadata after imports (ensures tables are registered)
     try:
         from svc_infra.db.sql.base import ModelBase  # type: ignore
         mb_md = getattr(ModelBase, "metadata", None)
@@ -209,14 +191,12 @@ def _collect_metadata() -> list[object]:
     except Exception as e:
         logger.debug("ModelBase not available or empty: %s", e)
 
-    # 4) Optional: autobind API key model (no-op if feature isn’t configured)
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model
         try_autobind_apikey_model(require_env=False)
     except Exception as e:
         logger.debug("svc-infra apikey autobind skipped: %s", e)
 
-    # 5) De-dup + only keep metadata with at least one table
     uniq: list[object] = []
     seen: set[int] = set()
     for md in found:
@@ -229,19 +209,20 @@ def _collect_metadata() -> list[object]:
             seen.add(id(md))
             uniq.append(md)
 
-    return uniq
+    try:
+        total_tables = sum(len(getattr(md, "tables", {})) for md in uniq)
+        logger.info("alembic env (async): discovered %s metadata objects with %s tables total", len(uniq), total_tables)
+    except Exception:
+        pass
 
+    return uniq
 
 target_metadata = _collect_metadata()
 
-
 def _want_include_schemas() -> bool:
-    # explicit opt-in always wins
     val = _x.get("include_schemas", "") or os.getenv("ALEMBIC_INCLUDE_SCHEMAS", "")
     if str(val).strip() in {"1", "true", "True", "yes"}:
         return True
-
-    # auto: if any collected metadata has tables with a non-default schema, include schemas
     try:
         for md in (target_metadata or []):
             for t in getattr(md, "tables", {}).values():
@@ -250,7 +231,6 @@ def _want_include_schemas() -> bool:
     except Exception:
         pass
     return False
-
 
 def _system_schemas_for(url: str) -> set[str]:
     try:
@@ -267,20 +247,13 @@ def _system_schemas_for(url: str) -> set[str]:
         return {"INFORMATION_SCHEMA"}
     return set()
 
-
 def _include_object_factory(url: str):
-    """
-    Include-object hook with optional guard against dropping tables that exist
-    in the DB but are missing from metadata. Enable by setting ALEMBIC_SKIP_DROPS=1.
-    """
     sys_schemas = _system_schemas_for(url)
     skip_drops = os.getenv("ALEMBIC_SKIP_DROPS", "").lower() in {"1", "true", "yes"}
-
     def _include_object(obj, name, type_, reflected, compare_to):
         schema = getattr(obj, "schema", None)
         if schema and str(schema) in sys_schemas:
             return False
-
         version_table = (
             context.get_x_argument(as_dictionary=True).get("version_table")
             if hasattr(context, "get_x_argument")
@@ -288,14 +261,10 @@ def _include_object_factory(url: str):
         ) or os.getenv("ALEMBIC_VERSION_TABLE", "alembic_version")
         if type_ == "table" and name == version_table:
             return True
-
         if skip_drops and type_ == "table" and reflected and compare_to is None:
             return False
-
         return True
-
     return _include_object
-
 
 def _do_run_migrations(connection):
     url = config.get_main_option("sqlalchemy.url")
@@ -313,7 +282,6 @@ def _do_run_migrations(connection):
     with context.begin_transaction():
         context.run_migrations()
 
-
 async def run_migrations_online() -> None:
     url = config.get_main_option("sqlalchemy.url")
     engine = create_async_engine(url)
@@ -321,10 +289,8 @@ async def run_migrations_online() -> None:
         await connection.run_sync(_do_run_migrations)
     await engine.dispose()
 
-
 if context.is_offline_mode():
     raise SystemExit("Run offline migrations with a sync env.py or set offline to False.")
 else:
     import asyncio as _asyncio
-
     _asyncio.run(run_migrations_online())

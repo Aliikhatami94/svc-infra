@@ -35,20 +35,32 @@ def _render_item(type_, obj, autogen_context):
 config = context.config
 if config.config_file_name is not None:
     import logging.config as _lc
-
     _lc.fileConfig(config.config_file_name)
 logger = logging.getLogger(__name__)
 
-# ---- sys.path bootstrap for src-layout projects ----
+# ---- sys.path bootstrap (WORKS WITHOUT alembic.ini) ----
+# Prefer explicit prepend from alembic.ini if present, but always also derive project_root
 prepend = config.get_main_option("prepend_sys_path") or ""
+script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
+migrations_dir = pathlib.Path(script_loc).resolve()
+# The project root is the parent of the migrations directory
+project_root = migrations_dir.parent
+
+def _ensure_on_syspath(p: pathlib.Path) -> None:
+    s = str(p)
+    if s and s not in sys.path:
+        sys.path.insert(0, s)
+
 if prepend:
-    if prepend not in sys.path:
-        sys.path.insert(0, prepend)
+    _ensure_on_syspath(pathlib.Path(prepend))
     src_path = pathlib.Path(prepend) / "src"
     if src_path.exists():
-        s = str(src_path)
-        if s not in sys.path:
-            sys.path.insert(0, s)
+        _ensure_on_syspath(src_path)
+
+# Always add discovered project roots too (even if prepend is empty)
+_ensure_on_syspath(project_root)
+if (project_root / "src").exists():
+    _ensure_on_syspath(project_root / "src")
 
 
 # ---- robust x-arg parsing for all Alembic versions ----
@@ -97,11 +109,10 @@ config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False)
 
 
 # ---- metadata discovery (prefer ModelBase) ----
-DISCOVER_PACKAGES: List[str] = [__PACKAGES_LIST__]
+DISCOVER_PACKAGES: List[str] = ['svc_infra.apf_payments.models']  # scaffold seed; merged with FS + env
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(",") if s.strip()]
-
 
 def _collect_metadata() -> list[object]:
     """
@@ -109,8 +120,8 @@ def _collect_metadata() -> list[object]:
 
     Strategy:
       1) Import packages from DISCOVER_PACKAGES and env ALEMBIC_DISCOVER_PACKAGES.
-      2) Also ALWAYS discover top-level packages under project root and /src (merge, not fallback).
-      3) Prefer ModelBase.metadata after imports.
+      2) ALWAYS also discover top-level packages under project_root and project_root/src.
+      3) Prefer svc_infra.db.sql.base.ModelBase.metadata after imports.
       4) Also collect any per-module `metadata` / `Base` / `MetaData` objects.
       5) De-duplicate and return only those with tables.
     """
@@ -123,28 +134,25 @@ def _collect_metadata() -> list[object]:
         if hasattr(md, "tables") and hasattr(md, "schema"):
             found.append(md)
 
-    # 1) Start with baked + env-provided packages (seed list)
+    # 1) Seed with baked + env-provided packages
     pkgs: list[str] = []
     for p in list(DISCOVER_PACKAGES or []):
         if p and p not in pkgs:
             pkgs.append(p)
-
     env_pkgs = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "")
     if env_pkgs:
         for p in (x.strip() for x in env_pkgs.split(",") if x.strip()):
             if p not in pkgs:
                 pkgs.append(p)
 
-    # 2) ALWAYS merge filesystem discovery (project root + src/) to ensure app packages are imported
-    roots: list[pathlib.Path] = []
-    if prepend:
-        roots.append(pathlib.Path(prepend))
-        roots.append(pathlib.Path(prepend) / "src")
-    for root in roots:
-        if not root or not root.exists():
-            continue
+    # 2) ALWAYS merge filesystem discovery (project_root + src) so app packages are imported
+    fs_roots: list[pathlib.Path] = []
+    for candidate in {project_root, project_root / "src"}:
+        if candidate.exists():
+            fs_roots.append(candidate)
+
+    for root in fs_roots:
         for p in root.iterdir():
-            # add top-level python packages (dirs with __init__.py)
             if p.is_dir() and (p / "__init__.py").exists():
                 name = p.name
                 if name not in pkgs:
@@ -219,6 +227,13 @@ def _collect_metadata() -> list[object]:
         if id(md) not in seen:
             seen.add(id(md))
             uniq.append(md)
+
+    # Helpful hint in INFO so you can see discovery health
+    try:
+        total_tables = sum(len(getattr(md, "tables", {})) for md in uniq)
+        logger.info("alembic env: discovered %s metadata objects with %s tables total", len(uniq), total_tables)
+    except Exception:
+        pass
 
     return uniq
 
