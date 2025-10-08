@@ -38,10 +38,10 @@ if config.config_file_name is not None:
     _lc.fileConfig(config.config_file_name)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # ensure our INFO messages show up
+logger.setLevel(logging.INFO)
 
 
-# ---- sys.path bootstrap (works even without alembic.ini) ----
+# ---- sys.path bootstrap ----
 prepend = config.get_main_option("prepend_sys_path") or ""
 script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
 migrations_dir = pathlib.Path(script_loc).resolve()
@@ -58,13 +58,12 @@ if prepend:
     if src_path.exists():
         _ensure_on_syspath(src_path)
 
-# Always add derived roots, too
 _ensure_on_syspath(project_root)
 if (project_root / "src").exists():
     _ensure_on_syspath(project_root / "src")
 
 
-# ---- robust x-arg parsing (all Alembic versions) ----
+# ---- x-args ----
 def _x_args_dict() -> dict:
     try:
         return context.get_x_argument(as_dictionary=True)  # type: ignore[arg-type]
@@ -83,7 +82,7 @@ def _x_args_dict() -> dict:
     return out
 
 
-# ---- Resolve DB URL (priority: -x -> env -> helper -> ini) ----
+# ---- DB URL resolution ----
 _x = _x_args_dict()
 cli_dburl = _x.get("dburl", "").strip()
 env_dburl = os.getenv("SQL_URL", "").strip()
@@ -108,7 +107,7 @@ u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
 
-# ---- metadata discovery (prefer ModelBase; strong diagnostics) ----
+# ---- metadata discovery (prefer ModelBase; scan ALL attrs) ----
 DISCOVER_PACKAGES: List[str] = ['svc_infra.apf_payments.models']  # seed; merged with FS + env
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
@@ -116,19 +115,16 @@ if ENV_DISCOVER:
 
 def _collect_metadata() -> list[object]:
     """
-    Discover SQLAlchemy MetaData objects for Alembic autogenerate.
-
     Strategy:
-      1) Force-import known-infra packages (payments) + any in ALEMBIC_DISCOVER_PACKAGES.
-      2) ALSO import top-level packages under project_root and project_root/src.
-      3) Import common model-bearing modules: "<pkg>.models", "<pkg>.db", "<pkg>.orm", "<pkg>.entities".
-         Additionally attempt importing bare 'models' if it exists on sys.path.
-      4) Prefer svc_infra.db.sql.base.ModelBase.metadata after imports.
-      5) Collect module-level `metadata` / `Base` / `MetaData` as extras.
+      1) Force-import infra packages + ALEMBIC_DISCOVER_PACKAGES.
+      2) ALSO import top-level packages under project root and src/.
+      3) Import common model-bearing submodules.
+      4) Prefer ModelBase.metadata after imports.
+      5) Collect ANY object whose `.metadata` has tables (scan ALL attrs).
       6) De-dup and keep only those with at least one table.
     """
-    tried: list[Tuple[str, str]] = []      # (name, "ok"|"err")
-    errors: list[Tuple[str, str]] = []     # (name, traceback)
+    tried: list[Tuple[str, str]] = []
+    errors: list[Tuple[str, str]] = []
     found: list[object] = []
 
     def _note(name: str, ok: bool, err: str | None = None):
@@ -138,10 +134,21 @@ def _collect_metadata() -> list[object]:
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        if hasattr(md, "tables") and hasattr(md, "schema"):
+        # must have a dict-like .tables attribute for MetaData
+        if hasattr(md, "tables") and getattr(md, "tables"):
             found.append(md)
 
-    # 1) Seed with baked + env-provided
+    def _scan_module_objects(mod: object) -> None:
+        # NEW: scan every attribute on the module and add anything that exposes a MetaData with tables
+        try:
+            for val in vars(mod).values():
+                md = getattr(val, "metadata", None) or None
+                if md is not None and hasattr(md, "tables") and getattr(md, "tables"):
+                    found.append(md)
+        except Exception:
+            pass
+
+    # 1) seed list
     pkgs: list[str] = []
     for p in list(DISCOVER_PACKAGES or []):
         if p and p not in pkgs:
@@ -152,7 +159,7 @@ def _collect_metadata() -> list[object]:
             if p not in pkgs:
                 pkgs.append(p)
 
-    # 2) Merge filesystem discovery (project_root + src)
+    # 2) filesystem discovery (root + src)
     fs_roots: list[pathlib.Path] = []
     for candidate in {project_root, project_root / "src"}:
         if candidate.exists():
@@ -164,37 +171,38 @@ def _collect_metadata() -> list[object]:
                 if name not in pkgs:
                     pkgs.append(name)
 
-    # Always try a bare 'models' module too (common in apps)
-    pkgs = pkgs + [m for m in ["models"] if m not in pkgs]
+    # Always also try a bare 'models'
+    if "models" not in pkgs:
+        pkgs.append("models")
 
-    # Import each package, then scan common submodules
-    for pkg_name in pkgs:
+    # import each package and scan
+    def _import_and_collect(modname: str):
         try:
-            pkg = importlib.import_module(pkg_name)
-            _note(pkg_name, True, None)
+            mod = importlib.import_module(modname)
+            _note(modname, True, None)
         except Exception:
-            _note(pkg_name, False, traceback.format_exc())
-            continue
-
+            _note(modname, False, traceback.format_exc())
+            return None
+        # common top-level attrs
         for attr in ("metadata", "MetaData", "Base", "base"):
-            obj = getattr(pkg, attr, None)
+            obj = getattr(mod, attr, None)
             if obj is not None:
                 _maybe_add(obj)
+        # scan ALL attributes for hidden bases/metadatas
+        _scan_module_objects(mod)
+        return mod
 
+    for pkg_name in pkgs:
+        pkg = _import_and_collect(pkg_name)
+        if pkg is None:
+            continue
+
+        # typical submodules
         for subname in ("models", "db", "orm", "entities"):
-            modname = f"{pkg_name}.{subname}" if "." in pkg_name or pkg_name != "models" else subname
-            try:
-                sub = importlib.import_module(modname)
-                _note(modname, True, None)
-            except Exception:
-                _note(modname, False, traceback.format_exc())
-                sub = None
-            if sub is not None:
-                for attr in ("metadata", "MetaData", "Base", "base"):
-                    obj = getattr(sub, attr, None)
-                    if obj is not None:
-                        _maybe_add(obj)
+            # import <pkg>.models etc.
+            submod = _import_and_collect(f"{pkg_name}.{subname}")
 
+        # walk down and only load modules with model-ish names
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
@@ -203,22 +211,13 @@ def _collect_metadata() -> list[object]:
                 continue
             if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
                 continue
-            try:
-                mod = importlib.import_module(name)
-                _note(name, True, None)
-            except Exception:
-                _note(name, False, traceback.format_exc())
-                continue
-            for attr in ("metadata", "MetaData", "Base", "base"):
-                obj = getattr(mod, attr, None)
-                if obj is not None:
-                    _maybe_add(obj)
+            _import_and_collect(name)
 
-    # 4) Prefer ModelBase.metadata after all imports (ensures tables registered)
+    # Prefer ModelBase after all imports
     try:
         from svc_infra.db.sql.base import ModelBase  # type: ignore
         mb_md = getattr(ModelBase, "metadata", None)
-        if mb_md is not None and hasattr(mb_md, "tables") and mb_md.tables:
+        if mb_md is not None and getattr(mb_md, "tables", {}):
             found.append(mb_md)
             _note("ModelBase.metadata", True, None)
         else:
@@ -226,7 +225,7 @@ def _collect_metadata() -> list[object]:
     except Exception:
         _note("ModelBase import", False, traceback.format_exc())
 
-    # 5) Optional: autobind API key model
+    # Optional: autobind API key model
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model
         try_autobind_apikey_model(require_env=False)
@@ -234,12 +233,12 @@ def _collect_metadata() -> list[object]:
     except Exception:
         _note("svc_infra.db.sql.apikey.try_autobind_apikey_model", False, traceback.format_exc())
 
-    # 6) De-dup with at least one table
+    # De-dup MetaData objects
     uniq: list[object] = []
     seen: set[int] = set()
     for md in found:
         try:
-            if not (hasattr(md, "tables") and md.tables):
+            if not getattr(md, "tables", {}):
                 continue
         except Exception:
             continue
@@ -247,7 +246,6 @@ def _collect_metadata() -> list[object]:
             seen.add(id(md))
             uniq.append(md)
 
-    # Diagnostics
     total_tables = 0
     try:
         total_tables = sum(len(getattr(md, "tables", {})) for md in uniq)
@@ -257,11 +255,24 @@ def _collect_metadata() -> list[object]:
     context.config.print_stdout(
         f"[alembic env] discovered {len(uniq)} metadata objects with {total_tables} tables total"
     )
+
+    # If payments is expected but didn’t contribute, emit a hint
+    want_payments = os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}
+    if want_payments:
+        # naive check: any table named like pay_* or any module import success?
+        saw_pay = any(any(tn.startswith("pay_") for tn in md.tables.keys()) for md in uniq) if uniq else False
+        if not saw_pay:
+            context.config.print_stdout(
+                "[alembic env] WARNING: APF_ENABLE_PAYMENTS is set but no payments tables were discovered. "
+                "The env now scans all module attributes; if payments models are gated behind runtime init, "
+                "ensure importing `svc_infra.apf_payments.models` registers tables on a declarative base."
+            )
+
+    # If nothing, dump import attempts / first 10 tracebacks
     if total_tables == 0:
         context.config.print_stdout("[alembic env] import attempts (ok/err):")
         for name, status in tried:
             context.config.print_stdout(f"  - {status:3s}  {name}")
-        # Only print tracebacks for failures (keeps noise manageable)
         for name, tb in errors[:10]:
             context.config.print_stdout(f"  --- import error: {name} ---")
             context.config.print_stdout(tb)
@@ -273,11 +284,9 @@ target_metadata = _collect_metadata()
 
 
 def _want_include_schemas() -> bool:
-    # explicit opt-in always wins
     val = _x.get("include_schemas", "") or os.getenv("ALEMBIC_INCLUDE_SCHEMAS", "")
     if str(val).strip() in {"1", "true", "True", "yes"}:
         return True
-    # auto if any table has a non-default schema
     try:
         for md in (target_metadata or []):
             for t in getattr(md, "tables", {}).values():
@@ -305,10 +314,6 @@ def _system_schemas_for(url: str) -> set[str]:
 
 
 def _include_object_factory(url: str):
-    """
-    Include-object hook with optional guard against dropping tables that exist
-    in the DB but are missing from metadata. Set ALEMBIC_SKIP_DROPS=1 to enable.
-    """
     sys_schemas = _system_schemas_for(url)
     skip_drops = os.getenv("ALEMBIC_SKIP_DROPS", "").lower() in {"1", "true", "yes"}
 
@@ -316,7 +321,6 @@ def _include_object_factory(url: str):
         schema = getattr(obj, "schema", None)
         if schema and str(schema) in sys_schemas:
             return False
-        # Keep Alembic version table
         version_table = (
             context.get_x_argument(as_dictionary=True).get("version_table")
             if hasattr(context, "get_x_argument")
@@ -324,7 +328,6 @@ def _include_object_factory(url: str):
         ) or os.getenv("ALEMBIC_VERSION_TABLE", "alembic_version")
         if type_ == "table" and name == version_table:
             return True
-        # Guard: don't drop tables that exist in DB but aren't in metadata
         if skip_drops and type_ == "table" and reflected and compare_to is None:
             return False
         return True

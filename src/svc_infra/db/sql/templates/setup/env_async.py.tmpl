@@ -37,7 +37,7 @@ if config.config_file_name is not None:
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# ---- sys.path bootstrap (works without alembic.ini) ----
+# sys.path bootstrap
 prepend = config.get_main_option("prepend_sys_path") or ""
 script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
 migrations_dir = pathlib.Path(script_loc).resolve()
@@ -58,7 +58,7 @@ _ensure_on_syspath(project_root)
 if (project_root / "src").exists():
     _ensure_on_syspath(project_root / "src")
 
-# --- x-args parsing ---
+# x-args
 def _x_args_dict() -> dict:
     try:
         return context.get_x_argument(as_dictionary=True)  # type: ignore[arg-type]
@@ -76,7 +76,7 @@ def _x_args_dict() -> dict:
             out[item] = ""
     return out
 
-# --- DB URL resolution ---
+# DB URL
 _x = _x_args_dict()
 cli_dburl = _x.get("dburl", "").strip()
 env_dburl = os.getenv("SQL_URL", "").strip()
@@ -108,7 +108,7 @@ u = _coerce_to_async(u)
 u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
-# --- metadata discovery (same strategy + diagnostics) ---
+# metadata discovery (scan ALL attrs)
 DISCOVER_PACKAGES: List[str] = ['svc_infra.apf_payments.models']
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
@@ -126,8 +126,17 @@ def _collect_metadata() -> list[object]:
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        if hasattr(md, "tables") and hasattr(md, "schema"):
+        if hasattr(md, "tables") and getattr(md, "tables"):
             found.append(md)
+
+    def _scan_module_objects(mod: object) -> None:
+        try:
+            for val in vars(mod).values():
+                md = getattr(val, "metadata", None) or None
+                if md is not None and hasattr(md, "tables") and getattr(md, "tables"):
+                    found.append(md)
+        except Exception:
+            pass
 
     pkgs: list[str] = []
     for p in list(DISCOVER_PACKAGES or []):
@@ -150,35 +159,29 @@ def _collect_metadata() -> list[object]:
                 if name not in pkgs:
                     pkgs.append(name)
 
-    pkgs = pkgs + [m for m in ["models"] if m not in pkgs]
+    if "models" not in pkgs:
+        pkgs.append("models")
 
-    for pkg_name in pkgs:
+    def _import_and_collect(modname: str):
         try:
-            pkg = importlib.import_module(pkg_name)
-            _note(pkg_name, True, None)
+            mod = importlib.import_module(modname)
+            _note(modname, True, None)
         except Exception:
-            _note(pkg_name, False, traceback.format_exc())
-            continue
-
+            _note(modname, False, traceback.format_exc())
+            return None
         for attr in ("metadata", "MetaData", "Base", "base"):
-            obj = getattr(pkg, attr, None)
+            obj = getattr(mod, attr, None)
             if obj is not None:
                 _maybe_add(obj)
+        _scan_module_objects(mod)
+        return mod
 
+    for pkg_name in pkgs:
+        pkg = _import_and_collect(pkg_name)
+        if pkg is None:
+            continue
         for subname in ("models", "db", "orm", "entities"):
-            modname = f"{pkg_name}.{subname}" if "." in pkg_name or pkg_name != "models" else subname
-            try:
-                sub = importlib.import_module(modname)
-                _note(modname, True, None)
-            except Exception:
-                _note(modname, False, traceback.format_exc())
-                sub = None
-            if sub is not None:
-                for attr in ("metadata", "MetaData", "Base", "base"):
-                    obj = getattr(sub, attr, None)
-                    if obj is not None:
-                        _maybe_add(obj)
-
+            _import_and_collect(f"{pkg_name}.{subname}")
         mod_path = getattr(pkg, "__path__", None)
         if not mod_path:
             continue
@@ -187,21 +190,12 @@ def _collect_metadata() -> list[object]:
                 continue
             if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
                 continue
-            try:
-                mod = importlib.import_module(name)
-                _note(name, True, None)
-            except Exception:
-                _note(name, False, traceback.format_exc())
-                continue
-            for attr in ("metadata", "MetaData", "Base", "base"):
-                obj = getattr(mod, attr, None)
-                if obj is not None:
-                    _maybe_add(obj)
+            _import_and_collect(name)
 
     try:
         from svc_infra.db.sql.base import ModelBase  # type: ignore
         mb_md = getattr(ModelBase, "metadata", None)
-        if mb_md is not None and hasattr(mb_md, "tables") and mb_md.tables:
+        if mb_md is not None and getattr(mb_md, "tables", {}):
             found.append(mb_md)
             _note("ModelBase.metadata", True, None)
         else:
@@ -220,7 +214,7 @@ def _collect_metadata() -> list[object]:
     seen: set[int] = set()
     for md in found:
         try:
-            if not (hasattr(md, "tables") and md.tables):
+            if not getattr(md, "tables", {}):
                 continue
         except Exception:
             continue
@@ -237,6 +231,17 @@ def _collect_metadata() -> list[object]:
     context.config.print_stdout(
         f"[alembic env (async)] discovered {len(uniq)} metadata objects with {total_tables} tables total"
     )
+
+    want_payments = os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}
+    if want_payments:
+        saw_pay = any(any(tn.startswith("pay_") for tn in md.tables.keys()) for md in uniq) if uniq else False
+        if not saw_pay:
+            context.config.print_stdout(
+                "[alembic env (async)] WARNING: APF_ENABLE_PAYMENTS is set but no payments tables were discovered. "
+                "Import scanning now inspects all module attributes; if models are gated behind runtime init, "
+                "ensure importing `svc_infra.apf_payments.models` registers tables."
+            )
+
     if total_tables == 0:
         context.config.print_stdout("[alembic env (async)] import attempts (ok/err):")
         for name, status in tried:
