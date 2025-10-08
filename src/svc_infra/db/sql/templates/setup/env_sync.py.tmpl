@@ -100,23 +100,37 @@ if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(',') if s.strip()]
 
 def _collect_metadata() -> list[object]:
-    try:
-        from svc_infra.db.sql.base import ModelBase  # type: ignore
-        md = getattr(ModelBase, "metadata", None)
-        if md is not None and hasattr(md, "tables") and md.tables:
-            return [md]
-    except Exception as e:
-        logger.debug("ModelBase not available or empty: %s", e)
-
     import importlib, pkgutil, pathlib
     found: list[object] = []
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        if hasattr(md, "tables") and hasattr(md, "schema"):
+        if hasattr(md, "tables") and getattr(md, "tables", None) and hasattr(md, "schema"):
             found.append(md)
 
+    # 1) Always import DISCOVER_PACKAGES up front so their models register on ModelBase
     pkgs = list(DISCOVER_PACKAGES) or []
+    for pkg_name in pkgs:
+        try:
+            importlib.import_module(pkg_name)
+        except Exception as e:
+            logger.debug("Failed to import %s: %s", pkg_name, e)
+        # best-effort: common submodule where models live
+        try:
+            importlib.import_module(f"{pkg_name}.models")
+        except Exception:
+            pass
+
+    # 2) Prefer ModelBase after packages have been imported
+    try:
+        from svc_infra.db.sql.base import ModelBase  # type: ignore
+        md = getattr(ModelBase, "metadata", None)
+        if md is not None and getattr(md, "tables", None):
+            found.append(md)
+    except Exception as e:
+        logger.debug("ModelBase not available or empty: %s", e)
+
+    # 3) Optional discovery scan (kept from your original logic)
     if not pkgs:
         roots = []
         if prepend:
@@ -166,14 +180,14 @@ def _collect_metadata() -> list[object]:
                 if obj is not None:
                     _maybe_add(obj)
 
-    # --- AUTOBIND API KEY MODEL (if a marked User model exists) ---
+    # 4) Autobind API key model (unchanged)
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model
-        # If you prefer gating on env, pass require_env=True and set AUTH_ENABLE_API_KEYS=1
         try_autobind_apikey_model(require_env=False)
     except Exception as e:
         logger.debug("svc-infra apikey autobind skipped: %s", e)
 
+    # 5) De-dup
     uniq, seen = [], set()
     for md in found:
         if id(md) not in seen:
