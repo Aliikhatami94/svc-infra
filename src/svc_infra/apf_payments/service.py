@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from sqlalchemy import select
@@ -10,36 +11,71 @@ from .provider.registry import get_provider_registry
 from .schemas import CustomerOut, CustomerUpsertIn, IntentCreateIn, IntentOut, RefundIn
 
 
+def _default_provider_name() -> str:
+    # Environment override; defaults to "stripe"
+    return (os.getenv("APF_PAYMENTS_PROVIDER") or "stripe").lower()
+
+
 class PaymentsService:
+    """
+    Payments domain facade.
+
+    NOTE: Adapter lookup is LAZY. We only resolve a provider adapter when a method
+    actually needs to call the provider. This lets purely-DB endpoints (e.g. listing
+    transactions) work even if no provider adapter is registered.
+    """
+
     def __init__(self, session: AsyncSession, provider_name: Optional[str] = None):
         self.session = session
-        self.adapter = get_provider_registry().get(provider_name)
+        self._provider_name = (provider_name or _default_provider_name()).lower()
+        self._adapter = None  # resolved on first use
 
-    # Customers
+    # --- internal helpers -----------------------------------------------------
+
+    def _get_adapter(self):
+        if self._adapter is not None:
+            return self._adapter
+        reg = get_provider_registry()
+        # Try to fetch the named adapter; if missing, raise a helpful error
+        try:
+            self._adapter = reg.get(self._provider_name)
+        except Exception as e:
+            raise RuntimeError(
+                f"No payments adapter registered for '{self._provider_name}'. "
+                "Install and register a provider (e.g., `stripe`) OR pass a custom adapter via "
+                "`add_payments(app, adapters=[...])`. If you only need DB endpoints (like "
+                "`/payments/transactions`), this error will not occur unless you call a provider API."
+            ) from e
+        return self._adapter
+
+    # --- Customers ------------------------------------------------------------
+
     async def ensure_customer(self, data: CustomerUpsertIn) -> CustomerOut:
-        out = await self.adapter.ensure_customer(data)
+        adapter = self._get_adapter()
+        out = await adapter.ensure_customer(data)
         # upsert local row
         existing = await self.session.scalar(
             select(PayCustomer).where(
-                PayCustomer.provider == "stripe",
+                PayCustomer.provider == out.provider,
                 PayCustomer.provider_customer_id == out.provider_customer_id,
             )
         )
         if not existing:
+            # If your PayCustomer model has additional columns (email/name), include them here.
             self.session.add(
                 PayCustomer(
                     provider=out.provider,
                     provider_customer_id=out.provider_customer_id,
                     user_id=data.user_id,
-                    email=out.email,
-                    name=out.name,
                 )
             )
         return out
 
-    # Intents
+    # --- Intents --------------------------------------------------------------
+
     async def create_intent(self, user_id: Optional[str], data: IntentCreateIn) -> IntentOut:
-        out = await self.adapter.create_intent(data, user_id=user_id)
+        adapter = self._get_adapter()
+        out = await adapter.create_intent(data, user_id=user_id)
         self.session.add(
             PayIntent(
                 provider=out.provider,
@@ -49,14 +85,13 @@ class PaymentsService:
                 currency=out.currency,
                 status=out.status,
                 client_secret=out.client_secret,
-                description=data.description,
             )
         )
-        # minimal ledger entry (Receivable vs Sales): we’ll post on succeed webhooks; for draft we skip
         return out
 
     async def confirm_intent(self, provider_intent_id: str) -> IntentOut:
-        out = await self.adapter.confirm_intent(provider_intent_id)
+        adapter = self._get_adapter()
+        out = await adapter.confirm_intent(provider_intent_id)
         pi = await self.session.scalar(
             select(PayIntent).where(PayIntent.provider_intent_id == provider_intent_id)
         )
@@ -66,7 +101,8 @@ class PaymentsService:
         return out
 
     async def cancel_intent(self, provider_intent_id: str) -> IntentOut:
-        out = await self.adapter.cancel_intent(provider_intent_id)
+        adapter = self._get_adapter()
+        out = await adapter.cancel_intent(provider_intent_id)
         pi = await self.session.scalar(
             select(PayIntent).where(PayIntent.provider_intent_id == provider_intent_id)
         )
@@ -75,26 +111,29 @@ class PaymentsService:
         return out
 
     async def refund(self, provider_intent_id: str, data: RefundIn) -> IntentOut:
-        out = await self.adapter.refund(provider_intent_id, data)
-        # ledger impact will be handled when webhook finalizes
+        adapter = self._get_adapter()
+        out = await adapter.refund(provider_intent_id, data)
         return out
 
-    # Webhook handling (verify + persist + ledger postings)
+    # --- Webhooks -------------------------------------------------------------
+
     async def handle_webhook(self, provider: str, signature: str | None, payload: bytes) -> dict:
-        parsed = await self.adapter.verify_and_parse_webhook(signature, payload)
-        # save raw event (dedupe upstream if unique constraint fails)
+        # Webhooks also require provider adapter
+        adapter = self._get_adapter()
+        parsed = await adapter.verify_and_parse_webhook(signature, payload)
+
+        # Save raw event (keep JSON column/shape aligned with your model)
         self.session.add(
             PayEvent(
                 provider=provider,
                 provider_event_id=parsed["id"],
-                signature_valid=True,
-                payload=parsed,
+                payload_json=parsed,  # or serialize before assign if your column is Text
             )
         )
 
         typ = parsed.get("type", "")
         obj = parsed.get("data") or {}
-        # handle a few core lifecycle events for sales/receivables
+
         if provider == "stripe":
             if typ == "payment_intent.succeeded":
                 await self._post_sale(obj)
@@ -102,12 +141,12 @@ class PaymentsService:
                 await self._post_refund(obj)
             elif typ == "charge.captured":
                 await self._post_capture(obj)
-            # fees & payouts handled via balance transactions (future)
 
         return {"ok": True}
 
+    # --- Ledger postings ------------------------------------------------------
+
     async def _post_sale(self, pi_obj: dict):
-        # Sales (credit), Receivable (debit)
         provider_intent_id = pi_obj.get("id")
         amount = int(pi_obj.get("amount") or 0)
         currency = str(pi_obj.get("currency") or "USD").upper()
@@ -118,24 +157,13 @@ class PaymentsService:
             intent.status = "succeeded"
             self.session.add(
                 LedgerEntry(
-                    account="Receivable",
+                    provider=intent.provider,
+                    provider_ref=provider_intent_id,
+                    user_id=intent.user_id,
                     amount=+amount,
                     currency=currency,
-                    intent_id=intent.id,
-                    provider=intent.provider,
-                    provider_ref=provider_intent_id,
-                    user_id=intent.user_id,
-                )
-            )
-            self.session.add(
-                LedgerEntry(
-                    account="Sales",
-                    amount=-amount,
-                    currency=currency,
-                    intent_id=intent.id,
-                    provider=intent.provider,
-                    provider_ref=provider_intent_id,
-                    user_id=intent.user_id,
+                    kind="payment",
+                    status="posted",
                 )
             )
 
@@ -147,27 +175,15 @@ class PaymentsService:
             select(PayIntent).where(PayIntent.provider_intent_id == pi_id)
         )
         if intent:
-            # Cash debit, Receivable credit
             self.session.add(
                 LedgerEntry(
-                    account="Cash",
-                    amount=+amount,
-                    currency=currency,
-                    intent_id=intent.id,
                     provider=intent.provider,
                     provider_ref=charge_obj.get("id"),
                     user_id=intent.user_id,
-                )
-            )
-            self.session.add(
-                LedgerEntry(
-                    account="Receivable",
-                    amount=-amount,
+                    amount=+amount,
                     currency=currency,
-                    intent_id=intent.id,
-                    provider=intent.provider,
-                    provider_ref=pi_id,
-                    user_id=intent.user_id,
+                    kind="capture",
+                    status="posted",
                 )
             )
 
@@ -179,26 +195,14 @@ class PaymentsService:
             select(PayIntent).where(PayIntent.provider_intent_id == pi_id)
         )
         if intent and amount > 0:
-            # Refunds (debit), Cash (credit)
             self.session.add(
                 LedgerEntry(
-                    account="Refunds",
+                    provider=intent.provider,
+                    provider_ref=charge_obj.get("id"),
+                    user_id=intent.user_id,
                     amount=+amount,
                     currency=currency,
-                    intent_id=intent.id,
-                    provider=intent.provider,
-                    provider_ref=charge_obj.get("id"),
-                    user_id=intent.user_id,
-                )
-            )
-            self.session.add(
-                LedgerEntry(
-                    account="Cash",
-                    amount=-amount,
-                    currency=currency,
-                    intent_id=intent.id,
-                    provider=intent.provider,
-                    provider_ref=charge_obj.get("id"),
-                    user_id=intent.user_id,
+                    kind="refund",
+                    status="posted",
                 )
             )
