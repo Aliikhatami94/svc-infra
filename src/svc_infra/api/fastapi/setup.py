@@ -262,3 +262,5 @@ def setup_service_api(
 
         html = render_index_html(service_name=service.name, release=service.release, cards=cards)
         return HTMLResponse(html)
+
+    return parent
