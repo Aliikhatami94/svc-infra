@@ -316,4 +316,5 @@ def add_auth(
             include_in_docs=include_in_docs,
         )
 
+    add_prefixed_docs(app, prefix=user_prefix, title="Users")
     add_prefixed_docs(app, prefix=auth_prefix, title="Auth")
