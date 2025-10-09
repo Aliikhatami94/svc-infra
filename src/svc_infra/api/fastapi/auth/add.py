@@ -115,7 +115,7 @@ def setup_oauth_authentication(
     user_model,
     auth_backend,
     settings_obj,
-    oauth_prefix: str,
+    auth_prefix: str,
     post_login_redirect: str | None,
     provider_account_model=None,
     auth_policy: AuthPolicy,
@@ -139,7 +139,7 @@ def setup_oauth_authentication(
     # Install oauth prefix routers
     install_oauth_routers(
         app,
-        oauth_prefix=oauth_prefix,
+        oauth_prefix=auth_prefix + "/oauth",
         oauth_router_instance=oauth_router_instance,
         include_in_docs=include_in_docs,
     )
@@ -309,7 +309,7 @@ def add_auth(
             user_model=user_model,
             auth_backend=auth_backend,
             settings_obj=settings_obj,
-            oauth_prefix=oauth_prefix,
+            auth_prefix=auth_prefix,
             post_login_redirect=post_login_redirect,
             provider_account_model=provider_account_model,
             auth_policy=policy,
