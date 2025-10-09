@@ -206,15 +206,15 @@ def add_prefixed_docs(
 
     r = public_router(tags=["Docs"], include_in_schema=False)
 
-    @r.get(openapi_path, include_in_schema=False)
+    @r.get(openapi_path, show_in_schema=False)
     def scoped_openapi():
         return _scoped_schema()
 
-    @r.get(swagger_path, include_in_schema=False)
+    @r.get(swagger_path, show_in_schema=False)
     def scoped_swagger():
         return get_swagger_ui_html(openapi_url=openapi_path, title=f"{title} • Swagger")
 
-    @r.get(redoc_path, include_in_schema=False)
+    @r.get(redoc_path, show_in_schema=False)
     def scoped_redoc():
         return get_redoc_html(openapi_url=openapi_path, title=f"{title} • ReDoc")
 
