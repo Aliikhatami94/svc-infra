@@ -24,7 +24,8 @@ def cmd_scaffold(
         "Item", help="Class name for entity/auth (e.g., User, Member, Product)."
     ),
     table_name: Optional[str] = typer.Option(
-        None, help="Optional table name (defaults to plural snake of entity name)."
+        None,
+        help="Optional table name. For kind=auth, can also be set via AUTH_TABLE_NAME; defaults to plural snake of entity.",
     ),
     models_dir: Path = typer.Option(..., help="Directory for models."),
     schemas_dir: Path = typer.Option(..., help="Directory for schemas."),

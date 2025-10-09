@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 
@@ -35,8 +36,8 @@ def scaffold_core(
     include_soft_delete: bool = False,
     overwrite: bool = False,
     same_dir: bool = False,
-    models_filename: Optional[str] = None,  # <--- NEW
-    schemas_filename: Optional[str] = None,  # <--- NEW
+    models_filename: Optional[str] = None,
+    schemas_filename: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create starter model + schema files.
@@ -52,7 +53,12 @@ def scaffold_core(
     # content per kind
     if kind == "auth":
         auth_ent = pascal(entity_name or "User")
-        auth_tbl = table_name or plural_snake(auth_ent)
+        env_tbl = (
+            os.getenv("AUTH_TABLE_NAME")
+            or os.getenv("SVC_INFRA_AUTH_TABLE")
+            or os.getenv("APF_AUTH_TABLE_NAME")
+        )
+        auth_tbl = (table_name or env_tbl or plural_snake(auth_ent)).strip()
 
         models_txt = render_template(
             tmpl_dir="svc_infra.db.sql.templates.models_schemas.auth",
@@ -155,7 +161,13 @@ def scaffold_models_core(
 
     if kind == "auth":
         auth_ent = pascal(entity_name or "User")
-        auth_tbl = table_name or plural_snake(auth_ent)
+        env_tbl = (
+            os.getenv("AUTH_TABLE_NAME")
+            or os.getenv("SVC_INFRA_AUTH_TABLE")
+            or os.getenv("APF_AUTH_TABLE_NAME")
+        )
+        auth_tbl = (table_name or env_tbl or plural_snake(auth_ent)).strip()
+
         txt = render_template(
             tmpl_dir="svc_infra.db.sql.templates.models_schemas.auth",
             name="models.py.tmpl",
