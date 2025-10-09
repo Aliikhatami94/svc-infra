@@ -6,12 +6,12 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 
+from svc_infra.api.fastapi.dual.public import public_router
+
 # (prefix, swagger_path, redoc_path, openapi_path, title)
 DOC_SCOPES: List[Tuple[str, str, str, str, str]] = []
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "patch", "options", "head", "trace"}
-
-# ---------------------- path & ref helpers ----------------------
 
 
 def _path_included(
@@ -23,12 +23,10 @@ def _path_included(
         pfx = pfx.rstrip("/") or "/"
         return path == pfx or path.startswith(pfx + "/")
 
-    if include_prefixes:
-        if not any(_match(p) for p in include_prefixes):
-            return False
-    if exclude_prefixes:
-        if any(_match(p) for p in exclude_prefixes):
-            return False
+    if include_prefixes and not any(_match(p) for p in include_prefixes):
+        return False
+    if exclude_prefixes and any(_match(p) for p in exclude_prefixes):
+        return False
     return True
 
 
@@ -53,8 +51,7 @@ def _close_over_component_refs(
     seen = set(initial)
     while to_visit:
         section, name = to_visit.pop()
-        section_map = (full_components or {}).get(section) or {}
-        comp = section_map.get(name)
+        comp = (full_components or {}).get(section, {}).get(name)
         if not isinstance(comp, dict):
             continue
         nested: Set[Tuple[str, str]] = set()
@@ -98,8 +95,7 @@ def _prune_to_paths(
                 keep_names |= used_security_schemes
             if not keep_names:
                 continue
-            section_map = items or {}
-            pruned = {name: section_map[name] for name in keep_names if name in section_map}
+            pruned = {name: items[name] for name in keep_names if name in items}
             if pruned:
                 pruned_components[section] = pruned
     schema["components"] = pruned_components if pruned_components else {}
@@ -111,8 +107,7 @@ def _prune_to_paths(
 
     info = dict(schema.get("info") or {})
     if title_suffix:
-        base_title = info.get("title") or "API"
-        info["title"] = f"{base_title} • {title_suffix}"
+        info["title"] = f"{info.get('title') or 'API'} • {title_suffix}"
     schema["info"] = info
     return schema
 
@@ -131,17 +126,12 @@ def _build_filtered_schema(
     return _prune_to_paths(full_schema, keep_paths, title_suffix)
 
 
-# ---------------------- root filtering core ----------------------
-
-
 def _ensure_original_openapi_saved(app: FastAPI) -> None:
-    # Keep a pointer to the unfiltered function exactly once
     if not hasattr(app.state, "_scoped_original_openapi"):
         app.state._scoped_original_openapi = app.openapi  # type: ignore[attr-defined]
 
 
 def _get_full_schema_from_original(app: FastAPI) -> Dict:
-    # Always read from the original (unfiltered) OpenAPI source
     _ensure_original_openapi_saved(app)
     return copy.deepcopy(app.state._scoped_original_openapi())  # type: ignore[attr-defined]
 
@@ -152,13 +142,9 @@ def _install_root_filter(app: FastAPI, exclude_prefixes: List[str]) -> None:
 
     def root_filtered_openapi():
         full_schema = _get_full_schema_from_original(app)
-        return _build_filtered_schema(
-            full_schema,
-            exclude_prefixes=app.state._scoped_root_exclusions,  # type: ignore[attr-defined]
-            title_suffix=None,
-        )
+        return _build_filtered_schema(full_schema, exclude_prefixes=app.state._scoped_root_exclusions)  # type: ignore[attr-defined]
 
-    app.openapi = root_filtered_openapi  # swap only the root presenter
+    app.openapi = root_filtered_openapi
 
 
 def _current_registered_scopes() -> List[str]:
@@ -171,28 +157,24 @@ def _ensure_root_excludes_registered_scopes(app: FastAPI) -> None:
         _install_root_filter(app, scopes)
 
 
-# ---------------------- public API ----------------------
-
-
 def add_prefixed_docs(
     app: FastAPI, *, prefix: str, title: str, auto_exclude_from_root: bool = True
 ) -> None:
     """
     Expose filtered OpenAPI + Swagger/ReDoc for only the routes under `prefix`.
-    - OpenAPI:  {prefix}/openapi.json
-    - Swagger:  {prefix}/docs
-    - ReDoc:    {prefix}/redoc
-    Also (by default) registers the scope so the ROOT spec auto-excludes it.
+    These 3 endpoints are mounted on a PUBLIC router so they don't require auth:
+      - {prefix}/openapi.json
+      - {prefix}/docs
+      - {prefix}/redoc
     """
     scope = prefix.rstrip("/") or "/"
     openapi_path = f"{scope}/openapi.json"
     swagger_path = f"{scope}/docs"
     redoc_path = f"{scope}/redoc"
 
-    # ensure we can always read the full schema regardless of later root filtering
     _ensure_original_openapi_saved(app)
 
-    # Per-scope cache (optional)
+    # Build via cached snapshot of the original spec
     _scope_cache: Dict | None = None
 
     def _scoped_schema():
@@ -204,17 +186,22 @@ def add_prefixed_docs(
             )
         return _scope_cache
 
-    @app.get(openapi_path, include_in_schema=False)
+    # Mount the three endpoints on a PUBLIC router to bypass guards
+    r = public_router(tags=["Docs"], include_in_schema=False)
+
+    @r.get(openapi_path, include_in_schema=False)
     def scoped_openapi():
         return _scoped_schema()
 
-    @app.get(swagger_path, include_in_schema=False)
+    @r.get(swagger_path, include_in_schema=False)
     def scoped_swagger():
         return get_swagger_ui_html(openapi_url=openapi_path, title=f"{title} • Swagger")
 
-    @app.get(redoc_path, include_in_schema=False)
+    @r.get(redoc_path, include_in_schema=False)
     def scoped_redoc():
         return get_redoc_html(openapi_url=openapi_path, title=f"{title} • ReDoc")
+
+    app.include_router(r, prefix="")  # paths are absolute
 
     DOC_SCOPES.append((scope, swagger_path, redoc_path, openapi_path, title))
 
@@ -223,8 +210,4 @@ def add_prefixed_docs(
 
 
 def replace_root_openapi_with_exclusions(app: FastAPI, *, exclude_prefixes: List[str]) -> None:
-    """
-    Manual hook: make ROOT /openapi.json exclude `exclude_prefixes`.
-    Typically not needed because add_prefixed_docs() registers scopes automatically.
-    """
     _install_root_filter(app, exclude_prefixes)
