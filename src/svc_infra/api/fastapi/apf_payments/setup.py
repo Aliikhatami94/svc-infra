@@ -43,9 +43,9 @@ def add_payments(
     """
     _maybe_register_default_providers(register_default_providers, adapters)
 
+    add_prefixed_docs(app, prefix=prefix, title="Payments")
+
     for r in build_payments_routers(prefix=prefix):
         app.include_router(
             r, include_in_schema=True if include_in_docs is None else bool(include_in_docs)
         )
-
-    add_prefixed_docs(app, prefix=prefix, title="Payments")

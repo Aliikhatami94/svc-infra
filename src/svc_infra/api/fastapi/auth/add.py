@@ -283,6 +283,9 @@ def add_auth_users(
             https_only=bool(getattr(settings_obj, "session_cookie_secure", False)),
         )
 
+    add_prefixed_docs(app, prefix=user_prefix, title="Users")
+    add_prefixed_docs(app, prefix=auth_prefix, title="Auth")
+
     if enable_password:
         setup_password_authentication(
             app,
@@ -314,6 +317,3 @@ def add_auth_users(
             auth_policy=policy,
             include_in_docs=include_in_docs,
         )
-
-    add_prefixed_docs(app, prefix=user_prefix, title="Users")
-    add_prefixed_docs(app, prefix=auth_prefix, title="Auth")
