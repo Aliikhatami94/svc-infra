@@ -12,7 +12,6 @@ from .schemas import CustomerOut, CustomerUpsertIn, IntentCreateIn, IntentOut, R
 
 
 def _default_provider_name() -> str:
-    # Environment override; defaults to "stripe"
     return (os.getenv("APF_PAYMENTS_PROVIDER") or "stripe").lower()
 
 
