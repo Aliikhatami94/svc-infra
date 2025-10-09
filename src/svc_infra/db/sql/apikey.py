@@ -40,7 +40,7 @@ def get_apikey_model() -> type:
 def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type:
     """
     Create and register an ApiKey model bound to the provided user_model and table name.
-    Call this once during app boot (e.g., inside add_auth when enable_api_keys=True).
+    Call this once during app boot (e.g., inside add_auth_users when enable_api_keys=True).
     """
 
     class ApiKey(ModelBase):  # type: ignore[misc, valid-type]

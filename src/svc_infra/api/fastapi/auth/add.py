@@ -12,7 +12,7 @@ from svc_infra.api.fastapi.auth.routers.account import account_router
 from svc_infra.api.fastapi.auth.routers.apikey_router import apikey_router
 from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_backend
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
-from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, OAUTH_PREFIX, USER_PREFIX
+from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, USER_PREFIX
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
 
@@ -222,7 +222,7 @@ def install_oauth_routers(
     )
 
 
-def add_auth(
+def add_auth_users(
     app: FastAPI,
     *,
     user_model,
@@ -231,7 +231,6 @@ def add_auth(
     schema_update,
     post_login_redirect: str | None = None,
     auth_prefix: str = AUTH_PREFIX,
-    oauth_prefix: str = OAUTH_PREFIX,
     user_prefix: str = USER_PREFIX,
     enable_password: bool = True,
     enable_oauth: bool = True,

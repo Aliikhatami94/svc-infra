@@ -7,7 +7,7 @@ Usage:
         easy_service_app, easy_service_api, EasyAppOptions, LoggingOptions, ObservabilityOptions,
 
         # Auth bootstrap
-        add_auth, get_auth_settings, AuthSettings, AuthPolicy, DefaultAuthPolicy,
+        add_auth_users, get_auth_settings, AuthSettings, AuthPolicy, DefaultAuthPolicy,
 
         # Identity (endpoint params + router deps + guards)
         Principal, Identity, OptionalIdentity,
@@ -31,7 +31,7 @@ Usage:
 # ----------------
 # Auth bootstrap / config
 # ----------------
-from svc_infra.api.fastapi.auth.add import add_auth
+from svc_infra.api.fastapi.auth.add import add_auth_users
 from svc_infra.api.fastapi.auth.mfa.router import mfa_router
 from svc_infra.api.fastapi.auth.mfa.security import RequireMFAIfEnabled
 from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
@@ -102,7 +102,7 @@ __all__ = [
     "LoggingOptions",
     "ObservabilityOptions",
     # Auth bootstrap / config
-    "add_auth",
+    "add_auth_users",
     "get_auth_settings",
     "AuthSettings",
     "AuthPolicy",
