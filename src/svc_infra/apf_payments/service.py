@@ -16,13 +16,6 @@ def _default_provider_name() -> str:
 
 
 class PaymentsService:
-    """
-    Payments domain facade.
-
-    NOTE: Adapter lookup is LAZY. We only resolve a provider adapter when a method
-    actually needs to call the provider. This lets purely-DB endpoints (e.g. listing
-    transactions) work even if no provider adapter is registered.
-    """
 
     def __init__(self, session: AsyncSession, provider_name: Optional[str] = None):
         self.session = session
