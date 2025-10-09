@@ -3,7 +3,6 @@ name: Auto publish to PyPI on main
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: {}
 
 concurrency:
   group: publish-pypi
@@ -11,58 +10,31 @@ concurrency:
 
 jobs:
   release:
-    # Skip only when the push actor is the bot (still allows manual re-runs)
-    if: ${{ github.event_name != 'push' || github.actor != 'github-actions[bot]' }}
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write
+      contents: write   # for committing/tagging version bumps
+      id-token: write   # REQUIRED for PyPI Trusted Publisher (OIDC)
 
     steps:
-      - name: "Debug event context"
-        run: |
-          set -xeuo pipefail
-          echo "Event...........: ${GITHUB_EVENT_NAME}"
-          echo "Actor...........: ${GITHUB_ACTOR}"
-          echo "Ref.............: ${GITHUB_REF}"
-          echo "SHA.............: ${GITHUB_SHA}"
-          echo "Repository......: ${GITHUB_REPOSITORY}"
-          echo "Run attempt.....: ${GITHUB_RUN_ATTEMPT}"
-          echo "Workflow........: ${GITHUB_WORKFLOW}"
-          echo "Workspace.......: ${GITHUB_WORKSPACE}"
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: "Debug git state (before anything)"
-        run: |
-          set -xeuo pipefail
-          git remote -v
-          git status
-          echo "HEAD commit:"
-          git show -s --decorate --oneline
-          echo "Latest tag (if any):"
-          git describe --tags --abbrev=0 || echo "No tags yet"
-          echo "Changed files in last commit:"
-          git diff --name-status HEAD^..HEAD || true
-          echo "Current branch (computed):"
-          git rev-parse --abbrev-ref HEAD
-
-      - name: "Set up Python"
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: "Install Poetry 2.x"
+      - name: Install Poetry 2.x
         run: |
           python -m pip install --upgrade pip pipx
           pipx install "poetry==2.0.1"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           poetry --version
 
-      - name: "Repair or create lockfile"
+      - name: Repair or create lockfile
         id: relock
         run: |
           set -euo pipefail
@@ -79,81 +51,43 @@ jobs:
           poetry lock --no-interaction
           echo "lock_status=recreated" >> $GITHUB_OUTPUT
 
-      - name: "Commit regenerated lockfile (if changed)"
+      - name: Commit regenerated lockfile (if changed)
         if: steps.relock.outputs.lock_status == 'recreated'
         run: |
-          set -xeuo pipefail
           git add poetry.lock
           git commit -m "ci: regenerate poetry.lock" || true
           git push || true
 
-      - name: "Install deps (no dev)"
+      - name: Install deps (no dev)
         run: poetry install --no-root --only main --sync --no-interaction
 
-      - name: "Configure git identity"
+      - name: Configure git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: "Bump patch version"
+      # Bump patch version on every push to main
+      - name: Bump patch version
         id: bump
         run: |
-          set -xeuo pipefail
           poetry version patch
           NEW_VER=$(poetry version -s)
           echo "new_version=$NEW_VER" >> "$GITHUB_OUTPUT"
-          echo "Bumped version to: $NEW_VER"
 
-      - name: "Preflight: tag existence + diff visibility"
-        id: preflight
+      - name: Commit version bump
         run: |
-          set -euo pipefail
-          NEW_VER="${{ steps.bump.outputs.new_version }}"
-          TAG="v${NEW_VER}"
-          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-            echo "TagAlreadyExists=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Tag ${TAG} already exists on repo. Subsequent tagging will be skipped."
-          else
-            echo "TagAlreadyExists=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "Staged diff (pre-commit):"
-          git diff --staged || true
-          echo "Working tree diff:"
-          git diff || true
-
-      - name: "Commit version bump"
-        run: |
-          set -xeuo pipefail
           NEW_VER="${{ steps.bump.outputs.new_version }}"
           git add pyproject.toml poetry.lock || true
-          if git diff --cached --quiet; then
-            echo "No changes to commit (pyproject.toml/poetry.lock unchanged)."
-          else
-            git commit -m "ci: release v${NEW_VER}"
-          fi
-          if [ "${{ steps.preflight.outputs.TagAlreadyExists }}" = "false" ]; then
-            git tag "v${NEW_VER}" || echo "::warning::Tag creation reported a problem."
-          else
-            echo "::notice::Skipping tag creation because it already exists."
-          fi
-          git push || (echo "::warning::git push failed" && true)
-          git push --tags || (echo "::warning::git push --tags failed" && true)
+          git commit -m "ci: release v${NEW_VER}" || echo "No changes to commit"
+          git tag "v${NEW_VER}" || echo "Tag exists; continuing"
+          git push || true
+          git push --tags || true
 
-      - name: "Build distributions"
+      - name: Build distributions
         run: poetry build
 
-      - name: "Publish to PyPI via OIDC"
+      # Publish to PyPI via Trusted Publisher / OIDC (no API token needed)
+      - name: Publish to PyPI via OIDC
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
-
-      - name: "Post-build diagnostics"
-        if: always()
-        run: |
-          set -xeuo pipefail
-          echo "Dist contents:"
-          ls -l dist || true
-          echo "Latest tag now:"
-          git describe --tags --abbrev=0 || true
-          echo "All tags (last 10):"
-          git tag --sort=-creatordate | head -n 10 || true
