@@ -9,9 +9,9 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 # (prefix, swagger_path, redoc_path, openapi_path, title)
 DOC_SCOPES: List[Tuple[str, str, str, str, str]] = []
 
-# --- internals ---------------------------------------------------------------
-
 _HTTP_METHODS = {"get", "put", "post", "delete", "patch", "options", "head", "trace"}
+
+# ---------------------- path & ref helpers ----------------------
 
 
 def _path_included(
@@ -49,7 +49,6 @@ def _collect_refs(obj, refset: Set[Tuple[str, str]]):
 def _close_over_component_refs(
     full_components: Dict, initial: Set[Tuple[str, str]]
 ) -> Set[Tuple[str, str]]:
-    """Follow $refs inside referenced components until closure."""
     to_visit = list(initial)
     seen = set(initial)
     while to_visit:
@@ -70,11 +69,9 @@ def _close_over_component_refs(
 def _prune_to_paths(
     full_schema: Dict, keep_paths: Dict[str, dict], title_suffix: Optional[str]
 ) -> Dict:
-    """Return a new schema limited to keep_paths and only referenced components/tags/security."""
     schema = copy.deepcopy(full_schema)
     schema["paths"] = keep_paths
 
-    # 1) collect used tags, component $refs, and security schemes
     used_tags: Set[str] = set()
     direct_refs: Set[Tuple[str, str]] = set()
     used_security_schemes: Set[str] = set()
@@ -91,36 +88,32 @@ def _prune_to_paths(
                     used_security_schemes.add(scheme_name)
 
     comps = schema.get("components") or {}
-    # 2) transitive closure of refs via components
     all_refs = _close_over_component_refs(comps, direct_refs)
 
-    # 3) rebuild components
     pruned_components: Dict[str, Dict] = {}
-    for section, items in comps.items() if isinstance(comps, dict) else []:
-        keep_names = {name for (sec, name) in all_refs if sec == section}
-        if section == "securitySchemes":
-            keep_names |= used_security_schemes
-        if not keep_names:
-            continue
-        section_map = items or {}
-        pruned = {name: section_map[name] for name in keep_names if name in section_map}
-        if pruned:
-            pruned_components[section] = pruned
+    if isinstance(comps, dict):
+        for section, items in comps.items():
+            keep_names = {name for (sec, name) in all_refs if sec == section}
+            if section == "securitySchemes":
+                keep_names |= used_security_schemes
+            if not keep_names:
+                continue
+            section_map = items or {}
+            pruned = {name: section_map[name] for name in keep_names if name in section_map}
+            if pruned:
+                pruned_components[section] = pruned
     schema["components"] = pruned_components if pruned_components else {}
 
-    # 4) prune top-level tags to only the used ones
     if "tags" in schema and isinstance(schema["tags"], list):
         schema["tags"] = [
             t for t in schema["tags"] if isinstance(t, dict) and t.get("name") in used_tags
         ]
 
-    # 5) tweak title
     info = dict(schema.get("info") or {})
     if title_suffix:
         base_title = info.get("title") or "API"
         info["title"] = f"{base_title} • {title_suffix}"
     schema["info"] = info
-
     return schema
 
 
@@ -138,7 +131,47 @@ def _build_filtered_schema(
     return _prune_to_paths(full_schema, keep_paths, title_suffix)
 
 
-# --- public helpers ----------------------------------------------------------
+# ---------------------- root filtering core ----------------------
+
+
+def _ensure_original_openapi_saved(app: FastAPI) -> None:
+    # Keep a pointer to the unfiltered function exactly once
+    if not hasattr(app.state, "_scoped_original_openapi"):
+        app.state._scoped_original_openapi = app.openapi  # type: ignore[attr-defined]
+
+
+def _get_full_schema_from_original(app: FastAPI) -> Dict:
+    # Always read from the original (unfiltered) OpenAPI source
+    _ensure_original_openapi_saved(app)
+    return copy.deepcopy(app.state._scoped_original_openapi())  # type: ignore[attr-defined]
+
+
+def _install_root_filter(app: FastAPI, exclude_prefixes: List[str]) -> None:
+    _ensure_original_openapi_saved(app)
+    app.state._scoped_root_exclusions = sorted(set(exclude_prefixes))  # type: ignore[attr-defined]
+
+    def root_filtered_openapi():
+        full_schema = _get_full_schema_from_original(app)
+        return _build_filtered_schema(
+            full_schema,
+            exclude_prefixes=app.state._scoped_root_exclusions,  # type: ignore[attr-defined]
+            title_suffix=None,
+        )
+
+    app.openapi = root_filtered_openapi  # swap only the root presenter
+
+
+def _current_registered_scopes() -> List[str]:
+    return [scope for (scope, *_rest) in DOC_SCOPES]
+
+
+def _ensure_root_excludes_registered_scopes(app: FastAPI) -> None:
+    scopes = _current_registered_scopes()
+    if scopes:
+        _install_root_filter(app, scopes)
+
+
+# ---------------------- public API ----------------------
 
 
 def add_prefixed_docs(
@@ -156,18 +189,24 @@ def add_prefixed_docs(
     swagger_path = f"{scope}/docs"
     redoc_path = f"{scope}/redoc"
 
-    # capture a stable copy of the full (mutated) schema once
-    _full_cache: Dict | None = None
+    # ensure we can always read the full schema regardless of later root filtering
+    _ensure_original_openapi_saved(app)
 
-    def _full():
-        nonlocal _full_cache
-        if _full_cache is None:
-            _full_cache = copy.deepcopy(app.openapi())
-        return _full_cache
+    # Per-scope cache (optional)
+    _scope_cache: Dict | None = None
+
+    def _scoped_schema():
+        nonlocal _scope_cache
+        if _scope_cache is None:
+            full = _get_full_schema_from_original(app)
+            _scope_cache = _build_filtered_schema(
+                full, include_prefixes=[scope], title_suffix=title
+            )
+        return _scope_cache
 
     @app.get(openapi_path, include_in_schema=False)
     def scoped_openapi():
-        return _build_filtered_schema(_full(), include_prefixes=[scope], title_suffix=title)
+        return _scoped_schema()
 
     @app.get(swagger_path, include_in_schema=False)
     def scoped_swagger():
@@ -186,53 +225,6 @@ def add_prefixed_docs(
 def replace_root_openapi_with_exclusions(app: FastAPI, *, exclude_prefixes: List[str]) -> None:
     """
     Manual hook: make ROOT /openapi.json exclude `exclude_prefixes`.
-    Usually you won't call this directly — add_prefixed_docs() calls the
-    automatic variant below — but it's here if you need explicit control.
+    Typically not needed because add_prefixed_docs() registers scopes automatically.
     """
     _install_root_filter(app, exclude_prefixes)
-
-
-# --- automation for root filtering ------------------------------------------
-
-
-def _current_registered_scopes() -> List[str]:
-    return [scope for (scope, *_rest) in DOC_SCOPES]
-
-
-def _install_root_filter(app: FastAPI, exclude_prefixes: List[str]) -> None:
-    # If we've already wrapped, just update the exclude set captured by the wrapper.
-    sentinel = getattr(app.state, "_scoped_root_openapi_installed", None)
-    if sentinel and hasattr(app.state, "_scoped_root_exclusions"):
-        app.state._scoped_root_exclusions = sorted(set(exclude_prefixes))
-        return
-
-    original_openapi = app.openapi
-    full_cache: Dict | None = None
-    app.state._scoped_root_exclusions = sorted(set(exclude_prefixes))
-
-    def full_schema():
-        nonlocal full_cache
-        if full_cache is None:
-            full_cache = copy.deepcopy(original_openapi())
-        return full_cache
-
-    def root_filtered_openapi():
-        return _build_filtered_schema(
-            full_schema(),
-            exclude_prefixes=app.state._scoped_root_exclusions,
-            title_suffix=None,
-        )
-
-    app.openapi = root_filtered_openapi  # monkey-patch FastAPI docs source
-    app.state._scoped_root_openapi_installed = True
-
-
-def _ensure_root_excludes_registered_scopes(app: FastAPI) -> None:
-    """
-    Automatically keep root /openapi.json filtered to exclude every scope
-    that has been registered via add_prefixed_docs().
-    """
-    scopes = _current_registered_scopes()
-    if not scopes:
-        return
-    _install_root_filter(app, scopes)
