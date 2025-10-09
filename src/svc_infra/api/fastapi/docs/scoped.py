@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 
 from svc_infra.api.fastapi.dual.public import public_router
+from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV, Environment
 
 # (prefix, swagger_path, redoc_path, openapi_path, title)
 DOC_SCOPES: List[Tuple[str, str, str, str, str]] = []
@@ -157,16 +158,34 @@ def _ensure_root_excludes_registered_scopes(app: FastAPI) -> None:
         _install_root_filter(app, scopes)
 
 
+def _normalize_envs(envs: Optional[Iterable[Environment | str]]) -> Optional[set[Environment]]:
+    if envs is None:
+        return None
+    out: set[Environment] = set()
+    for e in envs:
+        out.add(e if isinstance(e, Environment) else Environment(e))
+    return out
+
+
 def add_prefixed_docs(
-    app: FastAPI, *, prefix: str, title: str, auto_exclude_from_root: bool = True
+    app: FastAPI,
+    *,
+    prefix: str,
+    title: str,
+    auto_exclude_from_root: bool = True,
+    visible_envs: Optional[Iterable[Environment | str]] = (LOCAL_ENV, DEV_ENV),
 ) -> None:
     """
     Expose filtered OpenAPI + Swagger/ReDoc for only the routes under `prefix`.
-    These 3 endpoints are mounted on a PUBLIC router so they don't require auth:
-      - {prefix}/openapi.json
-      - {prefix}/docs
-      - {prefix}/redoc
+    These 3 endpoints are mounted on a PUBLIC router so they don't require auth.
+    Visibility can be limited via `visible_envs` (defaults: LOCAL/DEV). If the
+    current environment isn't allowed, this function becomes a no-op.
     """
+    allow = _normalize_envs(visible_envs)
+    if allow is not None and CURRENT_ENVIRONMENT not in allow:
+        # Not visible in this environment -> no routes, no card
+        return
+
     scope = prefix.rstrip("/") or "/"
     openapi_path = f"{scope}/openapi.json"
     swagger_path = f"{scope}/docs"
@@ -174,7 +193,6 @@ def add_prefixed_docs(
 
     _ensure_original_openapi_saved(app)
 
-    # Build via cached snapshot of the original spec
     _scope_cache: Dict | None = None
 
     def _scoped_schema():
@@ -186,7 +204,6 @@ def add_prefixed_docs(
             )
         return _scope_cache
 
-    # Mount the three endpoints on a PUBLIC router to bypass guards
     r = public_router(tags=["Docs"], include_in_schema=False)
 
     @r.get(openapi_path, include_in_schema=False)
@@ -201,7 +218,7 @@ def add_prefixed_docs(
     def scoped_redoc():
         return get_redoc_html(openapi_url=openapi_path, title=f"{title} • ReDoc")
 
-    app.include_router(r, prefix="")  # paths are absolute
+    app.include_router(r, prefix="")  # absolute paths
 
     DOC_SCOPES.append((scope, swagger_path, redoc_path, openapi_path, title))
 

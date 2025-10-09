@@ -21,7 +21,7 @@ from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.openapi.mutators import setup_mutators
 from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
 from svc_infra.api.fastapi.routers import register_all_routers
-from svc_infra.app.env import CURRENT_ENVIRONMENT
+from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +144,10 @@ def _build_parent_app(
     public_cors_origins: list[str] | str | None,
     root_routers: list[str] | str | None,
     root_server_url: str | None = None,
-    root_include_api_key: bool = False,  # <-- NEW
+    root_include_api_key: bool = False,
 ) -> FastAPI:
+    show_root_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
+
     parent = FastAPI(
         title=service.name,
         version=service.release,
@@ -153,9 +155,9 @@ def _build_parent_app(
         license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
         description=service.description,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url=("/docs" if show_root_docs else None),
+        redoc_url=("/redoc" if show_root_docs else None),
+        openapi_url=("/openapi.json" if show_root_docs else None),
     )
 
     _setup_cors(parent, public_cors_origins)
@@ -231,13 +233,17 @@ def setup_service_api(
     @parent.get("/", include_in_schema=False)
     def index():
         cards: list[CardSpec] = []
-        # Root card
-        cards.append(
-            CardSpec(
-                tag="",
-                docs=DocTargets(swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"),
+        is_local_dev = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
+
+        if is_local_dev:
+            # Root card
+            cards.append(
+                CardSpec(
+                    tag="",
+                    docs=DocTargets(swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"),
+                )
             )
-        )
+
         # Version cards
         for spec in versions:
             tag = spec.tag.strip("/")
@@ -251,14 +257,16 @@ def setup_service_api(
                     ),
                 )
             )
-        # Scoped cards (auth, payments, etc.)
-        for scope, swagger, redoc, openapi_json, title in DOC_SCOPES:
-            cards.append(
-                CardSpec(
-                    tag=scope.strip("/"),
-                    docs=DocTargets(swagger=swagger, redoc=redoc, openapi_json=openapi_json),
+
+        if is_local_dev:
+            # Scoped cards (auth, payments, etc.)
+            for scope, swagger, redoc, openapi_json, title in DOC_SCOPES:
+                cards.append(
+                    CardSpec(
+                        tag=scope.strip("/"),
+                        docs=DocTargets(swagger=swagger, redoc=redoc, openapi_json=openapi_json),
+                    )
                 )
-            )
 
         html = render_index_html(service_name=service.name, release=service.release, cards=cards)
         return HTMLResponse(html)
