@@ -107,8 +107,15 @@ u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
 
+# ---- feature flags / constants ----
+WANT_PAYMENTS = os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}
+FORCE_PAYMENTS = os.getenv("ALEMBIC_FORCE_PAYMENTS", "").lower() in {"1", "true", "yes"}
+PAYMENT_TABLES = {"pay_customers", "pay_intents", "pay_events", "ledger_entries"}
+
+
 # ---- metadata discovery (prefer ModelBase; scan ALL attrs) ----
-DISCOVER_PACKAGES: List[str] = ['svc_infra.apf_payments.models']  # seed; merged with FS + env
+# IMPORTANT: do NOT seed with payments package unless enabled/forced.
+DISCOVER_PACKAGES: List[str] = []  # seed empty; merged with FS + env
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(",") if s.strip()]
@@ -116,8 +123,8 @@ if ENV_DISCOVER:
 def _collect_metadata() -> list[object]:
     """
     Strategy:
-      1) (If APF_ENABLE_PAYMENTS) force-import payments module and log result.
-      2) Import infra packages + ALEMBIC_DISCOVER_PACKAGES.
+      1) (If WANT_PAYMENTS or FORCE_PAYMENTS) force-import payments module and log result.
+      2) Import packages + ALEMBIC_DISCOVER_PACKAGES (+ payments only when enabled).
       3) ALSO import top-level packages under project root and src/.
       4) Import common model-bearing submodules.
       5) Prefer ModelBase.metadata after imports.
@@ -147,8 +154,8 @@ def _collect_metadata() -> list[object]:
         except Exception:
             pass
 
-    # (1) Force-load payments when enabled and log explicit outcome
-    if os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}:
+    # (1) Force-load payments when enabled/forced and log explicit outcome
+    if WANT_PAYMENTS or FORCE_PAYMENTS:
         try:
             importlib.import_module("svc_infra.apf_payments.models")
             context.config.print_stdout("[alembic env] payments module import: ok (svc_infra.apf_payments.models)")
@@ -158,9 +165,14 @@ def _collect_metadata() -> list[object]:
 
     # (2) seed list
     pkgs: list[str] = []
+    # add payments package ONLY when enabled/forced
+    if WANT_PAYMENTS or FORCE_PAYMENTS:
+        pkgs.append("svc_infra.apf_payments.models")
+
     for p in list(DISCOVER_PACKAGES or []):
         if p and p not in pkgs:
             pkgs.append(p)
+
     env_pkgs = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "")
     if env_pkgs:
         for p in (x.strip() for x in env_pkgs.split(",") if x.strip()):
@@ -258,9 +270,8 @@ def _collect_metadata() -> list[object]:
         f"[alembic env] discovered {len(uniq)} metadata objects with {total_tables} tables total"
     )
 
-    want_payments = os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}
-    if want_payments:
-        saw_pay = any(any(tn.startswith("pay_") for tn in md.tables.keys()) for md in uniq) if uniq else False
+    if WANT_PAYMENTS and not FORCE_PAYMENTS:
+        saw_pay = any(any(tn in PAYMENT_TABLES for tn in md.tables.keys()) for md in uniq) if uniq else False
         if not saw_pay:
             context.config.print_stdout(
                 "[alembic env] WARNING: APF_ENABLE_PAYMENTS is set but no payments tables were discovered. "
@@ -315,11 +326,15 @@ def _system_schemas_for(url: str) -> set[str]:
 def _include_object_factory(url: str):
     sys_schemas = _system_schemas_for(url)
     skip_drops = os.getenv("ALEMBIC_SKIP_DROPS", "").lower() in {"1", "true", "yes"}
+    want_payments = WANT_PAYMENTS or FORCE_PAYMENTS
 
     def _include_object(obj, name, type_, reflected, compare_to):
+        # filter system schemas
         schema = getattr(obj, "schema", None)
         if schema and str(schema) in sys_schemas:
             return False
+
+        # Always keep Alembic version table
         version_table = (
             context.get_x_argument(as_dictionary=True).get("version_table")
             if hasattr(context, "get_x_argument")
@@ -327,8 +342,23 @@ def _include_object_factory(url: str):
         ) or os.getenv("ALEMBIC_VERSION_TABLE", "alembic_version")
         if type_ == "table" and name == version_table:
             return True
+
+        # Guard: don't drop tables that exist in DB but aren't in metadata
         if skip_drops and type_ == "table" and reflected and compare_to is None:
             return False
+
+        # Payments gating: when disabled, exclude payments tables and their indexes
+        if not want_payments:
+            if type_ == "table" and name in PAYMENT_TABLES:
+                return False
+            if type_ == "index":
+                try:
+                    parent = getattr(obj, "table", None)
+                    if parent is not None and getattr(parent, "name", None) in PAYMENT_TABLES:
+                        return False
+                except Exception:
+                    pass
+
         return True
 
     return _include_object
