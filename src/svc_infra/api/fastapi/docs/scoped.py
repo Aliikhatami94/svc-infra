@@ -5,8 +5,8 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import HTMLResponse
 
-from svc_infra.api.fastapi.dual.public import public_router
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV, Environment
 
 # (prefix, swagger_path, redoc_path, openapi_path, title)
@@ -175,15 +175,8 @@ def add_prefixed_docs(
     auto_exclude_from_root: bool = True,
     visible_envs: Optional[Iterable[Environment | str]] = (LOCAL_ENV, DEV_ENV),
 ) -> None:
-    """
-    Expose filtered OpenAPI + Swagger/ReDoc for only the routes under `prefix`.
-    These 3 endpoints are mounted on a PUBLIC router so they don't require auth.
-    Visibility can be limited via `visible_envs` (defaults: LOCAL/DEV). If the
-    current environment isn't allowed, this function becomes a no-op.
-    """
     allow = _normalize_envs(visible_envs)
     if allow is not None and CURRENT_ENVIRONMENT not in allow:
-        # Not visible in this environment -> no routes, no card
         return
 
     scope = prefix.rstrip("/") or "/"
@@ -192,7 +185,6 @@ def add_prefixed_docs(
     redoc_path = f"{scope}/redoc"
 
     _ensure_original_openapi_saved(app)
-
     _scope_cache: Dict | None = None
 
     def _scoped_schema():
@@ -204,21 +196,18 @@ def add_prefixed_docs(
             )
         return _scope_cache
 
-    r = public_router(tags=["Docs"], include_in_schema=False)
-
-    @r.get(openapi_path, show_in_schema=False)
+    # --- Register directly on the app to ensure truly public & collision-proof ---
+    @app.get(openapi_path, include_in_schema=False)
     def scoped_openapi():
         return _scoped_schema()
 
-    @r.get(swagger_path, show_in_schema=False)
+    @app.get(swagger_path, include_in_schema=False, response_class=HTMLResponse)
     def scoped_swagger():
         return get_swagger_ui_html(openapi_url=openapi_path, title=f"{title} • Swagger")
 
-    @r.get(redoc_path, show_in_schema=False)
+    @app.get(redoc_path, include_in_schema=False, response_class=HTMLResponse)
     def scoped_redoc():
         return get_redoc_html(openapi_url=openapi_path, title=f"{title} • ReDoc")
-
-    app.include_router(r, prefix="")  # absolute paths
 
     DOC_SCOPES.append((scope, swagger_path, redoc_path, openapi_path, title))
 
