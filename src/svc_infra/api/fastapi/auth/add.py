@@ -16,6 +16,7 @@ from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, OAUTH_PREFIX, USER_P
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
 
+from ..docs.scoped import add_prefixed_docs
 from .policy import AuthPolicy, DefaultAuthPolicy
 from .providers import providers_from_settings
 from .settings import get_auth_settings
@@ -314,3 +315,5 @@ def add_auth(
             auth_policy=policy,
             include_in_docs=include_in_docs,
         )
+
+    add_prefixed_docs(app, prefix=auth_prefix, title="Auth")

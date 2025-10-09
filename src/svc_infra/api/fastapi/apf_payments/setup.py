@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from svc_infra.apf_payments.provider.registry import get_provider_registry
 from svc_infra.api.fastapi.apf_payments.router import build_payments_routers
+from svc_infra.api.fastapi.docs.scoped import add_prefixed_docs
 
 
 def _maybe_register_default_providers(
@@ -46,3 +47,5 @@ def add_payments(
         app.include_router(
             r, include_in_schema=True if include_in_docs is None else bool(include_in_docs)
         )
+
+    add_prefixed_docs(app, prefix=prefix, title="Payments")

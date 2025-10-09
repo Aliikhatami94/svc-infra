@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRoute
 
 from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_index_html
+from svc_infra.api.fastapi.docs.scoped import DOC_SCOPES
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
 from svc_infra.api.fastapi.middleware.idempotency import IdempotencyMiddleware
@@ -230,16 +231,14 @@ def setup_service_api(
     @parent.get("/", include_in_schema=False)
     def index():
         cards: list[CardSpec] = []
-
-        # Root card first
+        # Root card
         cards.append(
             CardSpec(
-                tag="",  # renders as "/"
+                tag="",
                 docs=DocTargets(swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"),
             )
         )
-
-        # One card per version
+        # Version cards
         for spec in versions:
             tag = spec.tag.strip("/")
             cards.append(
@@ -252,8 +251,14 @@ def setup_service_api(
                     ),
                 )
             )
+        # Scoped cards (auth, payments, etc.)
+        for scope, swagger, redoc, openapi_json, title in DOC_SCOPES:
+            cards.append(
+                CardSpec(
+                    tag=scope.strip("/"),
+                    docs=DocTargets(swagger=swagger, redoc=redoc, openapi_json=openapi_json),
+                )
+            )
 
         html = render_index_html(service_name=service.name, release=service.release, cards=cards)
         return HTMLResponse(html)
-
-    return parent
