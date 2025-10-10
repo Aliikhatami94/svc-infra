@@ -98,10 +98,11 @@ def _dump_or_none(model):
 
 
 def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
+    title = f"{service.name} • {spec.tag}" if getattr(spec, "tag", None) else service.name
     child = FastAPI(
-        title=service.name,
+        title=title,
         version=service.release,
-        contact=_dump_or_none(service.contact),  # FastAPI expects plain dicts
+        contact=_dump_or_none(service.contact),
         license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
         description=service.description,
