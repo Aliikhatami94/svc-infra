@@ -74,3 +74,98 @@ class StatementRow(BaseModel):
     fees: int
     net: int
     count: int
+
+
+class PaymentMethodAttachIn(BaseModel):
+    customer_provider_id: str
+    payment_method_token: str  # provider token (e.g., stripe pm_ or payment_method id)
+    make_default: bool = True
+
+
+class PaymentMethodOut(BaseModel):
+    id: str
+    provider: str
+    provider_customer_id: str
+    provider_method_id: str
+    brand: Optional[str] = None
+    last4: Optional[str] = None
+    exp_month: Optional[int] = None
+    exp_year: Optional[int] = None
+    is_default: bool = False
+
+
+class ProductCreateIn(BaseModel):
+    name: str
+    active: bool = True
+
+
+class ProductOut(BaseModel):
+    id: str
+    provider: str
+    provider_product_id: str
+    name: str
+    active: bool
+
+
+class PriceCreateIn(BaseModel):
+    provider_product_id: str
+    currency: Currency
+    unit_amount: AmountMinor
+    interval: Optional[Literal["day", "week", "month", "year"]] = None
+    trial_days: Optional[int] = None
+    active: bool = True
+
+
+class PriceOut(BaseModel):
+    id: str
+    provider: str
+    provider_price_id: str
+    provider_product_id: str
+    currency: Currency
+    unit_amount: AmountMinor
+    interval: Optional[str] = None
+    trial_days: Optional[int] = None
+    active: bool = True
+
+
+class SubscriptionCreateIn(BaseModel):
+    customer_provider_id: str
+    price_provider_id: str
+    quantity: int = 1
+    trial_days: Optional[int] = None
+    proration_behavior: Literal["create_prorations", "none", "always_invoice"] = "create_prorations"
+
+
+class SubscriptionUpdateIn(BaseModel):
+    price_provider_id: Optional[str] = None
+    quantity: Optional[int] = None
+    cancel_at_period_end: Optional[bool] = None
+    proration_behavior: Literal["create_prorations", "none", "always_invoice"] = "create_prorations"
+
+
+class SubscriptionOut(BaseModel):
+    id: str
+    provider: str
+    provider_subscription_id: str
+    provider_price_id: str
+    status: str
+    quantity: int
+    cancel_at_period_end: bool
+    current_period_end: Optional[str] = None
+
+
+class InvoiceCreateIn(BaseModel):
+    customer_provider_id: str
+    auto_advance: bool = True
+
+
+class InvoiceOut(BaseModel):
+    id: str
+    provider: str
+    provider_invoice_id: str
+    provider_customer_id: str
+    status: str
+    amount_due: AmountMinor
+    currency: Currency
+    hosted_invoice_url: Optional[str] = None
+    pdf_url: Optional[str] = None

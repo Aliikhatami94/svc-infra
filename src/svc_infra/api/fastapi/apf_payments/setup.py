@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Iterable, Optional
 
 from fastapi import FastAPI
@@ -7,6 +8,8 @@ from fastapi import FastAPI
 from svc_infra.apf_payments.provider.registry import get_provider_registry
 from svc_infra.api.fastapi.apf_payments.router import build_payments_routers
 from svc_infra.api.fastapi.docs.scoped import add_prefixed_docs
+
+logger = logging.getLogger(__name__)
 
 
 def _maybe_register_default_providers(
@@ -42,10 +45,20 @@ def add_payments(
     - Reuses your OpenAPI defaults (security + responses) via DualAPIRouter factories.
     """
     _maybe_register_default_providers(register_default_providers, adapters)
-
     add_prefixed_docs(app, prefix=prefix, title="Payments")
 
     for r in build_payments_routers(prefix=prefix):
         app.include_router(
             r, include_in_schema=True if include_in_docs is None else bool(include_in_docs)
         )
+
+    @app.on_event("startup")
+    async def _payments_startup_check():
+        try:
+            reg = get_provider_registry()
+            adapter = reg.get()  # default provider
+            # Try a cheap call (Stripe: read account or key balance; we just access .name)
+            _ = adapter.name
+        except Exception as e:
+            # Log loud; don’t crash the whole app by default
+            logger.warning(f"[payments] Provider adapter not ready: {e}")

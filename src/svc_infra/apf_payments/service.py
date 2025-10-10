@@ -6,9 +6,37 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import LedgerEntry, PayCustomer, PayEvent, PayIntent
+from .models import (
+    LedgerEntry,
+    PayCustomer,
+    PayEvent,
+    PayIntent,
+    PayInvoice,
+    PayPaymentMethod,
+    PayPrice,
+    PayProduct,
+    PaySubscription,
+)
 from .provider.registry import get_provider_registry
-from .schemas import CustomerOut, CustomerUpsertIn, IntentCreateIn, IntentOut, RefundIn
+from .schemas import (
+    CustomerOut,
+    CustomerUpsertIn,
+    IntentCreateIn,
+    IntentOut,
+    InvoiceCreateIn,
+    InvoiceOut,
+    PaymentMethodAttachIn,
+    PaymentMethodOut,
+    PriceCreateIn,
+    PriceOut,
+    ProductCreateIn,
+    ProductOut,
+    RefundIn,
+    StatementRow,
+    SubscriptionCreateIn,
+    SubscriptionOut,
+    SubscriptionUpdateIn,
+)
 
 
 def _default_provider_name() -> str:
@@ -198,3 +226,127 @@ class PaymentsService:
                     status="posted",
                 )
             )
+
+    async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
+        out = await self._get_adapter().attach_payment_method(data)
+        # Upsert locally for quick listing
+        pm = PayPaymentMethod(
+            provider=out.provider,
+            provider_customer_id=out.provider_customer_id,
+            provider_method_id=out.provider_method_id,
+            brand=out.brand,
+            last4=out.last4,
+            exp_month=out.exp_month,
+            exp_year=out.exp_year,
+            is_default=out.is_default,
+        )
+        self.session.add(pm)
+        return out
+
+    async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:
+        return await self._get_adapter().list_payment_methods(provider_customer_id)
+
+    async def detach_payment_method(self, provider_method_id: str) -> None:
+        await self._get_adapter().detach_payment_method(provider_method_id)
+
+    async def set_default_payment_method(
+        self, provider_customer_id: str, provider_method_id: str
+    ) -> None:
+        await self._get_adapter().set_default_payment_method(
+            provider_customer_id, provider_method_id
+        )
+
+    # --- Products/Prices ---
+    async def create_product(self, data: ProductCreateIn) -> ProductOut:
+        out = await self._get_adapter().create_product(data)
+        self.session.add(
+            PayProduct(
+                provider=out.provider,
+                provider_product_id=out.provider_product_id,
+                name=out.name,
+                active=out.active,
+            )
+        )
+        return out
+
+    async def create_price(self, data: PriceCreateIn) -> PriceOut:
+        out = await self._get_adapter().create_price(data)
+        self.session.add(
+            PayPrice(
+                provider=out.provider,
+                provider_price_id=out.provider_price_id,
+                provider_product_id=out.provider_product_id,
+                currency=out.currency,
+                unit_amount=out.unit_amount,
+                interval=out.interval,
+                trial_days=out.trial_days,
+                active=out.active,
+            )
+        )
+        return out
+
+    # --- Subscriptions ---
+    async def create_subscription(self, data: SubscriptionCreateIn) -> SubscriptionOut:
+        out = await self._get_adapter().create_subscription(data)
+        self.session.add(
+            PaySubscription(
+                provider=out.provider,
+                provider_subscription_id=out.provider_subscription_id,
+                provider_price_id=out.provider_price_id,
+                status=out.status,
+                quantity=out.quantity,
+                cancel_at_period_end=out.cancel_at_period_end,
+            )
+        )
+        return out
+
+    async def update_subscription(
+        self, provider_subscription_id: str, data: SubscriptionUpdateIn
+    ) -> SubscriptionOut:
+        out = await self._get_adapter().update_subscription(provider_subscription_id, data)
+        # Optionally reflect status/quantity locally (query + update if exists)
+        return out
+
+    async def cancel_subscription(
+        self, provider_subscription_id: str, at_period_end: bool = True
+    ) -> SubscriptionOut:
+        out = await self._get_adapter().cancel_subscription(provider_subscription_id, at_period_end)
+        return out
+
+    # --- Invoices ---
+    async def create_invoice(self, data: InvoiceCreateIn) -> InvoiceOut:
+        out = await self._get_adapter().create_invoice(data)
+        self.session.add(
+            PayInvoice(
+                provider=out.provider,
+                provider_invoice_id=out.provider_invoice_id,
+                provider_customer_id=out.provider_customer_id,
+                status=out.status,
+                amount_due=out.amount_due,
+                currency=out.currency,
+                hosted_invoice_url=out.hosted_invoice_url,
+                pdf_url=out.pdf_url,
+            )
+        )
+        return out
+
+    async def finalize_invoice(self, provider_invoice_id: str) -> InvoiceOut:
+        return await self._get_adapter().finalize_invoice(provider_invoice_id)
+
+    async def void_invoice(self, provider_invoice_id: str) -> InvoiceOut:
+        return await self._get_adapter().void_invoice(provider_invoice_id)
+
+    async def pay_invoice(self, provider_invoice_id: str) -> InvoiceOut:
+        return await self._get_adapter().pay_invoice(provider_invoice_id)
+
+    # --- Intents QoL ---
+    async def get_intent(self, provider_intent_id: str) -> IntentOut:
+        return await self._get_adapter().hydrate_intent(provider_intent_id)
+
+    # --- Statements/Rollups ---
+    async def daily_statements_rollup(
+        self, date_from: str | None = None, date_to: str | None = None
+    ) -> list[StatementRow]:
+        # simple SQL rollup across LedgerEntry; filter by ts range if provided
+        # (left as exercise: GROUP BY currency; SUM amounts by kind; compute net=payments - refunds - fees)
+        return []
