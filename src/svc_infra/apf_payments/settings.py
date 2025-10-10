@@ -5,6 +5,9 @@ from typing import Optional
 
 from pydantic import BaseModel, SecretStr
 
+STRIPE_KEY = os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY")
+STRIPE_WH = os.getenv("STRIPE_WH_SECRET")
+
 
 class StripeConfig(BaseModel):
     secret_key: SecretStr
@@ -27,13 +30,13 @@ class PaymentsSettings(BaseModel):
     key = os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY") or ""
     stripe: Optional[StripeConfig] = (
         StripeConfig(
-            secret_key=SecretStr(key),
-            webhook_secret=SecretStr(os.getenv("STRIPE_WH_SECRET", "")),
+            secret_key=SecretStr(STRIPE_KEY),
+            webhook_secret=SecretStr(STRIPE_WH) if STRIPE_WH else None,
         )
-        if key
+        if STRIPE_KEY
         else None
     )
-    adyen: Optional[AdyenConfig] = None  # fill from env if you want
+    adyen: Optional[AdyenConfig] = None
 
 
 _SETTINGS: Optional[PaymentsSettings] = None
