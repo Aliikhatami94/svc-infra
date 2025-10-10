@@ -19,7 +19,10 @@ class AdyenConfig(BaseModel):
 
 
 class PaymentsSettings(BaseModel):
-    default_provider: str = os.getenv("PAYMENTS_PROVIDER", "stripe").lower()
+    default_provider: str = (
+        os.getenv("APF_PAYMENTS_PROVIDER") or os.getenv("PAYMENTS_PROVIDER", "stripe")
+    ).lower()
+
     # optional multi-tenant/provider map hook can be added later
     stripe: Optional[StripeConfig] = (
         StripeConfig(
