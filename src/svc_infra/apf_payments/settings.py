@@ -7,6 +7,7 @@ from pydantic import BaseModel, SecretStr
 
 STRIPE_KEY = os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY")
 STRIPE_WH = os.getenv("STRIPE_WH_SECRET")
+PROVIDER = (os.getenv("APF_PAYMENTS_PROVIDER") or os.getenv("PAYMENTS_PROVIDER", "stripe")).lower()
 
 
 class StripeConfig(BaseModel):
@@ -22,12 +23,9 @@ class AdyenConfig(BaseModel):
 
 
 class PaymentsSettings(BaseModel):
-    default_provider: str = (
-        os.getenv("APF_PAYMENTS_PROVIDER") or os.getenv("PAYMENTS_PROVIDER", "stripe")
-    ).lower()
+    default_provider: str = PROVIDER
 
     # optional multi-tenant/provider map hook can be added later
-    key = os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY") or ""
     stripe: Optional[StripeConfig] = (
         StripeConfig(
             secret_key=SecretStr(STRIPE_KEY),
