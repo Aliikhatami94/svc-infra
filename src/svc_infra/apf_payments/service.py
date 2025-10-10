@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Optional
 
 from sqlalchemy import select
@@ -37,10 +36,11 @@ from .schemas import (
     SubscriptionOut,
     SubscriptionUpdateIn,
 )
+from .settings import get_payments_settings
 
 
 def _default_provider_name() -> str:
-    return (os.getenv("APF_PAYMENTS_PROVIDER") or "stripe").lower()
+    return get_payments_settings().default_provider
 
 
 class PaymentsService:

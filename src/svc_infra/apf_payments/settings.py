@@ -24,12 +24,13 @@ class PaymentsSettings(BaseModel):
     ).lower()
 
     # optional multi-tenant/provider map hook can be added later
+    key = os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY") or ""
     stripe: Optional[StripeConfig] = (
         StripeConfig(
-            secret_key=SecretStr(os.getenv("STRIPE_SECRET", "")),
+            secret_key=SecretStr(key),
             webhook_secret=SecretStr(os.getenv("STRIPE_WH_SECRET", "")),
         )
-        if os.getenv("STRIPE_SECRET")
+        if key
         else None
     )
     adyen: Optional[AdyenConfig] = None  # fill from env if you want
