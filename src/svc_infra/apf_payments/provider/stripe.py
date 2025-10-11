@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Optional
+
+import anyio
 
 from ..schemas import CustomerOut, CustomerUpsertIn, IntentCreateIn, IntentOut, NextAction, RefundIn
 from ..settings import get_payments_settings
@@ -11,6 +14,10 @@ try:
     import stripe
 except Exception:  # pragma: no cover
     stripe = None  # type: ignore
+
+
+async def _acall(fn, /, *args, **kwargs):
+    return await anyio.to_thread.run_sync(partial(fn, *args, **kwargs))
 
 
 class StripeAdapter(ProviderAdapter):
@@ -28,21 +35,24 @@ class StripeAdapter(ProviderAdapter):
         )
 
     async def ensure_customer(self, data: CustomerUpsertIn) -> CustomerOut:
-        assert stripe
         # try by email (idempotent enough for demo; production can map via your DB)
         if data.email:
-            existing = stripe.Customer.list(email=data.email, limit=1).data
-            if existing:
-                c = existing[0]
-            else:
-                c = stripe.Customer.create(
+            existing = await _acall(stripe.Customer.list, email=data.email, limit=1)
+            c = (
+                existing.data[0]
+                if existing.data
+                else await _acall(
+                    stripe.Customer.create,
                     email=data.email,
                     name=data.name or None,
                     metadata={"user_id": data.user_id or ""},
                 )
+            )
         else:
-            c = stripe.Customer.create(
-                name=data.name or None, metadata={"user_id": data.user_id or ""}
+            c = await _acall(
+                stripe.Customer.create,
+                name=data.name or None,
+                metadata={"user_id": data.user_id or ""},
             )
         return CustomerOut(
             id=c.id,
@@ -53,8 +63,7 @@ class StripeAdapter(ProviderAdapter):
         )
 
     async def get_customer(self, provider_customer_id: str) -> Optional[CustomerOut]:
-        assert stripe
-        c = stripe.Customer.retrieve(provider_customer_id)
+        c = await _acall(stripe.Customer.retrieve, provider_customer_id)
         return CustomerOut(
             id=c.id,
             provider="stripe",
@@ -64,7 +73,6 @@ class StripeAdapter(ProviderAdapter):
         )
 
     async def create_intent(self, data: IntentCreateIn, *, user_id: str | None) -> IntentOut:
-        assert stripe
         kwargs: dict[str, Any] = dict(
             amount=int(data.amount),
             currency=data.currency.lower(),
@@ -74,7 +82,10 @@ class StripeAdapter(ProviderAdapter):
         )
         if data.payment_method_types:
             kwargs["payment_method_types"] = data.payment_method_types
-        pi = stripe.PaymentIntent.create(**{k: v for k, v in kwargs.items() if v is not None})
+        pi = await _acall(
+            stripe.PaymentIntent.create,
+            **{k: v for k, v in kwargs.items() if v is not None},
+        )
         return IntentOut(
             id=pi.id,
             provider="stripe",
@@ -87,8 +98,7 @@ class StripeAdapter(ProviderAdapter):
         )
 
     async def confirm_intent(self, provider_intent_id: str) -> IntentOut:
-        assert stripe
-        pi = stripe.PaymentIntent.confirm(provider_intent_id)
+        pi = await _acall(stripe.PaymentIntent.confirm, provider_intent_id)
         return IntentOut(
             id=pi.id,
             provider="stripe",
@@ -101,8 +111,7 @@ class StripeAdapter(ProviderAdapter):
         )
 
     async def cancel_intent(self, provider_intent_id: str) -> IntentOut:
-        assert stripe
-        pi = stripe.PaymentIntent.cancel(provider_intent_id)
+        pi = await _acall(stripe.PaymentIntent.cancel, provider_intent_id)
         return IntentOut(
             id=pi.id,
             provider="stripe",
@@ -113,30 +122,36 @@ class StripeAdapter(ProviderAdapter):
         )
 
     async def refund(self, provider_intent_id: str, data: RefundIn) -> IntentOut:
-        assert stripe
         # Stripe refunds are created against charges; simplify via PaymentIntent last charge
-        pi = stripe.PaymentIntent.retrieve(provider_intent_id, expand=["latest_charge"])
+        pi = await _acall(
+            stripe.PaymentIntent.retrieve, provider_intent_id, expand=["latest_charge"]
+        )
         charge_id = pi.latest_charge.id if getattr(pi, "latest_charge", None) else None
         if not charge_id:
             raise ValueError("No charge available to refund")
-        stripe.Refund.create(charge=charge_id, amount=int(data.amount) if data.amount else None)
+        await _acall(
+            stripe.Refund.create,
+            charge=charge_id,
+            amount=int(data.amount) if data.amount else None,
+        )
         # Re-hydrate
         return await self.hydrate_intent(provider_intent_id)
 
     async def verify_and_parse_webhook(
         self, signature: str | None, payload: bytes
     ) -> dict[str, Any]:
-        assert stripe
         if not self._wh_secret:
             raise ValueError("Stripe webhook secret not configured")
-        event = stripe.Webhook.construct_event(
-            payload=payload, sig_header=signature, secret=self._wh_secret
+        event = await _acall(
+            stripe.Webhook.construct_event,
+            payload=payload,
+            sig_header=signature,
+            secret=self._wh_secret,
         )
         return {"id": event.id, "type": event.type, "data": event.data.object}
 
     async def hydrate_intent(self, provider_intent_id: str) -> IntentOut:
-        assert stripe
-        pi = stripe.PaymentIntent.retrieve(provider_intent_id)
+        pi = await _acall(stripe.PaymentIntent.retrieve, provider_intent_id)
         return IntentOut(
             id=pi.id,
             provider="stripe",

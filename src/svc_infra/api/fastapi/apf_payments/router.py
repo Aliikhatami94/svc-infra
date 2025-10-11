@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional, cast
 
 from fastapi import Depends, Header, Request
 from starlette.responses import JSONResponse
@@ -29,6 +29,23 @@ from svc_infra.apf_payments.service import PaymentsService
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual import protected_router, public_router, service_router, user_router
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
+from svc_infra.api.fastapi.pagination import (
+    Paginated,
+    cursor_window,
+    make_pagination_injector,
+    sort_by,
+    use_pagination,
+)
+
+_TX_KINDS = {"payment", "refund", "fee", "payout", "capture"}
+
+
+def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "capture"]:
+    if kind not in _TX_KINDS:
+        # Choose: either raise (strict) or map to a default.
+        # Strict is safer so bad data doesn't silently pass through.
+        raise ValueError(f"Unknown ledger kind: {kind!r}")
+    return cast(Literal["payment", "refund", "fee", "payout", "capture"], kind)
 
 
 # --- deps ---
@@ -99,28 +116,58 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return out
 
     @prot.get(
-        "/transactions", response_model=list[TransactionRow], name="payments_list_transactions"
+        "/transactions",
+        response_model=Paginated[TransactionRow],  # <-- envelope
+        name="payments_list_transactions",
+        dependencies=[
+            Depends(
+                make_pagination_injector(
+                    envelope=True,  # return Paginated[...] with next_cursor
+                    allow_cursor=True,  # cursor mode
+                    allow_page=False,  # disable page/offset
+                    default_limit=50,
+                    max_limit=200,
+                )
+            )
+        ],
     )
     async def list_transactions(svc: PaymentsService = Depends(get_service)):
         from sqlalchemy import select
 
         from svc_infra.apf_payments.models import LedgerEntry
 
+        # Pull rows (you can add WHEREs for filters later)
         rows = (await svc.session.execute(select(LedgerEntry))).scalars().all()
-        return [
+
+        # Sort newest-first (descending by ts)
+        rows_sorted = sort_by(rows, key=lambda e: e.ts, desc=True)
+
+        # slice by cursor
+        ctx = use_pagination()
+        window, next_cursor = cursor_window(
+            rows_sorted,
+            cursor=ctx.cursor,
+            limit=ctx.limit,
+            key=lambda e: int(e.ts.timestamp()),  # numeric, monotonic
+            descending=True,
+        )
+
+        items = [
             TransactionRow(
                 id=e.id,
                 ts=e.ts.isoformat(),
-                type="payment",
-                amount=e.amount,
+                type=_tx_kind(e.kind),
+                amount=int(e.amount),
                 currency=e.currency,
                 status=e.status,
                 provider=e.provider,
                 provider_ref=e.provider_ref or "",
                 user_id=e.user_id,
             )
-            for e in rows
+            for e in window
         ]
+
+        return ctx.wrap(items, next_cursor=next_cursor)
 
     routers.append(prot)
 
@@ -147,9 +194,46 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         await svc.session.flush()
         return out
 
-    @prot.get("/methods", response_model=list[PaymentMethodOut], name="payments_list_methods")
-    async def list_methods(customer_provider_id: str, svc: PaymentsService = Depends(get_service)):
-        return await svc.list_payment_methods(customer_provider_id)
+    @prot.get(
+        "/methods",
+        response_model=Paginated[PaymentMethodOut],
+        name="payments_list_methods",
+        dependencies=[
+            Depends(
+                make_pagination_injector(
+                    envelope=True,
+                    allow_cursor=True,
+                    allow_page=False,
+                    default_limit=50,
+                    max_limit=200,
+                )
+            )
+        ],
+    )
+    async def list_methods(
+        customer_provider_id: str,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        methods = await svc.list_payment_methods(customer_provider_id)
+
+        # Stable sort: default first, then provider_method_id
+        methods_sorted = sort_by(
+            sort_by(methods, key=lambda m: m.provider_method_id or "", desc=False),
+            key=lambda m: m.is_default,
+            desc=True,
+        )
+
+        ctx = use_pagination()
+        window, next_cursor = cursor_window(
+            methods_sorted,
+            cursor=ctx.cursor,
+            limit=ctx.limit,
+            key=lambda m: m.provider_method_id or "",
+            descending=False,
+        )
+
+        # Already PaymentMethodOut models; no mapping needed
+        return ctx.wrap(window, next_cursor=next_cursor)
 
     @prot.post("/methods/{provider_method_id}/detach", name="payments_detach_method")
     async def detach_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):

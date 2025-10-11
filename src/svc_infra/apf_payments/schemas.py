@@ -54,7 +54,7 @@ class RefundIn(BaseModel):
 class TransactionRow(BaseModel):
     id: str
     ts: str
-    type: Literal["payment", "refund", "fee", "payout"]
+    type: Literal["payment", "refund", "fee", "payout", "capture"]
     amount: int
     currency: Currency
     status: str

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Index, Numeric, String, Text, text
+from sqlalchemy import JSON, Boolean, DateTime, Index, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from svc_infra.db.sql.authref import user_fk_constraint, user_id_type
@@ -73,7 +73,7 @@ class PayEvent(ModelBase):
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
     )
-    payload_json: Mapped[str] = mapped_column(Text, nullable=False)  # compact JSON string
+    payload_json: Mapped[dict] = mapped_column(JSON, nullable=False)  # compact JSON string
 
 
 class LedgerEntry(ModelBase):
