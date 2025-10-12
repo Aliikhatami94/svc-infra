@@ -8,6 +8,7 @@ from ..schemas import (
     IntentCreateIn,
     IntentOut,
     InvoiceCreateIn,
+    InvoiceLineItemIn,
     InvoiceOut,
     PaymentMethodAttachIn,
     PaymentMethodOut,
@@ -19,20 +20,19 @@ from ..schemas import (
     SubscriptionCreateIn,
     SubscriptionOut,
     SubscriptionUpdateIn,
+    UsageRecordIn,
 )
 
 
 class ProviderAdapter(Protocol):
     name: str
 
-    # Customers
     async def ensure_customer(self, data: CustomerUpsertIn) -> CustomerOut:
         pass
 
     async def get_customer(self, provider_customer_id: str) -> Optional[CustomerOut]:
         pass
 
-    # Payment Methods
     async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
         pass
 
@@ -47,14 +47,12 @@ class ProviderAdapter(Protocol):
     ) -> None:
         pass
 
-    # Products / Prices
     async def create_product(self, data: ProductCreateIn) -> ProductOut:
         pass
 
     async def create_price(self, data: PriceCreateIn) -> PriceOut:
         pass
 
-    # Subscriptions
     async def create_subscription(self, data: SubscriptionCreateIn) -> SubscriptionOut:
         pass
 
@@ -68,7 +66,6 @@ class ProviderAdapter(Protocol):
     ) -> SubscriptionOut:
         pass
 
-    # Invoices
     async def create_invoice(self, data: InvoiceCreateIn) -> InvoiceOut:
         pass
 
@@ -81,7 +78,6 @@ class ProviderAdapter(Protocol):
     async def pay_invoice(self, provider_invoice_id: str) -> InvoiceOut:
         pass
 
-    # Intents
     async def create_intent(self, data: IntentCreateIn, *, user_id: str | None) -> IntentOut:
         pass
 
@@ -97,8 +93,44 @@ class ProviderAdapter(Protocol):
     async def hydrate_intent(self, provider_intent_id: str) -> IntentOut:
         pass
 
-    # Webhooks
     async def verify_and_parse_webhook(
         self, signature: str | None, payload: bytes
     ) -> dict[str, Any]:
+        pass
+
+    async def capture_intent(self, provider_intent_id: str, *, amount: int | None) -> IntentOut:
+        pass
+
+    async def list_intents(
+        self,
+        *,
+        customer_provider_id: str | None,
+        status: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[IntentOut], str | None]:
+        pass
+
+    async def add_invoice_line_item(self, data: InvoiceLineItemIn) -> dict[str, Any]:
+        pass
+
+    async def list_invoices(
+        self,
+        *,
+        customer_provider_id: str | None,
+        status: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[InvoiceOut], str | None]:
+        pass
+
+    async def get_invoice(self, provider_invoice_id: str) -> InvoiceOut:
+        pass
+
+    async def preview_invoice(
+        self, *, customer_provider_id: str, subscription_id: str | None = None
+    ) -> InvoiceOut:
+        pass
+
+    async def create_usage_record(self, data: UsageRecordIn) -> dict[str, Any]:
         pass

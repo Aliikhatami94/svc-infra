@@ -18,12 +18,16 @@ from .models import (
 )
 from .provider.registry import get_provider_registry
 from .schemas import (
+    CaptureIn,
     CustomerOut,
     CustomerUpsertIn,
     IntentCreateIn,
+    IntentListFilter,
     IntentOut,
     InvoiceCreateIn,
+    InvoiceLineItemIn,
     InvoiceOut,
+    InvoicesListFilter,
     PaymentMethodAttachIn,
     PaymentMethodOut,
     PriceCreateIn,
@@ -35,6 +39,7 @@ from .schemas import (
     SubscriptionCreateIn,
     SubscriptionOut,
     SubscriptionUpdateIn,
+    UsageRecordIn,
 )
 from .settings import get_payments_settings
 
@@ -350,3 +355,50 @@ class PaymentsService:
         # simple SQL rollup across LedgerEntry; filter by ts range if provided
         # (left as exercise: GROUP BY currency; SUM amounts by kind; compute net=payments - refunds - fees)
         return []
+
+    async def capture_intent(self, provider_intent_id: str, data: CaptureIn) -> IntentOut:
+        out = await self._get_adapter().capture_intent(
+            provider_intent_id, amount=int(data.amount) if data.amount is not None else None
+        )
+        pi = await self.session.scalar(
+            select(PayIntent).where(PayIntent.provider_intent_id == provider_intent_id)
+        )
+        if pi:
+            pi.status = out.status
+            if out.status in ("succeeded", "requires_capture"):  # Stripe specifics vary
+                pi.captured = True if out.status == "succeeded" else pi.captured
+        return out
+
+    async def list_intents(self, f: IntentListFilter) -> tuple[list[IntentOut], str | None]:
+        return await self._get_adapter().list_intents(
+            customer_provider_id=f.customer_provider_id,
+            status=f.status,
+            limit=f.limit or 50,
+            cursor=f.cursor,
+        )
+
+    # ---- Invoices: lines/list/get/preview ----
+    async def add_invoice_line_item(self, data: InvoiceLineItemIn) -> dict:
+        return await self._get_adapter().add_invoice_line_item(data)
+
+    async def list_invoices(self, f: InvoicesListFilter) -> tuple[list[InvoiceOut], str | None]:
+        return await self._get_adapter().list_invoices(
+            customer_provider_id=f.customer_provider_id,
+            status=f.status,
+            limit=f.limit or 50,
+            cursor=f.cursor,
+        )
+
+    async def get_invoice(self, provider_invoice_id: str) -> InvoiceOut:
+        return await self._get_adapter().get_invoice(provider_invoice_id)
+
+    async def preview_invoice(
+        self, customer_provider_id: str, subscription_id: str | None
+    ) -> InvoiceOut:
+        return await self._get_adapter().preview_invoice(
+            customer_provider_id=customer_provider_id, subscription_id=subscription_id
+        )
+
+    # ---- Metered usage ----
+    async def create_usage_record(self, data: UsageRecordIn) -> dict:
+        return await self._get_adapter().create_usage_record(data)

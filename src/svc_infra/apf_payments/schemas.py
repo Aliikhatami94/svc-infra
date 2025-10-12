@@ -169,3 +169,40 @@ class InvoiceOut(BaseModel):
     currency: Currency
     hosted_invoice_url: Optional[str] = None
     pdf_url: Optional[str] = None
+
+
+class CaptureIn(BaseModel):
+    amount: Optional[AmountMinor] = None  # partial capture supported
+
+
+class IntentListFilter(BaseModel):
+    customer_provider_id: Optional[str] = None
+    status: Optional[str] = None
+    limit: Optional[int] = Field(default=50, ge=1, le=200)
+    cursor: Optional[str] = None  # opaque provider cursor when supported
+
+
+class UsageRecordIn(BaseModel):
+    # Stripe: subscription_item is the target for metered billing.
+    # If provider doesn't use subscription_item, allow provider_price_id as fallback.
+    subscription_item: Optional[str] = None
+    provider_price_id: Optional[str] = None
+    quantity: conint(ge=0)
+    timestamp: Optional[int] = None  # Unix seconds; provider defaults to "now"
+    action: Optional[Literal["increment", "set"]] = "increment"
+
+
+class InvoiceLineItemIn(BaseModel):
+    customer_provider_id: str
+    description: Optional[str] = None
+    unit_amount: AmountMinor
+    currency: Currency
+    quantity: Optional[int] = 1
+    provider_price_id: Optional[str] = None  # if linked to a price, unit_amount may be ignored
+
+
+class InvoicesListFilter(BaseModel):
+    customer_provider_id: Optional[str] = None
+    status: Optional[str] = None
+    limit: Optional[int] = Field(default=50, ge=1, le=200)
+    cursor: Optional[str] = None

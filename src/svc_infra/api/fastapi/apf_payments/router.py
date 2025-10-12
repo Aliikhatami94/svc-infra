@@ -6,12 +6,16 @@ from fastapi import Depends, Header, Request
 from starlette.responses import JSONResponse
 
 from svc_infra.apf_payments.schemas import (
+    CaptureIn,
     CustomerOut,
     CustomerUpsertIn,
     IntentCreateIn,
+    IntentListFilter,
     IntentOut,
     InvoiceCreateIn,
+    InvoiceLineItemIn,
     InvoiceOut,
+    InvoicesListFilter,
     PaymentMethodAttachIn,
     PaymentMethodOut,
     PriceCreateIn,
@@ -24,6 +28,7 @@ from svc_infra.apf_payments.schemas import (
     SubscriptionOut,
     SubscriptionUpdateIn,
     TransactionRow,
+    UsageRecordIn,
 )
 from svc_infra.apf_payments.service import PaymentsService
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
@@ -357,6 +362,122 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         svc: PaymentsService = Depends(get_service),
     ):
         return await svc.daily_statements_rollup(date_from, date_to)
+
+    # ===== Intents: capture & list =====
+    @prot.post(
+        "/intents/{provider_intent_id}/capture",
+        response_model=IntentOut,
+        name="payments_capture_intent",
+    )
+    async def capture_intent(
+        provider_intent_id: str,
+        data: CaptureIn,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.capture_intent(provider_intent_id, data)
+        await svc.session.flush()
+        return out
+
+    @prot.get(
+        "/intents",
+        response_model=Paginated[IntentOut],
+        name="payments_list_intents",
+        dependencies=[
+            Depends(
+                make_pagination_injector(
+                    envelope=True,
+                    allow_cursor=True,
+                    allow_page=False,
+                    default_limit=50,
+                    max_limit=200,
+                )
+            )
+        ],
+    )
+    async def list_intents_endpoint(
+        customer_provider_id: Optional[str] = None,
+        status: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_intents(
+            IntentListFilter(
+                customer_provider_id=customer_provider_id,
+                status=status,
+                limit=ctx.limit,
+                cursor=ctx.cursor,
+            )
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    # ===== Invoices: lines/list/get/preview =====
+    @prot.post("/invoices/{provider_invoice_id}/lines", name="payments_add_invoice_line_item")
+    async def add_invoice_line(
+        provider_invoice_id: str,  # retained to feel REST-y though Stripe uses customer+invoiceitem
+        data: InvoiceLineItemIn,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        # NB: Stripe invoice items attach to customer; provider_invoice_id is unused here but kept for API shape
+        out = await svc.add_invoice_line_item(data)
+        await svc.session.flush()
+        return {"ok": True, **out}
+
+    @prot.get(
+        "/invoices",
+        response_model=Paginated[InvoiceOut],
+        name="payments_list_invoices",
+        dependencies=[
+            Depends(
+                make_pagination_injector(
+                    envelope=True,
+                    allow_cursor=True,
+                    allow_page=False,
+                    default_limit=50,
+                    max_limit=200,
+                )
+            )
+        ],
+    )
+    async def list_invoices_endpoint(
+        customer_provider_id: Optional[str] = None,
+        status: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_invoices(
+            InvoicesListFilter(
+                customer_provider_id=customer_provider_id,
+                status=status,
+                limit=ctx.limit,
+                cursor=ctx.cursor,
+            )
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @prot.get(
+        "/invoices/{provider_invoice_id}", response_model=InvoiceOut, name="payments_get_invoice"
+    )
+    async def get_invoice_endpoint(
+        provider_invoice_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_invoice(provider_invoice_id)
+
+    @prot.post("/invoices/preview", response_model=InvoiceOut, name="payments_preview_invoice")
+    async def preview_invoice_endpoint(
+        customer_provider_id: str,
+        subscription_id: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        return await svc.preview_invoice(customer_provider_id, subscription_id)
+
+    # ===== Metered usage =====
+    @prot.post("/usage_records", name="payments_create_usage_record")
+    async def create_usage_record_endpoint(
+        data: UsageRecordIn, svc: PaymentsService = Depends(get_service)
+    ):
+        out = await svc.create_usage_record(data)
+        await svc.session.flush()
+        return out
 
     routers.append(svc)
     routers.append(pub)
