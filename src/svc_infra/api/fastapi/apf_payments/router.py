@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional, cast
 
-from fastapi import Depends, Header, Request
+from fastapi import Depends, Header, Request, Response, status
 from starlette.responses import JSONResponse
 
 from svc_infra.apf_payments.schemas import (
@@ -47,15 +47,12 @@ _TX_KINDS = {"payment", "refund", "fee", "payout", "capture"}
 
 def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "capture"]:
     if kind not in _TX_KINDS:
-        # Choose: either raise (strict) or map to a default.
-        # Strict is safer so bad data doesn't silently pass through.
         raise ValueError(f"Unknown ledger kind: {kind!r}")
     return cast(Literal["payment", "refund", "fee", "payout", "capture"], kind)
 
 
 # --- deps ---
 async def get_service(session: SqlSessionDep) -> PaymentsService:
-    # No provider forced here; PaymentsService lazy-loads when needed
     return PaymentsService(session=session)
 
 
@@ -74,16 +71,29 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
 
     @user.post("/customers", response_model=CustomerOut, name="payments_upsert_customer")
     async def upsert_customer(data: CustomerUpsertIn, svc: PaymentsService = Depends(get_service)):
+        # Upsert semantics: keep 200 OK (creation vs update is ambiguous here).
         out = await svc.ensure_customer(data)
         await svc.session.flush()
         return out
 
-    @user.post("/intents", response_model=IntentOut, name="payments_create_intent")
-    async def create_intent(data: IntentCreateIn, svc: PaymentsService = Depends(get_service)):
-        # If your RequireUser principal exposes user id somewhere (e.g., request.state.principal.user.id),
-        # you can plumb it here. For now, let provider/customer flows attach user_id later.
+    @user.post(
+        "/intents",
+        response_model=IntentOut,
+        name="payments_create_intent",
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def create_intent(
+        data: IntentCreateIn,
+        request: Request,
+        response: Response,
+        svc: PaymentsService = Depends(get_service),
+    ):
         out = await svc.create_intent(user_id=None, data=data)
         await svc.session.flush()
+
+        # Location → canonical GET for this resource
+        location = request.url_for("payments_get_intent", provider_intent_id=out.provider_intent_id)
+        response.headers["Location"] = str(location)
         return out
 
     routers.append(user)
@@ -131,19 +141,15 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
 
         from svc_infra.apf_payments.models import LedgerEntry
 
-        # Pull rows (you can add WHEREs for filters later)
         rows = (await svc.session.execute(select(LedgerEntry))).scalars().all()
-
-        # Sort newest-first (descending by ts)
         rows_sorted = sort_by(rows, key=lambda e: e.ts, desc=True)
 
-        # slice by cursor
         ctx = use_pagination()
         window, next_cursor = cursor_window(
             rows_sorted,
             cursor=ctx.cursor,
             limit=ctx.limit,
-            key=lambda e: int(e.ts.timestamp()),  # numeric, monotonic
+            key=lambda e: int(e.ts.timestamp()),
             descending=True,
         )
 
@@ -161,7 +167,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
             )
             for e in window
         ]
-
         return ctx.wrap(items, next_cursor=next_cursor)
 
     routers.append(prot)
@@ -181,10 +186,16 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         await svc.session.flush()
         return JSONResponse(out)
 
-    @user.post("/methods/attach", response_model=PaymentMethodOut, name="payments_attach_method")
+    @user.post(
+        "/methods/attach",
+        response_model=PaymentMethodOut,
+        name="payments_attach_method",
+        status_code=status.HTTP_201_CREATED,
+    )
     async def attach_method(
         data: PaymentMethodAttachIn, svc: PaymentsService = Depends(get_service)
     ):
+        # No canonical GET by id; return 201 Created without Location.
         out = await svc.attach_payment_method(data)
         await svc.session.flush()
         return out
@@ -200,14 +211,11 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         svc: PaymentsService = Depends(get_service),
     ):
         methods = await svc.list_payment_methods(customer_provider_id)
-
-        # Stable sort: default first, then provider_method_id
         methods_sorted = sort_by(
             sort_by(methods, key=lambda m: m.provider_method_id or "", desc=False),
             key=lambda m: m.is_default,
             desc=True,
         )
-
         ctx = use_pagination()
         window, next_cursor = cursor_window(
             methods_sorted,
@@ -216,8 +224,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
             key=lambda m: m.provider_method_id or "",
             descending=False,
         )
-
-        # Already PaymentMethodOut models; no mapping needed
         return ctx.wrap(window, next_cursor=next_cursor)
 
     @prot.post("/methods/{provider_method_id}/detach", name="payments_detach_method")
@@ -237,25 +243,41 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return {"ok": True}
 
     # PRODUCTS/PRICES
-    @svc.post("/products", response_model=ProductOut, name="payments_create_product")
+    @svc.post(
+        "/products",
+        response_model=ProductOut,
+        name="payments_create_product",
+        status_code=status.HTTP_201_CREATED,
+    )
     async def create_product(data: ProductCreateIn, svc: PaymentsService = Depends(get_service)):
+        # No product GET endpoint; 201 without Location.
         out = await svc.create_product(data)
         await svc.session.flush()
         return out
 
-    @svc.post("/prices", response_model=PriceOut, name="payments_create_price")
+    @svc.post(
+        "/prices",
+        response_model=PriceOut,
+        name="payments_create_price",
+        status_code=status.HTTP_201_CREATED,
+    )
     async def create_price(data: PriceCreateIn, svc: PaymentsService = Depends(get_service)):
+        # No price GET endpoint; 201 without Location.
         out = await svc.create_price(data)
         await svc.session.flush()
         return out
 
     # SUBSCRIPTIONS
     @prot.post(
-        "/subscriptions", response_model=SubscriptionOut, name="payments_create_subscription"
+        "/subscriptions",
+        response_model=SubscriptionOut,
+        name="payments_create_subscription",
+        status_code=status.HTTP_201_CREATED,
     )
     async def create_subscription(
         data: SubscriptionCreateIn, svc: PaymentsService = Depends(get_service)
     ):
+        # No subscription GET endpoint; 201 without Location.
         out = await svc.create_subscription(data)
         await svc.session.flush()
         return out
@@ -289,10 +311,26 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return out
 
     # INVOICES
-    @prot.post("/invoices", response_model=InvoiceOut, name="payments_create_invoice")
-    async def create_invoice(data: InvoiceCreateIn, svc: PaymentsService = Depends(get_service)):
+    @prot.post(
+        "/invoices",
+        response_model=InvoiceOut,
+        name="payments_create_invoice",
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def create_invoice(
+        data: InvoiceCreateIn,
+        request: Request,
+        response: Response,
+        svc: PaymentsService = Depends(get_service),
+    ):
         out = await svc.create_invoice(data)
         await svc.session.flush()
+
+        # Location → canonical GET for invoice
+        location = request.url_for(
+            "payments_get_invoice", provider_invoice_id=out.provider_invoice_id
+        )
+        response.headers["Location"] = str(location)
         return out
 
     @prot.post(
@@ -381,13 +419,17 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return ctx.wrap(items, next_cursor=next_cursor)
 
     # ===== Invoices: lines/list/get/preview =====
-    @prot.post("/invoices/{provider_invoice_id}/lines", name="payments_add_invoice_line_item")
+    @prot.post(
+        "/invoices/{provider_invoice_id}/lines",
+        name="payments_add_invoice_line_item",
+        status_code=status.HTTP_201_CREATED,
+    )
     async def add_invoice_line(
-        provider_invoice_id: str,  # retained to feel REST-y though Stripe uses customer+invoiceitem
+        provider_invoice_id: str,
         data: InvoiceLineItemIn,
         svc: PaymentsService = Depends(get_service),
     ):
-        # NB: Stripe invoice items attach to customer; provider_invoice_id is unused here but kept for API shape
+        # Stripe invoice items attach to customer; no canonical GET for the created line.
         out = await svc.add_invoice_line_item(data)
         await svc.session.flush()
         return {"ok": True, **out}
@@ -431,7 +473,11 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return await svc.preview_invoice(customer_provider_id, subscription_id)
 
     # ===== Metered usage =====
-    @prot.post("/usage_records", name="payments_create_usage_record")
+    @prot.post(
+        "/usage_records",
+        name="payments_create_usage_record",
+        status_code=status.HTTP_201_CREATED,
+    )
     async def create_usage_record_endpoint(
         data: UsageRecordIn, svc: PaymentsService = Depends(get_service)
     ):
