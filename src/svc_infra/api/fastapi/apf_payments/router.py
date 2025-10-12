@@ -407,7 +407,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         await svc.session.flush()
         return out
 
-    @user.post(
+    @user.get(
         "/intents",
         response_model=IntentOut,
         name="payments_create_intent",
