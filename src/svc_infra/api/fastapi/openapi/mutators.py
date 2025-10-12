@@ -1315,9 +1315,10 @@ def attach_header_params_mutator():
                 pass
             return None
 
-        for path, method, op in _iter_ops(schema):
+        for _, method, op in _iter_ops(schema):
             params = op.setdefault("parameters", [])
 
+            # What inline params (non-$ref) are already present?
             inline_names = {
                 (p.get("name"), p.get("in"))
                 for p in params
@@ -1327,43 +1328,28 @@ def attach_header_params_mutator():
             def add_ref_if_absent(name: str):
                 ref = {"$ref": f"#/components/parameters/{name}"}
                 tup = _component_param_name(ref["$ref"])
+                # If an inline with the same (name, in) exists (e.g., from a dependency),
+                # don't add the ref at all.
                 if tup and tup in inline_names:
                     return
                 params.append(ref)
 
-            # ---- Idempotency-Key handling ----
-            is_payments = "payments" in (op.get("tags") or [])
-            is_webhook = path.startswith("/payments/webhooks/")
-
+            # ---- Write methods: Idempotency-Key fallback (optional via $ref) ----
+            # If the dependency added an inline required param, nothing to do;
+            # otherwise, add the optional component ref so callers can still send it.
             if method in ("post", "patch", "delete"):
-                if is_payments and not is_webhook:
-                    # Inline, required TRUE so it shows as required in the spec
-                    key = ("Idempotency-Key", "header")
-                    if key not in inline_names:
-                        params.append(
-                            {
-                                "name": "Idempotency-Key",
-                                "in": "header",
-                                "required": True,
-                                "schema": {"type": "string"},
-                                "description": "Provide to make the request idempotent for 24h.",
-                            }
-                        )
-                        inline_names.add(key)
-                else:
-                    # Non-payments or webhooks → keep it optional via $ref
+                if ("Idempotency-Key", "header") not in inline_names:
                     add_ref_if_absent("IdempotencyKey")
-
-                # (Optional) If-Match for updates via ref
+                # Optional optimistic concurrency for updates
                 if method in ("patch", "put"):
                     add_ref_if_absent("IfMatch")
 
-            # ---- Conditional GET headers (unchanged) ----
+            # ---- Conditional GET headers (optional via $ref) ----
             if method == "get":
                 add_ref_if_absent("IfNoneMatch")
                 add_ref_if_absent("IfModifiedSince")
 
-            # ---- Success response headers (unchanged) ----
+            # ---- Standard success/429 headers (unchanged) ----
             resps = op.get("responses") or {}
             for code, resp in resps.items():
                 try:
