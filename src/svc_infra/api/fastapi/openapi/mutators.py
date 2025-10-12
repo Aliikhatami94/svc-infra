@@ -1304,10 +1304,6 @@ def attach_header_params_mutator():
         comp_params = comps.setdefault("parameters", {})
 
         def _component_param_name(ref: str) -> tuple[str, str] | None:
-            """
-            Given '#/components/parameters/<Key>', return (name, in) from the component,
-            or None if not resolvable.
-            """
             try:
                 key = ref.rsplit("/", 1)[-1]
                 p = comp_params.get(key) or {}
@@ -1319,10 +1315,9 @@ def attach_header_params_mutator():
                 pass
             return None
 
-        for _, method, op in _iter_ops(schema):
+        for path, method, op in _iter_ops(schema):
             params = op.setdefault("parameters", [])
 
-            # Build a set of existing (name, in) for inline params so we don't add refs that duplicate them
             inline_names = {
                 (p.get("name"), p.get("in"))
                 for p in params
@@ -1331,21 +1326,44 @@ def attach_header_params_mutator():
 
             def add_ref_if_absent(name: str):
                 ref = {"$ref": f"#/components/parameters/{name}"}
-                # Only add if no inline param already declares the same (name,in)
                 tup = _component_param_name(ref["$ref"])
                 if tup and tup in inline_names:
                     return
                 params.append(ref)
 
+            # ---- Idempotency-Key handling ----
+            is_payments = "payments" in (op.get("tags") or [])
+            is_webhook = path.startswith("/payments/webhooks/")
+
             if method in ("post", "patch", "delete"):
-                add_ref_if_absent("IdempotencyKey")
+                if is_payments and not is_webhook:
+                    # Inline, required TRUE so it shows as required in the spec
+                    key = ("Idempotency-Key", "header")
+                    if key not in inline_names:
+                        params.append(
+                            {
+                                "name": "Idempotency-Key",
+                                "in": "header",
+                                "required": True,
+                                "schema": {"type": "string"},
+                                "description": "Provide to make the request idempotent for 24h.",
+                            }
+                        )
+                        inline_names.add(key)
+                else:
+                    # Non-payments or webhooks → keep it optional via $ref
+                    add_ref_if_absent("IdempotencyKey")
+
+                # (Optional) If-Match for updates via ref
                 if method in ("patch", "put"):
                     add_ref_if_absent("IfMatch")
+
+            # ---- Conditional GET headers (unchanged) ----
             if method == "get":
                 add_ref_if_absent("IfNoneMatch")
                 add_ref_if_absent("IfModifiedSince")
 
-            # RESPONSE HEADERS
+            # ---- Success response headers (unchanged) ----
             resps = op.get("responses") or {}
             for code, resp in resps.items():
                 try:
@@ -1372,6 +1390,7 @@ def attach_header_params_mutator():
                         "schema": {"type": "integer"},
                         "description": "Seconds until next allowed request.",
                     }
+
         return schema
 
     return m
