@@ -44,8 +44,8 @@ def _encode_cursor(payload: dict) -> str:
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
-# public; handy if you need to decode an incoming cursor
 def decode_cursor(token: Optional[str]) -> dict:
+    """Public: decode an incoming cursor token for debugging/ops."""
     if not token:
         return {}
     s = token + "=" * (-len(token) % 4)
@@ -55,15 +55,14 @@ def decode_cursor(token: Optional[str]) -> dict:
 
 # ---------- Context ----------
 class PaginationContext(Generic[T]):
-    # mode config
     envelope: bool
     allow_cursor: bool
     allow_page: bool
 
-    # values
     cursor_params: CursorParams | None
     page_params: PageParams | None
     filters: FilterParams | None
+    limit_override: int | None
 
     def __init__(
         self,
@@ -117,7 +116,6 @@ class PaginationContext(Generic[T]):
             return Paginated[T](items=items, next_cursor=next_cursor, total=total)
         return items
 
-    # convenience: derive a naive next_cursor from the last item
     def next_cursor_from_last(
         self, items: Sequence[T], *, key: Callable[[T], str | int]
     ) -> Optional[str]:
@@ -135,20 +133,20 @@ _pagination_ctx: contextvars.ContextVar[PaginationContext] = contextvars.Context
 def use_pagination() -> PaginationContext:
     ctx = _pagination_ctx.get()
     if ctx is None:
-        # Safe defaults; this happens if a route forgot to install the injector
+        # Safe defaults; if a route forgot to install the injector
         ctx = PaginationContext(
             envelope=False,
             allow_cursor=True,
-            allow_page=True,
+            allow_page=False,
             cursor_params=CursorParams(),
-            page_params=PageParams(),
-            filters=FilterParams(),
+            page_params=None,
+            filters=None,
         )
     return ctx
 
 
+# ---------- Utilities ----------
 def text_filter(items: Iterable[T], q: Optional[str], *getters: Callable[[T], str]) -> list[T]:
-    """Simple contains filter across one or more string fields."""
     if not q:
         return list(items)
     ql = q.lower()
@@ -170,13 +168,10 @@ def sort_by(
     key: Callable[[T], Any],
     desc: bool = False,
 ) -> list[T]:
-    """Stable sort with a key func."""
     return sorted(list(items), key=key, reverse=desc)
 
 
 def cursor_window(items, *, cursor, limit, key, descending: bool, offset: int = 0):
-    # items must already be filtered/sorted
-
     # compute start_index
     if cursor:
         payload = decode_cursor(cursor)
@@ -195,14 +190,14 @@ def cursor_window(items, *, cursor, limit, key, descending: bool, offset: int = 
     window = slice_[:limit]
 
     next_cur = None
-    if has_more:
+    if has_more and window:
         last_key = key(window[-1])
         next_cur = _encode_cursor({"after": last_key})
 
     return window, next_cur
 
 
-# ---------- Dependency factory (used by the router decorator) ----------
+# ---------- Dependency factories ----------
 def make_pagination_injector(
     *,
     envelope: bool,
@@ -210,7 +205,97 @@ def make_pagination_injector(
     allow_page: bool,
     default_limit: int = 50,
     max_limit: int = 200,
+    include_filters: bool = False,
 ):
+    """
+    Returns a dependency with a signature that only includes the relevant query params.
+    This keeps the generated OpenAPI in sync with actual behavior.
+    """
+
+    # Cursor-only (common case)
+    if allow_cursor and not allow_page and not include_filters:
+
+        async def _inject(
+            request: Request,
+            cursor: str | None = Query(None),
+            limit: int = Query(default_limit, ge=1, le=max_limit),
+        ):
+            cur = CursorParams(cursor=cursor, limit=limit)
+            _pagination_ctx.set(
+                PaginationContext(
+                    envelope=envelope,
+                    allow_cursor=True,
+                    allow_page=False,
+                    cursor_params=cur,
+                    page_params=None,
+                    filters=None,
+                )
+            )
+            return None
+
+        return _inject
+
+    # Cursor + filters
+    if allow_cursor and not allow_page and include_filters:
+
+        async def _inject(
+            request: Request,
+            cursor: str | None = Query(None),
+            limit: int = Query(default_limit, ge=1, le=max_limit),
+            q: str | None = Query(None),
+            sort: str | None = Query(None),
+            created_after: str | None = Query(None),
+            created_before: str | None = Query(None),
+            updated_after: str | None = Query(None),
+            updated_before: str | None = Query(None),
+        ):
+            cur = CursorParams(cursor=cursor, limit=limit)
+            flt = FilterParams(
+                q=q,
+                sort=sort,
+                created_after=created_after,
+                created_before=created_before,
+                updated_after=updated_after,
+                updated_before=updated_before,
+            )
+            _pagination_ctx.set(
+                PaginationContext(
+                    envelope=envelope,
+                    allow_cursor=True,
+                    allow_page=False,
+                    cursor_params=cur,
+                    page_params=None,
+                    filters=flt,
+                )
+            )
+            return None
+
+        return _inject
+
+    # Page-only
+    if not allow_cursor and allow_page:
+
+        async def _inject(
+            request: Request,
+            page: int = Query(1, ge=1),
+            page_size: int = Query(default_limit, ge=1, le=max_limit),
+        ):
+            pag = PageParams(page=page, page_size=page_size)
+            _pagination_ctx.set(
+                PaginationContext(
+                    envelope=envelope,
+                    allow_cursor=False,
+                    allow_page=True,
+                    cursor_params=None,
+                    page_params=pag,
+                    filters=None,
+                )
+            )
+            return None
+
+        return _inject
+
+    # Both cursor + page (rare; exposes all)
     async def _inject(
         request: Request,
         cursor: str | None = Query(None),
@@ -226,23 +311,16 @@ def make_pagination_injector(
     ):
         cur = CursorParams(cursor=cursor, limit=limit) if allow_cursor else None
         pag = PageParams(page=page, page_size=page_size) if allow_page else None
-        flt = FilterParams(
-            q=q,
-            sort=sort,
-            created_after=created_after,
-            created_before=created_before,
-            updated_after=updated_after,
-            updated_before=updated_before,
-        )
-
-        # detect if 'limit' was explicitly provided
-        limit_override = (
-            limit
-            if (
-                "limit" in request.query_params
-                and "page_size" not in request.query_params
-                and cursor is None
+        flt = (
+            FilterParams(
+                q=q,
+                sort=sort,
+                created_after=created_after,
+                created_before=created_before,
+                updated_after=updated_after,
+                updated_before=updated_before,
             )
+            if include_filters
             else None
         )
 
@@ -254,9 +332,30 @@ def make_pagination_injector(
                 cursor_params=cur,
                 page_params=pag,
                 filters=flt,
-                limit_override=limit_override,
             )
         )
         return None
 
     return _inject
+
+
+# ----- Convenience helpers for routers -----
+def cursor_pager(
+    default_limit: int = 50,
+    max_limit: int = 200,
+    *,
+    envelope: bool = True,
+    include_filters: bool = False,
+):
+    """
+    The one-liner most routes should use.
+    Produces OpenAPI with only: `cursor` and `limit` (plus filters if requested).
+    """
+    return make_pagination_injector(
+        envelope=envelope,
+        allow_cursor=True,
+        allow_page=False,
+        default_limit=default_limit,
+        max_limit=max_limit,
+        include_filters=include_filters,
+    )

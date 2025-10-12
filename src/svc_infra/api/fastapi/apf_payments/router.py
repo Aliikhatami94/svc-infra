@@ -36,8 +36,8 @@ from svc_infra.api.fastapi.dual import protected_router, public_router, service_
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
 from svc_infra.api.fastapi.pagination import (
     Paginated,
+    cursor_pager,
     cursor_window,
-    make_pagination_injector,
     sort_by,
     use_pagination,
 )
@@ -122,19 +122,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
 
     @prot.get(
         "/transactions",
-        response_model=Paginated[TransactionRow],  # <-- envelope
+        response_model=Paginated[TransactionRow],
         name="payments_list_transactions",
-        dependencies=[
-            Depends(
-                make_pagination_injector(
-                    envelope=True,  # return Paginated[...] with next_cursor
-                    allow_cursor=True,  # cursor mode
-                    allow_page=False,  # disable page/offset
-                    default_limit=50,
-                    max_limit=200,
-                )
-            )
-        ],
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
     )
     async def list_transactions(svc: PaymentsService = Depends(get_service)):
         from sqlalchemy import select
@@ -203,17 +193,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/methods",
         response_model=Paginated[PaymentMethodOut],
         name="payments_list_methods",
-        dependencies=[
-            Depends(
-                make_pagination_injector(
-                    envelope=True,
-                    allow_cursor=True,
-                    allow_page=False,
-                    default_limit=50,
-                    max_limit=200,
-                )
-            )
-        ],
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
     )
     async def list_methods(
         customer_provider_id: str,
@@ -382,17 +362,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents",
         response_model=Paginated[IntentOut],
         name="payments_list_intents",
-        dependencies=[
-            Depends(
-                make_pagination_injector(
-                    envelope=True,
-                    allow_cursor=True,
-                    allow_page=False,
-                    default_limit=50,
-                    max_limit=200,
-                )
-            )
-        ],
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
     )
     async def list_intents_endpoint(
         customer_provider_id: Optional[str] = None,
@@ -426,17 +396,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices",
         response_model=Paginated[InvoiceOut],
         name="payments_list_invoices",
-        dependencies=[
-            Depends(
-                make_pagination_injector(
-                    envelope=True,
-                    allow_cursor=True,
-                    allow_page=False,
-                    default_limit=50,
-                    max_limit=200,
-                )
-            )
-        ],
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
     )
     async def list_invoices_endpoint(
         customer_provider_id: Optional[str] = None,
