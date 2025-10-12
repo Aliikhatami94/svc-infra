@@ -34,6 +34,7 @@ from svc_infra.apf_payments.service import PaymentsService
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual import protected_router, public_router, service_router, user_router
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
+from svc_infra.api.fastapi.middleware.idempotency import require_idempotency_key
 from svc_infra.api.fastapi.pagination import (
     Paginated,
     cursor_pager,
@@ -43,6 +44,7 @@ from svc_infra.api.fastapi.pagination import (
 )
 
 _TX_KINDS = {"payment", "refund", "fee", "payout", "capture"}
+IDEMP_REQUIRED = {"x-require-idempotency": True}
 
 
 def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "capture"]:
@@ -54,11 +56,6 @@ def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "captur
 # --- deps ---
 async def get_service(session: SqlSessionDep) -> PaymentsService:
     return PaymentsService(session=session)
-
-
-# Require Idempotency-Key header (adds required header to OpenAPI and enforces at runtime) - import for payments endpoints for prevention of duplicate operations
-def require_idempotency_key(idempotency_key: str = Header(..., alias="Idempotency-Key")) -> str:
-    return idempotency_key
 
 
 # --- routers grouped by auth posture (same prefix is fine; FastAPI merges) ---
@@ -85,7 +82,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=IntentOut,
         name="payments_create_intent",
         status_code=status.HTTP_201_CREATED,
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def create_intent(
         data: IntentCreateIn,
@@ -106,7 +104,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/confirm",
         response_model=IntentOut,
         name="payments_confirm_intent",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def confirm_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.confirm_intent(provider_intent_id)
@@ -117,7 +116,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/cancel",
         response_model=IntentOut,
         name="payments_cancel_intent",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def cancel_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.cancel_intent(provider_intent_id)
@@ -128,7 +128,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/refund",
         response_model=IntentOut,
         name="payments_refund_intent",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def refund_intent(
         provider_intent_id: str, data: RefundIn, svc: PaymentsService = Depends(get_service)
@@ -198,7 +199,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=PaymentMethodOut,
         name="payments_attach_method",
         status_code=status.HTTP_201_CREATED,
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def attach_method(
         data: PaymentMethodAttachIn, svc: PaymentsService = Depends(get_service)
@@ -236,7 +238,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     @prot.post(
         "/methods/{provider_method_id}/detach",
         name="payments_detach_method",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def detach_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):
         await svc.detach_payment_method(provider_method_id)
@@ -246,7 +249,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     @prot.post(
         "/methods/{provider_method_id}/default",
         name="payments_set_default_method",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def set_default_method(
         provider_method_id: str,
@@ -286,7 +290,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=SubscriptionOut,
         name="payments_create_subscription",
         status_code=status.HTTP_201_CREATED,
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def create_subscription(
         data: SubscriptionCreateIn, svc: PaymentsService = Depends(get_service)
@@ -299,7 +304,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/subscriptions/{provider_subscription_id}",
         response_model=SubscriptionOut,
         name="payments_update_subscription",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def update_subscription(
         provider_subscription_id: str,
@@ -348,7 +354,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/finalize",
         response_model=InvoiceOut,
         name="payments_finalize_invoice",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def finalize_invoice(
         provider_invoice_id: str, svc: PaymentsService = Depends(get_service)
@@ -361,7 +368,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/void",
         response_model=InvoiceOut,
         name="payments_void_invoice",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def void_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.void_invoice(provider_invoice_id)
@@ -372,7 +380,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/pay",
         response_model=InvoiceOut,
         name="payments_pay_invoice",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def pay_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.pay_invoice(provider_invoice_id)
@@ -400,7 +409,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/capture",
         response_model=IntentOut,
         name="payments_capture_intent",
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def capture_intent(
         provider_intent_id: str,
@@ -411,11 +421,13 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         await svc.session.flush()
         return out
 
-    @prot.get(
+    @user.post(
         "/intents",
-        response_model=Paginated[IntentOut],
-        name="payments_list_intents",
-        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+        response_model=IntentOut,
+        name="payments_create_intent",
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def list_intents_endpoint(
         customer_provider_id: Optional[str] = None,
@@ -438,7 +450,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/lines",
         name="payments_add_invoice_line_item",
         status_code=status.HTTP_201_CREATED,
-        dependencies=[Depends(require_idempotency_key)],  # required
+        dependencies=[Depends(require_idempotency_key)],
+        openapi_extra=IDEMP_REQUIRED,
     )
     async def add_invoice_line(
         provider_invoice_id: str,
@@ -492,8 +505,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/usage_records",
         name="payments_create_usage_record",
         status_code=status.HTTP_201_CREATED,
-        # (Not in your required list, so not forcing Idempotency-Key here.
-        # Add Depends(require_idempotency_key) if you want it enforced.)
     )
     async def create_usage_record_endpoint(
         data: UsageRecordIn, svc: PaymentsService = Depends(get_service)

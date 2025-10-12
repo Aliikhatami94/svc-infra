@@ -1,6 +1,7 @@
 import hashlib
 import time
 
+from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -74,3 +75,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
                 return resp
         return await call_next(request)
+
+
+async def require_idempotency_key(request: Request) -> None:
+    if not request.headers.get("Idempotency-Key"):
+        raise HTTPException(
+            status_code=400, detail="Idempotency-Key header is required for this endpoint."
+        )
