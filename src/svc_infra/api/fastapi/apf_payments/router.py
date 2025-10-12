@@ -407,12 +407,11 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         await svc.session.flush()
         return out
 
-    @user.get(
+    @prot.get(
         "/intents",
-        response_model=IntentOut,
-        name="payments_create_intent",
-        status_code=status.HTTP_201_CREATED,
-        dependencies=[Depends(require_idempotency_key)],
+        response_model=Paginated[IntentOut],
+        name="payments_list_intents",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
     )
     async def list_intents_endpoint(
         customer_provider_id: Optional[str] = None,
