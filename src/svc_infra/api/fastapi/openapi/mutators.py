@@ -367,6 +367,18 @@ def auth_mutator(include_api_key: bool):
 
     def _m(schema: dict) -> dict:
         schema = dict(schema)
+
+        # Detect if any operation already references APIKeyHeader
+        any_op_wants_api_key = False
+        for _, _, op in _iter_ops(schema):
+            for sec in op.get("security") or []:
+                if isinstance(sec, dict) and "APIKeyHeader" in sec:
+                    any_op_wants_api_key = True
+                    break
+            if any_op_wants_api_key:
+                break
+
+        # Add OAuth2 (always)
         comps = schema.setdefault("components", {}).setdefault("securitySchemes", {})
         comps.setdefault(
             "OAuth2PasswordBearer",
@@ -375,11 +387,21 @@ def auth_mutator(include_api_key: bool):
                 "flows": {"password": {"tokenUrl": auth_login_path, "scopes": {}}},
             },
         )
-        if include_api_key:
+
+        # Add API key scheme only if:
+        #  - include_api_key flag is True (from spec/root), OR
+        #  - at least one operation already references APIKeyHeader.
+        if include_api_key or any_op_wants_api_key:
             comps.setdefault(
-                "APIKeyHeader", {"type": "apiKey", "name": "X-API-Key", "in": "header"}
+                "APIKeyHeader",
+                {
+                    "type": "apiKey",
+                    "name": "X-API-Key",
+                    "in": "header",
+                },
             )
 
+        # Normalize operation security (drop only 'SessionCookie')
         drop = {"SessionCookie"}
         for _, _, op in _iter_ops(schema):
             op["security"] = _normalize_security_list(op.get("security"), drop)
