@@ -44,7 +44,6 @@ from svc_infra.api.fastapi.pagination import (
 )
 
 _TX_KINDS = {"payment", "refund", "fee", "payout", "capture"}
-IDEMP_REQUIRED = {"x-require-idempotency": True}
 
 
 def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "capture"]:
@@ -83,7 +82,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_create_intent",
         status_code=status.HTTP_201_CREATED,
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def create_intent(
         data: IntentCreateIn,
@@ -105,7 +103,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=IntentOut,
         name="payments_confirm_intent",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def confirm_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.confirm_intent(provider_intent_id)
@@ -117,7 +114,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=IntentOut,
         name="payments_cancel_intent",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def cancel_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.cancel_intent(provider_intent_id)
@@ -129,7 +125,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=IntentOut,
         name="payments_refund_intent",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def refund_intent(
         provider_intent_id: str, data: RefundIn, svc: PaymentsService = Depends(get_service)
@@ -200,7 +195,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_attach_method",
         status_code=status.HTTP_201_CREATED,
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def attach_method(
         data: PaymentMethodAttachIn, svc: PaymentsService = Depends(get_service)
@@ -239,7 +233,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/methods/{provider_method_id}/detach",
         name="payments_detach_method",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def detach_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):
         await svc.detach_payment_method(provider_method_id)
@@ -250,7 +243,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/methods/{provider_method_id}/default",
         name="payments_set_default_method",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def set_default_method(
         provider_method_id: str,
@@ -291,7 +283,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_create_subscription",
         status_code=status.HTTP_201_CREATED,
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def create_subscription(
         data: SubscriptionCreateIn, svc: PaymentsService = Depends(get_service)
@@ -305,7 +296,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=SubscriptionOut,
         name="payments_update_subscription",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def update_subscription(
         provider_subscription_id: str,
@@ -355,7 +345,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=InvoiceOut,
         name="payments_finalize_invoice",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def finalize_invoice(
         provider_invoice_id: str, svc: PaymentsService = Depends(get_service)
@@ -369,7 +358,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=InvoiceOut,
         name="payments_void_invoice",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def void_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.void_invoice(provider_invoice_id)
@@ -381,7 +369,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=InvoiceOut,
         name="payments_pay_invoice",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def pay_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.pay_invoice(provider_invoice_id)
@@ -410,7 +397,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=IntentOut,
         name="payments_capture_intent",
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def capture_intent(
         provider_intent_id: str,
@@ -427,7 +413,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_create_intent",
         status_code=status.HTTP_201_CREATED,
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def list_intents_endpoint(
         customer_provider_id: Optional[str] = None,
@@ -451,7 +436,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_add_invoice_line_item",
         status_code=status.HTTP_201_CREATED,
         dependencies=[Depends(require_idempotency_key)],
-        openapi_extra=IDEMP_REQUIRED,
     )
     async def add_invoice_line(
         provider_invoice_id: str,
@@ -505,6 +489,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/usage_records",
         name="payments_create_usage_record",
         status_code=status.HTTP_201_CREATED,
+        # (Not in your required list, so not forcing Idempotency-Key here.
+        # Add Depends(require_idempotency_key) if you want it enforced.)
     )
     async def create_usage_record_endpoint(
         data: UsageRecordIn, svc: PaymentsService = Depends(get_service)

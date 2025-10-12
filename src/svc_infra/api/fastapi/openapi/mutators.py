@@ -711,57 +711,91 @@ def strip_ref_siblings_in_parameters_mutator():
 
 def dedupe_parameters_mutator():
     """
-    Deduplicate operation.parameters:
-      - Prefer $ref entries over inline params with the same name.
-      - Deduplicate repeated $ref entries (same target).
-      - Deduplicate repeated inline entries by (name, in).
+    Deduplicate operation.parameters by actual (name, in):
+      - Prefer **inline** params over $ref so per-op 'required: true' (e.g., Idempotency-Key) wins.
+      - Collapse duplicate $refs.
+      - If a $ref and an inline share the same (name, in), keep the inline and drop the $ref.
     """
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
+        comps = schema.get("components") or {}
+        comp_params = (comps.get("parameters") or {}).copy()
+
+        def _resolve_ref(ref: str) -> tuple[str, str] | None:
+            # '#/components/parameters/<Key>' -> ('Idempotency-Key','header'), etc.
+            try:
+                key = ref.rsplit("/", 1)[-1]
+                p = comp_params.get(key) or {}
+                name = p.get("name")
+                where = p.get("in")
+                if isinstance(name, str) and isinstance(where, str):
+                    return (name, where)
+            except Exception:
+                pass
+            return None
+
         for _, _, op in _iter_ops(schema):
             params = op.get("parameters")
             if not isinstance(params, list) or not params:
                 continue
 
-            # First, collect all $ref target names: "#/components/parameters/<NAME>"
-            ref_targets: list[str] = []
+            # First pass: collect inline params by (name, in)
+            inline_by_key: dict[tuple[str, str], dict] = {}
             for p in params:
-                if isinstance(p, dict) and "$ref" in p and isinstance(p["$ref"], str):
-                    ref_targets.append(p["$ref"].rsplit("/", 1)[-1])
+                if isinstance(p, dict) and "$ref" not in p:
+                    name = p.get("name")
+                    where = p.get("in")
+                    if isinstance(name, str) and isinstance(where, str):
+                        # Prefer the first inline; later duplicates ignored
+                        inline_by_key.setdefault((name, where), p)
 
-            seen_refs: set[str] = set()
-            seen_inline_keys: set[tuple[str, str]] = set()
+            seen_ref_targets: set[str] = set()
+            seen_keys: set[tuple[str, str]] = set()
             result: list[dict] = []
 
             for p in params:
                 if not isinstance(p, dict):
                     continue
 
-                # Handle $ref params
-                if "$ref" in p and isinstance(p["$ref"], str):
-                    ref_name = p["$ref"].rsplit("/", 1)[-1]
-                    if ref_name in seen_refs:
+                if "$ref" in p:
+                    ref = p.get("$ref")
+                    if not isinstance(ref, str):
                         continue
-                    seen_refs.add(ref_name)
-                    # ensure no siblings (if upstream didn't strip)
-                    if len(p) > 1:
-                        p = {"$ref": p["$ref"]}
-                    result.append(p)
+                    # de-dup exact same $ref
+                    if ref in seen_ref_targets:
+                        continue
+                    seen_ref_targets.add(ref)
+
+                    tup = _resolve_ref(ref)
+                    if tup is None:
+                        # keep unresolved ref (unlikely)
+                        result.append({"$ref": ref})
+                        continue
+
+                    # If an inline with same (name, in) exists, prefer inline, skip this $ref
+                    if tup in inline_by_key:
+                        continue
+
+                    # Else, keep this $ref if we didn't already keep a param for that key
+                    if tup in seen_keys:
+                        continue
+                    seen_keys.add(tup)
+                    # Ensure no siblings remain
+                    result.append({"$ref": ref})
                     continue
 
-                # Inline params: drop if a ref with the same name already exists
+                # inline param
                 name = p.get("name")
                 where = p.get("in")
-                if isinstance(name, str) and name in ref_targets:
-                    # There is a component param with the same name; prefer the $ref
+                if not (isinstance(name, str) and isinstance(where, str)):
+                    result.append(p)
                     continue
-
-                # Deduplicate inline params by (name, in)
-                key = (str(name), str(where))
-                if key in seen_inline_keys:
+                key = (name, where)
+                if key in seen_keys:
+                    # already kept an inline with same (name, in)
                     continue
-                seen_inline_keys.add(key)
+                seen_keys.add(key)
                 result.append(p)
 
             op["parameters"] = result
@@ -1266,21 +1300,52 @@ def hardening_components_mutator():
 def attach_header_params_mutator():
     def m(schema: dict) -> dict:
         schema = dict(schema)
+        comps = schema.setdefault("components", {})
+        comp_params = comps.setdefault("parameters", {})
+
+        def _component_param_name(ref: str) -> tuple[str, str] | None:
+            """
+            Given '#/components/parameters/<Key>', return (name, in) from the component,
+            or None if not resolvable.
+            """
+            try:
+                key = ref.rsplit("/", 1)[-1]
+                p = comp_params.get(key) or {}
+                name = p.get("name")
+                where = p.get("in")
+                if isinstance(name, str) and isinstance(where, str):
+                    return (name, where)
+            except Exception:
+                pass
+            return None
+
         for _, method, op in _iter_ops(schema):
             params = op.setdefault("parameters", [])
 
-            def add_ref(name):
-                params.append({"$ref": f"#/components/parameters/{name}"})
+            # Build a set of existing (name, in) for inline params so we don't add refs that duplicate them
+            inline_names = {
+                (p.get("name"), p.get("in"))
+                for p in params
+                if isinstance(p, dict) and "$ref" not in p and "name" in p and "in" in p
+            }
+
+            def add_ref_if_absent(name: str):
+                ref = {"$ref": f"#/components/parameters/{name}"}
+                # Only add if no inline param already declares the same (name,in)
+                tup = _component_param_name(ref["$ref"])
+                if tup and tup in inline_names:
+                    return
+                params.append(ref)
 
             if method in ("post", "patch", "delete"):
-                add_ref("IdempotencyKey")
+                add_ref_if_absent("IdempotencyKey")
                 if method in ("patch", "put"):
-                    add_ref("IfMatch")
+                    add_ref_if_absent("IfMatch")
             if method == "get":
-                add_ref("IfNoneMatch")
-                add_ref("IfModifiedSince")
+                add_ref_if_absent("IfNoneMatch")
+                add_ref_if_absent("IfModifiedSince")
 
-            # RESPONSE HEADERS — use *hyphenated* header names as keys
+            # RESPONSE HEADERS
             resps = op.get("responses") or {}
             for code, resp in resps.items():
                 try:
