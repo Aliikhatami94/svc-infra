@@ -56,6 +56,11 @@ async def get_service(session: SqlSessionDep) -> PaymentsService:
     return PaymentsService(session=session)
 
 
+# Require Idempotency-Key header (adds required header to OpenAPI and enforces at runtime) - import for payments endpoints for prevention of duplicate operations
+def require_idempotency_key(idempotency_key: str = Header(..., alias="Idempotency-Key")) -> str:
+    return idempotency_key
+
+
 # --- routers grouped by auth posture (same prefix is fine; FastAPI merges) ---
 def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     routers: list[DualAPIRouter] = []
@@ -71,7 +76,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
 
     @user.post("/customers", response_model=CustomerOut, name="payments_upsert_customer")
     async def upsert_customer(data: CustomerUpsertIn, svc: PaymentsService = Depends(get_service)):
-        # Upsert semantics: keep 200 OK (creation vs update is ambiguous here).
         out = await svc.ensure_customer(data)
         await svc.session.flush()
         return out
@@ -81,6 +85,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=IntentOut,
         name="payments_create_intent",
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def create_intent(
         data: IntentCreateIn,
@@ -90,10 +95,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     ):
         out = await svc.create_intent(user_id=None, data=data)
         await svc.session.flush()
-
-        # Location → canonical GET for this resource
-        location = request.url_for("payments_get_intent", provider_intent_id=out.provider_intent_id)
-        response.headers["Location"] = str(location)
+        response.headers["Location"] = str(
+            request.url_for("payments_get_intent", provider_intent_id=out.provider_intent_id)
+        )
         return out
 
     routers.append(user)
@@ -102,6 +106,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/confirm",
         response_model=IntentOut,
         name="payments_confirm_intent",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def confirm_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.confirm_intent(provider_intent_id)
@@ -112,6 +117,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/cancel",
         response_model=IntentOut,
         name="payments_cancel_intent",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def cancel_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.cancel_intent(provider_intent_id)
@@ -122,6 +128,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/refund",
         response_model=IntentOut,
         name="payments_refund_intent",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def refund_intent(
         provider_intent_id: str, data: RefundIn, svc: PaymentsService = Depends(get_service)
@@ -191,11 +198,11 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=PaymentMethodOut,
         name="payments_attach_method",
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def attach_method(
         data: PaymentMethodAttachIn, svc: PaymentsService = Depends(get_service)
     ):
-        # No canonical GET by id; return 201 Created without Location.
         out = await svc.attach_payment_method(data)
         await svc.session.flush()
         return out
@@ -226,13 +233,21 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         )
         return ctx.wrap(window, next_cursor=next_cursor)
 
-    @prot.post("/methods/{provider_method_id}/detach", name="payments_detach_method")
+    @prot.post(
+        "/methods/{provider_method_id}/detach",
+        name="payments_detach_method",
+        dependencies=[Depends(require_idempotency_key)],  # required
+    )
     async def detach_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):
         await svc.detach_payment_method(provider_method_id)
         await svc.session.flush()
         return {"ok": True}
 
-    @prot.post("/methods/{provider_method_id}/default", name="payments_set_default_method")
+    @prot.post(
+        "/methods/{provider_method_id}/default",
+        name="payments_set_default_method",
+        dependencies=[Depends(require_idempotency_key)],  # required
+    )
     async def set_default_method(
         provider_method_id: str,
         customer_provider_id: str,
@@ -250,7 +265,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         status_code=status.HTTP_201_CREATED,
     )
     async def create_product(data: ProductCreateIn, svc: PaymentsService = Depends(get_service)):
-        # No product GET endpoint; 201 without Location.
         out = await svc.create_product(data)
         await svc.session.flush()
         return out
@@ -262,7 +276,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         status_code=status.HTTP_201_CREATED,
     )
     async def create_price(data: PriceCreateIn, svc: PaymentsService = Depends(get_service)):
-        # No price GET endpoint; 201 without Location.
         out = await svc.create_price(data)
         await svc.session.flush()
         return out
@@ -273,11 +286,11 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=SubscriptionOut,
         name="payments_create_subscription",
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def create_subscription(
         data: SubscriptionCreateIn, svc: PaymentsService = Depends(get_service)
     ):
-        # No subscription GET endpoint; 201 without Location.
         out = await svc.create_subscription(data)
         await svc.session.flush()
         return out
@@ -286,6 +299,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/subscriptions/{provider_subscription_id}",
         response_model=SubscriptionOut,
         name="payments_update_subscription",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def update_subscription(
         provider_subscription_id: str,
@@ -325,18 +339,16 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     ):
         out = await svc.create_invoice(data)
         await svc.session.flush()
-
-        # Location → canonical GET for invoice
-        location = request.url_for(
-            "payments_get_invoice", provider_invoice_id=out.provider_invoice_id
+        response.headers["Location"] = str(
+            request.url_for("payments_get_invoice", provider_invoice_id=out.provider_invoice_id)
         )
-        response.headers["Location"] = str(location)
         return out
 
     @prot.post(
         "/invoices/{provider_invoice_id}/finalize",
         response_model=InvoiceOut,
         name="payments_finalize_invoice",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def finalize_invoice(
         provider_invoice_id: str, svc: PaymentsService = Depends(get_service)
@@ -349,6 +361,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/void",
         response_model=InvoiceOut,
         name="payments_void_invoice",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def void_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.void_invoice(provider_invoice_id)
@@ -359,6 +372,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/pay",
         response_model=InvoiceOut,
         name="payments_pay_invoice",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def pay_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
         out = await svc.pay_invoice(provider_invoice_id)
@@ -386,6 +400,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/intents/{provider_intent_id}/capture",
         response_model=IntentOut,
         name="payments_capture_intent",
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def capture_intent(
         provider_intent_id: str,
@@ -423,13 +438,13 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/lines",
         name="payments_add_invoice_line_item",
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],  # required
     )
     async def add_invoice_line(
         provider_invoice_id: str,
         data: InvoiceLineItemIn,
         svc: PaymentsService = Depends(get_service),
     ):
-        # Stripe invoice items attach to customer; no canonical GET for the created line.
         out = await svc.add_invoice_line_item(data)
         await svc.session.flush()
         return {"ok": True, **out}
@@ -477,6 +492,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/usage_records",
         name="payments_create_usage_record",
         status_code=status.HTTP_201_CREATED,
+        # (Not in your required list, so not forcing Idempotency-Key here.
+        # Add Depends(require_idempotency_key) if you want it enforced.)
     )
     async def create_usage_record_endpoint(
         data: UsageRecordIn, svc: PaymentsService = Depends(get_service)
