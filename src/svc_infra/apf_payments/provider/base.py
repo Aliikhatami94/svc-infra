@@ -26,6 +26,7 @@ from ..schemas import (
     SubscriptionOut,
     SubscriptionUpdateIn,
     UsageRecordIn,
+    UsageRecordOut,
 )
 
 
@@ -139,7 +140,7 @@ class ProviderAdapter(Protocol):
     ) -> InvoiceOut:
         pass
 
-    async def create_usage_record(self, data: UsageRecordIn) -> dict[str, Any]:
+    async def create_usage_record(self, data: UsageRecordIn) -> UsageRecordOut:
         pass
 
     # --- Setup Intents ---

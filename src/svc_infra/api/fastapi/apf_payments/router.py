@@ -34,6 +34,8 @@ from svc_infra.apf_payments.schemas import (
     SubscriptionUpdateIn,
     TransactionRow,
     UsageRecordIn,
+    UsageRecordOut,
+    WebhookAckOut,
     WebhookReplayOut,
 )
 from svc_infra.apf_payments.service import PaymentsService
@@ -183,7 +185,11 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     # PUBLIC webhooks
     pub = public_router(prefix=prefix, tags=["payments"])
 
-    @pub.post("/webhooks/{provider}", name="payments_webhook")
+    @pub.post(
+        "/webhooks/{provider}",
+        name="payments_webhook",
+        response_model=WebhookAckOut,
+    )
     async def webhooks(
         provider: str,
         request: Request,
@@ -507,6 +513,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_create_usage_record",
         status_code=status.HTTP_201_CREATED,
         dependencies=[Depends(require_idempotency_key)],
+        response_model=UsageRecordOut,
     )
     async def create_usage_record_endpoint(
         data: UsageRecordIn, svc: PaymentsService = Depends(get_service)
@@ -598,6 +605,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/disputes/{provider_dispute_id}/submit_evidence",
         name="payments_submit_dispute_evidence",
         dependencies=[Depends(require_idempotency_key)],
+        response_model=DisputeOut,
     )
     async def submit_dispute_evidence(
         provider_dispute_id: str,

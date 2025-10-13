@@ -48,6 +48,7 @@ from .schemas import (
     SubscriptionOut,
     SubscriptionUpdateIn,
     UsageRecordIn,
+    UsageRecordOut,
 )
 from .settings import get_payments_settings
 
@@ -459,7 +460,7 @@ class PaymentsService:
         )
 
     # ---- Metered usage ----
-    async def create_usage_record(self, data: UsageRecordIn) -> dict:
+    async def create_usage_record(self, data: UsageRecordIn) -> UsageRecordOut:
         return await self._get_adapter().create_usage_record(data)
 
     # --- Setup Intents --------------------------------------------------------

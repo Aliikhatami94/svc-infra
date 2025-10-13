@@ -256,3 +256,15 @@ class SetupIntentCreateIn(BaseModel):
 
 class WebhookReplayOut(BaseModel):
     replayed: int
+
+
+class WebhookAckOut(BaseModel):
+    ok: bool
+
+
+class UsageRecordOut(BaseModel):
+    id: str
+    quantity: int
+    timestamp: Optional[int] = None
+    subscription_item: Optional[str] = None
+    provider_price_id: Optional[str] = None
