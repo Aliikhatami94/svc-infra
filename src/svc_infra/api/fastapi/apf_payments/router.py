@@ -76,6 +76,7 @@ async def get_service(session: SqlSessionDep) -> PaymentsService:
 def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     routers: list[DualAPIRouter] = []
 
+    pub = public_router(prefix=prefix)
     user = user_router(prefix=prefix)
     svc = service_router(prefix=prefix)
     prot = protected_router(prefix=prefix)
@@ -197,9 +198,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return ctx.wrap(items, next_cursor=next_cursor)
 
     routers.append(prot)
-
-    # PUBLIC webhooks
-    pub = public_router(prefix=prefix, tags=["payments"])
 
     @pub.post(
         "/webhooks/{provider}",
