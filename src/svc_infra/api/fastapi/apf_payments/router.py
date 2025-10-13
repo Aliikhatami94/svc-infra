@@ -433,7 +433,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return await svc.get_intent(provider_intent_id)
 
     # STATEMENTS (rollup)
-    @svc.get(
+    @prot.get(
         "/statements/daily",
         response_model=list[StatementRow],
         name="payments_daily_statements",
@@ -627,7 +627,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return out
 
     # ===== Disputes =====
-    @svc.get(
+    @prot.get(
         "/disputes",
         name="payments_list_disputes",
         response_model=Paginated[DisputeOut],
@@ -644,7 +644,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         )
         return ctx.wrap(items, next_cursor=next_cursor)
 
-    @svc.get(
+    @prot.get(
         "/disputes/{provider_dispute_id}",
         name="payments_get_dispute",
         response_model=DisputeOut,
@@ -653,7 +653,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     async def get_dispute(provider_dispute_id: str, svc: PaymentsService = Depends(get_service)):
         return await svc.get_dispute(provider_dispute_id)
 
-    @svc.post(
+    @prot.post(
         "/disputes/{provider_dispute_id}/submit_evidence",
         name="payments_submit_dispute_evidence",
         dependencies=[Depends(require_idempotency_key)],
@@ -670,13 +670,13 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return out
 
     # ===== Balance & Payouts =====
-    @svc.get(
+    @prot.get(
         "/balance", name="payments_get_balance", response_model=BalanceSnapshotOut, tags=["Balance"]
     )
     async def get_balance(svc: PaymentsService = Depends(get_service)):
         return await svc.get_balance_snapshot()
 
-    @svc.get(
+    @prot.get(
         "/payouts",
         name="payments_list_payouts",
         response_model=Paginated[PayoutOut],
@@ -785,7 +785,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     ):
         return await svc.get_product(provider_product_id)
 
-    @svc.get(
+    @prot.get(
         "/products",
         response_model=Paginated[ProductOut],
         name="payments_list_products",
@@ -819,7 +819,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return out
 
     # ===== Prices: get/list/update (active toggle) =====
-    @svc.get(
+    @prot.get(
         "/prices/{provider_price_id}",
         response_model=PriceOut,
         name="payments_get_price",
@@ -830,7 +830,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     ):
         return await svc.get_price(provider_price_id)
 
-    @svc.get(
+    @prot.get(
         "/prices",
         response_model=Paginated[PriceOut],
         name="payments_list_prices",
