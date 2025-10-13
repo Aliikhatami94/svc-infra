@@ -248,3 +248,11 @@ class BalanceAmount(BaseModel):
 class BalanceSnapshotOut(BaseModel):
     available: list[BalanceAmount] = Field(default_factory=list)
     pending: list[BalanceAmount] = Field(default_factory=list)
+
+
+class SetupIntentCreateIn(BaseModel):
+    payment_method_types: list[str] = Field(default_factory=lambda: ["card"])
+
+
+class WebhookReplayOut(BaseModel):
+    replayed: int

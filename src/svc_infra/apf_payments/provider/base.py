@@ -20,6 +20,7 @@ from ..schemas import (
     ProductCreateIn,
     ProductOut,
     RefundIn,
+    SetupIntentCreateIn,
     SetupIntentOut,
     SubscriptionCreateIn,
     SubscriptionOut,
@@ -43,12 +44,12 @@ class ProviderAdapter(Protocol):
     async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:
         pass
 
-    async def detach_payment_method(self, provider_method_id: str) -> None:
+    async def detach_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
         pass
 
     async def set_default_payment_method(
         self, provider_customer_id: str, provider_method_id: str
-    ) -> None:
+    ) -> PaymentMethodOut:
         pass
 
     async def create_product(self, data: ProductCreateIn) -> ProductOut:
@@ -117,7 +118,7 @@ class ProviderAdapter(Protocol):
 
     async def add_invoice_line_item(
         self, provider_invoice_id: str, data: InvoiceLineItemIn
-    ) -> dict[str, Any]:
+    ) -> InvoiceOut:
         pass
 
     async def list_invoices(
@@ -142,7 +143,7 @@ class ProviderAdapter(Protocol):
         pass
 
     # --- Setup Intents ---
-    async def create_setup_intent(self, payment_method_types: list[str]) -> SetupIntentOut:
+    async def create_setup_intent(self, data: SetupIntentCreateIn) -> SetupIntentOut:
         pass
 
     async def confirm_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:

@@ -41,6 +41,7 @@ from .schemas import (
     ProductCreateIn,
     ProductOut,
     RefundIn,
+    SetupIntentCreateIn,
     SetupIntentOut,
     StatementRow,
     SubscriptionCreateIn,
@@ -259,13 +260,13 @@ class PaymentsService:
     async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:
         return await self._get_adapter().list_payment_methods(provider_customer_id)
 
-    async def detach_payment_method(self, provider_method_id: str) -> None:
-        await self._get_adapter().detach_payment_method(provider_method_id)
+    async def detach_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
+        return await self._get_adapter().detach_payment_method(provider_method_id)
 
     async def set_default_payment_method(
         self, provider_customer_id: str, provider_method_id: str
-    ) -> None:
-        await self._get_adapter().set_default_payment_method(
+    ) -> PaymentMethodOut:
+        return await self._get_adapter().set_default_payment_method(
             provider_customer_id, provider_method_id
         )
 
@@ -436,7 +437,7 @@ class PaymentsService:
     # ---- Invoices: lines/list/get/preview ----
     async def add_invoice_line_item(
         self, provider_invoice_id: str, data: InvoiceLineItemIn
-    ) -> dict:
+    ) -> InvoiceOut:
         return await self._get_adapter().add_invoice_line_item(provider_invoice_id, data)
 
     async def list_invoices(self, f: InvoicesListFilter) -> tuple[list[InvoiceOut], str | None]:
@@ -462,14 +463,13 @@ class PaymentsService:
         return await self._get_adapter().create_usage_record(data)
 
     # --- Setup Intents --------------------------------------------------------
-
-    async def create_setup_intent(self, payment_method_types: list[str]) -> SetupIntentOut:
-        out = await self._get_adapter().create_setup_intent(payment_method_types)
+    async def create_setup_intent(self, data: SetupIntentCreateIn) -> SetupIntentOut:
+        out = await self._get_adapter().create_setup_intent(data)
         self.session.add(
             PaySetupIntent(
                 provider=out.provider,
                 provider_setup_intent_id=out.provider_setup_intent_id,
-                user_id=None,  # set if you thread a user_id; your router currently doesn't
+                user_id=None,
                 status=out.status,
                 client_secret=out.client_secret,
             )

@@ -26,6 +26,7 @@ from svc_infra.apf_payments.schemas import (
     ProductCreateIn,
     ProductOut,
     RefundIn,
+    SetupIntentCreateIn,
     SetupIntentOut,
     StatementRow,
     SubscriptionCreateIn,
@@ -33,6 +34,7 @@ from svc_infra.apf_payments.schemas import (
     SubscriptionUpdateIn,
     TransactionRow,
     UsageRecordIn,
+    WebhookReplayOut,
 )
 from svc_infra.apf_payments.service import PaymentsService
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
@@ -73,6 +75,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/customers",
         response_model=CustomerOut,
         name="payments_upsert_customer",
+        dependencies=[Depends(require_idempotency_key)],
     )
     async def upsert_customer(data: CustomerUpsertIn, svc: PaymentsService = Depends(get_service)):
         out = await svc.ensure_customer(data)
@@ -235,16 +238,18 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     @prot.post(
         "/methods/{provider_method_id}/detach",
         name="payments_detach_method",
+        response_model=PaymentMethodOut,
         dependencies=[Depends(require_idempotency_key)],
     )
     async def detach_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):
-        await svc.detach_payment_method(provider_method_id)
+        out = await svc.detach_payment_method(provider_method_id)
         await svc.session.flush()
-        return {"ok": True}
+        return out
 
     @prot.post(
         "/methods/{provider_method_id}/default",
         name="payments_set_default_method",
+        response_model=PaymentMethodOut,  # ADD
         dependencies=[Depends(require_idempotency_key)],
     )
     async def set_default_method(
@@ -252,9 +257,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         customer_provider_id: str,
         svc: PaymentsService = Depends(get_service),
     ):
-        await svc.set_default_payment_method(customer_provider_id, provider_method_id)
+        out = await svc.set_default_payment_method(customer_provider_id, provider_method_id)
         await svc.session.flush()
-        return {"ok": True}
+        return out
 
     # PRODUCTS/PRICES
     @svc.post(
@@ -441,6 +446,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/invoices/{provider_invoice_id}/lines",
         name="payments_add_invoice_line_item",
         status_code=status.HTTP_201_CREATED,
+        response_model=InvoiceOut,
         dependencies=[Depends(require_idempotency_key)],
     )
     async def add_invoice_line(
@@ -450,7 +456,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     ):
         out = await svc.add_invoice_line_item(provider_invoice_id, data)
         await svc.session.flush()
-        return {"ok": True, **out}
+        return out
 
     @prot.get(
         "/invoices",
@@ -514,19 +520,21 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/setup_intents",
         name="payments_create_setup_intent",
         status_code=status.HTTP_201_CREATED,
+        response_model=SetupIntentOut,
         dependencies=[Depends(require_idempotency_key)],
     )
     async def create_setup_intent(
-        payment_method_types: list[str] = Body(default_factory=lambda: ["card"]),
+        data: SetupIntentCreateIn,
         svc: PaymentsService = Depends(get_service),
     ):
-        out = await svc.create_setup_intent(payment_method_types)
+        out = await svc.create_setup_intent(data)
         await svc.session.flush()
         return out
 
     @prot.post(
         "/setup_intents/{provider_setup_intent_id}/confirm",
         name="payments_confirm_setup_intent",
+        response_model=SetupIntentOut,
         dependencies=[Depends(require_idempotency_key)],
     )
     async def confirm_setup_intent(
@@ -550,6 +558,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     @prot.post(
         "/intents/{provider_intent_id}/resume",
         name="payments_resume_intent",
+        response_model=IntentOut,
         dependencies=[Depends(require_idempotency_key)],
     )
     async def resume_intent(
@@ -627,6 +636,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     @svc.post(
         "/webhooks/replay",
         name="payments_replay_webhooks",
+        response_model=WebhookReplayOut,
         dependencies=[Depends(require_idempotency_key)],
     )
     async def replay_webhooks(
