@@ -920,6 +920,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     @prot.delete(
         "/invoices/{provider_invoice_id}/lines/{provider_line_item_id}",
         name="payments_delete_invoice_line_item",
+        summary="Delete Invoice Line Item (draft invoices only)",
         response_model=InvoiceOut,
         dependencies=[Depends(require_idempotency_key)],
     )
@@ -928,20 +929,48 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         provider_line_item_id: str,
         svc: PaymentsService = Depends(get_service),
     ):
+        """
+        Removes a line item from a DRAFT invoice only. For finalized invoices,
+        use `void` or `credit` flows instead.
+        """
         out = await svc.delete_invoice_line_item(provider_invoice_id, provider_line_item_id)
         await svc.session.flush()
         return out
 
-    # --- Optional REST alias for detach (calls your existing logic) ---
+    # --- Canonical: remove local alias/association (non-destructive) ---
     @prot.delete(
-        "/methods/{provider_method_id}",
+        "/method_aliases/{alias_id}",
         name="payments_delete_method_alias",
+        summary="Remove Method Alias (non-destructive)",
         response_model=PaymentMethodOut,
         dependencies=[Depends(require_idempotency_key)],
     )
-    async def delete_method_alias(
+    async def delete_method_alias(alias_id: str, svc: PaymentsService = Depends(get_service)):
+        """
+        Removes the local alias/association to a payment method.
+        This does **not** delete the underlying payment method at the provider.
+        Equivalent to `detach_payment_method`.
+        """
+        out = await svc.detach_payment_method(alias_id)
+        await svc.session.flush()
+        return out
+
+    # --- Back-compat shim (deprecated): keep old path but mark deprecated ---
+    @prot.delete(
+        "/methods/{provider_method_id}",
+        name="payments_delete_method_alias_deprecated",
+        summary="(Deprecated) Remove Method Alias — use /method_aliases/{alias_id}",
+        deprecated=True,
+        response_model=PaymentMethodOut,
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def delete_method_alias_deprecated(
         provider_method_id: str, svc: PaymentsService = Depends(get_service)
     ):
+        """
+        DEPRECATED: use DELETE /method_aliases/{alias_id} instead.
+        Non-destructive; only removes local alias/association.
+        """
         out = await svc.detach_payment_method(provider_method_id)
         await svc.session.flush()
         return out
