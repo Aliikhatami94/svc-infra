@@ -955,26 +955,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         await svc.session.flush()
         return out
 
-    # --- Back-compat shim (deprecated): keep old path but mark deprecated ---
-    @prot.delete(
-        "/methods/{provider_method_id}",
-        name="payments_delete_method_alias_deprecated",
-        summary="(Deprecated) Remove Method Alias — use /method_aliases/{alias_id}",
-        deprecated=True,
-        response_model=PaymentMethodOut,
-        dependencies=[Depends(require_idempotency_key)],
-    )
-    async def delete_method_alias_deprecated(
-        provider_method_id: str, svc: PaymentsService = Depends(get_service)
-    ):
-        """
-        DEPRECATED: use DELETE /method_aliases/{alias_id} instead.
-        Non-destructive; only removes local alias/association.
-        """
-        out = await svc.detach_payment_method(provider_method_id)
-        await svc.session.flush()
-        return out
-
     routers.append(svc)
     routers.append(pub)
     return routers
