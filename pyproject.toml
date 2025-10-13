@@ -107,6 +107,8 @@ pytest-asyncio = "^0.23.8"
 ruff = "^0.6.9"
 mypy = "^1.11.2"
 types-requests = "^2.32.0.20241016"
+pytest-mock = "^3.15.1"
+httpx = "^0.28.1"
 
 [tool.poetry.scripts]
 svc-infra = "svc_infra.cli:main"

@@ -43,6 +43,7 @@ from svc_infra.apf_payments.schemas import (
     UsageRecordListFilter,
     UsageRecordOut,
     WebhookAckOut,
+    WebhookReplayIn,
     WebhookReplayOut,
 )
 from svc_infra.apf_payments.service import PaymentsService
@@ -708,10 +709,10 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     async def replay_webhooks(
         since: Optional[str] = None,
         until: Optional[str] = None,
-        event_ids: Optional[list[str]] = Body(default=None),
+        data: WebhookReplayIn = Body(default=WebhookReplayIn()),
         svc: PaymentsService = Depends(get_service),
     ):
-        count = await svc.replay_webhooks(since, until, event_ids or [])
+        count = await svc.replay_webhooks(since, until, data.event_ids or [])
         await svc.session.flush()
         return {"replayed": count}
 

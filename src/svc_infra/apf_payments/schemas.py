@@ -254,6 +254,10 @@ class SetupIntentCreateIn(BaseModel):
     payment_method_types: list[str] = Field(default_factory=lambda: ["card"])
 
 
+class WebhookReplayIn(BaseModel):
+    event_ids: Optional[list[str]] = None
+
+
 class WebhookReplayOut(BaseModel):
     replayed: int
 
@@ -268,6 +272,7 @@ class UsageRecordOut(BaseModel):
     timestamp: Optional[int] = None
     subscription_item: Optional[str] = None
     provider_price_id: Optional[str] = None
+    action: Optional[Literal["increment", "set"]] = None
 
 
 # -------- Customers list filter ----------

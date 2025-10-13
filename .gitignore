@@ -1,8 +1,9 @@
 .idea/
 .env
 .env.local
-svc-infra.iml__pycache__/
+__pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
 *.iml
 *.pypl-token
