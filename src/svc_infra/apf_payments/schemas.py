@@ -206,3 +206,45 @@ class InvoicesListFilter(BaseModel):
     status: Optional[str] = None
     limit: Optional[int] = Field(default=50, ge=1, le=200)
     cursor: Optional[str] = None
+
+
+class SetupIntentOut(BaseModel):
+    id: str
+    provider: str
+    provider_setup_intent_id: str
+    status: str
+    client_secret: Optional[str] = None
+    next_action: Optional[NextAction] = None
+
+
+class DisputeOut(BaseModel):
+    id: str
+    provider: str
+    provider_dispute_id: str
+    amount: AmountMinor
+    currency: Currency
+    reason: Optional[str] = None
+    status: str
+    evidence_due_by: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class PayoutOut(BaseModel):
+    id: str
+    provider: str
+    provider_payout_id: str
+    amount: AmountMinor
+    currency: Currency
+    status: str
+    arrival_date: Optional[str] = None
+    type: Optional[str] = None
+
+
+class BalanceAmount(BaseModel):
+    currency: Currency
+    amount: AmountMinor
+
+
+class BalanceSnapshotOut(BaseModel):
+    available: list[BalanceAmount] = Field(default_factory=list)
+    pending: list[BalanceAmount] = Field(default_factory=list)

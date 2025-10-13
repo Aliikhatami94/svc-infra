@@ -8,19 +8,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .models import (
     LedgerEntry,
     PayCustomer,
+    PayDispute,
     PayEvent,
     PayIntent,
     PayInvoice,
     PayPaymentMethod,
+    PayPayout,
     PayPrice,
     PayProduct,
+    PaySetupIntent,
     PaySubscription,
 )
 from .provider.registry import get_provider_registry
 from .schemas import (
+    BalanceSnapshotOut,
     CaptureIn,
     CustomerOut,
     CustomerUpsertIn,
+    DisputeOut,
     IntentCreateIn,
     IntentListFilter,
     IntentOut,
@@ -30,11 +35,13 @@ from .schemas import (
     InvoicesListFilter,
     PaymentMethodAttachIn,
     PaymentMethodOut,
+    PayoutOut,
     PriceCreateIn,
     PriceOut,
     ProductCreateIn,
     ProductOut,
     RefundIn,
+    SetupIntentOut,
     StatementRow,
     SubscriptionCreateIn,
     SubscriptionOut,
@@ -72,6 +79,19 @@ class PaymentsService:
                 "`/payments/transactions`), this error will not occur unless you call a provider API."
             ) from e
         return self._adapter
+
+    # --- internal event dispatcher (shared by webhook + replay) ---------------
+    async def _dispatch_event(self, provider: str, parsed: dict) -> None:
+        typ = parsed.get("type", "")
+        obj = parsed.get("data") or {}
+
+        if provider == "stripe":
+            if typ == "payment_intent.succeeded":
+                await self._post_sale(obj)
+            elif typ == "charge.refunded":
+                await self._post_refund(obj)
+            elif typ == "charge.captured":
+                await self._post_capture(obj)
 
     # --- Customers ------------------------------------------------------------
 
@@ -143,30 +163,18 @@ class PaymentsService:
     # --- Webhooks -------------------------------------------------------------
 
     async def handle_webhook(self, provider: str, signature: str | None, payload: bytes) -> dict:
-        # Webhooks also require provider adapter
         adapter = self._get_adapter()
         parsed = await adapter.verify_and_parse_webhook(signature, payload)
 
-        # Save raw event (keep JSON column/shape aligned with your model)
         self.session.add(
             PayEvent(
                 provider=provider,
                 provider_event_id=parsed["id"],
-                payload_json=parsed,  # or serialize before assign if your column is Text
+                payload_json=parsed,
             )
         )
 
-        typ = parsed.get("type", "")
-        obj = parsed.get("data") or {}
-
-        if provider == "stripe":
-            if typ == "payment_intent.succeeded":
-                await self._post_sale(obj)
-            elif typ == "charge.refunded":
-                await self._post_refund(obj)
-            elif typ == "charge.captured":
-                await self._post_capture(obj)
-
+        await self._dispatch_event(provider, parsed)
         return {"ok": True}
 
     # --- Ledger postings ------------------------------------------------------
@@ -352,9 +360,57 @@ class PaymentsService:
     async def daily_statements_rollup(
         self, date_from: str | None = None, date_to: str | None = None
     ) -> list[StatementRow]:
-        # simple SQL rollup across LedgerEntry; filter by ts range if provided
-        # (left as exercise: GROUP BY currency; SUM amounts by kind; compute net=payments - refunds - fees)
-        return []
+        from datetime import datetime
+
+        from sqlalchemy import func
+
+        q = select(
+            func.date_trunc("day", LedgerEntry.ts).label("day"),
+            LedgerEntry.currency,
+            func.sum(func.case((LedgerEntry.kind == "payment", LedgerEntry.amount), else_=0)).label(
+                "gross"
+            ),
+            func.sum(func.case((LedgerEntry.kind == "refund", LedgerEntry.amount), else_=0)).label(
+                "refunds"
+            ),
+            func.sum(func.case((LedgerEntry.kind == "fee", LedgerEntry.amount), else_=0)).label(
+                "fees"
+            ),
+            func.count().label("count"),
+        )
+        if date_from:
+            try:
+                q = q.where(LedgerEntry.ts >= datetime.fromisoformat(date_from))
+            except Exception:
+                pass
+        if date_to:
+            try:
+                q = q.where(LedgerEntry.ts <= datetime.fromisoformat(date_to))
+            except Exception:
+                pass
+        q = q.group_by(func.date_trunc("day", LedgerEntry.ts), LedgerEntry.currency).order_by(
+            func.date_trunc("day", LedgerEntry.ts).desc()
+        )
+
+        rows = (await self.session.execute(q)).all()
+        out: list[StatementRow] = []
+        for day, currency, gross, refunds, fees, count in rows:
+            gross = int(gross or 0)
+            refunds = int(refunds or 0)
+            fees = int(fees or 0)
+            out.append(
+                StatementRow(
+                    period_start=day.isoformat(),
+                    period_end=day.isoformat(),
+                    currency=str(currency).upper(),
+                    gross=gross,
+                    refunds=refunds,
+                    fees=fees,
+                    net=gross - refunds - fees,
+                    count=int(count or 0),
+                )
+            )
+        return out
 
     async def capture_intent(self, provider_intent_id: str, data: CaptureIn) -> IntentOut:
         out = await self._get_adapter().capture_intent(
@@ -402,3 +458,166 @@ class PaymentsService:
     # ---- Metered usage ----
     async def create_usage_record(self, data: UsageRecordIn) -> dict:
         return await self._get_adapter().create_usage_record(data)
+
+    # --- Setup Intents --------------------------------------------------------
+
+    async def create_setup_intent(self, payment_method_types: list[str]) -> SetupIntentOut:
+        out = await self._get_adapter().create_setup_intent(payment_method_types)
+        self.session.add(
+            PaySetupIntent(
+                provider=out.provider,
+                provider_setup_intent_id=out.provider_setup_intent_id,
+                user_id=None,  # set if you thread a user_id; your router currently doesn't
+                status=out.status,
+                client_secret=out.client_secret,
+            )
+        )
+        return out
+
+    async def confirm_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
+        out = await self._get_adapter().confirm_setup_intent(provider_setup_intent_id)
+        row = await self.session.scalar(
+            select(PaySetupIntent).where(
+                PaySetupIntent.provider_setup_intent_id == provider_setup_intent_id
+            )
+        )
+        if row:
+            row.status = out.status
+            row.client_secret = out.client_secret or row.client_secret
+        return out
+
+    async def get_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
+        out = await self._get_adapter().get_setup_intent(provider_setup_intent_id)
+        # opportunistic upsert
+        row = await self.session.scalar(
+            select(PaySetupIntent).where(
+                PaySetupIntent.provider_setup_intent_id == provider_setup_intent_id
+            )
+        )
+        if row:
+            row.status = out.status
+            row.client_secret = out.client_secret or row.client_secret
+        else:
+            self.session.add(
+                PaySetupIntent(
+                    provider=out.provider,
+                    provider_setup_intent_id=out.provider_setup_intent_id,
+                    user_id=None,
+                    status=out.status,
+                    client_secret=out.client_secret,
+                )
+            )
+        return out
+
+    # --- SCA / 3DS resume -----------------------------------------------------
+    async def resume_intent_after_action(self, provider_intent_id: str) -> IntentOut:
+        out = await self._get_adapter().resume_intent_after_action(provider_intent_id)
+        pi = await self.session.scalar(
+            select(PayIntent).where(PayIntent.provider_intent_id == provider_intent_id)
+        )
+        if pi:
+            pi.status = out.status
+            pi.client_secret = out.client_secret or pi.client_secret
+        return out
+
+    # --- Disputes -------------------------------------------------------------
+    async def list_disputes(
+        self, *, status: Optional[str], limit: int, cursor: Optional[str]
+    ) -> tuple[list[DisputeOut], Optional[str]]:
+        return await self._get_adapter().list_disputes(status=status, limit=limit, cursor=cursor)
+
+    async def get_dispute(self, provider_dispute_id: str) -> DisputeOut:
+        out = await self._get_adapter().get_dispute(provider_dispute_id)
+        # Upsert locally
+        row = await self.session.scalar(
+            select(PayDispute).where(PayDispute.provider_dispute_id == provider_dispute_id)
+        )
+        if row:
+            row.status = out.status
+            row.amount = out.amount
+            row.currency = out.currency
+        else:
+            self.session.add(
+                PayDispute(
+                    provider=out.provider,
+                    provider_dispute_id=out.provider_dispute_id,
+                    provider_charge_id=None,  # set if adapter returns it
+                    amount=out.amount,
+                    currency=out.currency,
+                    reason=out.reason,
+                    status=out.status,
+                )
+            )
+        return out
+
+    async def submit_dispute_evidence(self, provider_dispute_id: str, evidence: dict) -> DisputeOut:
+        out = await self._get_adapter().submit_dispute_evidence(provider_dispute_id, evidence)
+        # reflect status
+        row = await self.session.scalar(
+            select(PayDispute).where(PayDispute.provider_dispute_id == provider_dispute_id)
+        )
+        if row:
+            row.status = out.status
+        return out
+
+    # --- Balance --------------------------------------------------------------
+    async def get_balance_snapshot(self) -> BalanceSnapshotOut:
+        return await self._get_adapter().get_balance_snapshot()
+
+    # --- Payouts --------------------------------------------------------------
+    async def list_payouts(
+        self, *, limit: int, cursor: Optional[str]
+    ) -> tuple[list[PayoutOut], Optional[str]]:
+        return await self._get_adapter().list_payouts(limit=limit, cursor=cursor)
+
+    async def get_payout(self, provider_payout_id: str) -> PayoutOut:
+        out = await self._get_adapter().get_payout(provider_payout_id)
+        # Upsert locally
+        row = await self.session.scalar(
+            select(PayPayout).where(PayPayout.provider_payout_id == provider_payout_id)
+        )
+        if row:
+            row.status = out.status
+            row.amount = out.amount
+            row.currency = out.currency
+            # arrival_date/type optional; update if present
+        else:
+            self.session.add(
+                PayPayout(
+                    provider=out.provider,
+                    provider_payout_id=out.provider_payout_id,
+                    amount=out.amount,
+                    currency=out.currency,
+                    status=out.status,
+                    # arrival_date/out.type if you add them onto PayoutOut
+                )
+            )
+        return out
+
+    # --- Webhook replay -------------------------------------------------------
+    async def replay_webhooks(
+        self, since: Optional[str], until: Optional[str], event_ids: list[str]
+    ) -> int:
+        from datetime import datetime
+
+        q = select(PayEvent).where(PayEvent.provider == self._provider_name)
+        if event_ids:
+            q = q.where(PayEvent.provider_event_id.in_(event_ids))
+        else:
+            # ISO8601 strings expected; ignore parsing errors safely
+            if since:
+                try:
+                    q = q.where(PayEvent.received_at >= datetime.fromisoformat(since))
+                except Exception:
+                    pass
+            if until:
+                try:
+                    q = q.where(PayEvent.received_at <= datetime.fromisoformat(until))
+                except Exception:
+                    pass
+
+        rows = (await self.session.execute(q)).scalars().all()
+        for ev in rows:
+            await self._dispatch_event(ev.provider, ev.payload_json)
+
+        return len(rows)

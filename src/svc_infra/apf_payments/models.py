@@ -199,3 +199,60 @@ class PayInvoice(ModelBase):
     )
 
     __table_args__ = (user_fk_constraint("user_id", ondelete="SET NULL"),)
+
+
+class PaySetupIntent(ModelBase):
+    __tablename__ = "pay_setup_intents"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[Optional[str]] = mapped_column(user_id_type(), index=True, nullable=True)
+    provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    provider_setup_intent_id: Mapped[str] = mapped_column(
+        String(128), unique=True, index=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), index=True, nullable=False
+    )  # requires_action|succeeded|canceled|processing
+    client_secret: Mapped[Optional[str]] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+    )
+    __table_args__ = (user_fk_constraint("user_id", ondelete="SET NULL"),)
+
+
+class PayDispute(ModelBase):
+    __tablename__ = "pay_disputes"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    provider_dispute_id: Mapped[str] = mapped_column(
+        String(128), unique=True, index=True, nullable=False
+    )
+    provider_charge_id: Mapped[Optional[str]] = mapped_column(String(128), index=True)
+    amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(
+        String(32), index=True, nullable=False
+    )  # needs_response|under_review|won|lost|warning_closed
+    evidence_due_by: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+    )
+
+
+class PayPayout(ModelBase):
+    __tablename__ = "pay_payouts"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    provider_payout_id: Mapped[str] = mapped_column(
+        String(128), unique=True, index=True, nullable=False
+    )
+    amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), index=True, nullable=False
+    )  # pending|in_transit|paid|canceled|failed
+    arrival_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    type: Mapped[Optional[str]] = mapped_column(String(32))  # bank_account|card|...
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+    )

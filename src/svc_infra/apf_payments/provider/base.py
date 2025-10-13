@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Any, Optional, Protocol
 
 from ..schemas import (
+    BalanceSnapshotOut,
     CustomerOut,
     CustomerUpsertIn,
+    DisputeOut,
     IntentCreateIn,
     IntentOut,
     InvoiceCreateIn,
@@ -12,11 +14,13 @@ from ..schemas import (
     InvoiceOut,
     PaymentMethodAttachIn,
     PaymentMethodOut,
+    PayoutOut,
     PriceCreateIn,
     PriceOut,
     ProductCreateIn,
     ProductOut,
     RefundIn,
+    SetupIntentOut,
     SubscriptionCreateIn,
     SubscriptionOut,
     SubscriptionUpdateIn,
@@ -133,4 +137,42 @@ class ProviderAdapter(Protocol):
         pass
 
     async def create_usage_record(self, data: UsageRecordIn) -> dict[str, Any]:
+        pass
+
+    # --- Setup Intents ---
+    async def create_setup_intent(self, payment_method_types: list[str]) -> SetupIntentOut:
+        pass
+
+    async def confirm_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
+        pass
+
+    async def get_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
+        pass
+
+    # --- SCA / 3DS resume ---
+    async def resume_intent_after_action(self, provider_intent_id: str) -> IntentOut:
+        pass
+
+    # --- Disputes ---
+    async def list_disputes(
+        self, *, status: str | None, limit: int, cursor: str | None
+    ) -> tuple[list[DisputeOut], str | None]:
+        pass
+
+    async def get_dispute(self, provider_dispute_id: str) -> DisputeOut:
+        pass
+
+    async def submit_dispute_evidence(self, provider_dispute_id: str, evidence: dict) -> DisputeOut:
+        pass
+
+    # --- Balance & Payouts ---
+    async def get_balance_snapshot(self) -> BalanceSnapshotOut:
+        pass
+
+    async def list_payouts(
+        self, *, limit: int, cursor: str | None
+    ) -> tuple[list[PayoutOut], str | None]:
+        pass
+
+    async def get_payout(self, provider_payout_id: str) -> PayoutOut:
         pass

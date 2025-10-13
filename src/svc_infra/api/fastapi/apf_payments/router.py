@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from typing import Literal, Optional, cast
 
-from fastapi import Depends, Header, Request, Response, status
+from fastapi import Body, Depends, Header, Request, Response, status
 from starlette.responses import JSONResponse
 
 from svc_infra.apf_payments.schemas import (
+    BalanceSnapshotOut,
     CaptureIn,
     CustomerOut,
     CustomerUpsertIn,
+    DisputeOut,
     IntentCreateIn,
     IntentListFilter,
     IntentOut,
@@ -18,11 +20,13 @@ from svc_infra.apf_payments.schemas import (
     InvoicesListFilter,
     PaymentMethodAttachIn,
     PaymentMethodOut,
+    PayoutOut,
     PriceCreateIn,
     PriceOut,
     ProductCreateIn,
     ProductOut,
     RefundIn,
+    SetupIntentOut,
     StatementRow,
     SubscriptionCreateIn,
     SubscriptionOut,
@@ -497,6 +501,132 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         out = await svc.create_usage_record(data)
         await svc.session.flush()
         return out
+
+    # ===== Setup Intents (off-session readiness) =====
+    @prot.post(
+        "/setup_intents",
+        name="payments_create_setup_intent",
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def create_setup_intent(
+        payment_method_types: list[str] = Body(default_factory=lambda: ["card"]),
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.create_setup_intent(payment_method_types)
+        await svc.session.flush()
+        return out
+
+    @prot.post(
+        "/setup_intents/{provider_setup_intent_id}/confirm",
+        name="payments_confirm_setup_intent",
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def confirm_setup_intent(
+        provider_setup_intent_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        out = await svc.confirm_setup_intent(provider_setup_intent_id)
+        await svc.session.flush()
+        return out
+
+    @prot.get(
+        "/setup_intents/{provider_setup_intent_id}",
+        name="payments_get_setup_intent",
+        response_model=SetupIntentOut,
+    )
+    async def get_setup_intent(
+        provider_setup_intent_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_setup_intent(provider_setup_intent_id)
+
+    # ===== 3DS/SCA resume (post-action) =====
+    @prot.post(
+        "/intents/{provider_intent_id}/resume",
+        name="payments_resume_intent",
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def resume_intent(
+        provider_intent_id: str,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.resume_intent_after_action(provider_intent_id)
+        await svc.session.flush()
+        return out
+
+    # ===== Disputes =====
+    @svc.get(
+        "/disputes",
+        name="payments_list_disputes",
+        response_model=Paginated[DisputeOut],
+        dependencies={[Depends(cursor_pager(default_limit=50, max_limit=200))]},
+    )
+    async def list_disputes(
+        status: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_disputes(
+            status=status, limit=ctx.limit, cursor=ctx.cursor
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @svc.get(
+        "/disputes/{provider_dispute_id}",
+        name="payments_get_dispute",
+        response_model=DisputeOut,
+    )
+    async def get_dispute(provider_dispute_id: str, svc: PaymentsService = Depends(get_service)):
+        return await svc.get_dispute(provider_dispute_id)
+
+    @svc.post(
+        "/disputes/{provider_dispute_id}/submit_evidence",
+        name="payments_submit_dispute_evidence",
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def submit_dispute_evidence(
+        provider_dispute_id: str,
+        evidence: dict = Body(..., embed=True),  # free-form evidence blob you validate internally
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.submit_dispute_evidence(provider_dispute_id, evidence)
+        await svc.session.flush()
+        return out
+
+    # ===== Balance & Payouts =====
+    @svc.get("/balance", name="payments_get_balance", response_model=BalanceSnapshotOut)
+    async def get_balance(svc: PaymentsService = Depends(get_service)):
+        return await svc.get_balance_snapshot()
+
+    @svc.get(
+        "/payouts",
+        name="payments_list_payouts",
+        response_model=Paginated[PayoutOut],
+        dependencies={[Depends(cursor_pager(default_limit=50, max_limit=200))]},
+    )
+    async def list_payouts(svc: PaymentsService = Depends(get_service)):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_payouts(limit=ctx.limit, cursor=ctx.cursor)
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @svc.get(
+        "/payouts/{provider_payout_id}",
+        name="payments_get_payout",
+        response_model=PayoutOut,
+    )
+    async def get_payout(provider_payout_id: str, svc: PaymentsService = Depends(get_service)):
+        return await svc.get_payout(provider_payout_id)
+
+    # ===== Webhook replay (operational) =====
+    @svc.post("/webhooks/replay", name="payments_replay_webhooks")
+    async def replay_webhooks(
+        since: Optional[str] = None,
+        until: Optional[str] = None,
+        event_ids: Optional[list[str]] = Body(default=None),
+        svc: PaymentsService = Depends(get_service),
+    ):
+        count = await svc.replay_webhooks(since, until, event_ids or [])
+        await svc.session.flush()
+        return {"replayed": count}
 
     routers.append(svc)
     routers.append(pub)
