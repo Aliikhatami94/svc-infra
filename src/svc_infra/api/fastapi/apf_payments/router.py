@@ -76,9 +76,9 @@ async def get_service(session: SqlSessionDep) -> PaymentsService:
 def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     routers: list[DualAPIRouter] = []
 
-    user = user_router(prefix=prefix, tags=["payments"])
-    svc = service_router(prefix=prefix, tags=["payments"])
-    prot = protected_router(prefix=prefix, tags=["payments"])
+    user = user_router(prefix=prefix)
+    svc = service_router(prefix=prefix)
+    prot = protected_router(prefix=prefix)
 
     # ===== Customers =====
     @user.post(
