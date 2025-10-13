@@ -115,7 +115,9 @@ class ProviderAdapter(Protocol):
     ) -> tuple[list[IntentOut], str | None]:
         pass
 
-    async def add_invoice_line_item(self, data: InvoiceLineItemIn) -> dict[str, Any]:
+    async def add_invoice_line_item(
+        self, provider_invoice_id: str, data: InvoiceLineItemIn
+    ) -> dict[str, Any]:
         pass
 
     async def list_invoices(

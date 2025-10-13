@@ -165,11 +165,11 @@ class PaymentsService:
     async def handle_webhook(self, provider: str, signature: str | None, payload: bytes) -> dict:
         adapter = self._get_adapter()
         parsed = await adapter.verify_and_parse_webhook(signature, payload)
-
         self.session.add(
             PayEvent(
                 provider=provider,
                 provider_event_id=parsed["id"],
+                type=parsed.get("type", ""),
                 payload_json=parsed,
             )
         )
@@ -434,8 +434,10 @@ class PaymentsService:
         )
 
     # ---- Invoices: lines/list/get/preview ----
-    async def add_invoice_line_item(self, data: InvoiceLineItemIn) -> dict:
-        return await self._get_adapter().add_invoice_line_item(data)
+    async def add_invoice_line_item(
+        self, provider_invoice_id: str, data: InvoiceLineItemIn
+    ) -> dict:
+        return await self._get_adapter().add_invoice_line_item(provider_invoice_id, data)
 
     async def list_invoices(self, f: InvoicesListFilter) -> tuple[list[InvoiceOut], str | None]:
         return await self._get_adapter().list_invoices(

@@ -65,16 +65,15 @@ async def get_service(session: SqlSessionDep) -> PaymentsService:
 def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     routers: list[DualAPIRouter] = []
 
-    # USER endpoints (require logged-in user)
     user = user_router(prefix=prefix, tags=["payments"])
-
-    # SERVICE endpoints (api key only)
     svc = service_router(prefix=prefix, tags=["payments"])
-
-    # PROTECTED endpoints (user OR api key)
     prot = protected_router(prefix=prefix, tags=["payments"])
 
-    @user.post("/customers", response_model=CustomerOut, name="payments_upsert_customer")
+    @user.post(
+        "/customers",
+        response_model=CustomerOut,
+        name="payments_upsert_customer",
+    )
     async def upsert_customer(data: CustomerUpsertIn, svc: PaymentsService = Depends(get_service)):
         out = await svc.ensure_customer(data)
         await svc.session.flush()
@@ -263,6 +262,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=ProductOut,
         name="payments_create_product",
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],
     )
     async def create_product(data: ProductCreateIn, svc: PaymentsService = Depends(get_service)):
         out = await svc.create_product(data)
@@ -274,6 +274,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=PriceOut,
         name="payments_create_price",
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],
     )
     async def create_price(data: PriceCreateIn, svc: PaymentsService = Depends(get_service)):
         out = await svc.create_price(data)
@@ -314,6 +315,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/subscriptions/{provider_subscription_id}/cancel",
         response_model=SubscriptionOut,
         name="payments_cancel_subscription",
+        dependencies=[Depends(require_idempotency_key)],
     )
     async def cancel_subscription(
         provider_subscription_id: str,
@@ -330,6 +332,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=InvoiceOut,
         name="payments_create_invoice",
         status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_idempotency_key)],
     )
     async def create_invoice(
         data: InvoiceCreateIn,
@@ -445,7 +448,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         data: InvoiceLineItemIn,
         svc: PaymentsService = Depends(get_service),
     ):
-        out = await svc.add_invoice_line_item(data)
+        out = await svc.add_invoice_line_item(provider_invoice_id, data)
         await svc.session.flush()
         return {"ok": True, **out}
 
@@ -479,7 +482,12 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     ):
         return await svc.get_invoice(provider_invoice_id)
 
-    @prot.post("/invoices/preview", response_model=InvoiceOut, name="payments_preview_invoice")
+    @prot.post(
+        "/invoices/preview",
+        response_model=InvoiceOut,
+        name="payments_preview_invoice",
+        dependencies=[Depends(require_idempotency_key)],
+    )
     async def preview_invoice_endpoint(
         customer_provider_id: str,
         subscription_id: Optional[str] = None,
@@ -492,8 +500,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/usage_records",
         name="payments_create_usage_record",
         status_code=status.HTTP_201_CREATED,
-        # (Not in your required list, so not forcing Idempotency-Key here.
-        # Add Depends(require_idempotency_key) if you want it enforced.)
+        dependencies=[Depends(require_idempotency_key)],
     )
     async def create_usage_record_endpoint(
         data: UsageRecordIn, svc: PaymentsService = Depends(get_service)
@@ -617,7 +624,11 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         return await svc.get_payout(provider_payout_id)
 
     # ===== Webhook replay (operational) =====
-    @svc.post("/webhooks/replay", name="payments_replay_webhooks")
+    @svc.post(
+        "/webhooks/replay",
+        name="payments_replay_webhooks",
+        dependencies=[Depends(require_idempotency_key)],
+    )
     async def replay_webhooks(
         since: Optional[str] = None,
         until: Optional[str] = None,
