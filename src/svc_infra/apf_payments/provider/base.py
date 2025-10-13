@@ -11,21 +11,27 @@ from ..schemas import (
     IntentOut,
     InvoiceCreateIn,
     InvoiceLineItemIn,
+    InvoiceLineItemOut,
     InvoiceOut,
     PaymentMethodAttachIn,
     PaymentMethodOut,
+    PaymentMethodUpdateIn,
     PayoutOut,
     PriceCreateIn,
     PriceOut,
+    PriceUpdateIn,
     ProductCreateIn,
     ProductOut,
+    ProductUpdateIn,
     RefundIn,
+    RefundOut,
     SetupIntentCreateIn,
     SetupIntentOut,
     SubscriptionCreateIn,
     SubscriptionOut,
     SubscriptionUpdateIn,
     UsageRecordIn,
+    UsageRecordListFilter,
     UsageRecordOut,
 )
 
@@ -34,9 +40,6 @@ class ProviderAdapter(Protocol):
     name: str
 
     async def ensure_customer(self, data: CustomerUpsertIn) -> CustomerOut:
-        pass
-
-    async def get_customer(self, provider_customer_id: str) -> Optional[CustomerOut]:
         pass
 
     async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
@@ -179,4 +182,89 @@ class ProviderAdapter(Protocol):
         pass
 
     async def get_payout(self, provider_payout_id: str) -> PayoutOut:
+        pass
+
+    # --- Customers ---
+    async def list_customers(
+        self, *, provider: str | None, user_id: str | None, limit: int, cursor: str | None
+    ) -> tuple[list[CustomerOut], str | None]:
+        """Optional: if not implemented, the service will list from local DB."""
+        pass
+
+    async def get_customer(self, provider_customer_id: str) -> Optional[CustomerOut]:
+        pass
+
+    # --- Products / Prices ---
+    async def get_product(self, provider_product_id: str) -> ProductOut:
+        pass
+
+    async def list_products(
+        self, *, active: bool | None, limit: int, cursor: str | None
+    ) -> tuple[list[ProductOut], str | None]:
+        pass
+
+    async def update_product(self, provider_product_id: str, data: ProductUpdateIn) -> ProductOut:
+        pass
+
+    async def get_price(self, provider_price_id: str) -> PriceOut:
+        pass
+
+    async def list_prices(
+        self,
+        *,
+        provider_product_id: str | None,
+        active: bool | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[PriceOut], str | None]:
+        pass
+
+    async def update_price(self, provider_price_id: str, data: PriceUpdateIn) -> PriceOut:
+        pass
+
+    # --- Subscriptions ---
+    async def get_subscription(self, provider_subscription_id: str) -> SubscriptionOut:
+        pass
+
+    async def list_subscriptions(
+        self,
+        *,
+        customer_provider_id: str | None,
+        status: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[SubscriptionOut], str | None]:
+        pass
+
+    # --- Payment Method (single + update) ---
+    async def get_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
+        pass
+
+    async def update_payment_method(
+        self, provider_method_id: str, data: PaymentMethodUpdateIn
+    ) -> PaymentMethodOut:
+        pass
+
+    # --- Refunds list/get ---
+    async def list_refunds(
+        self, *, provider_payment_intent_id: str | None, limit: int, cursor: str | None
+    ) -> tuple[list[RefundOut], str | None]:
+        pass
+
+    async def get_refund(self, provider_refund_id: str) -> RefundOut:
+        pass
+
+    # --- Invoice line items list ---
+    async def list_invoice_line_items(
+        self, provider_invoice_id: str, *, limit: int, cursor: str | None
+    ) -> tuple[list[InvoiceLineItemOut], str | None]:
+        pass
+
+    # --- Usage records list/get ---
+    async def list_usage_records(
+        self, f: UsageRecordListFilter
+    ) -> tuple[list[UsageRecordOut], str | None]:
+        pass
+
+    async def get_usage_record(self, usage_record_id: str) -> UsageRecordOut:
         pass

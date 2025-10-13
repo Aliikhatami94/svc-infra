@@ -268,3 +268,61 @@ class UsageRecordOut(BaseModel):
     timestamp: Optional[int] = None
     subscription_item: Optional[str] = None
     provider_price_id: Optional[str] = None
+
+
+# -------- Customers list filter ----------
+class CustomersListFilter(BaseModel):
+    provider: Optional[str] = None
+    user_id: Optional[str] = None
+    limit: Optional[int] = Field(default=50, ge=1, le=200)
+    cursor: Optional[str] = None  # we’ll paginate on provider_customer_id asc
+
+
+# -------- Products / Prices updates ----------
+class ProductUpdateIn(BaseModel):
+    name: Optional[str] = None
+    active: Optional[bool] = None
+
+
+class PriceUpdateIn(BaseModel):
+    active: Optional[bool] = None
+
+
+# -------- Payment Method update ----------
+class PaymentMethodUpdateIn(BaseModel):
+    # keep minimal + commonly supported card fields
+    name: Optional[str] = None
+    exp_month: Optional[int] = None
+    exp_year: Optional[int] = None
+    # extend here later with address fields (line1, city, etc.)
+
+
+# -------- Refunds (list/get) ----------
+class RefundOut(BaseModel):
+    id: str
+    provider: str
+    provider_refund_id: str
+    provider_payment_intent_id: Optional[str] = None
+    amount: AmountMinor
+    currency: Currency
+    status: str
+    reason: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+# -------- Invoice line items (list) ----------
+class InvoiceLineItemOut(BaseModel):
+    id: str
+    description: Optional[str] = None
+    amount: AmountMinor
+    currency: Currency
+    quantity: Optional[int] = 1
+    provider_price_id: Optional[str] = None
+
+
+# -------- Usage records list/get ----------
+class UsageRecordListFilter(BaseModel):
+    subscription_item: Optional[str] = None
+    provider_price_id: Optional[str] = None
+    limit: Optional[int] = Field(default=50, ge=1, le=200)
+    cursor: Optional[str] = None

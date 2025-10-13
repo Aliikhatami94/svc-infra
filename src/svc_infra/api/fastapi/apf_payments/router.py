@@ -9,6 +9,7 @@ from svc_infra.apf_payments.schemas import (
     BalanceSnapshotOut,
     CaptureIn,
     CustomerOut,
+    CustomersListFilter,
     CustomerUpsertIn,
     DisputeOut,
     IntentCreateIn,
@@ -16,16 +17,21 @@ from svc_infra.apf_payments.schemas import (
     IntentOut,
     InvoiceCreateIn,
     InvoiceLineItemIn,
+    InvoiceLineItemOut,
     InvoiceOut,
     InvoicesListFilter,
     PaymentMethodAttachIn,
     PaymentMethodOut,
+    PaymentMethodUpdateIn,
     PayoutOut,
     PriceCreateIn,
     PriceOut,
+    PriceUpdateIn,
     ProductCreateIn,
     ProductOut,
+    ProductUpdateIn,
     RefundIn,
+    RefundOut,
     SetupIntentCreateIn,
     SetupIntentOut,
     StatementRow,
@@ -34,6 +40,7 @@ from svc_infra.apf_payments.schemas import (
     SubscriptionUpdateIn,
     TransactionRow,
     UsageRecordIn,
+    UsageRecordListFilter,
     UsageRecordOut,
     WebhookAckOut,
     WebhookReplayOut,
@@ -656,6 +663,288 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         count = await svc.replay_webhooks(since, until, event_ids or [])
         await svc.session.flush()
         return {"replayed": count}
+
+    # ===== Customers: list/get =====
+    @prot.get(
+        "/customers",
+        response_model=Paginated[CustomerOut],
+        name="payments_list_customers",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+    )
+    async def list_customers_endpoint(
+        provider: Optional[str] = None,
+        user_id: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_customers(
+            CustomersListFilter(
+                provider=provider, user_id=user_id, limit=ctx.limit, cursor=ctx.cursor
+            )
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @prot.get(
+        "/customers/{provider_customer_id}",
+        response_model=CustomerOut,
+        name="payments_get_customer",
+    )
+    async def get_customer_endpoint(
+        provider_customer_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_customer(provider_customer_id)
+
+    # ===== Payment Methods: get/update =====
+    @prot.get(
+        "/methods/{provider_method_id}",
+        response_model=PaymentMethodOut,
+        name="payments_get_method",
+    )
+    async def get_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):
+        return await svc.get_payment_method(provider_method_id)
+
+    @prot.post(
+        "/methods/{provider_method_id}",
+        response_model=PaymentMethodOut,
+        name="payments_update_method",
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def update_method(
+        provider_method_id: str,
+        data: PaymentMethodUpdateIn,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.update_payment_method(provider_method_id, data)
+        await svc.session.flush()
+        return out
+
+    # ===== Products: get/list/update (archive via active=False) =====
+    @svc.get(
+        "/products/{provider_product_id}",
+        response_model=ProductOut,
+        name="payments_get_product",
+    )
+    async def get_product_endpoint(
+        provider_product_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_product(provider_product_id)
+
+    @svc.get(
+        "/products",
+        response_model=Paginated[ProductOut],
+        name="payments_list_products",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+    )
+    async def list_products_endpoint(
+        active: Optional[bool] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_products(
+            active=active, limit=ctx.limit, cursor=ctx.cursor
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @svc.post(
+        "/products/{provider_product_id}",
+        response_model=ProductOut,
+        name="payments_update_product",
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def update_product_endpoint(
+        provider_product_id: str,
+        data: ProductUpdateIn,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.update_product(provider_product_id, data)
+        await svc.session.flush()
+        return out
+
+    # ===== Prices: get/list/update (active toggle) =====
+    @svc.get(
+        "/prices/{provider_price_id}",
+        response_model=PriceOut,
+        name="payments_get_price",
+    )
+    async def get_price_endpoint(
+        provider_price_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_price(provider_price_id)
+
+    @svc.get(
+        "/prices",
+        response_model=Paginated[PriceOut],
+        name="payments_list_prices",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+    )
+    async def list_prices_endpoint(
+        provider_product_id: Optional[str] = None,
+        active: Optional[bool] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_prices(
+            provider_product_id=provider_product_id,
+            active=active,
+            limit=ctx.limit,
+            cursor=ctx.cursor,
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @svc.post(
+        "/prices/{provider_price_id}",
+        response_model=PriceOut,
+        name="payments_update_price",
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def update_price_endpoint(
+        provider_price_id: str,
+        data: PriceUpdateIn,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.update_price(provider_price_id, data)
+        await svc.session.flush()
+        return out
+
+    # ===== Subscriptions: get/list =====
+    @prot.get(
+        "/subscriptions/{provider_subscription_id}",
+        response_model=SubscriptionOut,
+        name="payments_get_subscription",
+    )
+    async def get_subscription_endpoint(
+        provider_subscription_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_subscription(provider_subscription_id)
+
+    @prot.get(
+        "/subscriptions",
+        response_model=Paginated[SubscriptionOut],
+        name="payments_list_subscriptions",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+    )
+    async def list_subscriptions_endpoint(
+        customer_provider_id: Optional[str] = None,
+        status: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_subscriptions(
+            customer_provider_id=customer_provider_id,
+            status=status,
+            limit=ctx.limit,
+            cursor=ctx.cursor,
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    # ===== Invoices: list line items =====
+    @prot.get(
+        "/invoices/{provider_invoice_id}/lines",
+        response_model=Paginated[InvoiceLineItemOut],
+        name="payments_list_invoice_line_items",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+    )
+    async def list_invoice_lines_endpoint(
+        provider_invoice_id: str,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_invoice_line_items(
+            provider_invoice_id, limit=ctx.limit, cursor=ctx.cursor
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    # ===== Refunds: list/get =====
+    @prot.get(
+        "/refunds",
+        response_model=Paginated[RefundOut],
+        name="payments_list_refunds",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+    )
+    async def list_refunds_endpoint(
+        provider_payment_intent_id: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_refunds(
+            provider_payment_intent_id=provider_payment_intent_id,
+            limit=ctx.limit,
+            cursor=ctx.cursor,
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @prot.get(
+        "/refunds/{provider_refund_id}",
+        response_model=RefundOut,
+        name="payments_get_refund",
+    )
+    async def get_refund_endpoint(
+        provider_refund_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_refund(provider_refund_id)
+
+    # ===== Usage Records: list/get =====
+    @prot.get(
+        "/usage_records",
+        response_model=Paginated[UsageRecordOut],
+        name="payments_list_usage_records",
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
+    )
+    async def list_usage_records_endpoint(
+        subscription_item: Optional[str] = None,
+        provider_price_id: Optional[str] = None,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        ctx = use_pagination()
+        items, next_cursor = await svc.list_usage_records(
+            UsageRecordListFilter(
+                subscription_item=subscription_item,
+                provider_price_id=provider_price_id,
+                limit=ctx.limit,
+                cursor=ctx.cursor,
+            )
+        )
+        return ctx.wrap(items, next_cursor=next_cursor)
+
+    @prot.get(
+        "/usage_records/{usage_record_id}",
+        response_model=UsageRecordOut,
+        name="payments_get_usage_record",
+    )
+    async def get_usage_record_endpoint(
+        usage_record_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        return await svc.get_usage_record(usage_record_id)
+
+    # --- Invoices: delete line item ---
+    @prot.delete(
+        "/invoices/{provider_invoice_id}/lines/{provider_line_item_id}",
+        name="payments_delete_invoice_line_item",
+        response_model=InvoiceOut,
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def delete_invoice_line_item_endpoint(
+        provider_invoice_id: str,
+        provider_line_item_id: str,
+        svc: PaymentsService = Depends(get_service),
+    ):
+        out = await svc.delete_invoice_line_item(provider_invoice_id, provider_line_item_id)
+        await svc.session.flush()
+        return out
+
+    # --- Optional REST alias for detach (calls your existing logic) ---
+    @prot.delete(
+        "/methods/{provider_method_id}",
+        name="payments_delete_method_alias",
+        response_model=PaymentMethodOut,
+        dependencies=[Depends(require_idempotency_key)],
+    )
+    async def delete_method_alias(
+        provider_method_id: str, svc: PaymentsService = Depends(get_service)
+    ):
+        out = await svc.detach_payment_method(provider_method_id)
+        await svc.session.flush()
+        return out
 
     routers.append(svc)
     routers.append(pub)

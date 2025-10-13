@@ -24,6 +24,7 @@ from .schemas import (
     BalanceSnapshotOut,
     CaptureIn,
     CustomerOut,
+    CustomersListFilter,
     CustomerUpsertIn,
     DisputeOut,
     IntentCreateIn,
@@ -31,16 +32,21 @@ from .schemas import (
     IntentOut,
     InvoiceCreateIn,
     InvoiceLineItemIn,
+    InvoiceLineItemOut,
     InvoiceOut,
     InvoicesListFilter,
     PaymentMethodAttachIn,
     PaymentMethodOut,
+    PaymentMethodUpdateIn,
     PayoutOut,
     PriceCreateIn,
     PriceOut,
+    PriceUpdateIn,
     ProductCreateIn,
     ProductOut,
+    ProductUpdateIn,
     RefundIn,
+    RefundOut,
     SetupIntentCreateIn,
     SetupIntentOut,
     StatementRow,
@@ -48,6 +54,7 @@ from .schemas import (
     SubscriptionOut,
     SubscriptionUpdateIn,
     UsageRecordIn,
+    UsageRecordListFilter,
     UsageRecordOut,
 )
 from .settings import get_payments_settings
@@ -624,3 +631,176 @@ class PaymentsService:
             await self._dispatch_event(ev.provider, ev.payload_json)
 
         return len(rows)
+
+    # ---- Customers ----
+    async def list_customers(self, f: CustomersListFilter) -> tuple[list[CustomerOut], str | None]:
+        adapter = self._get_adapter()
+        try:
+            return await adapter.list_customers(
+                provider=f.provider, user_id=f.user_id, limit=f.limit or 50, cursor=f.cursor
+            )
+        except NotImplementedError:
+            # Fallback to local DB listing
+            q = select(PayCustomer).order_by(PayCustomer.provider_customer_id.asc())
+            if f.provider:
+                q = q.where(PayCustomer.provider == f.provider)
+            if f.user_id:
+                q = q.where(PayCustomer.user_id == f.user_id)
+            rows = (await self.session.execute(q)).scalars().all()
+            # simple cursor by provider_customer_id; production can optimize
+            next_cursor = None
+            if f.limit and len(rows) > f.limit:
+                rows = rows[: f.limit]
+                next_cursor = rows[-1].provider_customer_id
+            return (
+                [
+                    CustomerOut(
+                        id=r.id,
+                        provider=r.provider,
+                        provider_customer_id=r.provider_customer_id,
+                        email=None,
+                        name=None,
+                    )
+                    for r in rows
+                ],
+                next_cursor,
+            )
+
+    async def get_customer(self, provider_customer_id: str) -> CustomerOut:
+        adapter = self._get_adapter()
+        out = await adapter.get_customer(provider_customer_id)
+        if out is None:
+            raise RuntimeError("Customer not found")
+        # upsert locally
+        row = await self.session.scalar(
+            select(PayCustomer).where(PayCustomer.provider_customer_id == provider_customer_id)
+        )
+        if not row:
+            self.session.add(
+                PayCustomer(
+                    provider=out.provider,
+                    provider_customer_id=out.provider_customer_id,
+                    user_id=None,
+                    tenant_id="",
+                )
+            )
+        return out
+
+    # ---- Products / Prices ----
+    async def get_product(self, provider_product_id: str) -> ProductOut:
+        return await self._get_adapter().get_product(provider_product_id)
+
+    async def list_products(
+        self, *, active: bool | None, limit: int, cursor: str | None
+    ) -> tuple[list[ProductOut], str | None]:
+        return await self._get_adapter().list_products(active=active, limit=limit, cursor=cursor)
+
+    async def update_product(self, provider_product_id: str, data: ProductUpdateIn) -> ProductOut:
+        out = await self._get_adapter().update_product(provider_product_id, data)
+        # reflect DB
+        row = await self.session.scalar(
+            select(PayProduct).where(PayProduct.provider_product_id == provider_product_id)
+        )
+        if row:
+            if data.name is not None:
+                row.name = data.name
+            if data.active is not None:
+                row.active = data.active
+        return out
+
+    async def get_price(self, provider_price_id: str) -> PriceOut:
+        return await self._get_adapter().get_price(provider_price_id)
+
+    async def list_prices(
+        self,
+        *,
+        provider_product_id: str | None,
+        active: bool | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[PriceOut], str | None]:
+        return await self._get_adapter().list_prices(
+            provider_product_id=provider_product_id, active=active, limit=limit, cursor=cursor
+        )
+
+    async def update_price(self, provider_price_id: str, data: PriceUpdateIn) -> PriceOut:
+        out = await self._get_adapter().update_price(provider_price_id, data)
+        row = await self.session.scalar(
+            select(PayPrice).where(PayPrice.provider_price_id == provider_price_id)
+        )
+        if row and data.active is not None:
+            row.active = data.active
+        return out
+
+    # ---- Subscriptions ----
+    async def get_subscription(self, provider_subscription_id: str) -> SubscriptionOut:
+        return await self._get_adapter().get_subscription(provider_subscription_id)
+
+    async def list_subscriptions(
+        self,
+        *,
+        customer_provider_id: str | None,
+        status: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[SubscriptionOut], str | None]:
+        return await self._get_adapter().list_subscriptions(
+            customer_provider_id=customer_provider_id, status=status, limit=limit, cursor=cursor
+        )
+
+    # ---- Payment Methods (get/update) ----
+    async def get_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
+        return await self._get_adapter().get_payment_method(provider_method_id)
+
+    async def update_payment_method(
+        self, provider_method_id: str, data: PaymentMethodUpdateIn
+    ) -> PaymentMethodOut:
+        out = await self._get_adapter().update_payment_method(provider_method_id, data)
+        row = await self.session.scalar(
+            select(PayPaymentMethod).where(
+                PayPaymentMethod.provider_method_id == provider_method_id
+            )
+        )
+        if row:
+            if data.name is not None:
+                pass  # keep local-only if/when you add column
+            if data.exp_month is not None:
+                row.exp_month = data.exp_month
+            if data.exp_year is not None:
+                row.exp_year = data.exp_year
+        return out
+
+    # ---- Refunds list/get ----
+    async def list_refunds(
+        self, *, provider_payment_intent_id: str | None, limit: int, cursor: str | None
+    ) -> tuple[list[RefundOut], str | None]:
+        return await self._get_adapter().list_refunds(
+            provider_payment_intent_id=provider_payment_intent_id, limit=limit, cursor=cursor
+        )
+
+    async def get_refund(self, provider_refund_id: str) -> RefundOut:
+        return await self._get_adapter().get_refund(provider_refund_id)
+
+    # ---- Invoice line items list ----
+    async def list_invoice_line_items(
+        self, provider_invoice_id: str, *, limit: int, cursor: str | None
+    ) -> tuple[list[InvoiceLineItemOut], str | None]:
+        return await self._get_adapter().list_invoice_line_items(
+            provider_invoice_id, limit=limit, cursor=cursor
+        )
+
+    # ---- Usage records list/get ----
+    async def list_usage_records(
+        self, f: UsageRecordListFilter
+    ) -> tuple[list[UsageRecordOut], str | None]:
+        return await self._get_adapter().list_usage_records(f)
+
+    async def get_usage_record(self, usage_record_id: str) -> UsageRecordOut:
+        return await self._get_adapter().get_usage_record(usage_record_id)
+
+    async def delete_invoice_line_item(
+        self, provider_invoice_id: str, provider_line_item_id: str
+    ) -> InvoiceOut:
+        return await self._get_adapter().delete_invoice_line_item(
+            provider_invoice_id, provider_line_item_id
+        )
