@@ -558,7 +558,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/disputes",
         name="payments_list_disputes",
         response_model=Paginated[DisputeOut],
-        dependencies={[Depends(cursor_pager(default_limit=50, max_limit=200))]},
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
     )
     async def list_disputes(
         status: Optional[str] = None,
@@ -601,7 +601,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         "/payouts",
         name="payments_list_payouts",
         response_model=Paginated[PayoutOut],
-        dependencies={[Depends(cursor_pager(default_limit=50, max_limit=200))]},
+        dependencies=[Depends(cursor_pager(default_limit=50, max_limit=200))],
     )
     async def list_payouts(svc: PaymentsService = Depends(get_service)):
         ctx = use_pagination()
