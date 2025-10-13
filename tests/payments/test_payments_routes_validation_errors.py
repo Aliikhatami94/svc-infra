@@ -62,7 +62,7 @@ async def test_create_intent_missing_required_fields(client, fake_adapter):
 @pytest.mark.asyncio
 async def test_create_customer_invalid_email(client, fake_adapter, mocker):
     """Test customer creation with invalid email format"""
-    from tests.conftest import create_mock_object
+    from tests.payments.conftest import create_mock_object
 
     # Set up mock to return a valid customer - validation happens at schema level
     mock_customer = create_mock_object(
