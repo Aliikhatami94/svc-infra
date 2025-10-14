@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, Set
+import inspect
+from typing import Any, Awaitable, Callable, Dict, Iterable, Set
 
 from fastapi import Depends, HTTPException
 
@@ -60,6 +61,80 @@ def RequireAnyPermission(*candidates: str):
     return Depends(_guard)
 
 
+# ------- ABAC (Attribute-Based Access Control) helpers -------
+ABACPredicate = Callable[[Identity, Any], bool | Awaitable[bool]]
+
+
+def owns_resource(attr: str = "owner_id") -> ABACPredicate:
+    def _predicate(principal: Identity, resource: Any) -> bool:
+        user = getattr(principal, "user", None)
+        uid = getattr(user, "id", None)
+        rid = getattr(resource, attr, None) or getattr(resource, "user_id", None)
+        return bool(uid is not None and rid is not None and str(uid) == str(rid))
+
+    return _predicate
+
+
+async def _maybe_await(v):
+    if inspect.isawaitable(v):
+        return await v
+    return v
+
+
+def enforce_abac(
+    principal: Identity,
+    *,
+    permission: str,
+    resource: Any,
+    predicate: ABACPredicate,
+):
+    perms = principal_permissions(principal)
+    if permission not in perms:
+        raise HTTPException(403, f"missing_permissions:{permission}")
+    ok = False
+    # allow sync or async predicate
+    res = predicate(principal, resource)
+    if inspect.isawaitable(res):
+        # Fast path for sync contexts: raise clear guidance
+        raise RuntimeError(
+            "enforce_abac received an async predicate in a sync context; use RequireABAC for FastAPI dependencies."
+        )
+    else:
+        ok = bool(res)
+    if not ok:
+        raise HTTPException(403, "forbidden")
+    return principal
+
+
+def RequireABAC(
+    *,
+    permission: str,
+    predicate: ABACPredicate,
+    resource_getter: Callable[..., Any],
+):
+    """FastAPI dependency: enforce permission and attribute check using a resource provider.
+
+    Example:
+        def load_doc(): ...
+        @router.get("/docs/{doc_id}", dependencies=[RequireABAC(permission="doc.read", predicate=owns_resource(), resource_getter=load_doc)])
+        async def get_doc(identity: Identity, doc = Depends(load_doc)):
+            ...
+    Note: Using the provider in both the dependency and endpoint will call it twice. For heavy
+    providers, wire only in the dependency and re-fetch via the dependency override or request.state.
+    """
+
+    async def _guard(principal: Identity, resource: Any = Depends(resource_getter)):
+        perms = principal_permissions(principal)
+        if permission not in perms:
+            raise HTTPException(403, f"missing_permissions:{permission}")
+        ok = await _maybe_await(predicate(principal, resource))
+        if not ok:
+            raise HTTPException(403, "forbidden")
+        return principal
+
+    return Depends(_guard)
+
+
 __all__ = [
     "PERMISSION_REGISTRY",
     "get_permissions_for_roles",
@@ -67,4 +142,7 @@ __all__ = [
     "has_permission",
     "RequirePermission",
     "RequireAnyPermission",
+    "RequireABAC",
+    "enforce_abac",
+    "owns_resource",
 ]

@@ -15,23 +15,24 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Research: audit existing auth, password handling, session storage, roles. (roles_router, RequireRoles, MFA, API key, OAuth scaffolding present; security headers implemented; password policy module exists; refresh token encryption template present)
 - [x] Design: ADR for password hashing, token model (access/refresh), RBAC schema, audit log hash-chain. (ADR 0001)
 - [x] Implement: password policy & validator. (validate_password + tests committed)
-- [ ] Implement: breach password check (HIBP range query integration / toggle).
+- [x] Implement: breach password check (HIBP range query integration / toggle). (hibp client + validator hook)
 - [x] Implement: account lockout service (compute_lockout + FailedAuthAttempt + tests; login hook pending)
-- [ ] Implement: session/device table (list + revoke endpoints).
+- [x] Implement: session/device table (list + revoke endpoints). (router integrated; negative ownership test added)
 - [x] Implement: session/device table (model scaffolding added in security.models: AuthSession; endpoints pending)
 - [ ] Implement: refresh-token rotation & revocation list.
 - [x] Implement: refresh-token rotation & revocation list (models: RefreshToken, RefreshTokenRevocation + rotate utility; integration pending)
 - [x] Implement: RBAC decorators + permission registry. (security.permissions + tests)
-- [ ] Implement: ABAC predicate hook (resource-level attributes).
+- [x] Implement: ABAC predicate hook (resource-level attributes). (RequireABAC, owns_resource, enforce_abac + tests)
 - [ ] Implement: org/team membership & invitations (tokens, expiry, resend).
 - [ ] Implement: signed cookies helper.
 - [x] Implement: security headers middleware (baseline done).
-- [ ] Implement: strict CORS defaults with allowlist config.
+- [x] Implement: strict CORS defaults with allowlist config. (default deny; env/param allowlist)
 - [ ] Implement: secret management abstraction + rotation API.
 - [ ] Implement: JWT/crypto key rolling script (dual key validity window).
 - [ ] Implement: audit log model (append-only + hash chain field).
 - [x] Implement: audit log model (AuditLog + compute_audit_hash utility; append service + tamper verify tests pending)
 - [x] Tests: password policy + lockout (cooldown escalation). Pending: session revocation, RBAC enforcement.
+- [x] Tests: breach password rejection & pass cases with stubbed checker.
 - [x] Tests: audit log hash-chain integrity (tamper detection). (security.audit + test_audit_log_chain)
 - [ ] Verify: run security marker tests.
 - [ ] Docs: security configuration & examples.

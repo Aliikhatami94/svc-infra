@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Callable, Iterable, Optional
 
 COMMON_PASSWORDS = {"password", "123456", "qwerty", "letmein", "admin"}
 
-HIBP_DISABLED = True  # placeholder flag; integrate hash range API later
+HIBP_DISABLED = False  # default enabled; can be toggled via settings at startup
 
 
 @dataclass
@@ -33,6 +33,17 @@ DIGIT = re.compile(r"[0-9]")
 SYMBOL = re.compile(r"[!@#$%^&*()_+=\-{}\[\]:;,.?/]")
 
 
+BreachedChecker = Callable[[str], bool]
+
+
+_breached_checker: Optional[BreachedChecker] = None
+
+
+def configure_breached_checker(checker: Optional[BreachedChecker]) -> None:
+    global _breached_checker
+    _breached_checker = checker
+
+
 def validate_password(pw: str, policy: PasswordPolicy | None = None) -> None:
     policy = policy or PasswordPolicy()
     reasons: list[str] = []
@@ -52,10 +63,15 @@ def validate_password(pw: str, policy: PasswordPolicy | None = None) -> None:
         if lowered in COMMON_PASSWORDS or any(term in lowered for term in COMMON_PASSWORDS):
             reasons.append("common_password")
     if policy.forbid_breached and not HIBP_DISABLED:
-        # TODO: implement k-anonymity range query (prefix first5 SHA1) and cache results
-        pass
+        if _breached_checker and _breached_checker(pw):
+            reasons.append("breached_password")
     if reasons:
         raise PasswordValidationError(reasons)
 
 
-__all__ = ["PasswordPolicy", "validate_password", "PasswordValidationError"]
+__all__ = [
+    "PasswordPolicy",
+    "validate_password",
+    "PasswordValidationError",
+    "configure_breached_checker",
+]

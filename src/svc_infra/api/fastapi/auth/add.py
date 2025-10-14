@@ -11,6 +11,7 @@ from svc_infra.api.fastapi.auth.mfa.router import mfa_router
 from svc_infra.api.fastapi.auth.routers.account import account_router
 from svc_infra.api.fastapi.auth.routers.apikey_router import apikey_router
 from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_backend
+from svc_infra.api.fastapi.auth.routers.session_router import build_session_router
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, USER_PREFIX
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
@@ -72,6 +73,15 @@ def install_user_routers(
         tags=["Session / Registration"],
         include_in_schema=include_in_docs,
         dependencies=[Depends(login_client_gaurd)],
+    )
+    # Session/device listing & revocation endpoints (AuthSession model)
+    # Mounted under the user prefix so final paths become /{user_prefix}/sessions/... (e.g., /users/sessions/me)
+    # The router itself has a /sessions prefix.
+    app.include_router(
+        build_session_router(),
+        prefix=user_prefix,
+        tags=["Session Management"],
+        include_in_schema=include_in_docs,
     )
     app.include_router(
         register_router,

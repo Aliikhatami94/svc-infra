@@ -105,6 +105,20 @@ def test_setup_service_api_applies_cors_configuration(mocker):
     assert cors_middleware.kwargs["allow_credentials"] is True
 
 
+def test_setup_service_api_cors_strict_by_default(mocker, monkeypatch):
+    # Ensure env not set -> no CORS middleware added
+    monkeypatch.delenv("CORS_ALLOW_ORIGINS", raising=False)
+    app = _build_service_app(mocker=mocker, public_cors_origins=None)
+    assert all(m.cls is not CORSMiddleware for m in app.user_middleware)
+
+
+def test_setup_service_api_cors_from_env(mocker, monkeypatch):
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://a.example, https://b.example")
+    app = _build_service_app(mocker=mocker, public_cors_origins=None)
+    cors = next(m for m in app.user_middleware if m.cls is CORSMiddleware)
+    assert cors.kwargs["allow_origins"] == ["https://a.example", "https://b.example"]
+
+
 def test_setup_service_api_sets_route_logger_header(mocker):
     app = _build_service_app(mocker=mocker)
     client = TestClient(app)
