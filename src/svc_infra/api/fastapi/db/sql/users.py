@@ -12,6 +12,7 @@ from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.dual.dualize import dualize_public, dualize_user
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
+from svc_infra.security.jwt_rotation import RotatingJWTStrategy
 
 from ...auth.security import auth_login_path
 from ...auth.sender import get_sender
@@ -94,7 +95,18 @@ def get_fastapi_users(
         lifetime = getattr(jwt_block, "lifetime_seconds", None) if jwt_block else None
         if not isinstance(lifetime, int) or lifetime <= 0:
             lifetime = 3600
-        return JWTStrategy(secret=secret, lifetime_seconds=lifetime)
+        old = []
+        if jwt_block and getattr(jwt_block, "old_secrets", None):
+            old = [s.get_secret_value() for s in jwt_block.old_secrets or []]
+        audience = "fastapi-users:auth"
+        if old:
+            return RotatingJWTStrategy(
+                secret=secret,
+                lifetime_seconds=lifetime,
+                old_secrets=old,
+                token_audience=audience,
+            )
+        return JWTStrategy(secret=secret, lifetime_seconds=lifetime, token_audience=audience)
 
     bearer_transport = BearerTransport(tokenUrl=auth_login_path)
     auth_backend = AuthenticationBackend(

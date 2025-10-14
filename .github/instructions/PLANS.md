@@ -27,8 +27,8 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [ ] Implement: signed cookies helper.
 - [x] Implement: security headers middleware (baseline done).
 - [x] Implement: strict CORS defaults with allowlist config. (default deny; env/param allowlist)
-- [ ] Implement: secret management abstraction + rotation API.
-- [ ] Implement: JWT/crypto key rolling script (dual key validity window).
+- [x] Implement: secret management abstraction + rotation API. (RotatingJWTStrategy with old_secrets support)
+- [x] Implement: JWT/crypto key rolling script (dual key validity window). (config via AUTH_JWT__OLD_SECRETS and tests)
 - [ ] Implement: audit log model (append-only + hash chain field).
 - [x] Implement: audit log model (AuditLog + compute_audit_hash utility; append service + tamper verify tests pending)
 - [x] Tests: password policy + lockout (cooldown escalation). Pending: session revocation, RBAC enforcement.
