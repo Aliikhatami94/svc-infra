@@ -24,6 +24,12 @@ def _maybe_register_default_providers(
             reg.register(StripeAdapter())
         except Exception:
             pass
+        try:
+            from svc_infra.apf_payments.provider.aiydan import AiydanAdapter
+
+            reg.register(AiydanAdapter())
+        except Exception:
+            pass
     if adapters:
         for a in adapters:
             reg.register(a)  # must implement ProviderAdapter protocol (name, create_intent, etc.)
