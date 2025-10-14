@@ -178,6 +178,7 @@ def fake_adapter(mocker) -> ProviderAdapter:
         get_invoice = mocker.AsyncMock()
         preview_invoice = mocker.AsyncMock()
         list_invoice_line_items = mocker.AsyncMock()
+        # invoice line items
         # other endpoints used by tests
         verify_and_parse_webhook = mocker.AsyncMock()
         list_disputes = mocker.AsyncMock()
@@ -217,8 +218,6 @@ def fake_adapter(mocker) -> ProviderAdapter:
         get_refund = mocker.AsyncMock()
         # setup intents
         resume_intent_after_action = mocker.AsyncMock()
-        # invoice line items
-        delete_invoice_line_item = mocker.AsyncMock()
         # webhook replay
         replay_webhooks = mocker.AsyncMock()
         # service methods (not adapter methods)

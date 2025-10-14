@@ -797,10 +797,3 @@ class PaymentsService:
 
     async def get_usage_record(self, usage_record_id: str) -> UsageRecordOut:
         return await self._get_adapter().get_usage_record(usage_record_id)
-
-    async def delete_invoice_line_item(
-        self, provider_invoice_id: str, provider_line_item_id: str
-    ) -> InvoiceOut:
-        return await self._get_adapter().delete_invoice_line_item(
-            provider_invoice_id, provider_line_item_id
-        )

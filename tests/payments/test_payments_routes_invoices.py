@@ -270,30 +270,6 @@ async def test_list_invoice_line_items(client, fake_adapter, mocker):
 
 
 @pytest.mark.asyncio
-async def test_delete_invoice_line_item(client, fake_adapter, mocker):
-    """Test deleting invoice line item"""
-    fake_adapter.delete_invoice_line_item.return_value = mocker.Mock(
-        id="inv_1",
-        provider="stripe",
-        provider_invoice_id="inv_123",
-        provider_customer_id="cus_123",
-        status="draft",
-        amount_due=500,
-        currency="USD",
-        hosted_invoice_url=None,
-        pdf_url=None,
-    )
-
-    res = await client.delete("/payments/invoices/inv_123/lines/li_123", headers=IDEMP)
-    assert res.status_code == 200
-    body = res.json()
-    assert body["provider_invoice_id"] == "inv_123"
-    assert body["amount_due"] == 500
-
-    fake_adapter.delete_invoice_line_item.assert_awaited_once_with("inv_123", "li_123")
-
-
-@pytest.mark.asyncio
 async def test_preview_invoice(client, fake_adapter, mocker):
     """Test invoice preview"""
     fake_adapter.preview_invoice.return_value = mocker.Mock(

@@ -7,6 +7,8 @@ __pycache__/
 .pytest_cache/
 *.iml
 *.pypl-token
+.vscode/
+.codex/
 
 -PY
 __pypackages__/

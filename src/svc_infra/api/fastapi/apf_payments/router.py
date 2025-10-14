@@ -985,28 +985,6 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     ):
         return await svc.get_usage_record(usage_record_id)
 
-    # --- Invoices: delete line item ---
-    @prot.delete(
-        "/invoices/{provider_invoice_id}/lines/{provider_line_item_id}",
-        name="payments_delete_invoice_line_item",
-        summary="Delete Invoice Line Item (draft invoices only)",
-        response_model=InvoiceOut,
-        dependencies=[Depends(require_idempotency_key)],
-        tags=["Invoices"],
-    )
-    async def delete_invoice_line_item_endpoint(
-        provider_invoice_id: str,
-        provider_line_item_id: str,
-        svc: PaymentsService = Depends(get_service),
-    ):
-        """
-        Removes a line item from a DRAFT invoice only. For finalized invoices,
-        use `void` or `credit` flows instead.
-        """
-        out = await svc.delete_invoice_line_item(provider_invoice_id, provider_line_item_id)
-        await svc.session.flush()
-        return out
-
     # --- Canonical: remove local alias/association (non-destructive) ---
     @prot.delete(
         "/method_aliases/{alias_id}",
