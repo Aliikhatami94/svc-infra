@@ -70,7 +70,9 @@ def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "captur
 
 # --- deps ---
 async def get_service(session: SqlSessionDep) -> PaymentsService:
-    return PaymentsService(session=session)
+    # TODO: derive tenant_id from auth/session context; placeholder requires explicit value.
+    # For now, use a fixed test tenant id; production integration must override.
+    return PaymentsService(session=session, tenant_id="test_tenant")
 
 
 # --- routers grouped by auth posture (same prefix is fine; FastAPI merges) ---

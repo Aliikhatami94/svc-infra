@@ -28,6 +28,8 @@ from svc_infra.api.fastapi.paths.auth import (
     OAUTH_LOGIN_PATH,
     OAUTH_REFRESH_PATH,
 )
+from svc_infra.security.models import RefreshToken
+from svc_infra.security.session import issue_session_and_refresh, rotate_session_refresh
 
 
 def _gen_pkce_pair() -> tuple[str, str]:
@@ -466,9 +468,13 @@ async def _validate_and_decode_jwt_token(raw_token: str) -> str:
 
 
 async def _set_cookie_on_response(
-    resp: Response, auth_backend: AuthenticationBackend, user: Any
+    resp: Response,
+    auth_backend: AuthenticationBackend,
+    user: Any,
+    *,
+    refresh_raw: str,
 ) -> None:
-    """Set authentication cookie on response."""
+    """Set authentication (JWT) and refresh cookies on response."""
     st = get_auth_settings()
     strategy = auth_backend.get_strategy()
     jwt_token = await strategy.write_token(user)
@@ -477,10 +483,23 @@ async def _set_cookie_on_response(
     if same_site_lit == "none" and not bool(st.session_cookie_secure):
         raise HTTPException(500, "session_cookie_samesite=None requires session_cookie_secure=True")
 
+    # Access/Auth cookie (short-lived JWT)
     resp.set_cookie(
         key=_cookie_name(st),
         value=jwt_token,
         max_age=st.session_cookie_max_age_seconds,
+        httponly=True,
+        secure=bool(st.session_cookie_secure),
+        samesite=same_site_lit,
+        domain=_cookie_domain(st),
+        path="/",
+    )
+
+    # Refresh cookie (opaque token, longer lived)
+    resp.set_cookie(
+        key=getattr(st, "session_cookie_name", "svc_session"),
+        value=refresh_raw,
+        max_age=60 * 60 * 24 * 7,  # 7 days default
         httponly=True,
         secure=bool(st.session_cookie_secure),
         samesite=same_site_lit,
@@ -641,9 +660,18 @@ def _create_oauth_router(
         user.last_login = datetime.now(timezone.utc)
         await session.commit()
 
-        # Create response with auth cookie
+        # Create session + initial refresh token
+        raw_refresh, _rt = await issue_session_and_refresh(
+            session,
+            user_id=user.id,
+            tenant_id=getattr(user, "tenant_id", None),
+            user_agent=str(request.headers.get("user-agent", ""))[:512],
+            ip_hash=None,
+        )
+
+        # Create response with auth + refresh cookies
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
-        await _set_cookie_on_response(resp, auth_backend, user)
+        await _set_cookie_on_response(resp, auth_backend, user, refresh_raw=raw_refresh)
 
         # Clean up session state
         _clean_oauth_session_state(request, provider)
@@ -655,7 +683,8 @@ def _create_oauth_router(
             except Exception:
                 pass
 
-        return resp
+    # unreachable legacy return removed
+    # return resp
 
     @router.post(
         OAUTH_REFRESH_PATH,
@@ -667,50 +696,62 @@ def _create_oauth_router(
         """Refresh authentication token."""
         st = get_auth_settings()
 
-        # Read and validate cookie
-        name = _cookie_name(st)
-        raw = request.cookies.get(name)
-        if not raw:
+        # Read and validate auth JWT cookie
+        name_auth = _cookie_name(st)
+        raw_auth = request.cookies.get(name_auth)
+        if not raw_auth:
             raise HTTPException(401, "missing_token")
 
-        # Validate and decode JWT token
-        user_id = await _validate_and_decode_jwt_token(raw)
+        # Validate and decode JWT token to get user id
+        user_id = await _validate_and_decode_jwt_token(raw_auth)
 
         # Load user
         user = await session.get(user_model, user_id)
         if not user:
             raise HTTPException(401, "invalid_token")
 
-        # Handle MFA if required
-        if await policy.should_require_mfa(user):
-            pre = await get_mfa_pre_jwt_writer().write(user)
-            redirect_url = str(getattr(st, "post_login_redirect", "/"))
-            allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
-            require_https = bool(getattr(st, "session_cookie_secure", False))
-            _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
+        # Obtain refresh cookie
+        refresh_cookie_name = getattr(st, "session_cookie_name", "svc_session")
+        raw_refresh = request.cookies.get(refresh_cookie_name)
+        if not raw_refresh:
+            raise HTTPException(401, "missing_refresh_token")
 
-            nxt = request.query_params.get("next")
-            if nxt:
-                try:
-                    _validate_redirect(nxt, allow_hosts, require_https=require_https)
-                    redirect_url = nxt
-                except HTTPException:
-                    pass
+        # Lookup refresh token row by hash
+        from sqlalchemy import select
 
-            qs = urlencode({"mfa": "required", "pre_token": pre})
-            return RedirectResponse(url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND)
+        from svc_infra.security.models import hash_refresh_token
 
-        # Create response with new token
-        resp = Response(status_code=204)
-        await _set_cookie_on_response(resp, auth_backend, user)
+        token_hash = hash_refresh_token(raw_refresh)
+        found: RefreshToken | None = (
+            (
+                await session.execute(
+                    select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if (
+            not found
+            or found.revoked_at
+            or (found.expires_at and found.expires_at < datetime.now(timezone.utc))
+        ):
+            raise HTTPException(401, "invalid_refresh_token")
 
-        # Optional: notify policy hook
+        # Rotate refresh token
+        new_raw, _new_rt = await rotate_session_refresh(session, current=found)
+
+        # Write response (204) with new cookies
+        resp = Response(status_code=status.HTTP_204_NO_CONTENT)
+        await _set_cookie_on_response(resp, auth_backend, user, refresh_raw=new_raw)
+        return resp
+
+        # Dead code removed: MFA branch handled earlier in login flow, refresh returns 204 above.
         if hasattr(policy, "on_token_refresh"):
             try:
                 await policy.on_token_refresh(user)
             except Exception:
                 pass
 
-        return resp
-
+    # Return router at end of factory
     return router

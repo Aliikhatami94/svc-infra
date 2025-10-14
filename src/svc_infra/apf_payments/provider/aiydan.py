@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Optional, Sequence, Tuple
 
 from svc_infra.apf_payments.schemas import (
+    BalanceAmount,
     BalanceSnapshotOut,
     CustomerOut,
     CustomerUpsertIn,
@@ -277,13 +278,38 @@ def _usage_record_to_out(data: dict[str, Any]) -> UsageRecordOut:
         provider_price_id=(
             str(data.get("provider_price_id")) if data.get("provider_price_id") else None
         ),
+        action=(str(data.get("action")) if data.get("action") else None),
     )
 
 
 def _balance_snapshot_to_out(data: dict[str, Any]) -> BalanceSnapshotOut:
+    def _normalize(side: Any) -> list[dict[str, Any]]:
+        if isinstance(side, list):
+            out: list[dict[str, Any]] = []
+            for item in side:
+                if isinstance(item, dict) and "currency" in item and "amount" in item:
+                    out.append(
+                        {
+                            "currency": str(item["currency"]).upper(),
+                            "amount": int(item["amount"] or 0),
+                        }
+                    )
+            return out
+        if isinstance(side, dict):
+            return [
+                {"currency": str(cur).upper(), "amount": int(amt or 0)} for cur, amt in side.items()
+            ]
+        return []
+
     return BalanceSnapshotOut(
-        available=data.get("available", {}),
-        pending=data.get("pending", {}),
+        available=[
+            BalanceAmount(currency=i["currency"], amount=i["amount"])
+            for i in _normalize(data.get("available"))
+        ],
+        pending=[
+            BalanceAmount(currency=i["currency"], amount=i["amount"])
+            for i in _normalize(data.get("pending"))
+        ],
     )
 
 
