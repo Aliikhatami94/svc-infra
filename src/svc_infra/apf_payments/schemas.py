@@ -24,7 +24,7 @@ class CustomerOut(BaseModel):
 
 class IntentCreateIn(BaseModel):
     amount: AmountMinor = Field(..., description="Minor units (e.g., cents)")
-    currency: Currency = Field(..., example="USD")
+    currency: Currency = Field(..., json_schema_extra={"example": "USD"})
     description: Optional[str] = None
     capture_method: Literal["automatic", "manual"] = "automatic"
     payment_method_types: list[str] = Field(default_factory=list)  # let provider default

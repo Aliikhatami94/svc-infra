@@ -4,7 +4,7 @@ NoSQL database test fixtures and configuration.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, Mock
 
@@ -23,8 +23,8 @@ class UserDocumentModel:
         self.email = kwargs.get("email")
         self.name = kwargs.get("name")
         self.is_active = kwargs.get("is_active", True)
-        self.created_at = kwargs.get("created_at", datetime.utcnow())
-        self.updated_at = kwargs.get("updated_at", datetime.utcnow())
+        self.created_at = kwargs.get("created_at", datetime.now(timezone.utc))
+        self.updated_at = kwargs.get("updated_at", datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert document to dictionary."""
@@ -53,8 +53,8 @@ class ProductDocumentModel:
         self.price = kwargs.get("price")
         self.category_id = kwargs.get("category_id")
         self.active = kwargs.get("active", True)
-        self.created_at = kwargs.get("created_at", datetime.utcnow())
-        self.updated_at = kwargs.get("updated_at", datetime.utcnow())
+        self.created_at = kwargs.get("created_at", datetime.now(timezone.utc))
+        self.updated_at = kwargs.get("updated_at", datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert document to dictionary."""
@@ -139,8 +139,8 @@ def sample_user_document_data():
         "email": "test@example.com",
         "name": "Test User",
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
 
 
@@ -154,8 +154,8 @@ def sample_product_document_data():
         "price": 1999,
         "category_id": "category_789",
         "active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
 
 

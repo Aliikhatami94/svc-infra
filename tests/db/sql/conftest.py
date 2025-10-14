@@ -94,8 +94,8 @@ def mock_sqlalchemy_session(mocker):
     session = Mock()
     session.execute = AsyncMock()
     session.get = AsyncMock()
-    session.add = AsyncMock()
-    session.delete = AsyncMock()
+    session.add = Mock()  # add is not async
+    session.delete = Mock()  # delete is not async
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
     session.flush = AsyncMock()

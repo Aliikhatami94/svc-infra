@@ -52,7 +52,7 @@ def add_payments(
             r, include_in_schema=True if include_in_docs is None else bool(include_in_docs)
         )
 
-    @app.on_event("startup")
+    # Store the startup function to be called by lifespan if needed
     async def _payments_startup_check():
         try:
             reg = get_provider_registry()
@@ -60,5 +60,10 @@ def add_payments(
             # Try a cheap call (Stripe: read account or key balance; we just access .name)
             _ = adapter.name
         except Exception as e:
-            # Log loud; don’t crash the whole app by default
+            # Log loud; don't crash the whole app by default
             logger.warning(f"[payments] Provider adapter not ready: {e}")
+
+    # Add to app state for potential lifespan usage
+    if not hasattr(app.state, "startup_events"):
+        app.state.startup_events = []
+    app.state.startup_events.append(_payments_startup_check)

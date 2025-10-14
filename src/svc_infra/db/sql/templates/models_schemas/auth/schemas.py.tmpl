@@ -18,7 +18,7 @@ class Timestamped(BaseModel):
 
 class ProviderAccountBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    provider: str = Field(..., examples=["google", "github", "linkedin", "microsoft"])
+    provider: str = Field(..., json_schema_extra={"examples": ["google", "github", "linkedin", "microsoft"]})
     provider_account_id: str
 
 class ProviderAccountRead(ProviderAccountBase, Timestamped):

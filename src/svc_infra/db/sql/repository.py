@@ -105,7 +105,7 @@ class SqlRepository:
                 setattr(obj, self.soft_delete_flag_field, False)
             await session.flush()
             return True
-        await session.delete(obj)
+        session.delete(obj)
         await session.flush()
         return True
 
