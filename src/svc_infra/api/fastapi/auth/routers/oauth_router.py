@@ -685,9 +685,6 @@ def _create_oauth_router(
 
         return resp
 
-    # unreachable legacy return removed
-    # return resp
-
     @router.post(
         OAUTH_REFRESH_PATH,
         status_code=status.HTTP_204_NO_CONTENT,

@@ -3,25 +3,41 @@ import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from svc_infra.obs.metrics import emit_rate_limited
+
+from .ratelimit_store import InMemoryRateLimitStore, RateLimitStore
+
 
 class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, limit: int = 120, window: int = 60, key_fn=None):
+    def __init__(
+        self,
+        app,
+        limit: int = 120,
+        window: int = 60,
+        key_fn=None,
+        store: RateLimitStore | None = None,
+    ):
         super().__init__(app)
         self.limit, self.window = limit, window
         self.key_fn = key_fn or (lambda r: r.headers.get("X-API-Key") or r.client.host)
-        self.buckets = {}  # replace with Redis in prod
+        self.store = store or InMemoryRateLimitStore(limit=limit)
 
     async def dispatch(self, request, call_next):
         key = self.key_fn(request)
         now = int(time.time())
-        win = now - (now % self.window)
-        bucket = self.buckets.setdefault((key, win), 0)
+        # Increment counter in store
+        count, limit, reset = self.store.incr(str(key), self.window)
+        remaining = max(0, limit - count)
 
-        remaining = self.limit - bucket
-        reset = win + self.window
+        if remaining < 0:  # defensive clamp
+            remaining = 0
 
-        if remaining <= 0:
+        if count > limit:
             retry = max(0, reset - now)
+            try:
+                emit_rate_limited(str(key), limit, retry)
+            except Exception:
+                pass
             return JSONResponse(
                 status_code=429,
                 content={
@@ -31,16 +47,15 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
                     "code": "RATE_LIMITED",
                 },
                 headers={
-                    "X-RateLimit-Limit": str(self.limit),
+                    "X-RateLimit-Limit": str(limit),
                     "X-RateLimit-Remaining": "0",
                     "X-RateLimit-Reset": str(reset),
                     "Retry-After": str(retry),
                 },
             )
 
-        self.buckets[(key, win)] = bucket + 1
         resp = await call_next(request)
-        resp.headers.setdefault("X-RateLimit-Limit", str(self.limit))
-        resp.headers.setdefault("X-RateLimit-Remaining", str(self.limit - (bucket + 1)))
+        resp.headers.setdefault("X-RateLimit-Limit", str(limit))
+        resp.headers.setdefault("X-RateLimit-Remaining", str(remaining))
         resp.headers.setdefault("X-RateLimit-Reset", str(reset))
         return resp

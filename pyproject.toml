@@ -119,6 +119,10 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*",]
 python_functions = ["test_*"]
+markers = [
+    "security: Security and auth hardening tests",
+    "ratelimit: Rate limiting and abuse protection tests",
+]
 filterwarnings = [
     "ignore:The `route` decorator is deprecated:DeprecationWarning:starlette.*",
 ]
