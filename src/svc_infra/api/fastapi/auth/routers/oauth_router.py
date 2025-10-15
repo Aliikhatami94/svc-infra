@@ -744,7 +744,6 @@ def _create_oauth_router(
         # Write response (204) with new cookies
         resp = Response(status_code=status.HTTP_204_NO_CONTENT)
         await _set_cookie_on_response(resp, auth_backend, user, refresh_raw=new_raw)
-        return resp
 
         # Dead code removed: MFA branch handled earlier in login flow, refresh returns 204 above.
         if hasattr(policy, "on_token_refresh"):
@@ -752,6 +751,8 @@ def _create_oauth_router(
                 await policy.on_token_refresh(user)
             except Exception:
                 pass
+
+        return resp
 
     # Return router at end of factory
     return router
