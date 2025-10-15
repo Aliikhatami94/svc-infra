@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 """
-Metrics package public API.
-
-Provides lightweight, overridable hooks for abuse heuristics so callers can
-plug in logging or a metrics backend without a hard dependency.
+Lightweight metrics hooks for abuse heuristics. Intentionally minimal to avoid pulling
+full metrics stacks; these are no-ops by default but can be swapped in tests or wired
+to a metrics backend by overriding the functions.
 """
 
 from typing import Callable, Optional

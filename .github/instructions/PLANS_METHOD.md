@@ -1,0 +1,171 @@
+# Planning Methodology (PLANS_METHOD)
+
+This document describes the standardized method used to build the production readiness plan in `PLANS.md`. Follow these steps to create future plans that are actionable, testable, and traceable.
+
+---
+## 1. Scope Definition
+- Clarify the objective (e.g., "Production Readiness v1", "Introduce Billing Module", "Refactor Auth").
+- Identify mandatory vs. optional (fast follow) components.
+- Capture constraints (time, team size, external dependencies) and assumptions.
+
+Deliverable: Intro paragraph + Must-have vs Nice-to-have section skeleton.
+
+---
+## 2. Decomposition into Domains
+Break the scope into high-level domains (e.g., Security, Rate Limiting, Tenancy, Data Lifecycle).
+
+Heuristics:
+- Group by operational concern (security, reliability, data).
+- Keep each domain independently shippable.
+- Avoid mixing infrastructure concerns (e.g., background jobs) with feature concerns (e.g., billing).
+
+Deliverable: Domain list with headings.
+
+---
+## 3. Standard Subtask Pattern
+Each domain should follow the same subtask lifecycle:
+1. Research – Verify if functionality already exists; list existing code references for reuse or mark as skipped (~).
+2. Design – Produce ADR or schema proposal; define interfaces & data models.
+3. Implement – Code changes; keep atomic and reference PR links.
+4. Tests – Unit + integration tests; define markers per domain (e.g., `pytest -m security`).
+5. Verify – Run domain-focused test marker; optionally stress or load checks.
+6. Docs – Update developer guides, API references, or operational runbooks.
+
+Represent these steps as individual checklist items.
+
+---
+## 4. Check Types & Notation
+- [ ] Pending
+- [x] Completed
+- [~] Skipped (already exists, out of scope, or replaced)
+- (note) Inline context, decisions, or links (ADR-###, PR-###).
+
+Use consistent ordering: Research → Design → Implement → Tests → Verify → Docs.
+
+---
+## 5. Skipping Existing Functionality
+During Research:
+- Use code search (grep/semantic) to locate potential existing implementations.
+- If found adequate: mark item as [~] Skipped; add note with file path.
+- If partial: adjust Design/Implement scope to extend rather than rebuild.
+
+Example:
+```
+- [~] Implement: security headers middleware (already in `security/headers.py`)
+```
+
+---
+## 6. Test Integration Strategy
+For each domain define test markers or folder naming patterns:
+- security → tests/security/* or marker `@pytest.mark.security`
+- rate limiting → tests/rate_limit/* or marker `rate_limit`
+- billing → tests/billing/*
+
+Add at least:
+- Happy path test.
+- Boundary/edge test.
+- Failure mode test (e.g., lockout triggers, exceeded rate limit).
+
+Include verification step: run marker subset + full suite post-domain completion.
+
+---
+## 7. Global Verification Section
+Add a final section that consolidates:
+- Full pytest run after each major domain.
+- Flakiness detection (rerun markers multiple times).
+- Release readiness report (counts of completed vs. skipped items).
+- Changelog & version tag tasks.
+
+---
+## 8. Traceability & ADRs
+- For every non-trivial design choice create an ADR (Architecture Decision Record).
+- Link ADR IDs in plan items: `(ADR-005)`.
+- Maintain a running Notes / Decisions log at bottom of plan.
+
+ADR Minimum Fields:
+- Context, Decision, Alternatives, Consequences.
+
+---
+## 9. Incremental Updates Workflow
+1. Add domain section with all subtasks in Pending state.
+2. Perform Research → update statuses (mark Skipped or refine tasks).
+3. Draft Design → link ADR.
+4. Implement incrementally; after each PR, flip [ ] → [x] and append `(PR-###)`.
+5. Write tests before or with implementation; mark them as part of Tests subtask.
+6. Run Verify step; if pass, proceed to Docs.
+7. Avoid large batch flips—update each checkbox as work lands.
+
+---
+## 10. Quality Gate Alignment
+Ensure each domain references quality gates:
+- Lint / Typecheck / Tests / Security scan / SBOM.
+Add subtask if domain introduces new tooling.
+
+---
+## 11. Versioning & Releases
+Before declaring Done:
+- All Must-have domains fully completed (no unchecked items except intentional skips).
+- Global verification tasks all [x].
+- Produce release notes summarizing domain outcomes & major ADRs.
+
+---
+## 12. Example Template Snippet
+```
+# PLANS_METHOD (Concise)
+
+Goal: Produce a single self-contained plan in `PLANS.md` that is actionable, testable, and replaceable. When a new initiative starts, discard the old plan and regenerate with the same structure.
+
+## Core Pattern (Per Domain)
+Checklist order: Research → Design → Implement → Tests → Verify → Docs
+Symbols: [ ] pending | [x] done | [~] skipped (already exists / out of scope)
+
+## Steps
+1. Define Scope: Title + Must-have vs Nice-to-have domains.
+2. List Domains: Each is a heading (e.g., Security, Rate Limiting, Tenancy...).
+3. For each Domain add the six lifecycle subtasks as checkboxes.
+4. Research Phase: Search codebase first; mark existing features as [~] with file path.
+5. Design Phase: Create minimal ADR(s) if structural changes (note ADR IDs inline).
+6. Implement Phase: Ship smallest pieces; update checkboxes immediately with (PR-###).
+7. Tests Phase: Add unit + at least one integration test; mark domain test marker (optional).
+8. Verify Phase: Run selective pytest (e.g., markers) plus full suite when a domain completes.
+9. Docs Phase: Add or extend developer guide sections; keep docs light but discoverable.
+10. Global Section: Add final block with full test run, flakiness check, and release tag tasks.
+11. Replace Not Append: When starting next plan, overwrite `PLANS.md` using this pattern.
+
+## Minimal Domain Template
+```
+### Domain Name
+- [ ] Research: existing implementation (paths: ...)
+- [ ] Design: ADR-### summary
+- [ ] Implement: core components
+- [ ] Tests: unit + integration
+- [ ] Verify: pytest -m domain_name (and full suite)
+- [ ] Docs: usage & notes
+```
+
+## Skipping Example
+```
+- [~] Implement: security headers middleware (already in src/svc_infra/security/headers.py)
+```
+
+## Global Block Template
+```
+### Global Verification
+- [ ] Full pytest run
+- [ ] Flaky re-run (key markers x3)
+- [ ] Update PR / ADR links
+- [ ] Release readiness summary
+- [ ] Tag version & changelog
+```
+
+## Do / Don't
+Do: keep tasks atomic; update immediately after merge; record skips.
+Don't: batch-complete large sections without intermediate test/verify; duplicate old plans.
+
+## ADR Minimum Fields
+Context | Decision | Alternatives | Consequences (keep short; skip if trivial).
+
+## Ready Check (Before Release)
+All Must-have domains: Tests & Verify checked; Docs present; Global Verification complete.
+
+This concise method is sufficient to regenerate plans of the same style without extra overhead.

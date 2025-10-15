@@ -61,7 +61,8 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
     elif isinstance(public_cors_origins, str):
         origins = [o.strip() for o in public_cors_origins.split(",") if o and o.strip()]
     else:
-        fallback = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
+        # Strict by default: no CORS unless explicitly configured via env or parameter.
+        fallback = os.getenv("CORS_ALLOW_ORIGINS", "")
         origins = [o.strip() for o in fallback.split(",") if o and o.strip()]
 
     if not origins:

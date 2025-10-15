@@ -18,6 +18,8 @@ class OIDCProvider(BaseModel):
 class JWTSettings(BaseModel):
     secret: SecretStr
     lifetime_seconds: int = 60 * 60 * 24 * 7
+    # Optional older secrets accepted for verification during rotation window
+    old_secrets: List[SecretStr] = Field(default_factory=list)
 
 
 class PasswordClient(BaseModel):

@@ -65,9 +65,24 @@ def _default_provider_name() -> str:
 
 
 class PaymentsService:
+    """Payments service facade wrapping provider adapters and persisting key rows.
 
-    def __init__(self, session: AsyncSession, provider_name: Optional[str] = None):
+    NOTE: tenant_id is now required for all persistence operations. This is a breaking
+    change; callers must supply a valid tenant scope. (Future: could allow multi-tenant
+    mapping via adapter registry.)
+    """
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str,
+        provider_name: Optional[str] = None,
+    ):
+        if not tenant_id:
+            raise ValueError("tenant_id is required for PaymentsService")
         self.session = session
+        self.tenant_id = tenant_id
         self._provider_name = (provider_name or _default_provider_name()).lower()
         self._adapter = None  # resolved on first use
 
@@ -118,6 +133,7 @@ class PaymentsService:
             # If your PayCustomer model has additional columns (email/name), include them here.
             self.session.add(
                 PayCustomer(
+                    tenant_id=self.tenant_id,
                     provider=out.provider,
                     provider_customer_id=out.provider_customer_id,
                     user_id=data.user_id,
@@ -132,6 +148,7 @@ class PaymentsService:
         out = await adapter.create_intent(data, user_id=user_id)
         self.session.add(
             PayIntent(
+                tenant_id=self.tenant_id,
                 provider=out.provider,
                 provider_intent_id=out.provider_intent_id,
                 user_id=user_id,
@@ -167,6 +184,32 @@ class PaymentsService:
     async def refund(self, provider_intent_id: str, data: RefundIn) -> IntentOut:
         adapter = self._get_adapter()
         out = await adapter.refund(provider_intent_id, data)
+        # Create ledger entry if amount present and not already recorded
+        pi = await self.session.scalar(
+            select(PayIntent).where(PayIntent.provider_intent_id == provider_intent_id)
+        )
+        if pi:
+            amount = int(data.amount) if data.amount is not None else out.amount
+            # Guard against duplicates (same provider_ref + kind)
+            existing = await self.session.scalar(
+                select(LedgerEntry).where(
+                    LedgerEntry.provider_ref == provider_intent_id,
+                    LedgerEntry.kind == "refund",
+                )
+            )
+            if amount > 0 and not existing:
+                self.session.add(
+                    LedgerEntry(
+                        tenant_id=self.tenant_id,
+                        provider=pi.provider,
+                        provider_ref=provider_intent_id,
+                        user_id=pi.user_id,
+                        amount=+amount,
+                        currency=out.currency,
+                        kind="refund",
+                        status="posted",
+                    )
+                )
         return out
 
     # --- Webhooks -------------------------------------------------------------
@@ -176,6 +219,7 @@ class PaymentsService:
         parsed = await adapter.verify_and_parse_webhook(signature, payload)
         self.session.add(
             PayEvent(
+                tenant_id=self.tenant_id,
                 provider=provider,
                 provider_event_id=parsed["id"],
                 type=parsed.get("type", ""),
@@ -199,6 +243,7 @@ class PaymentsService:
             intent.status = "succeeded"
             self.session.add(
                 LedgerEntry(
+                    tenant_id=self.tenant_id,
                     provider=intent.provider,
                     provider_ref=provider_intent_id,
                     user_id=intent.user_id,
@@ -217,17 +262,27 @@ class PaymentsService:
             select(PayIntent).where(PayIntent.provider_intent_id == pi_id)
         )
         if intent:
-            self.session.add(
-                LedgerEntry(
-                    provider=intent.provider,
-                    provider_ref=charge_obj.get("id"),
-                    user_id=intent.user_id,
-                    amount=+amount,
-                    currency=currency,
-                    kind="capture",
-                    status="posted",
+            # Avoid duplicate capture entries
+            existing = await self.session.scalar(
+                select(LedgerEntry).where(
+                    LedgerEntry.provider_ref == charge_obj.get("id"),
+                    LedgerEntry.kind == "capture",
                 )
             )
+            if not existing:
+                self.session.add(
+                    LedgerEntry(
+                        tenant_id=self.tenant_id,
+                        provider=intent.provider,
+                        provider_ref=charge_obj.get("id"),
+                        user_id=intent.user_id,
+                        amount=+amount,
+                        currency=currency,
+                        kind="capture",
+                        status="posted",
+                    )
+                )
+            intent.captured = True
 
     async def _post_refund(self, charge_obj: dict):
         amount = int(charge_obj.get("amount_refunded") or 0)
@@ -237,22 +292,31 @@ class PaymentsService:
             select(PayIntent).where(PayIntent.provider_intent_id == pi_id)
         )
         if intent and amount > 0:
-            self.session.add(
-                LedgerEntry(
-                    provider=intent.provider,
-                    provider_ref=charge_obj.get("id"),
-                    user_id=intent.user_id,
-                    amount=+amount,
-                    currency=currency,
-                    kind="refund",
-                    status="posted",
+            existing = await self.session.scalar(
+                select(LedgerEntry).where(
+                    LedgerEntry.provider_ref == charge_obj.get("id"),
+                    LedgerEntry.kind == "refund",
                 )
             )
+            if not existing:
+                self.session.add(
+                    LedgerEntry(
+                        tenant_id=self.tenant_id,
+                        provider=intent.provider,
+                        provider_ref=charge_obj.get("id"),
+                        user_id=intent.user_id,
+                        amount=+amount,
+                        currency=currency,
+                        kind="refund",
+                        status="posted",
+                    )
+                )
 
     async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
         out = await self._get_adapter().attach_payment_method(data)
         # Upsert locally for quick listing
         pm = PayPaymentMethod(
+            tenant_id=self.tenant_id,
             provider=out.provider,
             provider_customer_id=out.provider_customer_id,
             provider_method_id=out.provider_method_id,
@@ -283,6 +347,7 @@ class PaymentsService:
         out = await self._get_adapter().create_product(data)
         self.session.add(
             PayProduct(
+                tenant_id=self.tenant_id,
                 provider=out.provider,
                 provider_product_id=out.provider_product_id,
                 name=out.name,
@@ -295,6 +360,7 @@ class PaymentsService:
         out = await self._get_adapter().create_price(data)
         self.session.add(
             PayPrice(
+                tenant_id=self.tenant_id,
                 provider=out.provider,
                 provider_price_id=out.provider_price_id,
                 provider_product_id=out.provider_product_id,
@@ -312,6 +378,7 @@ class PaymentsService:
         out = await self._get_adapter().create_subscription(data)
         self.session.add(
             PaySubscription(
+                tenant_id=self.tenant_id,
                 provider=out.provider,
                 provider_subscription_id=out.provider_subscription_id,
                 provider_price_id=out.provider_price_id,
@@ -340,6 +407,7 @@ class PaymentsService:
         out = await self._get_adapter().create_invoice(data)
         self.session.add(
             PayInvoice(
+                tenant_id=self.tenant_id,
                 provider=out.provider,
                 provider_invoice_id=out.provider_invoice_id,
                 provider_customer_id=out.provider_customer_id,
@@ -432,6 +500,27 @@ class PaymentsService:
             pi.status = out.status
             if out.status in ("succeeded", "requires_capture"):  # Stripe specifics vary
                 pi.captured = True if out.status == "succeeded" else pi.captured
+                # Add capture ledger entry if succeeded and not already posted
+                if out.status == "succeeded":
+                    existing = await self.session.scalar(
+                        select(LedgerEntry).where(
+                            LedgerEntry.provider_ref == provider_intent_id,
+                            LedgerEntry.kind == "capture",
+                        )
+                    )
+                    if not existing:
+                        self.session.add(
+                            LedgerEntry(
+                                tenant_id=self.tenant_id,
+                                provider=pi.provider,
+                                provider_ref=provider_intent_id,
+                                user_id=pi.user_id,
+                                amount=+out.amount,
+                                currency=out.currency,
+                                kind="capture",
+                                status="posted",
+                            )
+                        )
         return out
 
     async def list_intents(self, f: IntentListFilter) -> tuple[list[IntentOut], str | None]:
@@ -475,6 +564,7 @@ class PaymentsService:
         out = await self._get_adapter().create_setup_intent(data)
         self.session.add(
             PaySetupIntent(
+                tenant_id=self.tenant_id,
                 provider=out.provider,
                 provider_setup_intent_id=out.provider_setup_intent_id,
                 user_id=None,
@@ -510,6 +600,7 @@ class PaymentsService:
         else:
             self.session.add(
                 PaySetupIntent(
+                    tenant_id=self.tenant_id,
                     provider=out.provider,
                     provider_setup_intent_id=out.provider_setup_intent_id,
                     user_id=None,
@@ -549,6 +640,7 @@ class PaymentsService:
         else:
             self.session.add(
                 PayDispute(
+                    tenant_id=self.tenant_id,
                     provider=out.provider,
                     provider_dispute_id=out.provider_dispute_id,
                     provider_charge_id=None,  # set if adapter returns it
@@ -594,6 +686,7 @@ class PaymentsService:
         else:
             self.session.add(
                 PayPayout(
+                    tenant_id=self.tenant_id,
                     provider=out.provider,
                     provider_payout_id=out.provider_payout_id,
                     amount=out.amount,
@@ -678,10 +771,10 @@ class PaymentsService:
         if not row:
             self.session.add(
                 PayCustomer(
+                    tenant_id=self.tenant_id,
                     provider=out.provider,
                     provider_customer_id=out.provider_customer_id,
                     user_id=None,
-                    tenant_id="",
                 )
             )
         return out
