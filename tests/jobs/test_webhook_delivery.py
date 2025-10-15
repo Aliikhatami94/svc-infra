@@ -72,6 +72,12 @@ async def test_webhook_delivery_success(monkeypatch):
     assert ok is True
     # delivered
     assert len(fake.calls) == 1
+    url, body, headers = fake.calls[0]
+    assert headers.get("X-Event-Id") == str(msg.id)
+    assert headers.get("X-Topic") == msg.topic
+    assert headers.get("X-Attempt") == "1"
+    assert headers.get("X-Signature-Alg") == "hmac-sha256"
+    assert headers.get("X-Signature-Version") == "v1"
     # subsequent dedupe
     queue.enqueue("outbox.invoice.created", job_payload)
     ok2 = await process_one(queue, handler)

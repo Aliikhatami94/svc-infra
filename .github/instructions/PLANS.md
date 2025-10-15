@@ -75,15 +75,15 @@ Comprehensive checklist for making the framework production-ready. Each section 
  - [x] Docs: job authoring guide. (see docs/jobs.md)
 
 ### 5. Webhooks Framework
-- [ ] Research: existing webhook verification logic.
-- [ ] Design: event schema versioning, signature, retry schedule doc.
-- [ ] Implement: producer API & persistence model.
-- [ ] Implement: HMAC signing & verification middleware.
-- [ ] Implement: retry/backoff logic with tracking fields.
-- [ ] Implement: secret rotate & test-fire endpoints.
-- [ ] Tests: signature validation, retry escalation, version handling.
-- [ ] Verify: webhook test marker.
-- [ ] Docs: integration guide.
+- [x] Research: existing webhook verification logic. (note) Use HMAC-SHA256 over canonical JSON; header X-Signature; reuse outbox/jobs for delivery.
+- [x] Design: event schema versioning, signature, retry schedule doc. (ADR 0003)
+- [x] Implement: producer API & persistence model. (WebhookService + InMemoryWebhookSubscriptions publishing to outbox)
+- [x] Implement: HMAC signing & verification middleware. (sign/verify helpers + FastAPI require_signature)
+- [x] Implement: retry/backoff logic with tracking fields. (delivery headers include attempt and versioning; retries via JobQueue)
+- [x] Implement: secret rotate & test-fire endpoints. (verify_any supports rotation; router exposes /_webhooks/test-fire)
+- [x] Tests: signature validation, retry escalation, version handling. (unit + e2e under -m webhooks)
+- [x] Verify: webhook test marker. (pyproject marker added)
+- [x] Docs: integration guide. (see docs/webhooks.md)
 
 ### 6. Tenancy
 - [ ] Research: tenant_id coverage across existing models (list gaps).
