@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, List
+
+from uuid import uuid4
 
 from svc_infra.db.outbox import OutboxStore
 
@@ -12,6 +14,7 @@ class WebhookSubscription:
     topic: str
     url: str
     secret: str
+    id: str = field(default_factory=lambda: uuid4().hex)
 
 
 class InMemoryWebhookSubscriptions:
@@ -31,15 +34,26 @@ class WebhookService:
         self._subs = subs
 
     def publish(self, topic: str, payload: Dict, *, version: int = 1) -> int:
-        event = {
+        created_at = datetime.now(timezone.utc).isoformat()
+        base_event = {
             "topic": topic,
             "payload": payload,
             "version": version,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": created_at,
         }
-        # For each subscription, enqueue an outbox message
+        # For each subscription, enqueue an outbox message with subscriber identity
         last_id = 0
-        for _ in self._subs.get_for_topic(topic):
-            msg = self._outbox.enqueue(topic, event)
+        for sub in self._subs.get_for_topic(topic):
+            event = dict(base_event)
+            msg_payload = {
+                "event": event,
+                "subscription": {
+                    "id": sub.id,
+                    "topic": sub.topic,
+                    "url": sub.url,
+                    "secret": sub.secret,
+                },
+            }
+            msg = self._outbox.enqueue(topic, msg_payload)
             last_id = msg.id
         return last_id

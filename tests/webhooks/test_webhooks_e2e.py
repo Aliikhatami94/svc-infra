@@ -30,6 +30,30 @@ class FlakyServer:
         return Resp(status)
 
 
+def test_publish_enqueues_subscription_identity():
+    outbox = InMemoryOutboxStore()
+    subs = InMemoryWebhookSubscriptions()
+    subs.add("invoice.created", "https://example.test/a", "secret-a")
+    subs.add("invoice.created", "https://example.test/b", "secret-b")
+    svc = WebhookService(outbox=outbox, subs=subs)
+
+    svc.publish("invoice.created", {"id": "inv_multi"})
+
+    messages = [m for m in outbox._messages if m.topic == "invoice.created"]
+    assert len(messages) == 2
+    subscriptions = [m.payload["subscription"] for m in messages]
+    urls = {s["url"] for s in subscriptions}
+    secrets = {s["secret"] for s in subscriptions}
+    ids = {s["id"] for s in subscriptions}
+    assert urls == {"https://example.test/a", "https://example.test/b"}
+    assert secrets == {"secret-a", "secret-b"}
+    assert len(ids) == 2
+    for msg in messages:
+        event = msg.payload["event"]
+        assert event["topic"] == "invoice.created"
+        assert event["payload"]["id"] == "inv_multi"
+
+
 @pytest.mark.asyncio
 async def test_webhooks_e2e_publish_to_delivery_retry(monkeypatch):
     # Setup
