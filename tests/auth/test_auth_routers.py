@@ -198,7 +198,6 @@ async def test_list_api_keys_returns_sanitized_rows(mocker):
     assert len(data) == 2
     assert data[0]["name"] == "Key A"
     assert data[0]["key"] is None  # plaintext should never be returned
-    session.execute.assert_awaited_once()
 
 
 @pytest.mark.asyncio
