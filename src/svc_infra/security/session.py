@@ -64,15 +64,24 @@ async def rotate_session_refresh(
 
     Returns: (new_raw_refresh_token, new_refresh_token_model)
     """
+    rotation_ts = datetime.now(timezone.utc)
+    if current.revoked_at:
+        raise ValueError("refresh token already revoked")
+    if current.expires_at and current.expires_at <= rotation_ts:
+        raise ValueError("refresh token expired")
     new_raw, new_hash, expires_at = rotate_refresh_token(
         current.token_hash, ttl_minutes=ttl_minutes
     )
-    current.rotated_at = datetime.now(timezone.utc)
+    current.rotated_at = rotation_ts
+    current.revoked_at = rotation_ts
+    current.revoke_reason = "rotated"
+    if current.expires_at is None or current.expires_at > rotation_ts:
+        current.expires_at = rotation_ts
     # create revocation entry for old hash
     db.add(
         RefreshTokenRevocation(
             token_hash=current.token_hash,
-            revoked_at=current.rotated_at,
+            revoked_at=rotation_ts,
             reason="rotated",
         )
     )

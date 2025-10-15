@@ -128,7 +128,7 @@ Symbols: [ ] pending | [x] done | [~] skipped (already exists / out of scope)
 6. Implement Phase: Ship smallest pieces; update checkboxes immediately with (PR-###).
 7. Tests Phase: Add unit + at least one integration test; mark domain test marker (optional).
 8. Verify Phase: Run selective pytest (e.g., markers) plus full suite when a domain completes.
-9. Docs Phase: Add or extend developer guide sections; keep docs light but discoverable.
+9. Docs Phase: Add or extend developer guide sections; keep docs light but discoverable at root of the project /docs.
 10. Global Section: Add final block with full test run, flakiness check, and release tag tasks.
 11. Replace Not Append: When starting next plan, overwrite `PLANS.md` using this pattern.
 
