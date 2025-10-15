@@ -72,16 +72,18 @@ def _configure_cors(
 
     credentials = _resolve_allow_credentials(allow_credentials, env)
 
+    wildcard_origins = "*" in origins
+
     cors_kwargs: dict[str, object] = {
         "allow_credentials": credentials,
         "allow_methods": allow_methods,
         "allow_headers": allow_headers,
+        "allow_origins": ["*"] if wildcard_origins else origins,
     }
     origin_regex = env.get("CORS_ALLOW_ORIGIN_REGEX")
-    if "*" in origins:
+    if wildcard_origins:
         cors_kwargs["allow_origin_regex"] = origin_regex or ".*"
     else:
-        cors_kwargs["allow_origins"] = origins
         if origin_regex:
             cors_kwargs["allow_origin_regex"] = origin_regex
 
