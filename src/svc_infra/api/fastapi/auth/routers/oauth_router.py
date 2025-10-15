@@ -683,6 +683,8 @@ def _create_oauth_router(
             except Exception:
                 pass
 
+        return resp
+
     # unreachable legacy return removed
     # return resp
 
