@@ -13,6 +13,10 @@ class InboxStore(Protocol):
         """Optional: remove expired keys, return number purged."""
         ...
 
+    def is_marked(self, key: str) -> bool:
+        """Return True if key is already marked (not expired), without modifying it."""
+        ...
+
 
 class InMemoryInboxStore:
     def __init__(self) -> None:
@@ -33,6 +37,11 @@ class InMemoryInboxStore:
             self._keys.pop(k, None)
         return len(to_del)
 
+    def is_marked(self, key: str) -> bool:
+        now = time.time()
+        exp = self._keys.get(key)
+        return bool(exp and exp > now)
+
 
 class SqlInboxStore:
     """Skeleton for a SQL-backed inbox store (dedupe table).
@@ -52,4 +61,7 @@ class SqlInboxStore:
         raise NotImplementedError
 
     def purge_expired(self) -> int:  # pragma: no cover - skeleton
+        raise NotImplementedError
+
+    def is_marked(self, key: str) -> bool:  # pragma: no cover - skeleton
         raise NotImplementedError
