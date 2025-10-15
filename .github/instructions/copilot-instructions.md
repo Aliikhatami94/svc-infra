@@ -4,6 +4,11 @@
 - `svc-infra` is a shared infrastructure library for FastAPI services: API scaffolding, DB migrations, caching, observability, logging, and auth helpers.
 - Supported Python: 3.11–3.13. Publish-ready package via Poetry; CLI entrypoint `svc-infra` and module CLIs under `python -m svc_infra.*`.
 
+## Product goal
+- Make production-grade primitives dead-simple to adopt: one-call wiring with sensible defaults, minimal ENV-based configuration, and escape hatches for full customization.
+- Provide extensibility for multiple frameworks/providers where applicable (e.g., multiple payment providers, pluggable stores/backends for idempotency, rate limit, jobs).
+- Prioritize developer ergonomics: consistent APIs, easy defaults, and comprehensive tests/docs.
+
 ## Dev setup and checks
 - Install with Poetry: `poetry install` (ensure Python ≥3.11). Activate via `poetry shell` or prefix `poetry run`.
 - Enable hooks once: `poetry run pre-commit install`.

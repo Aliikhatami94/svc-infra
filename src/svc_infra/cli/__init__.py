@@ -4,6 +4,7 @@ import typer
 
 from svc_infra.cli.cmds import (
     _HELP,
+    jobs_app,
     register_alembic,
     register_mongo,
     register_mongo_scaffold,
@@ -25,6 +26,9 @@ register_mongo_scaffold(app)
 
 # -- observability commands ---
 register_obs(app)
+
+# -- jobs commands ---
+app.add_typer(jobs_app, name="jobs")
 
 
 def main():
