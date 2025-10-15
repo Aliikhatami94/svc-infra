@@ -111,6 +111,32 @@ app = setup_service_api(
 add_payments(app, prefix="/payments")
 ```
 
+**Tenant Context**
+
+All payments endpoints require a tenant identifier. The FastAPI router now
+derives it automatically from the authenticated principal:
+
+- API key principals → ``principal.api_key.tenant_id``
+- User principals → ``principal.user.tenant_id``
+- Fallbacks: ``X-Tenant-Id`` request header or ``request.state.tenant_id``
+
+If you need custom mapping logic (for example, translating API keys to an
+external tenant registry), register an override during startup:
+
+```python
+from svc_infra.api.fastapi.apf_payments.router import set_payments_tenant_resolver
+
+async def resolve_tenant(request, identity, header):
+    # return a string tenant id, or None to fall back to the defaults
+    return "tenant-from-custom-logic"
+
+set_payments_tenant_resolver(resolve_tenant)
+```
+
+If no tenant can be derived (and the override also returns ``None``), the
+router responds with ``400 tenant_context_missing`` so callers can supply the
+missing context explicitly.
+
 **Environment-Based Configuration**
 
 The `easy_service_app` reads these env vars automatically:
