@@ -2,6 +2,8 @@
 
 This guide covers the security primitives built into svc-infra and how to wire them:
 
+> ℹ️ Environment variables for the auth/security helpers are catalogued in [Environment Reference](environment.md).
+
 - Password policy and breach checking
 - Account lockout (exponential backoff)
 - Sessions and refresh tokens (rotation + revocation)
