@@ -683,8 +683,7 @@ def _create_oauth_router(
             except Exception:
                 pass
 
-    # unreachable legacy return removed
-    # return resp
+        return resp
 
     @router.post(
         OAUTH_REFRESH_PATH,
