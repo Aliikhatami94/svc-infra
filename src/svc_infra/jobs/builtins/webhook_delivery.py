@@ -36,9 +36,19 @@ def make_webhook_handler(
             # already delivered
             outbox.mark_processed(int(outbox_id))
             return
-        url = get_webhook_url_for_topic(topic)
-        secret = get_secret_for_topic(topic)
-        sig = sign(secret, payload)
+        event = payload.get("event") if isinstance(payload, dict) else None
+        subscription = payload.get("subscription") if isinstance(payload, dict) else None
+        if event is not None and subscription is not None:
+            delivery_payload = event
+            url = subscription.get("url") or get_webhook_url_for_topic(topic)
+            secret = subscription.get("secret") or get_secret_for_topic(topic)
+            subscription_id = subscription.get("id")
+        else:
+            delivery_payload = payload
+            url = get_webhook_url_for_topic(topic)
+            secret = get_secret_for_topic(topic)
+            subscription_id = None
+        sig = sign(secret, delivery_payload)
         headers = {
             header_name: sig,
             "X-Event-Id": str(outbox_id),
@@ -47,14 +57,16 @@ def make_webhook_handler(
             "X-Signature-Alg": "hmac-sha256",
             "X-Signature-Version": "v1",
         }
+        if subscription_id:
+            headers["X-Webhook-Subscription"] = str(subscription_id)
         # include event payload version if present
         version = None
-        if isinstance(payload, dict):
-            version = payload.get("version")
+        if isinstance(delivery_payload, dict):
+            version = delivery_payload.get("version")
         if version is not None:
             headers["X-Payload-Version"] = str(version)
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(url, json=payload, headers=headers)
+            resp = await client.post(url, json=delivery_payload, headers=headers)
             if 200 <= resp.status_code < 300:
                 # record delivery and mark processed
                 inbox.mark_if_new(key, ttl_seconds=24 * 3600)
