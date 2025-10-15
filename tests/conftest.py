@@ -14,3 +14,14 @@ def pytest_collection_modifyitems(config, items):
         norm = path.replace("\\", "/")
         if "/tests/security/" in norm or "/tests/auth/" in norm:
             item.add_marker(pytest.mark.security)
+        # Include API tests that assert rate limiting / request-size or metrics hooks
+        if "/tests/api/" in norm and (
+            "rate_limit" in norm or "request_size" in norm or "metrics_hooks" in norm
+        ):
+            item.add_marker(pytest.mark.security)
+            # Also mark as ratelimit when appropriate
+            if "rate_limit" in norm or "metrics_hooks" in norm:
+                item.add_marker(pytest.mark.ratelimit)
+        # Directly mark ratelimit tests anywhere in the path containing 'rate_limit'
+        if "rate_limit" in norm:
+            item.add_marker(pytest.mark.ratelimit)

@@ -43,10 +43,10 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Implement: per-route decorators & global middleware. (middleware + dependency factory)
 - [x] Implement: 429 Retry-After logic. (headers in 429 + OpenAPI conventions already present)
 - [x] Implement: request size & body parse timeout guard. (size limit middleware; parse timeout TBD)
-- [ ] Implement: basic bot/DoS heuristic metrics hook.
+- [x] Implement: basic bot/DoS heuristic metrics hook. (metrics hooks + middleware emits)
 - [x] Tests: bucket depletion/reset, per-route override, Retry-After presence. (tests added)
-- [ ] Verify: rate limiting test marker.
-- [ ] Docs: usage & tuning.
+- [x] Verify: rate limiting test marker. (`-m ratelimit` available; auto-tagged tests)
+- [x] Docs: usage & tuning. (see docs/rate-limiting.md)
 
 ### 3. Idempotency & Concurrency Controls
 - [ ] Research: scan for existing idempotency usage or version columns.

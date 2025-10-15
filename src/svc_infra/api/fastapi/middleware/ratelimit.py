@@ -3,6 +3,8 @@ import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from svc_infra.obs.metrics import emit_rate_limited
+
 from .ratelimit_store import InMemoryRateLimitStore, RateLimitStore
 
 
@@ -32,6 +34,10 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
 
         if count > limit:
             retry = max(0, reset - now)
+            try:
+                emit_rate_limited(str(key), limit, retry)
+            except Exception:
+                pass
             return JSONResponse(
                 status_code=429,
                 content={

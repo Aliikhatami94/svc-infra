@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore, RateLimitStore
+from svc_infra.obs.metrics import emit_rate_limited
 
 
 class RateLimiter:
@@ -28,6 +29,10 @@ class RateLimiter:
         count, limit, reset = self.store.incr(str(key), self.window)
         if count > limit:
             retry = max(0, reset - int(time.time()))
+            try:
+                emit_rate_limited(str(key), limit, retry)
+            except Exception:
+                pass
             raise HTTPException(
                 status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry)}
             )
@@ -50,6 +55,10 @@ def rate_limiter(
         count, lim, reset = store_.incr(str(key), window)
         if count > lim:
             retry = max(0, reset - int(time.time()))
+            try:
+                emit_rate_limited(str(key), lim, retry)
+            except Exception:
+                pass
             raise HTTPException(
                 status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry)}
             )
