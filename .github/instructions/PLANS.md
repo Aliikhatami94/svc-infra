@@ -52,7 +52,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Research: scan for existing idempotency usage or version columns. (found existing middleware; extended)
 - [x] Design: idempotency storage abstraction + request hash + 409 conflict semantics; TTL cleanup via lazy expiry.
 - [x] Implement: idempotency middleware with pluggable store (in-memory + Redis) and response envelope caching.
-- [ ] Implement: optimistic locking (version columns) + conflict exception.
+- [x] Implement: optimistic locking (version columns) + conflict exception.
 - [x] Implement: transactional outbox (in-memory store) + relay skeleton API. (SQL impl TBD)
 - [x] Implement: inbox pattern (in-memory dedupe store with TTL). (SQL impl TBD)
 - [x] Tests: idempotent replay and conflict on mismatched payload (concurrency marker added).
@@ -64,15 +64,15 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Docs: optimistic locking + outbox/inbox patterns & pitfalls. (see docs/idempotency.md)
 
 ### 4. Background Jobs & Scheduling
-- [ ] Research: existing job queue/scheduler utilities.
-- [ ] Design: Job schema, retry/backoff strategy, cron config format (YAML/DB).
-- [ ] Implement: JobQueue abstraction (Redis) with retry, backoff, DLQ.
-- [ ] Implement: cron scheduler loader & execution loop.
-- [ ] Implement: outbox processor job.
-- [ ] Implement: webhook delivery worker integration.
-- [ ] Tests: enqueue/dequeue, retry/backoff, cron triggers, DLQ path.
-- [ ] Verify: job test marker.
-- [ ] Docs: job authoring guide.
+- [x] Research: existing job queue/scheduler utilities. (note) Chose Redis as production queue backend (visibility timeout + ZSET/HASH), with in-memory queue/scheduler for local/dev; simple interval scheduler over full cron initially.
+- [x] Design: Job schema, retry/backoff strategy, cron config format (YAML/DB). (ADR 0002) Job{id, name, payload, available_at, attempts, max_attempts, backoff_seconds, last_error}; exponential backoff base*attempts; DLQ after max_attempts; interval scheduler with next_run_at; future cron loader from YAML.
+ - [x] Implement: JobQueue abstraction (Redis) with retry, backoff, DLQ. (RedisJobQueue + tests)
+ - [x] Implement: cron scheduler loader & execution loop. (env JSON loader + `svc-infra jobs run` loop)
+ - [x] Implement: outbox processor job. (built-in tick to enqueue one message per tick)
+ - [x] Implement: webhook delivery worker integration. (signed delivery, inbox dedupe, retry/backoff)
+ - [x] Tests: enqueue/dequeue, retry/backoff, cron triggers, DLQ path. (tests/jobs/* incl. fakeredis and CLI)
+- [x] Verify: job test marker. (tests/jobs/* using in-memory queue and scheduler pass under -m jobs)
+ - [x] Docs: job authoring guide. (see docs/jobs.md)
 
 ### 5. Webhooks Framework
 - [ ] Research: existing webhook verification logic.
@@ -213,11 +213,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 
 ### 19. Immediate Enhancements
 - [ ] Research: confirm absence/presence of each quick win.
-- [ ] Implement: rate limit middleware.
-- [ ] Implement: idempotency dependency.
-- [ ] Implement: JobQueue scaffold.
+- [x] Implement: rate limit middleware. (pluggable store + middleware/dependency added)
+- [x] Implement: idempotency dependency. (require_idempotency_key + middleware replay/conflict)
+- [x] Implement: JobQueue scaffold. (in-memory queue/scheduler/worker + easy_jobs)
 - [ ] Implement: tenant mixin prototype.
-- [ ] Implement: audit log helper & sinks.
+- [x] Implement: audit log helper & sinks. (append-only + hash chain; service wrapper)
 - [ ] Implement: webhook helper package.
 - [x] Implement: security headers middleware.
 - [ ] Implement: error code registry + linter.

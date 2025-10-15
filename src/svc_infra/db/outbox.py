@@ -20,7 +20,12 @@ class OutboxStore(Protocol):
         pass
 
     def fetch_next(self, *, topics: Optional[Iterable[str]] = None) -> Optional[OutboxMessage]:
-        """Return the next unprocessed message (FIFO per-topic), or None if none available."""
+        """Return the next undispatched, unprocessed message (FIFO per-topic), or None.
+
+        Notes:
+        - Messages with attempts > 0 are considered "dispatched" to the job queue and won't be re-enqueued.
+        - Delivery retries are handled by the job queue worker, not by re-reading the outbox.
+        """
         pass
 
     def mark_processed(self, msg_id: int) -> None:
@@ -47,6 +52,9 @@ class InMemoryOutboxStore:
         allowed = set(topics) if topics else None
         for msg in self._messages:
             if msg.processed_at is not None:
+                continue
+            # skip already dispatched messages (attempts>0)
+            if msg.attempts > 0:
                 continue
             if allowed is not None and msg.topic not in allowed:
                 continue

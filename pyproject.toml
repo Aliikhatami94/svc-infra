@@ -110,6 +110,7 @@ mypy = "^1.11.2"
 types-requests = "^2.32.0.20241016"
 pytest-mock = "^3.15.1"
 httpx = "^0.28.1"
+fakeredis = "^2.27.0"
 
 [tool.poetry.scripts]
 svc-infra = "svc_infra.cli:main"
@@ -123,6 +124,7 @@ markers = [
     "security: Security and auth hardening tests",
     "ratelimit: Rate limiting and abuse protection tests",
     "concurrency: Idempotency and concurrency control tests",
+    "jobs: Background jobs and scheduling tests",
 ]
 filterwarnings = [
     "ignore:The `route` decorator is deprecated:DeprecationWarning:starlette.*",
