@@ -2,6 +2,8 @@
 
 This module provides primitives to publish events to external consumers via webhooks, verify inbound signatures, and handle robust retries using the shared JobQueue and Outbox patterns.
 
+> ℹ️ Webhook helper environment expectations live in [Environment Reference](environment.md).
+
 ## Quickstart
 
 - Subscriptions and publishing:
@@ -40,9 +42,60 @@ app = FastAPI()
 app.post("/webhook")(lambda body=Depends(require_signature(lambda: ["old","new"])): {"ok": True})
 ```
 
+## FastAPI wiring
+
+- Attach the router with shared in-memory stores (great for tests / local runs):
+
+```python
+from fastapi import FastAPI
+
+from svc_infra.webhooks import add_webhooks
+
+app = FastAPI()
+add_webhooks(app)
+```
+
+- Respect environment overrides for Redis-backed stores by exporting `REDIS_URL`
+  and selecting the backend via `WEBHOOKS_OUTBOX=redis` (optional
+  `WEBHOOKS_INBOX=redis` for the dedupe store).  The helper records the chosen
+  instances on `app.state` for further customisation:
+
+```python
+import os
+
+os.environ["WEBHOOKS_OUTBOX"] = "redis"
+os.environ["WEBHOOKS_INBOX"] = "redis"
+
+app = FastAPI()
+add_webhooks(app)  # creates RedisOutboxStore / RedisInboxStore when redis-py is available
+
+# Later you can inspect or extend behaviour:
+app.state.webhooks_subscriptions.add("invoice.created", "https://example.com/webhook", "sekrit")
+```
+
+- Provide explicit overrides (e.g. dependency-injected SQL stores) or reuse your
+  existing job queue / scheduler.  Passing a queue automatically registers the
+  outbox tick and delivery handler so your worker loop can process jobs:
+
+```python
+from svc_infra.jobs.easy import easy_jobs
+
+queue, scheduler = easy_jobs()
+
+add_webhooks(
+    app,
+    outbox=my_outbox_store,
+    inbox=lambda: my_inbox_store,  # factories are supported
+    queue=queue,
+    scheduler=scheduler,
+)
+
+# scheduler.add_task(...) is handled internally when both queue and scheduler are supplied
+```
+
 ## Runner wiring
 
-- One-call jobs setup and scheduler tick from env:
+If you prefer explicit wiring, you can still register the tick manually:
 
 ```python
 from svc_infra.jobs.easy import easy_jobs
