@@ -83,6 +83,63 @@ payload = verify_cookie(sig, secret="k1", old_secrets=["k0"])  # returns dict
 - Strict CORS defaults (deny by default). Provide allowlist entries.
 - Security headers middleware sets common protections (X-Frame-Options, X-Content-Type-Options, etc.).
 
+Use `svc_infra.security.add.add_security` to install the default middlewares on any
+FastAPI app. By default it adds:
+
+- `SecurityHeadersMiddleware` with strict defaults (HSTS, X-Frame-Options, etc.).
+- A strict `CORSMiddleware` that only enables CORS when origins are provided (via
+  parameters or environment variables such as `CORS_ALLOW_ORIGINS`).
+
+The helper also supports optional toggles so you can match the same cookie and
+header configuration that `setup_service_api` uses.
+
+```python
+from fastapi import FastAPI
+
+from svc_infra.security.add import add_security
+
+app = FastAPI()
+
+add_security(
+    app,
+    cors_origins=["https://app.example.com"],
+    headers_overrides={"Content-Security-Policy": "default-src 'self'"},
+    install_session_middleware=True,  # adds Starlette's SessionMiddleware
+)
+```
+
+Environment variables (applied when parameters are omitted):
+
+| Variable | Purpose |
+| --- | --- |
+| `CORS_ALLOW_ORIGINS` | Comma-separated CORS origins (e.g. `https://app.example.com, https://admin.example.com`) |
+| `CORS_ALLOW_METHODS` | Allowed HTTP methods (defaults to `*`) |
+| `CORS_ALLOW_HEADERS` | Allowed headers (defaults to `*`) |
+| `CORS_ALLOW_ORIGIN_REGEX` | Regex used when matching origins (ignored if not set) |
+| `CORS_ALLOW_CREDENTIALS` | Toggle credentials support (`true` / `false`) |
+| `SESSION_COOKIE_NAME` | Session cookie name (defaults to `svc_session`) |
+| `SESSION_COOKIE_MAX_AGE_SECONDS` | Max age for the session cookie (defaults to `14400`) |
+| `SESSION_COOKIE_SAMESITE` | SameSite policy (`lax` by default) |
+| `SESSION_COOKIE_SECURE` | Force the session cookie to be HTTPS-only |
+| `SESSION_SECRET` | Secret key for Starlette's SessionMiddleware |
+
+When your service already uses `setup_service_api`, call `add_security` after
+building the parent app if you need additional overrides while keeping the
+defaults intact:
+
+```python
+from svc_infra.api.fastapi.setup import setup_service_api
+from svc_infra.security.add import add_security
+
+app = setup_service_api(...)
+
+add_security(
+    app,
+    headers_overrides={"Strict-Transport-Security": "max-age=63072000; includeSubDomains"},
+    enable_hsts_preload=False,
+)
+```
+
 ## RBAC and ABAC
 - RBAC decorators guard endpoints by role/permission.
 - ABAC evaluates resource ownership and attributes (e.g., `owns_resource`).
