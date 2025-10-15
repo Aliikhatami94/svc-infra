@@ -8,6 +8,8 @@ This guide shows you how to turn on metrics + dashboards in three easy modes:
 
 It's "one button": run `svc-infra obs-up` and you're good. The CLI will read your `.env` automatically and do the right thing.
 
+> ℹ️ A complete list of observability-related environment variables lives in [Environment Reference](../../../docs/environment.md).
+
 ---
 
 ## 0) Install & instrument your app (once)

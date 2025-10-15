@@ -2,6 +2,8 @@
 
 This module provides primitives to publish events to external consumers via webhooks, verify inbound signatures, and handle robust retries using the shared JobQueue and Outbox patterns.
 
+> ℹ️ Webhook helper environment expectations live in [Environment Reference](environment.md).
+
 ## Quickstart
 
 - Subscriptions and publishing:

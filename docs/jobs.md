@@ -2,6 +2,8 @@
 
 This module provides a lightweight JobQueue abstraction with a Redis backend for production and in-memory implementations for local/tests. A simple interval scheduler and CLI runner are included.
 
+> ℹ️ Job-related environment variables are documented in [Environment Reference](environment.md).
+
 ## Quickstart
 
 - Initialize in app code:
