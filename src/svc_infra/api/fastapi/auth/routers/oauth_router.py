@@ -738,17 +738,12 @@ def _create_oauth_router(
             raise HTTPException(401, "invalid_refresh_token")
 
         # Rotate refresh token
-        try:
-            new_raw, _new_rt = await rotate_session_refresh(session, current=found)
-        except ValueError:
-            # Token expired between validation and rotation; treat as invalid
-            raise HTTPException(401, "invalid_refresh_token") from None
+        new_raw, _new_rt = await rotate_session_refresh(session, current=found)
 
         # Write response (204) with new cookies
         resp = Response(status_code=status.HTTP_204_NO_CONTENT)
         await _set_cookie_on_response(resp, auth_backend, user, refresh_raw=new_raw)
-
-        # Dead code removed: MFA branch handled earlier in login flow, refresh returns 204 above.
+        # Policy hook: trigger after successful rotation; suppress hook errors
         if hasattr(policy, "on_token_refresh"):
             try:
                 await policy.on_token_refresh(user)

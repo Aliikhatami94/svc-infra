@@ -122,6 +122,7 @@ python_functions = ["test_*"]
 markers = [
     "security: Security and auth hardening tests",
     "ratelimit: Rate limiting and abuse protection tests",
+    "concurrency: Idempotency and concurrency control tests",
 ]
 filterwarnings = [
     "ignore:The `route` decorator is deprecated:DeprecationWarning:starlette.*",
