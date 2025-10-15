@@ -16,6 +16,7 @@ class RedisJobQueue(JobQueue):
     Keys (with optional prefix):
       - {p}:ready (LIST)        ready job ids
       - {p}:processing (LIST)   in-flight job ids
+      - {p}:processing_vt (ZSET) id -> visible_at (epoch seconds)
       - {p}:delayed (ZSET)      id -> available_at (epoch seconds)
       - {p}:seq (STRING)        INCR for job ids
       - {p}:job:{id} (HASH)     job fields (json payload)
@@ -67,9 +68,26 @@ class RedisJobQueue(JobQueue):
             pipe.zrem(self._k("delayed"), jid_s)
         pipe.execute()
 
+    def _requeue_timed_out_processing(self) -> None:
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        ids = self._r.zrangebyscore(self._k("processing_vt"), "-inf", now_ts)
+        if not ids:
+            return
+        pipe = self._r.pipeline()
+        for jid in ids:
+            jid_s = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
+            pipe.lrem(self._k("processing"), 1, jid_s)
+            pipe.lpush(self._k("ready"), jid_s)
+            pipe.zrem(self._k("processing_vt"), jid_s)
+            # clear stale visibility timestamp so next reservation can set a fresh one
+            pipe.hdel(self._job_key(jid_s), "visible_at")
+        pipe.execute()
+
     def reserve_next(self) -> Optional[Job]:
         # opportunistically move due delayed jobs
         self._move_due_delayed_to_ready()
+        # move timed-out processing jobs back to ready before reserving
+        self._requeue_timed_out_processing()
         jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
         if not jid:
             return None
@@ -114,7 +132,10 @@ class RedisJobQueue(JobQueue):
             return None
         # Update attempts and visibility timeout
         visible_at = int(datetime.now(timezone.utc).timestamp()) + int(self._vt)
-        self._r.hset(key, mapping={"attempts": attempts, "visible_at": visible_at})
+        pipe = self._r.pipeline()
+        pipe.hset(key, mapping={"attempts": attempts, "visible_at": visible_at})
+        pipe.zadd(self._k("processing_vt"), {job_id: visible_at})
+        pipe.execute()
         return Job(
             id=job_id,
             name=name,
@@ -127,6 +148,7 @@ class RedisJobQueue(JobQueue):
 
     def ack(self, job_id: str) -> None:
         self._r.lrem(self._k("processing"), 1, job_id)
+        self._r.zrem(self._k("processing_vt"), job_id)
         self._r.delete(self._job_key(job_id))
 
     def fail(self, job_id: str, *, error: str | None = None) -> None:
@@ -154,6 +176,7 @@ class RedisJobQueue(JobQueue):
         # DLQ if at or beyond max_attempts
         if attempts >= max_attempts:
             self._r.lrem(self._k("processing"), 1, job_id)
+            self._r.zrem(self._k("processing_vt"), job_id)
             self._r.lpush(self._k("dlq"), job_id)
             return
         delay = backoff_seconds * max(1, attempts)
@@ -164,4 +187,5 @@ class RedisJobQueue(JobQueue):
         }
         self._r.hset(key, mapping=mapping)
         self._r.lrem(self._k("processing"), 1, job_id)
+        self._r.zrem(self._k("processing_vt"), job_id)
         self._r.zadd(self._k("delayed"), {job_id: available_at_ts})
