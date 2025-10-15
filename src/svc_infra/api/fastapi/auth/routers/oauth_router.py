@@ -739,7 +739,11 @@ def _create_oauth_router(
             raise HTTPException(401, "invalid_refresh_token")
 
         # Rotate refresh token
-        new_raw, _new_rt = await rotate_session_refresh(session, current=found)
+        try:
+            new_raw, _new_rt = await rotate_session_refresh(session, current=found)
+        except ValueError:
+            # Token expired between validation and rotation; treat as invalid
+            raise HTTPException(401, "invalid_refresh_token") from None
 
         # Write response (204) with new cookies
         resp = Response(status_code=status.HTTP_204_NO_CONTENT)
