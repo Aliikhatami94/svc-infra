@@ -7,11 +7,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from httpx import ASGITransport, AsyncClient
 
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.idempotency import IdempotencyMiddleware
+from svc_infra.api.fastapi.middleware.optimistic_lock import check_version_or_409, require_if_match
 
 
 class TestCatchAllExceptionMiddleware:
@@ -75,6 +76,7 @@ class TestCatchAllExceptionMiddleware:
             assert "Internal Server Error" in response.text
 
 
+@pytest.mark.concurrency
 class TestIdempotencyMiddleware:
     """Test IdempotencyMiddleware functionality."""
 
@@ -145,6 +147,77 @@ class TestIdempotencyMiddleware:
             assert response1.status_code == 200
             assert response2.status_code == 200
             assert response1.json() == response2.json()
+
+    @pytest.mark.asyncio
+    async def test_middleware_conflict_on_mismatched_payload(self):
+        """Re-using same Idempotency-Key with different body should 409."""
+        app = FastAPI()
+
+        @app.post("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        app.add_middleware(IdempotencyMiddleware)
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            # First request
+            r1 = await client.post(
+                "/test",
+                json={"a": 1},
+                headers={"Idempotency-Key": "same-key"},
+            )
+            assert r1.status_code == 200
+            # Second request same key, different body
+            r2 = await client.post(
+                "/test",
+                json={"a": 2},
+                headers={"Idempotency-Key": "same-key"},
+            )
+            assert r2.status_code == 409
+
+
+@pytest.mark.concurrency
+class TestOptimisticLocking:
+    @pytest.mark.asyncio
+    async def test_missing_if_match(self):
+        app = FastAPI()
+
+        @app.patch("/resource")
+        async def update(_: str = Depends(require_if_match)):
+            return {"ok": True}
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            res = await client.patch("/resource", json={})
+            assert res.status_code == 428
+
+    @pytest.mark.asyncio
+    async def test_bad_if_match_format(self):
+        # current version is int=3
+        def _cur():
+            return 3
+
+        with pytest.raises(HTTPException) as ctx:
+            check_version_or_409(_cur, "abc")
+        assert ctx.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_version_mismatch_conflict(self):
+        def _cur():
+            return 5
+
+        with pytest.raises(HTTPException) as ctx:
+            check_version_or_409(_cur, "4")
+        assert ctx.value.status_code == 409
+
+    @pytest.mark.asyncio
+    async def test_version_match_success(self):
+        def _cur():
+            return 7
+
+        # should not raise
+        check_version_or_409(_cur, "7")
 
     @pytest.mark.asyncio
     async def test_middleware_without_idempotency_key(self):
