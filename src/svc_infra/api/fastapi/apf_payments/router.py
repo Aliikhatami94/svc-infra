@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Literal, Optional, cast
+import inspect
+from typing import Annotated, Awaitable, Callable, Literal, Optional, cast
 
-from fastapi import Body, Depends, Header, Request, Response, status
+from fastapi import Body, Depends, Header, HTTPException, Request, Response, status
 from starlette.responses import JSONResponse
 
 from svc_infra.apf_payments.schemas import (
@@ -47,6 +48,7 @@ from svc_infra.apf_payments.schemas import (
     WebhookReplayOut,
 )
 from svc_infra.apf_payments.service import PaymentsService
+from svc_infra.api.fastapi.auth.security import OptionalIdentity, Principal
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual import protected_router, public_router, service_router, user_router
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
@@ -69,10 +71,69 @@ def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "captur
 
 
 # --- deps ---
-async def get_service(session: SqlSessionDep) -> PaymentsService:
-    # TODO: derive tenant_id from auth/session context; placeholder requires explicit value.
-    # For now, use a fixed test tenant id; production integration must override.
-    return PaymentsService(session=session, tenant_id="test_tenant")
+TenantOverrideHook = Callable[
+    [Request, Optional[Principal], Optional[str]],
+    Awaitable[Optional[str]] | Optional[str],
+]
+
+_tenant_override_hook: TenantOverrideHook | None = None
+
+
+def set_payments_tenant_resolver(resolver: TenantOverrideHook | None) -> None:
+    """Override the default tenant resolution used by the payments router.
+
+    Projects can call this during startup to plug custom logic (e.g. multi-tenant
+    mappings). Passing ``None`` resets to the built-in behavior.
+    """
+
+    global _tenant_override_hook
+    _tenant_override_hook = resolver
+
+
+async def resolve_payments_tenant_id(
+    request: Request,
+    identity: OptionalIdentity = None,
+    tenant_header: Annotated[Optional[str], Header(alias="X-Tenant-Id", default=None)] = None,
+) -> str:
+    """Determine the tenant id for the current request.
+
+    The default strategy prefers authenticated principals (API keys first, then
+    user accounts) and falls back to the ``X-Tenant-Id`` header or ``request.state``.
+    Applications may override the behavior via
+    :func:`set_payments_tenant_resolver`.
+    """
+
+    if _tenant_override_hook is not None:
+        maybe = _tenant_override_hook(request, identity, tenant_header)
+        if inspect.isawaitable(maybe):  # pragma: no cover - depends on override type
+            maybe = await maybe
+        if maybe is not None:
+            return maybe
+
+    if identity:
+        api_key_tenant = getattr(getattr(identity, "api_key", None), "tenant_id", None)
+        if api_key_tenant:
+            return api_key_tenant
+
+        user_tenant = getattr(getattr(identity, "user", None), "tenant_id", None)
+        if user_tenant:
+            return user_tenant
+
+    if tenant_header:
+        return tenant_header
+
+    state_tenant = getattr(request.state, "tenant_id", None)
+    if state_tenant:
+        return state_tenant
+
+    raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="tenant_context_missing")
+
+
+PaymentsTenantDep = Annotated[str, Depends(resolve_payments_tenant_id)]
+
+
+async def get_service(session: SqlSessionDep, tenant_id: PaymentsTenantDep) -> PaymentsService:
+    return PaymentsService(session=session, tenant_id=tenant_id)
 
 
 # --- routers grouped by auth posture (same prefix is fine; FastAPI merges) ---
