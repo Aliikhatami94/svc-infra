@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -65,6 +66,9 @@ def auth_session_router(
     router = public_router()
     policy = auth_policy or DefaultAuthPolicy(get_auth_settings())
 
+    from svc_infra.api.fastapi.db.sql import SqlSessionDep
+    from svc_infra.security.lockout import get_lockout_status, record_attempt
+
     @router.post("/login", name="auth:jwt.login")
     async def login(
         request: Request,
@@ -74,27 +78,78 @@ def auth_session_router(
         client_id: str | None = Form(None),
         client_secret: str | None = Form(None),
         user_manager=Depends(fapi.get_user_manager),
+        session: SqlSessionDep = Depends(),
     ):
-        # 1) lookup user (normalize email)
         strategy = auth_backend.get_strategy()
-
         email = username.strip().lower()
+        # Compute IP hash for lockout correlation
+        client_ip = getattr(request.client, "host", None)
+        ip_hash = hashlib.sha256(client_ip.encode()).hexdigest() if client_ip else None
+
+        # Pre-check lockout by IP to avoid enumeration
+        try:
+            status_lo = await get_lockout_status(session, user_id=None, ip_hash=ip_hash)
+            if status_lo.locked and status_lo.next_allowed_at:
+                retry = int(
+                    (status_lo.next_allowed_at - datetime.now(timezone.utc)).total_seconds()
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail="account_locked",
+                    headers={"Retry-After": str(max(0, retry))},
+                )
+        except Exception:
+            pass
+
+        # Lookup user
         user = await user_manager.user_db.get_by_email(email)
         if not user:
             _, _ = _pwd.verify_and_update(password, _DUMMY_BCRYPT)
+            try:
+                await record_attempt(session, user_id=None, ip_hash=ip_hash, success=False)
+            except Exception:
+                pass
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
 
-        # 2) verify status + password
+        # Status checks
         if not getattr(user, "is_active", True):
             raise HTTPException(401, "account_disabled")
 
         hashed = getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
         if not hashed:
-            # No password set (likely OAuth-only account)
+            try:
+                await record_attempt(
+                    session, user_id=getattr(user, "id", None), ip_hash=ip_hash, success=False
+                )
+            except Exception:
+                pass
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
+
+        # Check lockout for this user + IP before verifying password
+        try:
+            status_user = await get_lockout_status(
+                session, user_id=getattr(user, "id", None), ip_hash=ip_hash
+            )
+            if status_user.locked and status_user.next_allowed_at:
+                retry = int(
+                    (status_user.next_allowed_at - datetime.now(timezone.utc)).total_seconds()
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail="account_locked",
+                    headers={"Retry-After": str(max(0, retry))},
+                )
+        except Exception:
+            pass
 
         ok, new_hash = _pwd.verify_and_update(password, hashed)
         if not ok:
+            try:
+                await record_attempt(
+                    session, user_id=getattr(user, "id", None), ip_hash=ip_hash, success=False
+                )
+            except Exception:
+                pass
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
 
         # If the hash needs upgrading, persist it (optional but recommended)
@@ -106,7 +161,6 @@ def auth_session_router(
             try:
                 await user_manager.user_db.update(user)
             except Exception:
-                # don't block login if updating hash fails; log if you have logging here
                 pass
 
         if getattr(user, "is_verified") is False:
@@ -128,6 +182,14 @@ def auth_session_router(
             await user_manager.user_db.update(user, {"last_login": user.last_login})
         except Exception:
             # don’t block login if this write fails
+            pass
+
+        # Record successful attempt (for audit)
+        try:
+            await record_attempt(
+                session, user_id=getattr(user, "id", None), ip_hash=ip_hash, success=True
+            )
+        except Exception:
             pass
 
         # 5) mint token and set cookie

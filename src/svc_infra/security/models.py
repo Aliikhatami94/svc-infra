@@ -115,6 +115,76 @@ class AuditLog(ModelBase):
     __table_args__ = (Index("ix_audit_chain", "tenant_id", "id"),)
 
 
+# ------------------------ Org / Teams ----------------------------------------
+
+
+class Organization(ModelBase):
+    __tablename__ = "organizations"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    slug: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+    )
+
+
+class Team(ModelBase):
+    __tablename__ = "teams"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+    )
+
+
+class OrganizationMembership(ModelBase):
+    __tablename__ = "organization_memberships"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+    )
+    deactivated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (UniqueConstraint("org_id", "user_id", name="uq_org_user_membership"),)
+
+
+class OrganizationInvitation(ModelBase):
+    __tablename__ = "organization_invitations"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    role: Mapped[str] = mapped_column(String(64), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), index=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+    )
+    last_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    resend_count: Mapped[int] = mapped_column(default=0)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
 # ------------------------ Utilities -------------------------------------------
 
 
