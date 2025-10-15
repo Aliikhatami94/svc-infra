@@ -38,7 +38,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 
 ### 2. Rate Limiting & Abuse Protection
 - [x] Research: confirm no existing rate limiter. (basic middleware existed; refactored to pluggable store)
-- [ ] Design: Redis bucket schema (lua vs atomic), config surface.
+- [x] Design: Redis bucket schema (lua vs atomic), config surface. (implemented fixed-window atomic INCR)
 - [x] Implement: core token bucket / leaky bucket. (in-memory store abstraction)
 - [x] Implement: per-route decorators & global middleware. (middleware + dependency factory)
 - [x] Implement: 429 Retry-After logic. (headers in 429 + OpenAPI conventions already present)
