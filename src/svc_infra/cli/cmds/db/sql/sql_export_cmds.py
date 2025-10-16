@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
+from sqlalchemy import text
 
 from svc_infra.db.sql.utils import build_engine
+
+try:  # SQLAlchemy async extras are optional
+    from sqlalchemy.ext.asyncio import AsyncEngine
+except Exception:  # pragma: no cover - fallback when async extras unavailable
+    AsyncEngine = None  # type: ignore[assignment]
 
 app = typer.Typer(help="SQL data export commands")
 
@@ -36,38 +43,32 @@ def export_tenant(
         raise typer.Exit(code=2)
 
     engine = build_engine(url)
-    # Sync connection is sufficient for export (sync engine for async URL will raise RuntimeError).
-    # build_engine returns proper engine for URL type.
-    rows: list[dict] = []
+    rows: list[dict[str, Any]]
     query = f"SELECT * FROM {table} WHERE {tenant_field} = :tenant_id"
     if limit and limit > 0:
         query += " LIMIT :limit"
 
-    try:
-        with engine.connect() as conn:  # type: ignore[attr-defined]
-            params = {"tenant_id": tenant_id}
-            if limit and limit > 0:
-                params["limit"] = int(limit)
-            res = conn.execute(
-                # sqlalchemy text may not be available across sync/async variants here; use raw execute
-                # This keeps dependencies light for a basic export.
-                conn.execution_options(stream_results=True).execute(query, params)  # type: ignore
-            )
-            # However, some DBAPI/SQLAlchemy versions require text() for parameters; fallback simple path
-    except Exception:
-        # Fallback using simple text compile for most SQLAlchemy installs
-        from sqlalchemy import text
+    params: dict[str, Any] = {"tenant_id": tenant_id}
+    if limit and limit > 0:
+        params["limit"] = int(limit)
 
-        with engine.connect() as conn:  # type: ignore[attr-defined]
-            q = text(query)
-            params = {"tenant_id": tenant_id}
-            if limit and limit > 0:
-                params["limit"] = int(limit)
-            res = conn.execute(q, params)
+    stmt = text(query)
 
-    # Iterate over result rows
-    for row in res.mappings():  # type: ignore[name-defined]
-        rows.append(dict(row))
+    is_async_engine = AsyncEngine is not None and isinstance(engine, AsyncEngine)
+
+    if is_async_engine:
+        assert AsyncEngine is not None  # for type checkers
+
+        async def _fetch() -> list[dict[str, Any]]:
+            async with engine.connect() as conn:  # type: ignore[call-arg]
+                result = await conn.execute(stmt, params)
+                return [dict(row) for row in result.mappings()]
+
+        rows = asyncio.run(_fetch())
+    else:
+        with engine.connect() as conn:  # type: ignore[attr-defined]
+            result = conn.execute(stmt, params)
+            rows = [dict(row) for row in result.mappings()]
 
     data = json.dumps(rows, indent=2)
     if output:
