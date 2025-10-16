@@ -12,6 +12,7 @@ from fastapi_users.password import PasswordHelper
 from svc_infra.api.fastapi.auth._cookies import compute_cookie_params
 from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
+from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.public import public_router
 
 _pwd = PasswordHelper()
@@ -66,19 +67,18 @@ def auth_session_router(
     router = public_router()
     policy = auth_policy or DefaultAuthPolicy(get_auth_settings())
 
-    from svc_infra.api.fastapi.db.sql import SqlSessionDep
     from svc_infra.security.lockout import get_lockout_status, record_attempt
 
     @router.post("/login", name="auth:jwt.login")
     async def login(
         request: Request,
+        session: SqlSessionDep,
         username: str = Form(...),
         password: str = Form(...),
         scope: str = Form(""),
         client_id: str | None = Form(None),
         client_secret: str | None = Form(None),
         user_manager=Depends(fapi.get_user_manager),
-        session: SqlSessionDep = Depends(),
     ):
         strategy = auth_backend.get_strategy()
         email = username.strip().lower()
