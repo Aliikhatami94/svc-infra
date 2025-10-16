@@ -126,6 +126,7 @@ markers = [
     "concurrency: Idempotency and concurrency control tests",
     "jobs: Background jobs and scheduling tests",
     "webhooks: Webhooks framework tests",
+    "tenancy: Tenancy isolation and enforcement tests",
 ]
 filterwarnings = [
     "ignore:The `route` decorator is deprecated:DeprecationWarning:starlette.*",

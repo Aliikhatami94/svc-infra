@@ -9,6 +9,7 @@ from svc_infra.cli.cmds import (
     register_mongo,
     register_mongo_scaffold,
     register_obs,
+    register_sql_export,
     register_sql_scaffold,
 )
 from svc_infra.cli.foundation.typer_bootstrap import pre_cli
@@ -19,6 +20,7 @@ pre_cli(app)
 # --- sql commands ---
 register_alembic(app)
 register_sql_scaffold(app)
+register_sql_export(app)
 
 # --- nosql commands ---
 register_mongo(app)

@@ -56,20 +56,31 @@ class SqlRepository:
         limit: int,
         offset: int,
         order_by: Optional[Sequence[Any]] = None,
+        where: Optional[Sequence[Any]] = None,
     ) -> Sequence[Any]:
-        stmt = self._base_select().limit(limit).offset(offset)
+        stmt = self._base_select()
+        if where:
+            stmt = stmt.where(and_(*where))
+        stmt = stmt.limit(limit).offset(offset)
         if order_by:
             stmt = stmt.order_by(*order_by)
         rows = (await session.execute(stmt)).scalars().all()
         return rows
 
-    async def count(self, session: AsyncSession) -> int:
-        stmt = select(func.count()).select_from(self._base_select().subquery())
+    async def count(self, session: AsyncSession, *, where: Optional[Sequence[Any]] = None) -> int:
+        base = self._base_select()
+        if where:
+            base = base.where(and_(*where))
+        stmt = select(func.count()).select_from(base.subquery())
         return (await session.execute(stmt)).scalar_one()
 
-    async def get(self, session: AsyncSession, id_value: Any) -> Any | None:
+    async def get(
+        self, session: AsyncSession, id_value: Any, *, where: Optional[Sequence[Any]] = None
+    ) -> Any | None:
         # honors soft-delete if configured
         stmt = self._base_select().where(self._id_column() == id_value)
+        if where:
+            stmt = stmt.where(and_(*where))
         return (await session.execute(stmt)).scalars().first()
 
     async def create(self, session: AsyncSession, data: dict[str, Any]) -> Any:
@@ -81,9 +92,14 @@ class SqlRepository:
         return obj
 
     async def update(
-        self, session: AsyncSession, id_value: Any, data: dict[str, Any]
+        self,
+        session: AsyncSession,
+        id_value: Any,
+        data: dict[str, Any],
+        *,
+        where: Optional[Sequence[Any]] = None,
     ) -> Any | None:
-        obj = await self.get(session, id_value)
+        obj = await self.get(session, id_value, where=where)
         if not obj:
             return None
         valid = self._model_columns()
@@ -93,8 +109,17 @@ class SqlRepository:
         await session.flush()
         return obj
 
-    async def delete(self, session: AsyncSession, id_value: Any) -> bool:
-        obj = await session.get(self.model, id_value)
+    async def delete(
+        self, session: AsyncSession, id_value: Any, *, where: Optional[Sequence[Any]] = None
+    ) -> bool:
+        # Fast path: when no extra filters provided, use session.get for simplicity (matches tests)
+        if not where:
+            obj = await session.get(self.model, id_value)
+        else:
+            # Respect soft-delete and optional tenant/extra filters by selecting through base select
+            stmt = self._base_select().where(self._id_column() == id_value)
+            stmt = stmt.where(and_(*where))
+            obj = (await session.execute(stmt)).scalars().first()
         if not obj:
             return False
         if self.soft_delete:
@@ -118,6 +143,7 @@ class SqlRepository:
         limit: int,
         offset: int,
         order_by: Optional[Sequence[Any]] = None,
+        where: Optional[Sequence[Any]] = None,
     ) -> Sequence[Any]:
         ilike = f"%{q}%"
         conditions = []
@@ -130,6 +156,8 @@ class SqlRepository:
                     # skip columns that cannot be used in ilike even with cast
                     continue
         stmt = self._base_select()
+        if where:
+            stmt = stmt.where(and_(*where))
         if conditions:
             stmt = stmt.where(or_(*conditions))
         stmt = stmt.limit(limit).offset(offset)
@@ -137,7 +165,14 @@ class SqlRepository:
             stmt = stmt.order_by(*order_by)
         return (await session.execute(stmt)).scalars().all()
 
-    async def count_filtered(self, session: AsyncSession, *, q: str, fields: Sequence[str]) -> int:
+    async def count_filtered(
+        self,
+        session: AsyncSession,
+        *,
+        q: str,
+        fields: Sequence[str],
+        where: Optional[Sequence[Any]] = None,
+    ) -> int:
         ilike = f"%{q}%"
         conditions = []
         for f in fields:
@@ -148,6 +183,8 @@ class SqlRepository:
                 except Exception:
                     continue
         stmt = self._base_select()
+        if where:
+            stmt = stmt.where(and_(*where))
         if conditions:
             stmt = stmt.where(or_(*conditions))
         # SELECT COUNT(*) FROM (<stmt>) as t
