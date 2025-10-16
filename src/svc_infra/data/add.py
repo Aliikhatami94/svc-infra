@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from typing import Callable, Iterable, Optional
 
 from fastapi import FastAPI
@@ -30,10 +31,9 @@ def add_data_lifecycle(
     and offers extension points. Jobs should be scheduled using svc_infra.jobs helpers.
     """
 
-    @app.on_event("startup")
-    async def _data_lifecycle_startup() -> None:  # noqa: D401, ANN202
+    async def _run_lifecycle() -> None:
+        # Startup
         if auto_migrate:
-            # Use existing CLI function to perform end-to-end setup and migrate.
             cmd_setup_and_migrate(
                 database_url=database_url,
                 overwrite_scaffold=False,
@@ -44,10 +44,12 @@ def add_data_lifecycle(
                 discover_packages=discover_packages,
                 with_payments=with_payments,
             )
-
         if on_load_fixtures:
-            # Run user-provided fixture loader (idempotent expected).
-            on_load_fixtures()
+            res = on_load_fixtures()
+            if inspect.isawaitable(res):
+                await res  # type: ignore[misc]
+
+    app.add_event_handler("startup", _run_lifecycle)
 
     # Store optional jobs on app.state for external schedulers to discover/register.
     if retention_jobs is not None:

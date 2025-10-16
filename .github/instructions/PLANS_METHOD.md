@@ -34,6 +34,31 @@ Each domain should follow the same subtask lifecycle:
 Represent these steps as individual checklist items.
 
 ---
+## 3.1 Hard Gates Between Stages (MANDATORY)
+To ensure discipline and traceability, later stages must not begin until all prior stages are completed and recorded. These are hard gates, not guidelines:
+
+- Gate A (Design): Do not start Design until Research is completed and sources are recorded in the plan (paths, notes, or [~] skips).
+- Gate B (Implement): Do not start Implementation until both Research and Design are completed with ADR links and explicit acceptance criteria.
+- Gate C (Tests): Tests must be authored alongside or before code changes. Do not mark Verify until tests exist and cover the changed behavior.
+- Gate D (Verify): Do not proceed to Docs until Verify passes for the domain (marker subset and/or focused test run is green).
+- Gate E (Docs): Docs are the final step. Do not mark the domain done unless Docs are updated and discoverable.
+
+Enforcement and Evidence:
+- Each checklist item must include a brief note and links: file paths, ADR IDs, PR numbers/commits, and any test names/markers.
+- It is not allowed to “jump ahead” in the checklist. If an item is found out-of-order, revert status and complete prerequisites first.
+- When work already exists, mark the prior stages as [~] Skipped with explicit paths and rationale.
+
+Example (proper ordering with evidence):
+```
+- [x] Research: rate limit storage exists (src/svc_infra/api/fastapi/rate_limit/store.py)
+- [x] Design: ADR-007 add tenant scope; keys & error semantics
+- [x] Implement: tenant-scoped limiter (PR-154, commit abc123)
+- [x] Tests: tests/api/test_rate_limit_tenant.py::test_scope_applies
+- [x] Verify: pytest -q -k rate_limit_tenant passed
+- [x] Docs: docs/rate-limiting.md updated with examples
+```
+
+---
 ## 4. Check Types & Notation
 - [ ] Pending
 - [x] Completed
@@ -160,7 +185,7 @@ Symbols: [ ] pending | [x] done | [~] skipped (already exists / out of scope)
 
 ## Do / Don't
 Do: keep tasks atomic; update immediately after merge; record skips.
-Don't: batch-complete large sections without intermediate test/verify; duplicate old plans.
+Don't: batch-complete large sections without intermediate test/verify; duplicate old plans; start later stages before earlier ones are completed (respect Hard Gates).
 
 ## ADR Minimum Fields
 Context | Decision | Alternatives | Consequences (keep short; skip if trivial).

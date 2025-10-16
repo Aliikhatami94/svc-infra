@@ -17,6 +17,7 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 | Observability | Prometheus middleware, Grafana automation, OTEL hooks | [Observability guide](docs/observability.md) |
 | Webhooks | Subscription store, signing, retry worker | [Webhooks framework](docs/webhooks.md) |
 | Security | Password policy, lockout, signed cookies, headers | [Security hardening](docs/security.md) |
+| Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](docs/data-lifecycle.md) |
 
 ## Minimal FastAPI bootstrap
 
