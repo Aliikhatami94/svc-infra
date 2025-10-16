@@ -15,6 +15,7 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 | Jobs | JobQueue, scheduler, CLI worker | [Jobs quickstart](docs/jobs.md) |
 | Cache | cashews decorators, namespace management, TTL helpers | [Cache guide](docs/cache.md) |
 | Observability | Prometheus middleware, Grafana automation, OTEL hooks | [Observability guide](docs/observability.md) |
+| Ops | Probes, breaker, SLOs & dashboards | [SLOs & Ops](docs/ops.md) |
 | Webhooks | Subscription store, signing, retry worker | [Webhooks framework](docs/webhooks.md) |
 | Security | Password policy, lockout, signed cookies, headers | [Security hardening](docs/security.md) |
 | Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](docs/data-lifecycle.md) |

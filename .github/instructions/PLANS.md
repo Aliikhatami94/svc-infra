@@ -127,12 +127,12 @@ Comprehensive checklist for making the framework production-ready. Each section 
 ### 8. SLOs & Ops
 - [x] Research: existing metrics/logging instrumentation. (see obs.add.add_observability, obs.metrics.asgi PrometheusMiddleware and http_server_* metrics; logging via app.logging.setup_logging)
 - [x] Design: metrics naming & labels; error budget methodology. (ADR-0006 — standardize http_server_* and db_pool_* metrics; primary SLI: success rate and request latency; SLOs per endpoint class with 99.9% success and latency targets; monthly error budget with burn alerts)
-- [ ] Implement: route instrumentation & dashboard spec artifacts.
+- [x] Implement: route instrumentation & dashboard spec artifacts. (route_classifier in add_observability; Grafana dashboard JSON at src/svc_infra/obs/grafana/dashboards/http-overview.json)
 - [x] Implement: health/readiness/startup probes. (see api/fastapi/ops/add.py:add_probes)
 - [x] Implement: maintenance mode flag & circuit breaker. (see api/fastapi/ops/add.py:add_maintenance_mode, circuit_breaker_dependency)
-- [ ] Tests: probe behavior, breaker trip/reset.
-- [ ] Verify: ops test marker.
-- [ ] Docs: SLO definitions & ops playbook.
+- [x] Tests: probe behavior, breaker trip/reset. (tests/ops/test_ops_probes_and_breaker.py)
+- [x] Verify: ops test marker. (pytest -m ops)
+- [x] Docs: SLO definitions & ops playbook. (see docs/ops.md; linked from README)
  - [x] Implement: easy-setup helpers for probes/maintenance-mode/circuit-breaker. (see api/fastapi/ops/add.py)
 
 ### 9. DX & Quality Gates
