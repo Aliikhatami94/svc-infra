@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -45,19 +44,13 @@ def add_docs(
     if export_openapi_to:
         export_path = Path(export_openapi_to)
 
-        @asynccontextmanager
-        async def _docs_ctx(app_: FastAPI):  # noqa: ANN001
+        async def _export_docs() -> None:
             # Startup export
             spec = app.openapi()
             export_path.parent.mkdir(parents=True, exist_ok=True)
             export_path.write_text(json.dumps(spec, indent=2))
-            try:
-                yield
-            finally:
-                pass
 
-        # Install/override lifespan handler for this app if not already set by caller.
-        app.router.lifespan_context = _docs_ctx  # type: ignore[assignment]
+        app.add_event_handler("startup", _export_docs)
 
 
 def add_sdk_generation_stub(

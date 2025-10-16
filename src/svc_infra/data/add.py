@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import inspect
-from contextlib import asynccontextmanager
 from typing import Callable, Iterable, Optional
 
 from fastapi import FastAPI
@@ -32,8 +31,7 @@ def add_data_lifecycle(
     and offers extension points. Jobs should be scheduled using svc_infra.jobs helpers.
     """
 
-    @asynccontextmanager
-    async def _lifecycle_ctx(app_: FastAPI):  # noqa: ANN001
+    async def _run_lifecycle() -> None:
         # Startup
         if auto_migrate:
             cmd_setup_and_migrate(
@@ -50,14 +48,8 @@ def add_data_lifecycle(
             res = on_load_fixtures()
             if inspect.isawaitable(res):
                 await res  # type: ignore[misc]
-        try:
-            yield
-        finally:
-            # No teardown actions currently
-            pass
 
-    # Install lifespan handler. If app already has one, this will override; caller can opt-out by not using add_data_lifecycle.
-    app.router.lifespan_context = _lifecycle_ctx  # type: ignore[assignment]
+    app.add_event_handler("startup", _run_lifecycle)
 
     # Store optional jobs on app.state for external schedulers to discover/register.
     if retention_jobs is not None:
