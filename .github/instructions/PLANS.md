@@ -29,6 +29,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Implement: secret management abstraction + rotation API. (RotatingJWTStrategy with old_secrets support)
 - [x] Implement: JWT/crypto key rolling script (dual key validity window). (config via AUTH_JWT__OLD_SECRETS and tests)
 - [x] Implement: audit log model (append-only + hash chain field). (AuditLog + compute_audit_hash + append_audit_event + service wrapper + tests)
+- [x] Implement: easy-setup helpers (add/setup/ease) for one-line integration. (see api.fastapi.auth.add.add_auth_users and security.add)
 - [x] Tests: password policy + lockout (cooldown escalation).
 - [x] Tests: session revocation + RBAC enforcement.
 - [x] Tests: breach password rejection & pass cases with stubbed checker.
@@ -44,6 +45,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Implement: 429 Retry-After logic. (headers in 429 + OpenAPI conventions already present)
 - [x] Implement: request size & body parse timeout guard. (size limit middleware; parse timeout TBD)
 - [x] Implement: basic bot/DoS heuristic metrics hook. (metrics hooks + middleware emits)
+- [x] Implement: easy-setup helper for wiring global/per-route rate limits. (integrated via setup_service_api/easy_service_api)
 - [x] Tests: bucket depletion/reset, per-route override, Retry-After presence. (tests added)
 - [x] Verify: rate limiting test marker. (`-m ratelimit` available; auto-tagged tests)
 - [x] Docs: usage & tuning. (see docs/rate-limiting.md)
@@ -55,6 +57,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Implement: optimistic locking (version columns) + conflict exception.
 - [x] Implement: transactional outbox (in-memory store) + relay skeleton API. (SQL impl TBD)
 - [x] Implement: inbox pattern (in-memory dedupe store with TTL). (SQL impl TBD)
+- [x] Implement: easy-setup helper to enable idempotency middleware/inbox/outbox. (integrated via setup_service_api/easy_service_api)
 - [x] Tests: idempotent replay and conflict on mismatched payload (concurrency marker added).
 - [x] Verify: idempotency tests selectable via marker (`-m concurrency`).
 - [x] Docs: idempotency middleware usage & semantics. (see docs/idempotency.md)
@@ -73,6 +76,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
  - [x] Tests: enqueue/dequeue, retry/backoff, cron triggers, DLQ path. (tests/jobs/* incl. fakeredis and CLI)
 - [x] Verify: job test marker. (tests/jobs/* using in-memory queue and scheduler pass under -m jobs)
  - [x] Docs: job authoring guide. (see docs/jobs.md)
+- [x] Implement: easy-setup helper to choose queue and start scheduler. (see jobs/easy.py)
 
 ### 5. Webhooks Framework
 - [x] Research: existing webhook verification logic. (note) Use HMAC-SHA256 over canonical JSON; header X-Signature; reuse outbox/jobs for delivery.
@@ -84,6 +88,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Tests: signature validation, retry escalation, version handling. (unit + e2e under -m webhooks)
 - [x] Verify: webhook test marker. (pyproject marker added)
 - [x] Docs: integration guide. (see docs/webhooks.md)
+- [x] Implement: easy-setup helper to add webhook producer/verify middleware. (see webhooks/add.py)
 
 ### 6. Tenancy
 - [x] Research: tenant_id coverage across existing models (payments models, audit/session models, SQL/Mongo scaffolds; enforcement gaps in generic SQL service/routers now addressed).
@@ -98,6 +103,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
  - [x] Tests: rate limits per-tenant; export correctness.
 - [x] Verify: tenancy test marker.
 - [x] Docs: isolation strategy (soft vs schema vs dedicated DB). (see docs/tenancy.md)
+- [x] Implement: easy-setup helper for tenant resolution and tenant-aware CRUD. (see api.fastapi.tenancy.add.add_tenancy and SQL router wiring)
 
 ### 7. Data Lifecycle
 - [ ] Research: migrations tooling & soft delete usage.
@@ -110,6 +116,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [ ] Tests: soft delete filter, erasure pipeline, retention purge logic.
 - [ ] Verify: data lifecycle test marker.
 - [ ] Docs: lifecycle & retention policies.
+ - [x] Implement: easy-setup helpers for migrator/fixtures/retention/erasure wiring. (see data/add.py:add_data_lifecycle)
 
 ### 8. SLOs & Ops
 - [ ] Research: existing metrics/logging instrumentation.
@@ -120,6 +127,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [ ] Tests: probe behavior, breaker trip/reset.
 - [ ] Verify: ops test marker.
 - [ ] Docs: SLO definitions & ops playbook.
+ - [x] Implement: easy-setup helpers for probes/maintenance-mode/circuit-breaker. (see api/fastapi/ops/add.py)
 
 ### 9. DX & Quality Gates
 - [ ] Research: current CI pipeline steps & gaps.
@@ -131,6 +139,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [ ] Tests: error spec adherence & migration check script.
 - [ ] Verify: CI dry-run locally.
 - [ ] Docs: contributing & release process.
+ - [x] Implement: easy-setup helper/CLI to scaffold CI, checks, and OpenAPI lint steps. (see dx/add.py)
 
 ### 10. Docs & SDKs
 - [ ] Research: existing OpenAPI & docs endpoints.
@@ -142,6 +151,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [ ] Tests: OpenAPI lint, SDK smoke import & sample call.
 - [ ] Verify: docs test marker / manual review.
 - [ ] Docs: Developer quickstart & API usage.
+ - [x] Implement: easy-setup helper to mount docs endpoints and run SDK generation. (see api/fastapi/docs/add.py)
 
 ---
 ## Nice-to-have (Fast Follows)
