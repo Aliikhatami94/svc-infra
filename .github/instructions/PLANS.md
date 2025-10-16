@@ -86,14 +86,18 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Docs: integration guide. (see docs/webhooks.md)
 
 ### 6. Tenancy
-- [ ] Research: tenant_id coverage across existing models (list gaps).
-- [ ] Design: BaseModelTenant mixin & query filter enforcement strategy.
-- [ ] Implement: request dependency for tenant resolution.
-- [ ] Implement: per-tenant quotas & rate limit overrides.
-- [ ] Implement: export tenant CLI.
-- [ ] Tests: tenant isolation (queries, rate limits), export correctness.
-- [ ] Verify: tenancy test marker.
-- [ ] Docs: isolation strategy (soft vs schema vs dedicated DB).
+- [x] Research: tenant_id coverage across existing models (payments models, audit/session models, SQL/Mongo scaffolds; enforcement gaps in generic SQL service/routers now addressed).
+- [x] Design: BaseModelTenant mixin & query filter enforcement strategy. (ADR-0004 tenancy model & enforcement primitives)
+- [x] Implement: request dependency for tenant resolution. (tenancy.context: resolve_tenant_id, require_tenant_id, TenantId, OptionalTenantId)
+- [x] Implement: add_tenancy helper to wire resolver hook. (api.fastapi.tenancy.add)
+- [x] Implement: tenant-aware CRUD wiring via SqlResource. (SqlResource.tenant_field + make_tenant_crud_router_plus_sql)
+ - [x] Implement: per-tenant quotas & rate limit overrides.
+- [x] Implement: export tenant CLI.
+- [x] Tests: tenant isolation (queries) via TenantSqlService wrapper and context resolver. (tests/tenancy/*)
+- [x] Tests: tenant-aware CRUD router behavior (scoped list, injected tenant_id on create, cross-tenant 404). (tests/tenancy/test_tenant_crud_router.py)
+ - [x] Tests: rate limits per-tenant; export correctness.
+- [x] Verify: tenancy test marker.
+- [x] Docs: isolation strategy (soft vs schema vs dedicated DB). (see docs/tenancy.md)
 
 ### 7. Data Lifecycle
 - [ ] Research: migrations tooling & soft delete usage.

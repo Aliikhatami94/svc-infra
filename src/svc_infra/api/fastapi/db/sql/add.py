@@ -10,7 +10,7 @@ from svc_infra.db.sql.management import make_crud_schemas
 from svc_infra.db.sql.repository import SqlRepository
 from svc_infra.db.sql.resource import SqlResource
 
-from .crud_router import make_crud_router_plus_sql
+from .crud_router import make_crud_router_plus_sql, make_tenant_crud_router_plus_sql
 from .health import _make_db_health_router
 from .session import dispose_session, initialize_session
 
@@ -37,18 +37,37 @@ def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
                 update_name=r.update_name,
             )
 
-        router = make_crud_router_plus_sql(
-            model=r.model,
-            service=svc,
-            read_schema=Read,
-            create_schema=Create,
-            update_schema=Update,
-            prefix=r.prefix,
-            tags=r.tags,
-            search_fields=r.search_fields,
-            default_ordering=r.ordering_default,
-            allowed_order_fields=r.allowed_order_fields,
-        )
+        if r.tenant_field:
+            # wrap service factory/instance through tenant router
+            def _factory():
+                return svc
+
+            router = make_tenant_crud_router_plus_sql(
+                model=r.model,
+                service_factory=_factory,
+                read_schema=Read,
+                create_schema=Create,
+                update_schema=Update,
+                prefix=r.prefix,
+                tenant_field=r.tenant_field,
+                tags=r.tags,
+                search_fields=r.search_fields,
+                default_ordering=r.ordering_default,
+                allowed_order_fields=r.allowed_order_fields,
+            )
+        else:
+            router = make_crud_router_plus_sql(
+                model=r.model,
+                service=svc,
+                read_schema=Read,
+                create_schema=Create,
+                update_schema=Update,
+                prefix=r.prefix,
+                tags=r.tags,
+                search_fields=r.search_fields,
+                default_ordering=r.ordering_default,
+                allowed_order_fields=r.allowed_order_fields,
+            )
         app.include_router(router)
 
 

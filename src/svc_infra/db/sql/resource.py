@@ -34,3 +34,8 @@ class SqlResource:
 
     # Only a type reference; no runtime dependency on FastAPI layer
     service_factory: Optional[Callable[[SqlRepository], "SqlService"]] = None
+
+    # Tenancy
+    tenant_field: Optional[str] = (
+        None  # when set, CRUD router will require TenantId and scope by field
+    )

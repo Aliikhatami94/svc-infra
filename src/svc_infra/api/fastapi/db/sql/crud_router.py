@@ -15,7 +15,9 @@ from svc_infra.api.fastapi.db.http import (
 )
 from svc_infra.api.fastapi.dual.public import public_router
 from svc_infra.db.sql.service import SqlService
+from svc_infra.db.sql.tenant import TenantSqlService
 
+from ...tenancy.context import TenantId
 from .session import SqlSessionDep
 
 CreateModel = TypeVar("CreateModel", bound=BaseModel)
@@ -59,7 +61,7 @@ def make_crud_router_plus_sql(
     # -------- LIST --------
     @router.get(
         "",
-        response_model=cast(Any, Page[read_schema]),
+        response_model=cast(Any, Page[Any]),
         description=f"List items of type {model.__name__}",
     )
     async def list_items(
@@ -92,7 +94,7 @@ def make_crud_router_plus_sql(
     # -------- GET by id --------
     @router.get(
         "/{item_id}",
-        response_model=cast(Any, read_schema),
+        response_model=cast(Any, Any),
         description=f"Get item of type {model.__name__}",
     )
     async def get_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
@@ -104,29 +106,39 @@ def make_crud_router_plus_sql(
     # -------- CREATE --------
     @router.post(
         "",
-        response_model=cast(Any, read_schema),
+        response_model=cast(Any, Any),
         status_code=201,
         description=f"Create item of type {model.__name__}",
     )
     async def create_item(
         session: SqlSessionDep,  # type: ignore[name-defined]
-        payload: create_schema = Body(...),
+        payload: Any = Body(...),
     ):
-        data = cast(BaseModel, payload).model_dump(exclude_unset=True)
+        if isinstance(payload, BaseModel):
+            data = payload.model_dump(exclude_unset=True)
+        elif isinstance(payload, dict):
+            data = payload
+        else:
+            raise HTTPException(422, "invalid_payload")
         return await service.create(session, data)
 
     # -------- UPDATE --------
     @router.patch(
         "/{item_id}",
-        response_model=cast(Any, read_schema),
+        response_model=cast(Any, Any),
         description=f"Update item of type {model.__name__}",
     )
     async def update_item(
         item_id: Any,
         session: SqlSessionDep,  # type: ignore[name-defined]
-        payload: update_schema = Body(...),
+        payload: Any = Body(...),
     ):
-        data = cast(BaseModel, payload).model_dump(exclude_unset=True)
+        if isinstance(payload, BaseModel):
+            data = payload.model_dump(exclude_unset=True)
+        elif isinstance(payload, dict):
+            data = payload
+        else:
+            raise HTTPException(422, "invalid_payload")
         row = await service.update(session, item_id, data)
         if not row:
             raise HTTPException(404, "Not found")
@@ -145,4 +157,136 @@ def make_crud_router_plus_sql(
     return router
 
 
-__all__ = ["make_crud_router_plus_sql"]
+def make_tenant_crud_router_plus_sql(
+    *,
+    model: type[Any],
+    service_factory: callable,  # factory that returns a SqlService (will be wrapped)
+    read_schema: Type[ReadModel],
+    create_schema: Type[CreateModel],
+    update_schema: Type[UpdateModel],
+    prefix: str,
+    tenant_field: str = "tenant_id",
+    tags: list[str] | None = None,
+    search_fields: Optional[Sequence[str]] = None,
+    default_ordering: Optional[str] = None,
+    allowed_order_fields: Optional[list[str]] = None,
+    mount_under_db_prefix: bool = True,
+) -> APIRouter:
+    """Like make_crud_router_plus_sql, but requires TenantId and scopes all operations."""
+    router_prefix = ("/_sql" + prefix) if mount_under_db_prefix else prefix
+    router = public_router(
+        prefix=router_prefix,
+        tags=tags or [prefix.strip("/")],
+        redirect_slashes=False,
+    )
+
+    def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:
+        if not order_spec:
+            return []
+        pieces = [p.strip() for p in order_spec.split(",") if p.strip()]
+        fields: list[str] = []
+        for p in pieces:
+            name = p[1:] if p.startswith("-") else p
+            if allowed_order_fields and name not in (allowed_order_fields or []):
+                continue
+            fields.append(p)
+        return fields
+
+    # create per-request service with tenant scoping
+    async def _svc(session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
+        base = service_factory  # consumer-provided factory or instance
+        svc = base  # assume already a SqlService by default
+        if callable(base):
+            svc = base  # the consumer likely closed over repo
+            # if callable returns a service, call it now
+            try:
+                svc = base()  # type: ignore[misc]
+            except TypeError:
+                svc = base  # already instance
+        if not isinstance(svc, TenantSqlService):
+            svc = TenantSqlService(getattr(svc, "repo", svc), tenant_id=tenant_id, tenant_field=tenant_field)  # type: ignore[arg-type]
+        return svc  # type: ignore[return-value]
+
+    @router.get("", response_model=cast(Any, Page[Any]))
+    async def list_items(
+        lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
+        op: Annotated[OrderParams, Depends(dep_order)],
+        sp: Annotated[SearchParams, Depends(dep_search)],
+        session: SqlSessionDep,  # type: ignore[name-defined]
+        tenant_id: TenantId,
+    ):
+        svc = await _svc(session, tenant_id)
+        order_spec = op.order_by or default_ordering
+        order_fields = _parse_ordering_to_fields(order_spec)
+        order_by = build_order_by(model, order_fields)
+        if sp.q:
+            fields = [
+                f.strip()
+                for f in (sp.fields or (",".join(search_fields or []) or "")).split(",")
+                if f.strip()
+            ]
+            items = await svc.search(
+                session, q=sp.q, fields=fields, limit=lp.limit, offset=lp.offset, order_by=order_by
+            )
+            total = await svc.count_filtered(session, q=sp.q, fields=fields)
+        else:
+            items = await svc.list(session, limit=lp.limit, offset=lp.offset, order_by=order_by)
+            total = await svc.count(session)
+        return Page[read_schema].from_items(
+            total=total, items=items, limit=lp.limit, offset=lp.offset
+        )
+
+    @router.get("/{item_id}", response_model=cast(Any, Any))
+    async def get_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
+        svc = await _svc(session, tenant_id)
+        row = await svc.get(session, item_id)
+        if not row:
+            raise HTTPException(404, "Not found")
+        return row
+
+    @router.post("", response_model=cast(Any, Any), status_code=201)
+    async def create_item(
+        session: SqlSessionDep,  # type: ignore[name-defined]
+        tenant_id: TenantId,
+        payload: Any = Body(...),
+    ):
+        svc = await _svc(session, tenant_id)
+        if isinstance(payload, BaseModel):
+            data = payload.model_dump(exclude_unset=True)
+        elif isinstance(payload, dict):
+            data = payload
+        else:
+            raise HTTPException(422, "invalid_payload")
+        return await svc.create(session, data)
+
+    @router.patch("/{item_id}", response_model=cast(Any, Any))
+    async def update_item(
+        item_id: Any,
+        session: SqlSessionDep,  # type: ignore[name-defined]
+        tenant_id: TenantId,
+        payload: Any = Body(...),
+    ):
+        svc = await _svc(session, tenant_id)
+        if isinstance(payload, BaseModel):
+            data = payload.model_dump(exclude_unset=True)
+        elif isinstance(payload, dict):
+            data = payload
+        else:
+            raise HTTPException(422, "invalid_payload")
+        row = await svc.update(session, item_id, data)
+        if not row:
+            raise HTTPException(404, "Not found")
+        return row
+
+    @router.delete("/{item_id}", status_code=204)
+    async def delete_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
+        svc = await _svc(session, tenant_id)
+        ok = await svc.delete(session, item_id)
+        if not ok:
+            raise HTTPException(404, "Not found")
+        return
+
+    return router
+
+
+__all__ = ["make_crud_router_plus_sql", "make_tenant_crud_router_plus_sql"]
