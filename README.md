@@ -18,6 +18,7 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 | Ops | Probes, breaker, SLOs & dashboards | [SLOs & Ops](docs/ops.md) |
 | Webhooks | Subscription store, signing, retry worker | [Webhooks framework](docs/webhooks.md) |
 | Security | Password policy, lockout, signed cookies, headers | [Security hardening](docs/security.md) |
+| Contributing | Dev setup and quality gates | [Contributing guide](docs/contributing.md) |
 | Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](docs/data-lifecycle.md) |
 
 ## Minimal FastAPI bootstrap

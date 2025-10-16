@@ -6,6 +6,7 @@ from svc_infra.cli.cmds import (
     _HELP,
     jobs_app,
     register_alembic,
+    register_dx,
     register_mongo,
     register_mongo_scaffold,
     register_obs,
@@ -28,6 +29,9 @@ register_mongo_scaffold(app)
 
 # -- observability commands ---
 register_obs(app)
+
+# -- dx commands ---
+register_dx(app)
 
 # -- jobs commands ---
 app.add_typer(jobs_app, name="jobs")

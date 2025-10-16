@@ -136,15 +136,15 @@ Comprehensive checklist for making the framework production-ready. Each section 
  - [x] Implement: easy-setup helpers for probes/maintenance-mode/circuit-breaker. (see api/fastapi/ops/add.py)
 
 ### 9. DX & Quality Gates
-- [ ] Research: current CI pipeline steps & gaps.
-- [ ] Design: gating order & required checks.
-- [ ] Implement: CI templates (tests, lint, mypy, migration check, SBOM, SAST/DAST stubs).
-- [ ] Implement: OpenAPI generation + lint step.
-- [ ] Implement: Problem+JSON error spec + error code registry + linter.
-- [ ] Implement: changelog automation script.
-- [ ] Tests: error spec adherence & migration check script.
-- [ ] Verify: CI dry-run locally.
-- [ ] Docs: contributing & release process.
+- [x] Research: current CI pipeline steps & gaps. (see dx/add.py::write_ci_workflow and tests/dx/test_dx_helpers.py)
+- [x] Design: gating order & required checks. (tests, flake8, mypy, pytest -W error, openapi/problem lint, migrations present check)
+- [x] Implement: CI templates (tests, lint, mypy, migration check, SBOM, SAST/DAST stubs). (dx/add.py::write_ci_workflow; dx/cli dx migrations/openapi)
+- [x] Implement: OpenAPI generation + lint step. (docs/add.py export + dx openapi check command)
+- [~] Implement: Problem+JSON error spec + error code registry + linter. (partial — Problem schema lint implemented; error code registry to follow)
+- [x] Implement: changelog automation script. (dx changelog command; see svc_infra/dx/changelog.py)
+- [x] Tests: error spec adherence & migration check script. (tests/dx/test_dx_checks.py)
+- [x] Verify: CI dry-run locally. (dx ci command prints plan and can run steps)
+- [x] Docs: contributing & release process. (docs/contributing.md; linked from README)
  - [x] Implement: easy-setup helper/CLI to scaffold CI, checks, and OpenAPI lint steps. (see dx/add.py)
 
 ### 10. Docs & SDKs
