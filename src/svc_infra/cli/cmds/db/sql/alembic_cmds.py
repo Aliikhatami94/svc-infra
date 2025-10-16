@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from importlib import import_module
 from typing import List, Optional
 
 import typer
@@ -209,3 +210,28 @@ def register(app: typer.Typer) -> None:
     app.command("sql-stamp")(cmd_stamp)
     app.command("sql-merge-heads")(cmd_merge_heads)
     app.command("sql-setup-and-migrate")(cmd_setup_and_migrate)
+    app.command("sql-seed")(cmd_seed)
+
+
+def _import_callable(path: str):
+    mod_name, _, fn_name = path.partition(":")
+    if not mod_name or not fn_name:
+        raise typer.BadParameter("Expected format 'module.path:callable'")
+    mod = import_module(mod_name)
+    fn = getattr(mod, fn_name, None)
+    if not callable(fn):
+        raise typer.BadParameter(f"Callable '{fn_name}' not found in module '{mod_name}'")
+    return fn
+
+
+def cmd_seed(
+    target: str = typer.Argument(..., help="Seed callable path 'module:func'"),
+    database_url: Optional[str] = typer.Option(
+        None,
+        help="Database URL; overrides env for this command.",
+    ),
+):
+    """Run a user-provided seed function to load fixtures/reference data."""
+    apply_database_url(database_url)
+    fn = _import_callable(target)
+    fn()

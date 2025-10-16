@@ -46,6 +46,18 @@ def make_crud_router_plus_sql(
         redirect_slashes=False,
     )
 
+    def _coerce_id(v: Any) -> Any:
+        """Best-effort coercion of path ids: cast digit-only strings to int.
+
+        Keeps original type otherwise to avoid breaking non-integer IDs.
+        """
+        if isinstance(v, str) and v.isdigit():
+            try:
+                return int(v)
+            except Exception:
+                return v
+        return v
+
     def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:
         if not order_spec:
             return []
@@ -87,9 +99,7 @@ def make_crud_router_plus_sql(
         else:
             items = await service.list(session, limit=lp.limit, offset=lp.offset, order_by=order_by)
             total = await service.count(session)
-        return Page[read_schema].from_items(
-            total=total, items=items, limit=lp.limit, offset=lp.offset
-        )
+        return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
     # -------- GET by id --------
     @router.get(
@@ -98,7 +108,7 @@ def make_crud_router_plus_sql(
         description=f"Get item of type {model.__name__}",
     )
     async def get_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
-        row = await service.get(session, item_id)
+        row = await service.get(session, _coerce_id(item_id))
         if not row:
             raise HTTPException(404, "Not found")
         return row
@@ -139,7 +149,7 @@ def make_crud_router_plus_sql(
             data = payload
         else:
             raise HTTPException(422, "invalid_payload")
-        row = await service.update(session, item_id, data)
+        row = await service.update(session, _coerce_id(item_id), data)
         if not row:
             raise HTTPException(404, "Not found")
         return row
@@ -149,7 +159,7 @@ def make_crud_router_plus_sql(
         "/{item_id}", status_code=204, description=f"Delete item of type {model.__name__}"
     )
     async def delete_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
-        ok = await service.delete(session, item_id)
+        ok = await service.delete(session, _coerce_id(item_id))
         if not ok:
             raise HTTPException(404, "Not found")
         return
@@ -180,6 +190,25 @@ def make_tenant_crud_router_plus_sql(
         redirect_slashes=False,
     )
 
+    # Evaluate the base service once to preserve in-memory state across requests in tests/local.
+    # Consumers may pass either an instance or a zero-arg factory function.
+    try:
+        _base_instance = service_factory() if callable(service_factory) else service_factory  # type: ignore[misc]
+    except TypeError:
+        # If the callable requires args, assume it's already an instance
+        _base_instance = service_factory  # type: ignore[assignment]
+
+    def _coerce_id(v: Any) -> Any:
+        """Best-effort coercion of path ids: cast digit-only strings to int.
+        Keeps original type otherwise.
+        """
+        if isinstance(v, str) and v.isdigit():
+            try:
+                return int(v)
+            except Exception:
+                return v
+        return v
+
     def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:
         if not order_spec:
             return []
@@ -194,17 +223,8 @@ def make_tenant_crud_router_plus_sql(
 
     # create per-request service with tenant scoping
     async def _svc(session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
-        base = service_factory  # consumer-provided factory or instance
-        svc = base  # assume already a SqlService by default
-        if callable(base):
-            svc = base  # the consumer likely closed over repo
-            # if callable returns a service, call it now
-            try:
-                svc = base()  # type: ignore[misc]
-            except TypeError:
-                svc = base  # already instance
-        if not isinstance(svc, TenantSqlService):
-            svc = TenantSqlService(getattr(svc, "repo", svc), tenant_id=tenant_id, tenant_field=tenant_field)  # type: ignore[arg-type]
+        repo_or_service = getattr(_base_instance, "repo", _base_instance)
+        svc: Any = TenantSqlService(repo_or_service, tenant_id=tenant_id, tenant_field=tenant_field)  # type: ignore[arg-type]
         return svc  # type: ignore[return-value]
 
     @router.get("", response_model=cast(Any, Page[Any]))
@@ -232,14 +252,12 @@ def make_tenant_crud_router_plus_sql(
         else:
             items = await svc.list(session, limit=lp.limit, offset=lp.offset, order_by=order_by)
             total = await svc.count(session)
-        return Page[read_schema].from_items(
-            total=total, items=items, limit=lp.limit, offset=lp.offset
-        )
+        return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
     @router.get("/{item_id}", response_model=cast(Any, Any))
     async def get_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
         svc = await _svc(session, tenant_id)
-        row = await svc.get(session, item_id)
+        row = await svc.get(session, _coerce_id(item_id))
         if not row:
             raise HTTPException(404, "Not found")
         return row
@@ -273,7 +291,7 @@ def make_tenant_crud_router_plus_sql(
             data = payload
         else:
             raise HTTPException(422, "invalid_payload")
-        row = await svc.update(session, item_id, data)
+        row = await svc.update(session, _coerce_id(item_id), data)
         if not row:
             raise HTTPException(404, "Not found")
         return row
@@ -281,7 +299,7 @@ def make_tenant_crud_router_plus_sql(
     @router.delete("/{item_id}", status_code=204)
     async def delete_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
         svc = await _svc(session, tenant_id)
-        ok = await svc.delete(session, item_id)
+        ok = await svc.delete(session, _coerce_id(item_id))
         if not ok:
             raise HTTPException(404, "Not found")
         return

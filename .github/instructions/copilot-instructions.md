@@ -52,6 +52,7 @@
 
 ## Agent workflow expectations
 - Plan first: before any edits, write a clear, step-by-step task plan and keep it updated as you progress.
+- Hard gates between stages: Do not Implement until Research and Design are completed and recorded in PLANS/ADRs. Do not mark Verify until Tests are green. Do not update Docs until Verify has passed. Follow the order strictly: Research → Design → Implement → Tests → Verify → Docs.
 - Tests are mandatory for changes: if you modify existing code or add new code, add or update tests in `tests/**` to cover the behavior you touched.
 - Always run tests locally before finishing: at minimum run `pytest -q` (prefer `poetry run pytest -q -W error` to match repo policy).
 - Wrap up each task with a brief quality gates summary (Build, Lint/Typecheck, Tests): report PASS/FAIL and address failures before concluding.

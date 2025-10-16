@@ -106,24 +106,30 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Implement: easy-setup helper for tenant resolution and tenant-aware CRUD. (see api.fastapi.tenancy.add.add_tenancy and SQL router wiring)
 
 ### 7. Data Lifecycle
-- [ ] Research: migrations tooling & soft delete usage.
-- [ ] Design: soft delete pattern & retention registry.
-- [ ] Implement: migrator CLI (status/apply/rollback/seed).
-- [ ] Implement: fixture/reference loader (idempotent).
-- [ ] Implement: GDPR erasure workflow (queued + audit entry).
-- [ ] Implement: retention purge job.
-- [ ] Implement: backup verification (PITR job).
-- [ ] Tests: soft delete filter, erasure pipeline, retention purge logic.
-- [ ] Verify: data lifecycle test marker.
-- [ ] Docs: lifecycle & retention policies.
+- [x] Research: migrations tooling & soft delete usage. (repo soft-delete filtering in `src/svc_infra/db/sql/repository.py`; model scaffolding for `deleted_at` in `src/svc_infra/db/sql/scaffold.py`; lifecycle helper in `src/svc_infra/data/add.py`; migrations & `sql-seed` in `src/svc_infra/cli/cmds/db/sql/alembic_cmds.py`)
+- [x] Design: soft delete pattern & retention registry. (ADR-0005)
+- [x] Implement: migrator CLI (status/apply/rollback/seed). (seed via sql-seed command)
+- [x] Implement: fixture/reference loader (idempotent). (see data/fixtures.py and add_data_lifecycle async support)
+- [x] Implement: GDPR erasure workflow (queued + audit entry). (see data/erasure.py with ErasurePlan/Step and audit hook)
+- [x] Implement: retention purge job. (see data/retention.py with RetentionPolicy + run_retention_purge)
+- [x] Implement: backup verification (PITR job). (see data/backup.py make_backup_verification_job)
+	- [x] Stub: backup health report + simple verifier (see data/backup.py)
+- [x] Tests: soft delete filter, erasure pipeline, retention purge logic.
+	- [x] Fixture loader sync/async + run-once sentinel tests (tests/data/test_fixtures_helper.py)
+	- [x] Retention purge soft-delete and hard-delete tests (tests/data/test_retention.py)
+	- [x] Erasure workflow steps + audit hook test (tests/data/test_erasure.py)
+	- [x] Backup verification basic tests (tests/data/test_backup.py)
+	- [x] Repository soft-delete behavior covered (tests/db/test_sql_repository_soft_delete.py)
+- [x] Verify: data lifecycle test marker. (pytest -m data_lifecycle)
+- [x] Docs: lifecycle & retention policies. (see docs/data-lifecycle.md; linked from README)
  - [x] Implement: easy-setup helpers for migrator/fixtures/retention/erasure wiring. (see data/add.py:add_data_lifecycle)
 
 ### 8. SLOs & Ops
-- [ ] Research: existing metrics/logging instrumentation.
-- [ ] Design: metrics naming & labels; error budget methodology.
+- [x] Research: existing metrics/logging instrumentation. (see obs.add.add_observability, obs.metrics.asgi PrometheusMiddleware and http_server_* metrics; logging via app.logging.setup_logging)
+- [x] Design: metrics naming & labels; error budget methodology. (ADR-0006 — standardize http_server_* and db_pool_* metrics; primary SLI: success rate and request latency; SLOs per endpoint class with 99.9% success and latency targets; monthly error budget with burn alerts)
 - [ ] Implement: route instrumentation & dashboard spec artifacts.
-- [ ] Implement: health/readiness/startup probes.
-- [ ] Implement: maintenance mode flag & circuit breaker.
+- [x] Implement: health/readiness/startup probes. (see api/fastapi/ops/add.py:add_probes)
+- [x] Implement: maintenance mode flag & circuit breaker. (see api/fastapi/ops/add.py:add_maintenance_mode, circuit_breaker_dependency)
 - [ ] Tests: probe behavior, breaker trip/reset.
 - [ ] Verify: ops test marker.
 - [ ] Docs: SLO definitions & ops playbook.

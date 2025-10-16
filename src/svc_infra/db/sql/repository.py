@@ -124,9 +124,10 @@ class SqlRepository:
             return False
         if self.soft_delete:
             # Prefer timestamp, also optionally set flag to False
-            if hasattr(self.model, self.soft_delete_field):
+            # Check attributes on the instance to support test doubles without class-level fields
+            if hasattr(obj, self.soft_delete_field):
                 setattr(obj, self.soft_delete_field, func.now())
-            if self.soft_delete_flag_field and hasattr(self.model, self.soft_delete_flag_field):
+            if self.soft_delete_flag_field and hasattr(obj, self.soft_delete_flag_field):
                 setattr(obj, self.soft_delete_flag_field, False)
             await session.flush()
             return True
