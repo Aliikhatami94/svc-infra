@@ -30,6 +30,7 @@ Each domain should follow the same subtask lifecycle:
 4. Tests – Unit + integration tests; define markers per domain (e.g., `pytest -m security`).
 5. Verify – Run domain-focused test marker; optionally stress or load checks.
 6. Docs – Update developer guides, API references, or operational runbooks.
+7. Acceptance (pre-deploy) – Run acceptance scenarios (A-IDs) in an ephemeral stack in CI; gate artifact promotion on success.
 
 Represent these steps as individual checklist items.
 
@@ -42,6 +43,7 @@ To ensure discipline and traceability, later stages must not begin until all pri
 - Gate C (Tests): Tests must be authored alongside or before code changes. Do not mark Verify until tests exist and cover the changed behavior.
 - Gate D (Verify): Do not proceed to Docs until Verify passes for the domain (marker subset and/or focused test run is green).
 - Gate E (Docs): Docs are the final step. Do not mark the domain done unless Docs are updated and discoverable.
+- Gate F (Acceptance): Promotion gate must pass. Do not publish artifacts until Acceptance scenarios for the domain (A-IDs) are green in CI on an ephemeral environment.
 
 Enforcement and Evidence:
 - Each checklist item must include a brief note and links: file paths, ADR IDs, PR numbers/commits, and any test names/markers.
@@ -56,6 +58,7 @@ Example (proper ordering with evidence):
 - [x] Tests: tests/api/test_rate_limit_tenant.py::test_scope_applies
 - [x] Verify: pytest -q -k rate_limit_tenant passed
 - [x] Docs: docs/rate-limiting.md updated with examples
+- [x] Acceptance: A2-01..A2-03 green in CI (run: build-and-accept #123, link)
 ```
 
 ---
@@ -65,7 +68,8 @@ Example (proper ordering with evidence):
 - [~] Skipped (already exists, out of scope, or replaced)
 - (note) Inline context, decisions, or links (ADR-###, PR-###).
 
-Use consistent ordering: Research → Design → Implement → Tests → Verify → Docs.
+Use consistent ordering: Research → Design → Implement → Tests → Verify → Docs → Acceptance (pre-deploy).
+Append “Acceptance (pre-deploy)” after Docs to record the CI promotion gate results, and treat it as a mandatory promotion gate.
 
 ---
 ## 5. Skipping Existing Functionality
@@ -92,6 +96,7 @@ Add at least:
 - Failure mode test (e.g., lockout triggers, exceeded rate limit).
 
 Include verification step: run marker subset + full suite post-domain completion.
+Add acceptance step: run `pytest -m "acceptance or smoke"` against an ephemeral stack (Docker Compose or Testcontainers) after build and before promotion.
 
 ---
 ## 7. Global Verification Section
@@ -100,6 +105,7 @@ Add a final section that consolidates:
 - Flakiness detection (rerun markers multiple times).
 - Release readiness report (counts of completed vs. skipped items).
 - Changelog & version tag tasks.
+- Acceptance gate summary: CI job link(s), A-IDs passed, compose up/down status.
 
 ---
 ## 8. Traceability & ADRs
@@ -119,12 +125,15 @@ ADR Minimum Fields:
 5. Write tests before or with implementation; mark them as part of Tests subtask.
 6. Run Verify step; if pass, proceed to Docs.
 7. Avoid large batch flips—update each checkbox as work lands.
+8. Maintain an acceptance matrix doc mapping A-IDs to endpoints/CLIs/fixtures; reference it in each domain’s Acceptance item.
+9. Add an Owner: line per domain and maintain an Evidence: bullet list with PRs/commits, key test names/markers, and CI run URLs.
 
 ---
 ## 10. Quality Gate Alignment
 Ensure each domain references quality gates:
 - Lint / Typecheck / Tests / Security scan / SBOM.
 Add subtask if domain introduces new tooling.
+Additionally, define acceptance gates per domain (A-IDs) and reference them in Verify and Acceptance items. Each checklist item should include evidence: PR/commit, test names, marker, and CI run URL.
 
 ---
 ## 11. Versioning & Releases
@@ -191,6 +200,12 @@ Don't: batch-complete large sections without intermediate test/verify; duplicate
 Context | Decision | Alternatives | Consequences (keep short; skip if trivial).
 
 ## Ready Check (Before Release)
-All Must-have domains: Tests & Verify checked; Docs present; Global Verification complete.
+All Must-have domains: Tests & Verify checked; Docs present; Acceptance (pre-deploy) green; Global Verification complete.
+
+### 3.5 Acceptance Matrix (new)
+- Define A-IDs (A1-01…) covering golden paths, negative cases, and ops.
+- Each domain’s “Acceptance” task references the relevant A-IDs.
+- CI gate runs A-IDs post-build in an ephemeral environment (Docker Compose or Testcontainers). Artifact promotion depends on pass.
+- Keep docs in `docs/acceptance-matrix.md` with mapping: A-ID → endpoints/CLIs/fixtures and any seed data required. Link the doc from each domain section.
 
 This concise method is sufficient to regenerate plans of the same style without extra overhead.

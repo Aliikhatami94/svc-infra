@@ -1,1 +1,1 @@
-# Test utilities package
+# Compatibility package so legacy imports like `tests.utils.*` continue to work

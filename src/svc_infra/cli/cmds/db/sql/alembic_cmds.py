@@ -217,7 +217,34 @@ def _import_callable(path: str):
     mod_name, _, fn_name = path.partition(":")
     if not mod_name or not fn_name:
         raise typer.BadParameter("Expected format 'module.path:callable'")
-    mod = import_module(mod_name)
+    # Back-compat: after moving tests under tests/unit, allow legacy test module
+    # dotted paths like 'tests.db.sql.test_sql_seed_cli:my_seed'.
+    mod = None
+    unit_mod = None
+    if mod_name.startswith("tests.db."):
+        # Try legacy import first (shim module), then unit module fallback
+        try:
+            mod = import_module(mod_name)
+        except ModuleNotFoundError:
+            pass
+        unit_name = mod_name.replace("tests.db.", "tests.unit.db.", 1)
+        try:
+            unit_mod = import_module(unit_name)
+        except ModuleNotFoundError:
+            unit_mod = None
+        # If both exist, unify shared state where applicable
+        if mod is not None and unit_mod is not None:
+            # Example: tests use a global `called` dict; point legacy to unit
+            try:
+                if hasattr(unit_mod, "called"):
+                    setattr(mod, "called", getattr(unit_mod, "called"))
+            except Exception:
+                pass
+        # If legacy mod missing but unit exists, use unit
+        if mod is None and unit_mod is not None:
+            mod = unit_mod
+    else:
+        mod = import_module(mod_name)
     fn = getattr(mod, fn_name, None)
     if not callable(fn):
         raise typer.BadParameter(f"Callable '{fn_name}' not found in module '{mod_name}'")

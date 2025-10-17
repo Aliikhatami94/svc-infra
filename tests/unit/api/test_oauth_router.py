@@ -10,7 +10,6 @@ from httpx import ASGITransport, AsyncClient
 
 from svc_infra.api.fastapi.auth.routers import oauth_router as oauth_router_module
 from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_backend
-
 from tests.utils.test_helpers import setup_database_mocks
 
 
@@ -67,9 +66,7 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
     async def fake_handle_mfa(policy, user, redirect_url):
         return None
 
-    async def fake_issue_session_and_refresh(
-        session, user_id, tenant_id, user_agent, ip_hash
-    ):
+    async def fake_issue_session_and_refresh(session, user_id, tenant_id, user_agent, ip_hash):
         return "refresh-token", SimpleNamespace(id="refresh-id")
 
     async def fake_set_cookie_on_response(resp, auth_backend, user, *, refresh_raw):
