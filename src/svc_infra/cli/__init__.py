@@ -10,6 +10,7 @@ from svc_infra.cli.cmds import (
     register_mongo,
     register_mongo_scaffold,
     register_obs,
+    register_sdk,
     register_sql_export,
     register_sql_scaffold,
 )
@@ -35,6 +36,9 @@ register_dx(app)
 
 # -- jobs commands ---
 app.add_typer(jobs_app, name="jobs")
+
+# -- sdk commands ---
+register_sdk(app)
 
 
 def main():

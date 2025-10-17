@@ -169,7 +169,7 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [ ] Implement: usage ingestion API (idempotent) + list aggregates.
 - [ ] Implement: quota/entitlement enforcement decorator/dependency.
 - [ ] Implement: aggregation job + invoice generator job (daily -> monthly cycle) + webhooks.
- - [ ] Implement: provider sync (optional): Stripe adapter skeleton and hooks to sync internal invoices/lines to provider invoices or payment intents.
+- [ ] Implement: Stripe adapter skeleton (optional) and sync hooks.
 - [ ] Tests: ingestion idempotency, aggregation correctness, invoice totals, quota block, webhook flows.
 - [ ] Verify: billing test marker.
 - [ ] Docs: billing overview & plan config.

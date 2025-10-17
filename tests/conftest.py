@@ -29,3 +29,19 @@ def pytest_collection_modifyitems(config, items):
         # Mark tenancy-related tests (either under a tenancy folder or filename contains 'tenant')
         if "/tests/tenancy/" in norm or "tenant" in norm:
             item.add_marker(pytest.mark.tenancy)
+
+
+def pytest_configure(config):
+    # Ensure custom markers are registered even if pyproject.toml isn't picked up in some contexts
+    for name, desc in [
+        ("security", "Security and auth hardening tests"),
+        ("ratelimit", "Rate limiting and abuse protection tests"),
+        ("concurrency", "Idempotency and concurrency control tests"),
+        ("jobs", "Background jobs and scheduling tests"),
+        ("webhooks", "Webhooks framework tests"),
+        ("tenancy", "Tenancy isolation and enforcement tests"),
+        ("data_lifecycle", "Data lifecycle (fixtures, retention, erasure, backups)"),
+        ("ops", "SLOs & Ops tests (probes, breaker, instrumentation)"),
+        ("dx", "Developer experience and quality gates tests"),
+    ]:
+        config.addinivalue_line("markers", f"{name}: {desc}")
