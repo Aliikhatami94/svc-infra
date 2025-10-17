@@ -1102,6 +1102,114 @@ def ensure_success_examples_mutator():
     return m
 
 
+# --- NEW: attach minimal x-codeSamples for common operations ---
+def attach_code_samples_mutator():
+    """Attach minimal curl/httpie x-codeSamples for each operation if missing.
+
+    We avoid templating parameters; samples illustrate method and path only.
+    """
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        servers = schema.get("servers") or [{"url": ""}]
+        base = servers[0].get("url") or ""
+
+        for path, method, op in _iter_ops(schema):
+            # Don't override existing samples
+            if isinstance(op.get("x-codeSamples"), list) and op["x-codeSamples"]:
+                continue
+            url = f"{base}{path}"
+            method_up = method.upper()
+            samples = [
+                {
+                    "lang": "bash",
+                    "label": "curl",
+                    "source": f"curl -X {method_up} '{url}'",
+                },
+                {
+                    "lang": "bash",
+                    "label": "httpie",
+                    "source": f"http {method_up} '{url}'",
+                },
+            ]
+            op["x-codeSamples"] = samples
+        return schema
+
+    return m
+
+
+# --- NEW: ensure Problem+JSON examples exist for standard error responses ---
+def ensure_problem_examples_mutator():
+    """Add example objects for 4xx/5xx responses using Problem schema if absent."""
+
+    try:
+        # Internal helper with sensible defaults
+        from .conventions import _problem_example  # type: ignore
+    except Exception:  # pragma: no cover - fallback
+
+        def _problem_example(**kw):  # type: ignore
+            base = {
+                "type": "about:blank",
+                "title": "Error",
+                "status": 500,
+                "detail": "An error occurred.",
+                "instance": "/request/trace",
+                "code": "INTERNAL_ERROR",
+            }
+            base.update(kw)
+            return base
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for _, _, op in _iter_ops(schema):
+            resps = op.get("responses") or {}
+            for code, resp in resps.items():
+                if not isinstance(resp, dict):
+                    continue
+                try:
+                    ic = int(code)
+                except Exception:
+                    continue
+                if ic < 400:
+                    continue
+                content = resp.setdefault("content", {})
+                # prefer problem+json but also set application/json if present
+                for mt in ("application/problem+json", "application/json"):
+                    mt_obj = content.get(mt)
+                    if mt_obj is None:
+                        # Create a basic media type referencing Problem schema when appropriate
+                        if mt == "application/problem+json":
+                            mt_obj = {"schema": {"$ref": "#/components/schemas/Problem"}}
+                            content[mt] = mt_obj
+                        else:
+                            continue
+                    if not isinstance(mt_obj, dict):
+                        continue
+                    if "example" in mt_obj or "examples" in mt_obj:
+                        continue
+                    mt_obj["example"] = _problem_example(status=ic)
+        return schema
+
+    return m
+
+
+# --- NEW: attach default tags from first path segment when missing ---
+def attach_default_tags_mutator():
+    """If an operation has no tags, tag it by its first path segment."""
+
+    def m(schema: dict) -> dict:
+        schema = dict(schema)
+        for path, _method, op in _iter_ops(schema):
+            tags = op.get("tags")
+            if tags:
+                continue
+            seg = path.strip("/").split("/", 1)[0] or "root"
+            op["tags"] = [seg]
+        return schema
+
+    return m
+
+
 def dedupe_tags_mutator():
     def m(schema: dict) -> dict:
         schema = dict(schema)
@@ -1429,6 +1537,9 @@ def setup_mutators(
         ensure_media_type_schemas_mutator(),
         ensure_examples_for_json_mutator(),
         ensure_success_examples_mutator(),
+        attach_default_tags_mutator(),
+        attach_code_samples_mutator(),
+        ensure_problem_examples_mutator(),
         ensure_media_examples_mutator(),
         scrub_invalid_object_examples_mutator(),
         normalize_no_content_204_mutator(),
