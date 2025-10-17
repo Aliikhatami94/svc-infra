@@ -1,1 +1,1 @@
-# SQL database tests package
+# Compatibility package for legacy imports; see tests/unit/db/sql

@@ -43,9 +43,7 @@ def _build_refresh_app(policy: SimpleNamespace, mocker):
     session = Mock()
     session.get = AsyncMock(return_value=user)
     session.execute = AsyncMock(
-        return_value=SimpleNamespace(
-            scalars=lambda: SimpleNamespace(first=lambda: found)
-        )
+        return_value=SimpleNamespace(scalars=lambda: SimpleNamespace(first=lambda: found))
     )
 
     async def _session_override():
@@ -102,9 +100,7 @@ async def test_refresh_triggers_policy_hook(mocker):
 
 @pytest.mark.asyncio
 async def test_refresh_policy_hook_errors_are_suppressed(mocker):
-    policy = SimpleNamespace(
-        on_token_refresh=AsyncMock(side_effect=RuntimeError("boom"))
-    )
+    policy = SimpleNamespace(on_token_refresh=AsyncMock(side_effect=RuntimeError("boom")))
     app, _session, user = _build_refresh_app(policy, mocker)
 
     response = await _call(
@@ -117,4 +113,3 @@ async def test_refresh_policy_hook_errors_are_suppressed(mocker):
     assert response.status_code == 204
     assert policy.on_token_refresh.await_count == 1
     assert policy.on_token_refresh.await_args[0][0] is user
-

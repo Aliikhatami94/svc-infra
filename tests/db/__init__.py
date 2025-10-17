@@ -1,1 +1,1 @@
-# Database tests package
+# Compatibility package for legacy imports under tests.db.*

@@ -67,7 +67,9 @@ def test_add_security_can_install_session_middleware(monkeypatch):
 
     add_security(app, install_session_middleware=True, session_secret_key="secret")
 
-    session_middleware = next(m for m in app.user_middleware if m.cls.__name__ == "SessionMiddleware")
+    session_middleware = next(
+        m for m in app.user_middleware if m.cls.__name__ == "SessionMiddleware"
+    )
     assert session_middleware.kwargs["session_cookie"] == "svc_session"
     assert session_middleware.kwargs["max_age"] == 4 * 3600
     assert session_middleware.kwargs["same_site"] == "lax"

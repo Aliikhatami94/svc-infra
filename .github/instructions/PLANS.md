@@ -11,7 +11,61 @@ Comprehensive checklist for making the framework production-ready. Each section 
 ---
 ## Must-have (Ship with v1)
 
+### A0. Acceptance Harness & CI Promotion Gate (new)
+- [ ] Design: Acceptance env contract (ports, env, seed users, base URL). (ADR-0009 Acceptance Harness)
+- [ ] Implement: docker-compose.test.yml + Makefile targets (accept/up/wait/seed/down).
+- [ ] Implement: Seed script and helpers (scripts/seed-acceptance.sh; tests/acceptance/_seed.py, _auth.py, _http.py).
+- [ ] Implement: health/readiness probes and wait-for helper.
+- [ ] Verify: CI job build-and-accept runs compose up, seeds, pytest -m "acceptance or smoke", OpenAPI lint, API Doctor, teardown.
+- [ ] Docs: docs/acceptance.md (how to run locally; make accept) and docs/acceptance-matrix.md (A-IDs mapping).
+ - [ ] Supply-chain: generate SBOM and image scan (Trivy/Grype) with severity gate; upload SBOM as artifact.
+ - [ ] Provenance: sign/attest images (cosign/SLSA provenance) — best-effort for v1.
+ - [ ] Backend matrix: run acceptance against in-memory stores AND Redis+Postgres.
+
+### 0. Backfill Coverage for Pre-Existing Modules (prior to this plan)
+Owner: TBD
+Evidence: (PRs, tests, CI runs)
+
+- API Scaffolding (FastAPI easy setup)
+	- [~] Research: existing setup helpers (src/svc_infra/api/fastapi/*, tests/unit/api/*).
+	- [ ] Implement: backfill unit tests for any uncovered paths (mounting, middlewares, versioned routers).
+	- [ ] Tests: ensure unit coverage for setup/easy helpers.
+	- [ ] Docs: short quickstart confirming parameters and defaults.
+	- [ ] Acceptance (pre-deploy): smoke app mounts correctly; /openapi.json present; CORS preflight passes.
+
+- APF Payments (existing sample module)
+	- [~] Research: existing router and tests (src/svc_infra/api/fastapi/apf_payments/router.py; tests/unit/payments/*).
+	- [ ] Implement: expand unit tests for edge cases (tenant resolver override, webhook replay, pagination limits).
+	- [ ] Tests: unit + integration against in-memory providers.
+	- [ ] Docs: minimal usage and extension points.
+	- [ ] Acceptance (pre-deploy): basic create/list/update flows succeed with tenant scoping and idempotency.
+
+- CLI (DB/Alembic) and Core CLIs
+	- [~] Research: existing commands (src/svc_infra/cli/cmds/db/sql/alembic_cmds.py; tests/unit/db/sql/*; dx/add.py).
+	- [ ] Implement: backfill unit tests for help flags and error paths (bad dotted paths, missing DB).
+	- [ ] Docs: CLI reference snippets in docs (db workflow, dx helpers).
+	- [ ] Acceptance (pre-deploy): migrate/rollback/seed exit 0 in ephemeral stack (A10-01).
+
+- Observability (obs add + CLI)
+	- [~] Research: add_observability and obs CLI (src/svc_infra/obs/*; tests/unit/obs/*).
+	- [ ] Implement: unit tests for route classification and metrics labels.
+	- [ ] Docs: metrics quickstart and dashboard JSON linkage.
+	- [ ] Acceptance (pre-deploy): metrics endpoint exposes http_server_* and db_pool_* (A8-01).
+
+- Cache
+	- [~] Research: cache module and decorators (src/svc_infra/cache/*; tests/unit/cache/*).
+	- [ ] Implement: unit tests for tags/recache and TTL interplay where missing.
+	- [ ] Docs: cache patterns and caveats.
+	- [ ] Acceptance (pre-deploy): smoke read/write path under load; headers unaffected (fold into A8 as needed).
+
+- Logging helpers
+	- [~] Research: logging setup (src/svc_infra/app/logging/*); unit coverage state.
+	- [ ] Implement: unit tests for JSON/plain modes, drop paths.
+	- [ ] Docs: logging modes and environment detection.
+	- [ ] Acceptance (pre-deploy): presence of security headers unaffected; no log spam on /metrics.
+
 ### 1. Security & Auth Hardening
+Owner: TBD
 - [x] Research: audit existing auth, password handling, session storage, roles. (roles_router, RequireRoles, MFA, API key, OAuth scaffolding present; security headers implemented; password policy module exists; refresh token encryption template present)
 - [x] Design: ADR for password hashing, token model (access/refresh), RBAC schema, audit log hash-chain. (ADR 0001)
 - [x] Implement: password policy & validator. (validate_password + tests committed)
@@ -36,8 +90,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Tests: audit log hash-chain integrity (tamper detection). (security.audit + test_audit_log_chain)
 - [x] Verify: run security marker tests. (auth + security suites passing as of 2025-10-14)
 - [x] Docs: security configuration & examples. (see docs/security.md)
+- [ ] Acceptance (pre-deploy): A1-01..A1-07 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 2. Rate Limiting & Abuse Protection
+Owner: TBD
 - [x] Research: confirm no existing rate limiter. (basic middleware existed; refactored to pluggable store)
 - [x] Design: Redis bucket schema (lua vs atomic), config surface. (implemented fixed-window atomic INCR)
 - [x] Implement: core token bucket / leaky bucket. (in-memory store abstraction)
@@ -49,8 +106,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Tests: bucket depletion/reset, per-route override, Retry-After presence. (tests added)
 - [x] Verify: rate limiting test marker. (`-m ratelimit` available; auto-tagged tests)
 - [x] Docs: usage & tuning. (see docs/rate-limiting.md)
+- [ ] Acceptance (pre-deploy): A2-01..A2-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 3. Idempotency & Concurrency Controls
+Owner: TBD
 - [x] Research: scan for existing idempotency usage or version columns. (found existing middleware; extended)
 - [x] Design: idempotency storage abstraction + request hash + 409 conflict semantics; TTL cleanup via lazy expiry.
 - [x] Implement: idempotency middleware with pluggable store (in-memory + Redis) and response envelope caching.
@@ -65,8 +125,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Tests: outbox enqueue/fetch/mark processed; inbox dedupe.
 - [x] Verify: concurrency suite covers optimistic locking and outbox/inbox. (`-m concurrency` green)
 - [x] Docs: optimistic locking + outbox/inbox patterns & pitfalls. (see docs/idempotency.md)
+- [ ] Acceptance (pre-deploy): A3-01..A3-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 4. Background Jobs & Scheduling
+Owner: TBD
 - [x] Research: existing job queue/scheduler utilities. (note) Chose Redis as production queue backend (visibility timeout + ZSET/HASH), with in-memory queue/scheduler for local/dev; simple interval scheduler over full cron initially.
 - [x] Design: Job schema, retry/backoff strategy, cron config format (YAML/DB). (ADR 0002) Job{id, name, payload, available_at, attempts, max_attempts, backoff_seconds, last_error}; exponential backoff base*attempts; DLQ after max_attempts; interval scheduler with next_run_at; future cron loader from YAML.
  - [x] Implement: JobQueue abstraction (Redis) with retry, backoff, DLQ. (RedisJobQueue + tests)
@@ -77,8 +140,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: job test marker. (tests/jobs/* using in-memory queue and scheduler pass under -m jobs)
  - [x] Docs: job authoring guide. (see docs/jobs.md)
 - [x] Implement: easy-setup helper to choose queue and start scheduler. (see jobs/easy.py)
+- [ ] Acceptance (pre-deploy): A4-01..A4-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 5. Webhooks Framework
+Owner: TBD
 - [x] Research: existing webhook verification logic. (note) Use HMAC-SHA256 over canonical JSON; header X-Signature; reuse outbox/jobs for delivery.
 - [x] Design: event schema versioning, signature, retry schedule doc. (ADR 0003)
 - [x] Implement: producer API & persistence model. (WebhookService + InMemoryWebhookSubscriptions publishing to outbox)
@@ -89,8 +155,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: webhook test marker. (pyproject marker added)
 - [x] Docs: integration guide. (see docs/webhooks.md)
 - [x] Implement: easy-setup helper to add webhook producer/verify middleware. (see webhooks/add.py)
+- [ ] Acceptance (pre-deploy): A5-01..A5-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 6. Tenancy
+Owner: TBD
 - [x] Research: tenant_id coverage across existing models (payments models, audit/session models, SQL/Mongo scaffolds; enforcement gaps in generic SQL service/routers now addressed).
 - [x] Design: BaseModelTenant mixin & query filter enforcement strategy. (ADR-0004 tenancy model & enforcement primitives)
 - [x] Implement: request dependency for tenant resolution. (tenancy.context: resolve_tenant_id, require_tenant_id, TenantId, OptionalTenantId)
@@ -104,8 +173,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: tenancy test marker.
 - [x] Docs: isolation strategy (soft vs schema vs dedicated DB). (see docs/tenancy.md)
 - [x] Implement: easy-setup helper for tenant resolution and tenant-aware CRUD. (see api.fastapi.tenancy.add.add_tenancy and SQL router wiring)
+- [ ] Acceptance (pre-deploy): A6-01..A6-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 7. Data Lifecycle
+Owner: TBD
 - [x] Research: migrations tooling & soft delete usage. (repo soft-delete filtering in `src/svc_infra/db/sql/repository.py`; model scaffolding for `deleted_at` in `src/svc_infra/db/sql/scaffold.py`; lifecycle helper in `src/svc_infra/data/add.py`; migrations & `sql-seed` in `src/svc_infra/cli/cmds/db/sql/alembic_cmds.py`)
 - [x] Design: soft delete pattern & retention registry. (ADR-0005)
 - [x] Implement: migrator CLI (status/apply/rollback/seed). (seed via sql-seed command)
@@ -123,8 +195,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: data lifecycle test marker. (pytest -m data_lifecycle)
 - [x] Docs: lifecycle & retention policies. (see docs/data-lifecycle.md; linked from README)
  - [x] Implement: easy-setup helpers for migrator/fixtures/retention/erasure wiring. (see data/add.py:add_data_lifecycle)
+- [ ] Acceptance (pre-deploy): A7-01..A7-04 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 8. SLOs & Ops
+Owner: TBD
 - [x] Research: existing metrics/logging instrumentation. (see obs.add.add_observability, obs.metrics.asgi PrometheusMiddleware and http_server_* metrics; logging via app.logging.setup_logging)
 - [x] Design: metrics naming & labels; error budget methodology. (ADR-0006 — standardize http_server_* and db_pool_* metrics; primary SLI: success rate and request latency; SLOs per endpoint class with 99.9% success and latency targets; monthly error budget with burn alerts)
 - [x] Implement: route instrumentation & dashboard spec artifacts. (route_classifier in add_observability; Grafana dashboard JSON at src/svc_infra/obs/grafana/dashboards/http-overview.json)
@@ -134,8 +209,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: ops test marker. (pytest -m ops)
 - [x] Docs: SLO definitions & ops playbook. (see docs/ops.md; linked from README)
  - [x] Implement: easy-setup helpers for probes/maintenance-mode/circuit-breaker. (see api/fastapi/ops/add.py)
+- [ ] Acceptance (pre-deploy): A8-01..A8-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 9. DX & Quality Gates
+Owner: TBD
 - [x] Research: current CI pipeline steps & gaps. (see dx/add.py::write_ci_workflow and tests/dx/test_dx_helpers.py)
 - [x] Design: gating order & required checks. (tests, flake8, mypy, pytest -W error, openapi/problem lint, migrations present check)
 - [x] Implement: CI templates (tests, lint, mypy, migration check, SBOM, SAST/DAST stubs). (dx/add.py::write_ci_workflow; dx/cli dx migrations/openapi)
@@ -146,8 +224,11 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: CI dry-run locally. (dx ci command prints plan and can run steps)
 - [x] Docs: contributing & release process. (docs/contributing.md; linked from README)
  - [x] Implement: easy-setup helper/CLI to scaffold CI, checks, and OpenAPI lint steps. (see dx/add.py)
+- [ ] Acceptance (pre-deploy): A9-01..A9-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ### 10. Docs & SDKs
+Owner: TBD
 - [x] Research: existing OpenAPI & docs endpoints. (see ADR 0007)
 - [x] Design: examples strategy & SDK generation pipeline. (ADR 0007)
 - [x] Implement: enriched OpenAPI (examples, error samples, tags). (x-codeSamples + Problem examples wired)
@@ -158,6 +239,8 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: docs test marker / manual review. (pytest -m docs; sdk tests under -m sdk)
 - [x] Docs: Developer quickstart & API usage. (docs/docs-and-sdks.md)
  - [x] Implement: easy-setup helper to mount docs endpoints and run SDK generation. (see api/fastapi/docs/add.py)
+- [ ] Acceptance (pre-deploy): A10-01..A10-03 green in CI (see docs/acceptance-matrix.md)
+Evidence: (PRs, tests, CI runs)
 
 ---
 ## Nice-to-have (Fast Follows)

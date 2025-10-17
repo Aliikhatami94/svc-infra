@@ -72,9 +72,7 @@ async def test_override_can_defer_to_default_flow():
 
     set_payments_tenant_resolver(_override)
     try:
-        tenant_id = await resolve_payments_tenant_id(
-            _request(), tenant_header="tenant_header"
-        )
+        tenant_id = await resolve_payments_tenant_id(_request(), tenant_header="tenant_header")
     finally:
         set_payments_tenant_resolver(None)
 
@@ -94,9 +92,7 @@ async def test_resolve_tenant_from_principal_api_key():
 
 @pytest.mark.asyncio
 async def test_resolve_tenant_from_header():
-    tenant_id = await resolve_payments_tenant_id(
-        _request(), tenant_header="tenant_header"
-    )
+    tenant_id = await resolve_payments_tenant_id(_request(), tenant_header="tenant_header")
 
     assert tenant_id == "tenant_header"
 
