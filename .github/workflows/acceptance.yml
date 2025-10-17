@@ -1,0 +1,33 @@
+name: A0 Acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  acceptance:
+    name: Acceptance (${{ matrix.backend }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [inmem, pg-redis]
+    env:
+      BACKEND: ${{ matrix.backend }}
+      COMPOSE_PROFILES: ${{ matrix.backend == 'pg-redis' && 'pg-redis' || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Docker Info
+        run: |
+          docker version
+          docker compose version
+
+      - name: Run acceptance harness
+        run: make accept
+
+      - name: Teardown stack
+        if: always()
+        run: make down || true

@@ -10,7 +10,7 @@ from httpx import ASGITransport, AsyncClient
 
 from svc_infra.api.fastapi.auth.routers import oauth_router as oauth_router_module
 from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_backend
-from tests.utils.test_helpers import setup_database_mocks
+from tests.unit.utils.test_helpers import setup_database_mocks
 
 
 @pytest.mark.asyncio

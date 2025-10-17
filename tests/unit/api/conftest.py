@@ -11,7 +11,7 @@ import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from tests.utils.test_helpers import (
+from tests.unit.utils.test_helpers import (
     create_mock_api_key,
     create_mock_principal,
     create_mock_user,

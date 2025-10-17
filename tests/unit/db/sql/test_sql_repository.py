@@ -11,7 +11,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 
 from svc_infra.db.sql.repository import SqlRepository
-from tests.db.sql.conftest import ProductModel, UserModel
+from tests.unit.db.sql.conftest import ProductModel, UserModel
 
 
 class TestSqlRepository:

@@ -15,7 +15,7 @@ from sqlalchemy.ext.declarative import declarative_base
 # Test database models
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from tests.utils.test_helpers import MockDatabaseSession
+from tests.unit.utils.test_helpers import MockDatabaseSession
 
 Base = declarative_base()
 

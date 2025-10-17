@@ -1,6 +1,6 @@
 import pytest
 
-from tests.payments.conftest import create_mock_object
+from tests.unit.payments.conftest import create_mock_object
 
 IDEMP = {"Idempotency-Key": "customer-test-1"}
 

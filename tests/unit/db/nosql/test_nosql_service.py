@@ -12,7 +12,7 @@ import pytest
 
 from svc_infra.db.nosql.repository import NoSqlRepository
 from svc_infra.db.nosql.service import NoSqlService
-from tests.db.nosql.conftest import ProductDocumentModel, UserDocumentModel
+from tests.unit.db.nosql.conftest import ProductDocumentModel, UserDocumentModel
 
 
 class TestNoSqlService:

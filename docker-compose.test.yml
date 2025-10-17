@@ -1,0 +1,72 @@
+services:
+  api:
+    image: python:3.12-slim
+    container_name: svc-infra-accept-api
+    working_dir: /workspace
+    environment:
+      - APP_ENV=test
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/workspace/src:/workspace
+      - LOG_LEVEL=INFO
+      - ENABLE_LOGGING=true
+      - ENABLE_OBS=true
+      - METRICS_PATH=/metrics
+      - OBS_SKIP_PATHS=/metrics,/health
+      # DB/Redis URLs are available if used by the app
+      - DATABASE_URL=postgresql+psycopg://app:app@db:5432/app
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./:/workspace:cached
+    ports:
+      - "8000:8000"
+    command: >-
+      bash -lc "set -euxo pipefail
+      && python -m pip install --no-cache-dir -U pip
+      && python -m pip install --no-cache-dir uvicorn
+      && python -m pip install --no-cache-dir /workspace
+      && uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000"
+
+  redis:
+    image: redis:7-alpine
+    container_name: svc-infra-accept-redis
+    profiles: ["pg-redis"]
+    command: ["redis-server", "--appendonly", "no"]
+
+  db:
+    image: postgres:16-alpine
+    container_name: svc-infra-accept-db
+    profiles: ["pg-redis"]
+    environment:
+      - POSTGRES_DB=app
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  tester:
+    image: python:3.12-slim
+    container_name: svc-infra-accept-tester
+    working_dir: /workspace
+    environment:
+      - APP_ENV=test
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/workspace/src:/workspace
+      - BASE_URL=http://api:8000
+    volumes:
+      - ./:/workspace:cached
+    depends_on:
+      - api
+    entrypoint: ["bash", "-lc"]
+    command: >-
+      "set -euxo pipefail
+      && python -m pip install --no-cache-dir -U pip
+      && python -m pip install --no-cache-dir pytest
+      && python -m pip install --no-cache-dir /workspace
+      && pytest -q -m acceptance tests/acceptance"
+
+networks:
+  default:
+    name: svc-infra-accept
