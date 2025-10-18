@@ -102,6 +102,10 @@ Owner: TBD
 - [x] Verify: run security marker tests. (auth + security suites passing as of 2025-10-14)
 - [x] Docs: security configuration & examples. (see docs/security.md)
 - [ ] Acceptance (pre-deploy): A1-01..A1-07 green in CI (see docs/acceptance-matrix.md)
+	- (evidence, partial) Added acceptance smoke for RBAC/ABAC and sessions list permissions:
+		- tests/acceptance/test_auth_acceptance.py
+		- acceptance app mounts demo secure routes and session router: tests/acceptance/app.py
+	- Pending: full register→verify→login flow, lockout, API keys lifecycle, MFA routes.
 Evidence: (PRs, tests, CI runs)
 
 ### 2. Rate Limiting & Abuse Protection

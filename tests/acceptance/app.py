@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
+from fastapi import APIRouter, Depends
 from sqlalchemy import create_engine
 
 from svc_infra.apf_payments import settings as payments_settings
@@ -16,10 +17,12 @@ from svc_infra.apf_payments.schemas import (
     PaymentMethodOut,
 )
 from svc_infra.api.fastapi.apf_payments.setup import add_payments
+from svc_infra.api.fastapi.auth.routers.session_router import build_session_router
 from svc_infra.api.fastapi.auth.security import Principal, _current_principal
 from svc_infra.api.fastapi.db.sql.session import get_session
 from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
 from svc_infra.security.add import add_security
+from svc_infra.security.permissions import RequireABAC, RequirePermission, owns_resource
 
 # Minimal acceptance app wiring the library's routers and defaults
 os.environ.setdefault("PAYMENTS_PROVIDER", "fake")
@@ -188,7 +191,41 @@ app.dependency_overrides[get_session] = _stub_get_session
 
 # Override auth to always provide a user with a tenant for acceptance.
 def _accept_principal():
-    return Principal(user=SimpleNamespace(tenant_id="accept-tenant"), scopes=["*"], via="jwt")
+    # Provide a minimal user identity with id and tenant for RBAC/ABAC acceptance tests.
+    return Principal(
+        user=SimpleNamespace(id="u-1", tenant_id="accept-tenant", roles=["support"]),
+        scopes=["*"],
+        via="jwt",
+    )
 
 
 app.dependency_overrides[_current_principal] = _accept_principal
+
+# --- Acceptance-only security demo routers ---
+_sec = APIRouter(prefix="/secure", tags=["acceptance-security"])  # test-only
+
+
+@_sec.get("/admin-only", dependencies=[RequirePermission("user.write")])
+async def admin_only():
+    return {"ok": True}
+
+
+async def _load_owned(owner_id: str):
+    # Simple resource provider returning an object with an owner_id attribute
+    return SimpleNamespace(owner_id=owner_id)
+
+
+@_sec.get(
+    "/owned/{owner_id}",
+    dependencies=[
+        RequireABAC(permission="user.read", predicate=owns_resource(), resource_getter=_load_owned)
+    ],
+)
+async def owned_resource(owner_id: str):
+    return {"owner_id": owner_id}
+
+
+app.include_router(_sec)
+
+# Mount session management endpoints under /users for acceptance tests (list/revoke)
+app.include_router(build_session_router(), prefix="/users")

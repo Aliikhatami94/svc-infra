@@ -32,6 +32,7 @@ services:
       && python -m pip install --no-cache-dir uvicorn
       && python -m pip install --no-cache-dir asyncpg
       && python -m pip install --no-cache-dir aiosqlite
+      && python -m pip install --no-cache-dir prometheus-client
       && python -m pip install --no-cache-dir /workspace
       && uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000"
 

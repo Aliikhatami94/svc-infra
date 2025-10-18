@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 RMI ?= all
 
-.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean
+.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean test
 
 compose_up:
 	@echo "[accept] Starting test stack..."
@@ -89,3 +89,18 @@ unitv:
 clean:
 	@echo "[clean] Removing Python caches, build artifacts, and logs"
 	rm -rf **/__pycache__ __pycache__ .pytest_cache .mypy_cache .ruff_cache build dist *.egg-info *.log
+
+# --- Combined test target ---
+test:
+	@echo "[test] Running unit and acceptance tests"
+	@status=0; \
+	$(MAKE) unit || status=$$?; \
+	if [ $$status -eq 0 ]; then \
+		$(MAKE) accept || status=$$?; \
+	fi; \
+	if [ $$status -eq 0 ]; then \
+		echo "[test] All tests passed"; \
+	else \
+		echo "[test] Tests failed"; \
+	fi; \
+	exit $$status
