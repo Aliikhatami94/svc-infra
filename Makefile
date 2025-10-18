@@ -24,8 +24,17 @@ wait:
 		exit 1
 
 seed:
-	@echo "[accept] Seeding acceptance data (noop for now)"
-	# Placeholder: hook DB migrations/seed via CLI here if needed
+	@echo "[accept] Running CLI migrate/current/downgrade/upgrade (ephemeral sqlite)"
+	# Use an ephemeral project root in the container to avoid touching repo files
+	docker compose -f docker-compose.test.yml exec -T -e PROJECT_ROOT=/tmp/svc-infra-accept -e SQL_URL=sqlite+aiosqlite:////tmp/svc-infra-accept/accept.db api \
+		bash -lc 'rm -rf $$PROJECT_ROOT && mkdir -p $$PROJECT_ROOT && \
+		python -m svc_infra.cli sql-setup-and-migrate --no-with-payments && \
+		python -m svc_infra.cli sql-current && \
+		python -m svc_infra.cli sql-downgrade -- -1 && \
+		python -m svc_infra.cli sql-upgrade head'
+	@echo "[accept] Seeding acceptance data via CLI (no-op)"
+	docker compose -f docker-compose.test.yml exec -T api \
+		python -m svc_infra.cli sql-seed tests.acceptance._seed:acceptance_seed
 
 pytest_accept:
 	@echo "[accept] Running acceptance tests in container..."
