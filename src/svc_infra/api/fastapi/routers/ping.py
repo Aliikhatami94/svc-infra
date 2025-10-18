@@ -14,6 +14,7 @@ router = public_router(tags=["Health Check"])
     PING_PATH,
     status_code=status.HTTP_200_OK,
     description="Operation to check if the service is up and running",
+    operation_id="health_ping_get",
 )
 def ping():
     logging.info("Health check: /ping endpoint accessed. Service is responsive.")

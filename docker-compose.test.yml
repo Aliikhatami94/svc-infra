@@ -4,7 +4,7 @@ services:
     container_name: svc-infra-accept-api
     working_dir: /workspace
     environment:
-      - BACKEND=${BACKEND}
+      - BACKEND=${BACKEND:-}
       - APP_ENV=dev
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/workspace/src:/workspace
@@ -20,6 +20,12 @@ services:
       - ./:/workspace:cached
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/ping', timeout=2).status==200 else sys.exit(1)"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+      start_period: 60s
     command: >-
       bash -lc "set -euxo pipefail
       && python -m pip install --no-cache-dir -U pip
@@ -54,7 +60,7 @@ services:
     container_name: svc-infra-accept-tester
     working_dir: /workspace
     environment:
-      - BACKEND=${BACKEND}
+      - BACKEND=${BACKEND:-}
       - APP_ENV=test
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/workspace/src:/workspace
@@ -63,14 +69,31 @@ services:
       - ./:/workspace:cached
     depends_on:
       - api
-    entrypoint: ["bash", "-lc"]
-    command: >-
-      "set -euxo pipefail
-      && python -m pip install --no-cache-dir -U pip
-      && python -m pip install --no-cache-dir pytest
-      && python -m pip install --no-cache-dir /workspace
-      && for i in $(seq 1 30); do curl -fsS http://api:8000/ping && break || sleep 1; done
-      && pytest -q -m acceptance tests/acceptance"
+    command:
+      - bash
+      - -lc
+      - |
+        set -euxo pipefail
+        python -m pip install --no-cache-dir -U pip
+        python -m pip install --no-cache-dir pytest
+        python -m pip install --no-cache-dir /workspace
+        cat >/tmp/wait_api.py <<'PY'
+        import sys, time, urllib.request
+        url = 'http://api:8000/ping'
+        ok = False
+        for i in range(90):
+            try:
+                with urllib.request.urlopen(url, timeout=2) as r:
+                    ok = (r.status == 200)
+                    print('API ready' if ok else f'status {r.status}')
+                    break
+            except Exception as e:
+                print(f'waiting for API: {e}')
+                time.sleep(1)
+        sys.exit(0 if ok else 1)
+        PY
+        python /tmp/wait_api.py
+        pytest -q -m acceptance tests/acceptance
 
 networks:
   default:

@@ -4,17 +4,17 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 import httpx
 import pytest
+
+from .app import app as acceptance_app
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-
-from .app import app as acceptance_app
 
 
 @pytest.fixture(scope="session")
@@ -22,7 +22,7 @@ def _acceptance_app_ready():
     """Ensure FastAPI startup/shutdown handlers run for the in-process app."""
 
     try:
-        prev_loop = asyncio.get_event_loop()
+        prev_loop = asyncio.get_running_loop()
     except RuntimeError:
         prev_loop = None
 
@@ -72,7 +72,7 @@ class _SyncASGIClient:
 
 
 @pytest.fixture(scope="session")
-def client(_acceptance_app_ready) -> httpx.Client:
+def client(_acceptance_app_ready) -> Generator[httpx.Client, None, None]:
     """HTTPX client for acceptance scenarios.
 
     If ``BASE_URL`` is provided we target that network endpoint so the
