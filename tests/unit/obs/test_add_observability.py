@@ -68,3 +68,52 @@ def test_add_observability_skips_when_disabled(mocker):
 
     add_prometheus.assert_not_called()
     bind_pool_metrics.assert_not_called()
+
+
+def test_add_observability_with_route_classifier_uses_resolver(mocker):
+    app = FastAPI()
+
+    # Ensure metrics enabled
+    mocker.patch(
+        "svc_infra.obs.add.ObservabilitySettings", return_value=create_settings(enabled=True)
+    )
+
+    # Patch the internal route template to return a stable base
+    mocker.patch("svc_infra.obs.metrics.asgi._route_template", return_value="/items/{id}")
+
+    # Capture the resolver passed to middleware
+    captured = {}
+
+    def _capture_add_mw(mw_cls, *, skip_paths=None, route_resolver=None, **_):  # type: ignore[no-redef]
+        captured["mw_cls"] = mw_cls
+        captured["skip_paths"] = tuple(skip_paths or ())
+        captured["resolver"] = route_resolver
+
+    mocker.patch.object(app, "add_middleware", side_effect=_capture_add_mw)
+
+    # Stub public_router include to avoid importing FastAPI internals
+    class _Router:
+        def add_api_route(self, *_args, **_kwargs):
+            return None
+
+    mocker.patch("svc_infra.api.fastapi.dual.public.public_router", return_value=_Router())
+    mocker.patch.object(app, "include_router", return_value=None)
+
+    # Route classifier returns a class based on input
+    def _classifier(route_path: str, method: str) -> str:
+        assert route_path == "/items/{id}"
+        assert method == "GET"
+        return "public"
+
+    add_observability(app, route_classifier=_classifier, metrics_path="/metrics")
+
+    # Validate middleware wiring
+    assert captured.get("mw_cls") is not None, "PrometheusMiddleware should be added"
+    assert "/metrics" in captured.get("skip_paths", ()), "metrics path must be skipped"
+    resolver = captured.get("resolver")
+    assert callable(resolver), "route_resolver must be installed when a classifier is provided"
+
+    # The resolver should append the |class suffix
+    req = Mock(method="GET")
+    out = resolver(req)
+    assert out == "/items/{id}|public"

@@ -3,6 +3,9 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
+from sqlalchemy import create_engine
+
+from svc_infra.apf_payments import settings as payments_settings
 from svc_infra.apf_payments.provider.base import ProviderAdapter
 from svc_infra.apf_payments.schemas import (
     CustomerOut,
@@ -15,13 +18,22 @@ from svc_infra.apf_payments.schemas import (
 from svc_infra.api.fastapi.apf_payments.setup import add_payments
 from svc_infra.api.fastapi.auth.security import Principal, _current_principal
 from svc_infra.api.fastapi.db.sql.session import get_session
-from svc_infra.api.fastapi.ease import easy_service_app
+from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
 
 # Minimal acceptance app wiring the library's routers and defaults
 os.environ.setdefault("PAYMENTS_PROVIDER", "fake")
-from svc_infra.apf_payments import settings as payments_settings
 
 payments_settings._SETTINGS = payments_settings.PaymentsSettings(default_provider="fake")
+# Provide a tiny SQLite engine so db_pool_* metrics are bound during acceptance
+_engine = create_engine("sqlite:///:memory:")
+# Trigger a connection once so pool metrics initialize label series
+try:
+    with _engine.connect() as _conn:
+        _ = _conn.execute("SELECT 1")
+except Exception:
+    # best effort; tests don't rely on actual DB
+    pass
+
 app = easy_service_app(
     name="svc-infra-acceptance",
     release="A0",
@@ -31,7 +43,15 @@ app = easy_service_app(
     root_routers=["svc_infra.api.fastapi.routers"],
     public_cors_origins=["*"],
     root_public_base_url="/",
+    options=EasyAppOptions(
+        observability=ObservabilityOptions(
+            enable=True,
+            db_engines=[_engine],
+            metrics_path="/metrics",
+        )
+    ),
 )
+
 
 # Minimal fake payments adapter for acceptance (no external calls).
 class FakeAdapter(ProviderAdapter):

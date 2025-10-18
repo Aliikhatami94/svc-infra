@@ -53,9 +53,12 @@ Evidence: (PRs, tests, CI runs)
 
 - Observability (obs add + CLI)
 	- [~] Research: add_observability and obs CLI (src/svc_infra/obs/*; tests/unit/obs/*).
-	- [ ] Implement: unit tests for route classification and metrics labels.
-	- [ ] Docs: metrics quickstart and dashboard JSON linkage.
-	- [ ] Acceptance (pre-deploy): metrics endpoint exposes http_server_* and db_pool_* (A8-01).
+	- [x] Implement: unit tests for route classification and metrics labels.
+		- Files: tests/unit/obs/test_add_observability.py (added classifier resolver test)
+	- [x] Docs: metrics quickstart and dashboard JSON linkage.
+		- Files: docs/observability.md (added Prometheus quickstart and dashboard pointers)
+	- [x] Acceptance (pre-deploy): metrics endpoint exposes http_server_* and db_pool_* (A8-01).
+		- Files: tests/acceptance/test_metrics_exposure.py; tests/acceptance/app.py (bind SQLite engine for db_pool metrics)
 
 - Cache
 	- [~] Research: cache module and decorators (src/svc_infra/cache/*; tests/unit/cache/*).
@@ -215,6 +218,7 @@ Owner: TBD
 - [x] Docs: SLO definitions & ops playbook. (see docs/ops.md; linked from README)
  - [x] Implement: easy-setup helpers for probes/maintenance-mode/circuit-breaker. (see api/fastapi/ops/add.py)
 - [ ] Acceptance (pre-deploy): A8-01..A8-03 green in CI (see docs/acceptance-matrix.md)
+	(note) A8-01 satisfied by tests/acceptance/test_metrics_exposure.py; A8-02..A8-03 pending.
 Evidence: (PRs, tests, CI runs)
 
 ### 9. DX & Quality Gates
