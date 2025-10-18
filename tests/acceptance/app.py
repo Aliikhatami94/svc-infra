@@ -3,9 +3,6 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import Mapped, mapped_column
-
 from svc_infra.apf_payments.provider.base import ProviderAdapter
 from svc_infra.apf_payments.schemas import (
     CustomerOut,
@@ -17,12 +14,14 @@ from svc_infra.apf_payments.schemas import (
 )
 from svc_infra.api.fastapi.apf_payments.setup import add_payments
 from svc_infra.api.fastapi.auth.security import Principal, _current_principal
-from svc_infra.api.fastapi.db.sql.add import add_sql_db
+from svc_infra.api.fastapi.db.sql.session import get_session
 from svc_infra.api.fastapi.ease import easy_service_app
-from svc_infra.db.sql.base import ModelBase
-from svc_infra.db.sql.types import GUID
 
 # Minimal acceptance app wiring the library's routers and defaults
+os.environ.setdefault("PAYMENTS_PROVIDER", "fake")
+from svc_infra.apf_payments import settings as payments_settings
+
+payments_settings._SETTINGS = payments_settings.PaymentsSettings(default_provider="fake")
 app = easy_service_app(
     name="svc-infra-acceptance",
     release="A0",
@@ -33,33 +32,6 @@ app = easy_service_app(
     public_cors_origins=["*"],
     root_public_base_url="/",
 )
-
-# Wire SQL session: prefer env DATABASE_URL, else default to a local SQLite file for acceptance.
-db_url = os.getenv("DATABASE_URL") or "sqlite+aiosqlite:////tmp/acceptance.db"
-add_sql_db(app, url=db_url)
-
-
-# Minimal auth users table to satisfy FK references from payments models.
-class _AcceptUser(ModelBase):
-    __tablename__ = "users"
-    __svc_infra_auth_user__ = True  # let authref discover this as the auth user model
-
-    id: Mapped[str] = mapped_column(GUID(), primary_key=True)
-
-
-# Auto-create schema at startup (payments models + minimal users table).
-@app.on_event("startup")
-async def _acceptance_create_schema() -> None:  # noqa: D401
-    # Import payments models so they register on ModelBase.metadata
-    from svc_infra.apf_payments import models as _pay_models  # noqa: F401
-
-    engine = create_async_engine(db_url)
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(ModelBase.metadata.create_all)
-    finally:
-        await engine.dispose()
-
 
 # Minimal fake payments adapter for acceptance (no external calls).
 class FakeAdapter(ProviderAdapter):
@@ -137,6 +109,31 @@ class FakeAdapter(ProviderAdapter):
 
 # Install payments under /payments using the fake adapter (skip default provider registration).
 add_payments(app, prefix="/payments", register_default_providers=False, adapters=[FakeAdapter()])
+
+
+# Replace the DB session dependency with a no-op stub so tests stay self-contained.
+class _StubSession:
+    async def scalar(self, _statement):
+        return None
+
+    def add(self, _obj):
+        return None
+
+    async def flush(self):
+        return None
+
+    async def commit(self):
+        return None
+
+    async def rollback(self):
+        return None
+
+
+async def _stub_get_session():
+    yield _StubSession()
+
+
+app.dependency_overrides[get_session] = _stub_get_session
 
 
 # Override auth to always provide a user with a tenant for acceptance.
