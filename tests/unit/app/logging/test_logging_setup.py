@@ -131,3 +131,109 @@ def test_setup_logging_applies_format_and_filters(monkeypatch):
     )
     allowed = all(f.filter(msg) for f in acc.filters)
     assert allowed is False  # dropped due to filter
+
+
+def _root_has_plain_formatter() -> bool:
+    root = logging.getLogger()
+    return any(
+        isinstance(h.formatter, logging.Formatter) and not isinstance(h.formatter, JsonFormatter)
+        for h in root.handlers
+    )
+
+
+def _root_has_json_formatter() -> bool:
+    root = logging.getLogger()
+    return any(isinstance(h.formatter, JsonFormatter) for h in root.handlers)
+
+
+def test_plain_formatter_when_fmt_plain(monkeypatch):
+    # Ensure env does not force format
+    monkeypatch.delenv("LOG_FORMAT", raising=False)
+    setup_logging(level=LogLevelOptions.INFO, fmt="plain", filter_envs=["local"])
+    assert _root_has_plain_formatter() is True
+    assert _root_has_json_formatter() is False
+
+
+def test_auto_format_defaults_plain_in_nonprod(monkeypatch):
+    # Force non-prod default
+    import svc_infra.app.logging.formats as formats
+
+    monkeypatch.setattr(formats, "IS_PROD", False)
+    monkeypatch.delenv("LOG_FORMAT", raising=False)
+    setup_logging(level=LogLevelOptions.INFO, fmt=None, filter_envs=["local"])
+    assert _root_has_plain_formatter() is True
+    assert _root_has_json_formatter() is False
+
+
+def test_auto_format_defaults_json_in_prod(monkeypatch):
+    # Force prod default
+    import svc_infra.app.logging.formats as formats
+
+    monkeypatch.setattr(formats, "IS_PROD", True)
+    monkeypatch.delenv("LOG_FORMAT", raising=False)
+    setup_logging(level=LogLevelOptions.INFO, fmt=None, filter_envs=["local"])
+    assert _root_has_json_formatter() is True
+
+
+def test_drop_paths_argument_overrides_env(monkeypatch):
+    # Remove any existing access filters from previous setup_logging calls
+    for name in ("uvicorn.access", "gunicorn.access"):
+        logger = logging.getLogger(name)
+        logger.filters = []  # reset
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("LOG_DROP_PATHS", "/metrics,/health")
+    # drop_paths argument should take precedence
+    setup_logging(
+        level=LogLevelOptions.INFO, fmt="plain", filter_envs=["local"], drop_paths=["/only"]
+    )
+
+    acc = logging.getLogger("uvicorn.access")
+    # This record matches env var but not the explicit drop list -> should be allowed
+    rec_health = logging.LogRecord(
+        name="uvicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='"GET /health HTTP/1.1" 200',
+        args=(),
+        exc_info=None,
+    )
+    allowed_health = all(f.filter(rec_health) for f in acc.filters)
+    assert allowed_health is True
+
+    # This record matches the explicit drop list -> should be dropped
+    rec_only = logging.LogRecord(
+        name="uvicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='"GET /only HTTP/1.1" 200',
+        args=(),
+        exc_info=None,
+    )
+    allowed_only = all(f.filter(rec_only) for f in acc.filters)
+    assert allowed_only is False
+
+
+def test_default_drops_metrics_when_enabled(monkeypatch):
+    # Remove any existing access filters from previous setup_logging calls
+    for name in ("uvicorn.access", "gunicorn.access"):
+        logger = logging.getLogger(name)
+        logger.filters = []  # reset
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.delenv("LOG_DROP_PATHS", raising=False)
+    # No drop_paths provided -> defaults to ["/metrics"] when filter is enabled for env
+    setup_logging(level=LogLevelOptions.INFO, fmt="plain", filter_envs=["local"])  # enabled
+
+    acc = logging.getLogger("uvicorn.access")
+    rec_metrics = logging.LogRecord(
+        name="uvicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='"GET /metrics HTTP/1.1" 200',
+        args=(),
+        exc_info=None,
+    )
+    allowed = all(f.filter(rec_metrics) for f in acc.filters)
+    assert allowed is False

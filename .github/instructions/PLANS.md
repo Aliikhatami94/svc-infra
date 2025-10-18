@@ -62,15 +62,18 @@ Evidence: (PRs, tests, CI runs)
 
 - Cache
 	- [~] Research: cache module and decorators (src/svc_infra/cache/*; tests/unit/cache/*).
-	- [ ] Implement: unit tests for tags/recache and TTL interplay where missing.
-	- [ ] Docs: cache patterns and caveats.
-	- [ ] Acceptance (pre-deploy): smoke read/write path under load; headers unaffected (fold into A8 as needed).
+	- [x] Implement: unit tests for tags/recache and TTL interplay where missing.
+		- Files: tests/unit/cache/test_ttl_and_recache.py (TTL and recache key variants); tests/unit/cache/test_cache_decorators.py (existing)
+	- [x] Docs: cache patterns and caveats. (expanded in docs/cache.md)
+	- [x] Acceptance (pre-deploy): smoke read/write path (in-memory); headers unaffected N/A (no HTTP hook).
+		- Files: tests/acceptance/test_cache_smoke.py
 
 - Logging helpers
 	- [~] Research: logging setup (src/svc_infra/app/logging/*); unit coverage state.
-	- [ ] Implement: unit tests for JSON/plain modes, drop paths.
-	- [ ] Docs: logging modes and environment detection.
-	- [ ] Acceptance (pre-deploy): presence of security headers unaffected; no log spam on /metrics.
+	- [x] Research: logging setup and existing tests/docs (src/svc_infra/app/logging/{add.py,formats.py,filter.py}; tests/unit/app/logging/test_logging_setup.py; src/svc_infra/app/README.md).
+	- [x] Implement: unit tests for JSON/plain modes, drop paths. (tests/unit/app/logging/test_logging_setup.py extended)
+	- [x] Docs: logging modes and environment detection. (src/svc_infra/app/README.md import fixes + examples)
+	- [x] Acceptance (pre-deploy): presence of security headers unaffected; no log spam on /metrics. (tests/acceptance/test_logging_no_spam_and_headers.py)
 
 ### 1. Security & Auth Hardening
 Owner: TBD

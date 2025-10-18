@@ -14,9 +14,8 @@ This README shows:
 
 ```python
 # main.py (or wherever your app starts)
-from svc_infra.logging.logging import setup_logging
+from svc_infra.app.logging import setup_logging, LogLevelOptions
 from svc_infra.app.env import pick
-from svc_infra.logging.logging import LogLevelOptions
 ```
 
 ---
@@ -39,7 +38,8 @@ What you get by default:
 Set via code:
 
 ```python
-from svc_infra.logging.logging import LogFormatOptions, LogLevelOptions
+from svc_infra.app.logging.formats import LogFormatOptions
+from svc_infra.app.logging import LogLevelOptions
 
 setup_logging(
     level=LogLevelOptions.INFO,          # or "INFO"
@@ -119,7 +119,7 @@ Old (pre-filter) example:
 
 ```python
 from svc_infra.app.env import pick
-from svc_infra.logging.logging import setup_logging, LogLevelOptions
+from svc_infra.app.logging import setup_logging, LogLevelOptions
 
 setup_logging(
     level=pick(
@@ -183,7 +183,7 @@ LOG_DROP_PATHS=/metrics,/health,/healthz
 ## 7) One-liner quickstart
 
 ```python
-from svc_infra.logging import setup_logging
+from svc_infra.app.logging import setup_logging
 setup_logging()  # done: sensible defaults + filters in prod/test
 ```
 
