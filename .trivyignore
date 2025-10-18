@@ -1,0 +1,9 @@
+# Trivy ignore list (temporary, vendor images)
+# Context: Upstream postgres:16-alpine on Alpine 3.22.2 currently ships libxml2 2.13.8-r0
+# which triggers the following CRITICAL CVEs. Fixed in libxml2 2.13.9-r0.
+# We only ignore these CVEs for vendor images until the tag updates propagate.
+# Date added: 2025-10-18
+# Review by: 2025-11-18 (remove once base images are patched)
+
+CVE-2025-49794
+CVE-2025-49796

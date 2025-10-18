@@ -89,7 +89,9 @@ class PaginationContext(Generic[T]):
 
     @property
     def limit(self) -> int:
-        if self.allow_cursor and self.cursor_params and self.cursor_params.cursor is not None:
+        # For cursor-based pagination, always honor the requested limit, even on the first page
+        # (cursor may be None for the first page).
+        if self.allow_cursor and self.cursor_params:
             return self.cursor_params.limit
         if self.allow_page and self.page_params:
             return self.limit_override or self.page_params.page_size
