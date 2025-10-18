@@ -4,7 +4,8 @@ services:
     container_name: svc-infra-accept-api
     working_dir: /workspace
     environment:
-      - APP_ENV=test
+      - BACKEND=${BACKEND}
+      - APP_ENV=dev
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/workspace/src:/workspace
       - LOG_LEVEL=INFO
@@ -12,8 +13,8 @@ services:
       - ENABLE_OBS=true
       - METRICS_PATH=/metrics
       - OBS_SKIP_PATHS=/metrics,/health
-      # DB/Redis URLs are available if used by the app
-      - DATABASE_URL=postgresql+psycopg://app:app@db:5432/app
+      - APF_PAYMENTS_PROVIDER=fake
+      # Redis URL is available if used by the app
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./:/workspace:cached
@@ -23,6 +24,8 @@ services:
       bash -lc "set -euxo pipefail
       && python -m pip install --no-cache-dir -U pip
       && python -m pip install --no-cache-dir uvicorn
+      && python -m pip install --no-cache-dir asyncpg
+      && python -m pip install --no-cache-dir aiosqlite
       && python -m pip install --no-cache-dir /workspace
       && uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000"
 
@@ -51,6 +54,7 @@ services:
     container_name: svc-infra-accept-tester
     working_dir: /workspace
     environment:
+      - BACKEND=${BACKEND}
       - APP_ENV=test
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/workspace/src:/workspace
@@ -65,6 +69,7 @@ services:
       && python -m pip install --no-cache-dir -U pip
       && python -m pip install --no-cache-dir pytest
       && python -m pip install --no-cache-dir /workspace
+      && for i in $(seq 1 30); do curl -fsS http://api:8000/ping && break || sleep 1; done
       && pytest -q -m acceptance tests/acceptance"
 
 networks:

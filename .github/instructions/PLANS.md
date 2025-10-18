@@ -21,8 +21,8 @@ Comprehensive checklist for making the framework production-ready. Each section 
 - [x] Verify: CI job to run acceptance matrix and teardown.
 	- Files: .github/workflows/acceptance.yml
 - [x] Docs: docs/acceptance.md and docs/acceptance-matrix.md updated for tester and profiles.
- - [ ] Supply-chain: generate SBOM and image scan (Trivy/Grype) with severity gate; upload SBOM as artifact.
- - [ ] Provenance: sign/attest images (cosign/SLSA provenance) — best-effort for v1.
+ - [x] Supply-chain: generate SBOM and image scan (Trivy) with severity gate; upload SBOM as artifact. (acceptance.yml)
+ - [x] Provenance: sign SBOM artifact (cosign keyless) — best-effort for v1. (acceptance.yml)
  - [x] Backend matrix: run acceptance against in-memory stores AND Redis+Postgres (via COMPOSE_PROFILES).
 
 ### 0. Backfill Coverage for Pre-Existing Modules (prior to this plan)
@@ -31,17 +31,19 @@ Evidence: (PRs, tests, CI runs)
 
 - API Scaffolding (FastAPI easy setup)
 	- [~] Research: existing setup helpers (src/svc_infra/api/fastapi/*, tests/unit/api/*).
-	- [ ] Implement: backfill unit tests for any uncovered paths (mounting, middlewares, versioned routers).
-	- [ ] Tests: ensure unit coverage for setup/easy helpers.
-	- [ ] Docs: short quickstart confirming parameters and defaults.
-	- [ ] Acceptance (pre-deploy): smoke app mounts correctly; /openapi.json present; CORS preflight passes.
+	- [x] Design: targeted unit tests for env-driven easy builders and router mounting coverage (matrix recorded 2025-10-17).
+	- [x] Implement: backfill unit tests for easy builders and include-api-key inference (tests/unit/api/test_fastapi_setup.py).
+	- [x] Tests: pytest -q tests/unit/api/test_fastapi_setup.py (→ covered in full suite).
+	- [x] Verify: pytest -q tests/unit (run 2025-10-17).
+	- [x] Docs: short quickstart confirming parameters and defaults. (docs/api.md Quickstart)
+	- [x] Acceptance (pre-deploy): smoke app mounts correctly; /openapi.json present; CORS preflight passes. (tests/acceptance/test_api_openapi_and_cors.py)
 
 - APF Payments (existing sample module)
 	- [~] Research: existing router and tests (src/svc_infra/api/fastapi/apf_payments/router.py; tests/unit/payments/*).
-	- [ ] Implement: expand unit tests for edge cases (tenant resolver override, webhook replay, pagination limits).
-	- [ ] Tests: unit + integration against in-memory providers.
-	- [ ] Docs: minimal usage and extension points.
-	- [ ] Acceptance (pre-deploy): basic create/list/update flows succeed with tenant scoping and idempotency.
+	- [x] Implement: expand unit tests for edge cases (tenant resolver override, webhook replay, pagination limits). (tests/unit/payments/test_payments_tenant_resolution.py, test_payments_routes_webhook_replay.py, test_payments_pagination_limits.py)
+	- [x] Tests: unit + integration against in-memory providers.
+	- [x] Docs: minimal usage and extension points. (src/svc_infra/apf_payments/README.md updated; examples for easy_service_app + add_payments, tenant resolver override, custom adapters)
+	- [x] Acceptance (pre-deploy): basic create/list/update flows succeed with tenant scoping and idempotency. (tests/acceptance/test_payments_basic_flows.py; acceptance app mounts payments with FakeAdapter and SQL session)
 
 - CLI (DB/Alembic) and Core CLIs
 	- [~] Research: existing commands (src/svc_infra/cli/cmds/db/sql/alembic_cmds.py; tests/unit/db/sql/*; dx/add.py).

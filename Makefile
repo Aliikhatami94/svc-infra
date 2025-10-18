@@ -39,11 +39,21 @@ down:
 # --- Unit tests ---
 unit:
 	@echo "[unit] Running unit tests (quiet)"
-	pytest -q tests/unit
+	@if ! command -v poetry >/dev/null 2>&1; then \
+		echo "[unit] Poetry is not installed. Please install Poetry (https://python-poetry.org/docs/#installation)"; \
+		exit 2; \
+	fi; \
+	poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+	poetry run pytest -q tests/unit
 
 unitv:
 	@echo "[unit] Running unit tests (verbose)"
-	pytest -vv tests/unit
+	@if ! command -v poetry >/dev/null 2>&1; then \
+		echo "[unit] Poetry is not installed. Please install Poetry (https://python-poetry.org/docs/#installation)"; \
+		exit 2; \
+	fi; \
+	poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+	poetry run pytest -vv tests/unit
 
 # --- Cleanup helpers ---
 clean:

@@ -9,6 +9,9 @@ jobs:
   acceptance:
     name: Acceptance (${{ matrix.backend }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # needed for keyless signing with cosign
     strategy:
       fail-fast: false
       matrix:
@@ -31,3 +34,76 @@ jobs:
       - name: Teardown stack
         if: always()
         run: make down || true
+
+      # Supply-chain: SBOM generation and vulnerability scanning (severity gate)
+      - name: Generate SBOM (CycloneDX JSON)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          artifact-name: svc-infra-sbom
+          output-file: sbom.cdx.json
+          format: cyclonedx-json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom.cdx.json
+          path: sbom.cdx.json
+
+      - name: Set up Trivy
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'image'
+          image-ref: 'python:3.12-slim'
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
+        continue-on-error: false
+
+      - name: Scan redis:7-alpine with Trivy (CRITICAL gate)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'image'
+          image-ref: 'redis:7-alpine'
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
+        continue-on-error: false
+
+      - name: Scan postgres:16-alpine with Trivy (CRITICAL gate)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'image'
+          image-ref: 'postgres:16-alpine'
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
+        continue-on-error: false
+
+      # Provenance: keyless sign the SBOM artifact (best-effort for v1)
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign SBOM (keyless)
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          cosign version
+          cosign sign-blob \
+            --output-signature sbom.cdx.json.sig \
+            --output-certificate sbom.cdx.json.crt \
+            sbom.cdx.json
+
+      - name: Upload SBOM signature artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-signature
+          path: |
+            sbom.cdx.json.sig
+            sbom.cdx.json.crt

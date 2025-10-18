@@ -63,6 +63,27 @@ async def test_override_hook_takes_precedence():
 
 
 @pytest.mark.asyncio
+async def test_async_override_hook_supported():
+    calls: list[tuple[Request, Principal | None, str | None]] = []
+
+    async def _override(request: Request, identity: Principal | None, header: str | None) -> str:
+        calls.append((request, identity, header))
+        return "tenant_async"
+
+    set_payments_tenant_resolver(_override)
+    try:
+        tenant_id = await resolve_payments_tenant_id(_request())
+    finally:
+        set_payments_tenant_resolver(None)
+
+    assert calls, "async override should be invoked"
+    assert tenant_id == "tenant_async"
+
+    service = await get_service(session=_DummySession(), tenant_id=tenant_id)
+    assert service.tenant_id == "tenant_async"
+
+
+@pytest.mark.asyncio
 async def test_override_can_defer_to_default_flow():
     override_calls: list[tuple[Request, Principal | None, str | None]] = []
 
