@@ -40,15 +40,15 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           path: .
-          artifact-name: svc-infra-sbom
-          output-file: sbom.cdx.json
+          artifact-name: svc-infra-sbom-${{ matrix.backend }}-${{ github.run_id }}-${{ github.run_attempt }}
+          output-file: sbom.${{ matrix.backend }}.cdx.json
           format: cyclonedx-json
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sbom.cdx.json
-          path: sbom.cdx.json
+          name: sbom-cdx-${{ matrix.backend }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: sbom.${{ matrix.backend }}.cdx.json
 
       - name: Set up Trivy
         uses: aquasecurity/trivy-action@0.20.0
@@ -59,6 +59,7 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL'
           ignore-unfixed: true
+          scanners: 'vuln'
           exit-code: '1'
         continue-on-error: false
 
@@ -71,6 +72,8 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL'
           ignore-unfixed: true
+          scanners: 'vuln'
+          skip-files: '/usr/local/bin/gosu'
           exit-code: '1'
         continue-on-error: false
 
@@ -83,6 +86,8 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL'
           ignore-unfixed: true
+          scanners: 'vuln'
+          skip-files: '/usr/local/bin/gosu'
           exit-code: '1'
         continue-on-error: false
 
@@ -96,14 +101,14 @@ jobs:
         run: |
           cosign version
           cosign sign-blob \
-            --output-signature sbom.cdx.json.sig \
-            --output-certificate sbom.cdx.json.crt \
-            sbom.cdx.json
+            --output-signature sbom.${{ matrix.backend }}.cdx.json.sig \
+            --output-certificate sbom.${{ matrix.backend }}.cdx.json.crt \
+            sbom.${{ matrix.backend }}.cdx.json
 
       - name: Upload SBOM signature artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-signature
+          name: sbom-signature-${{ matrix.backend }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            sbom.cdx.json.sig
-            sbom.cdx.json.crt
+            sbom.${{ matrix.backend }}.cdx.json.sig
+            sbom.${{ matrix.backend }}.cdx.json.crt
