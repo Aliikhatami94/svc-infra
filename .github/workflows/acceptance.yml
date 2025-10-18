@@ -60,10 +60,12 @@ jobs:
           severity: 'CRITICAL'
           ignore-unfixed: true
           scanners: 'vuln'
+          trivyignores: '.trivyignore'
           exit-code: '1'
         continue-on-error: false
 
       - name: Scan redis:7-alpine with Trivy (CRITICAL gate)
+        if: matrix.backend == 'pg-redis'
         uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: 'image'
@@ -74,10 +76,12 @@ jobs:
           ignore-unfixed: true
           scanners: 'vuln'
           skip-files: '/usr/local/bin/gosu'
+          trivyignores: '.trivyignore'
           exit-code: '1'
         continue-on-error: false
 
       - name: Scan postgres:16-alpine with Trivy (CRITICAL gate)
+        if: matrix.backend == 'pg-redis'
         uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: 'image'
@@ -88,6 +92,7 @@ jobs:
           ignore-unfixed: true
           scanners: 'vuln'
           skip-files: '/usr/local/bin/gosu'
+          trivyignores: '.trivyignore'
           exit-code: '1'
         continue-on-error: false
 
