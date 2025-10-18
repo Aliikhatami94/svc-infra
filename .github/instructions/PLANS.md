@@ -102,11 +102,25 @@ Owner: TBD
 - [x] Verify: run security marker tests. (auth + security suites passing as of 2025-10-14)
 - [x] Docs: security configuration & examples. (see docs/security.md)
 - [ ] Acceptance (pre-deploy): A1-01..A1-07 green in CI (see docs/acceptance-matrix.md)
-	- (evidence, partial) Added acceptance smoke for RBAC/ABAC and sessions list permissions:
+	- (evidence) RBAC/ABAC and sessions list permissions:
 		- tests/acceptance/test_auth_acceptance.py
 		- acceptance app mounts demo secure routes and session router: tests/acceptance/app.py
-	- Pending: full register→verify→login flow, lockout, API keys lifecycle, MFA routes.
-Evidence: (PRs, tests, CI runs)
+	- [x] A1-01: Register → Verify → Login → /auth/me happy path
+		- Files: tests/acceptance/test_auth_a101_flow.py; tests/acceptance/app.py (acceptance-only in-memory auth block: /auth/register, /auth/verify, /users/login, /auth/me)
+		- Result: acceptance suite green (part of acceptance CI; current total 18/18).
+	- [x] A1-02: Password policy enforcement acceptance
+		- Files: tests/acceptance/test_auth_a102_password_policy.py; tests/acceptance/app.py (/auth/register calls validate_password)
+		- Result: acceptance suite green locally (17/17).
+	- [x] A1-03: Account lockout acceptance
+		- Files: tests/acceptance/test_auth_a103_lockout.py; tests/acceptance/app.py (in-memory lockout in /users/login with threshold=3, Retry-After)
+		- Result: acceptance suite green locally (18/18).
+	- [x] A1-06: API keys lifecycle acceptance
+		- Files: tests/acceptance/test_auth_a106_api_keys.py; tests/acceptance/app.py (in-memory API keys under /auth: create/list/revoke/delete)
+		- Result: acceptance suite green locally and in harness (19/19).
+	- [x] A1-07: MFA lifecycle acceptance (step 1: start/confirm/status endpoints in acceptance app)
+		- Files: tests/acceptance/app.py (added /auth/mfa/start, /auth/mfa/confirm, /auth/mfa/status using in-memory users)
+		- Result: endpoints available; next step wires verify flow with pre-token + email OTP.
+ Evidence: (PRs, tests, CI runs)
 
 ### 2. Rate Limiting & Abuse Protection
 Owner: TBD

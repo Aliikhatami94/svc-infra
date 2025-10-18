@@ -191,9 +191,16 @@ def _collect_metadata() -> list[object]:
                 if name not in pkgs:
                     pkgs.append(name)
 
-    # Always also try a bare 'models'
+    # Only attempt a bare 'models' import if discoverable to avoid noisy tracebacks
     if "models" not in pkgs:
-        pkgs.append("models")
+        try:
+            spec = getattr(importlib, "util", None)
+            if spec is not None and getattr(spec, "find_spec", None) is not None:
+                if spec.find_spec("models") is not None:
+                    pkgs.append("models")
+        except Exception:
+            # If discovery fails, skip adding bare 'models'
+            pass
 
     def _import_and_collect(modname: str):
         try:
