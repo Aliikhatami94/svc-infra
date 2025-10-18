@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 import pytest_asyncio
 
-from tests.utils.test_helpers import MockDatabaseSession
+from tests.unit.utils.test_helpers import MockDatabaseSession
 
 
 # Test NoSQL document models

@@ -12,15 +12,18 @@ Comprehensive checklist for making the framework production-ready. Each section 
 ## Must-have (Ship with v1)
 
 ### A0. Acceptance Harness & CI Promotion Gate (new)
-- [ ] Design: Acceptance env contract (ports, env, seed users, base URL). (ADR-0009 Acceptance Harness)
-- [ ] Implement: docker-compose.test.yml + Makefile targets (accept/up/wait/seed/down).
-- [ ] Implement: Seed script and helpers (scripts/seed-acceptance.sh; tests/acceptance/_seed.py, _auth.py, _http.py).
-- [ ] Implement: health/readiness probes and wait-for helper.
-- [ ] Verify: CI job build-and-accept runs compose up, seeds, pytest -m "acceptance or smoke", OpenAPI lint, API Doctor, teardown.
-- [ ] Docs: docs/acceptance.md (how to run locally; make accept) and docs/acceptance-matrix.md (A-IDs mapping).
+- [x] Design: Acceptance env contract (ports, env, seed users, base URL). (ADR-0009 — docs/acceptance.md)
+- [x] Implement: docker-compose.test.yml + Makefile targets (accept/up/wait/seed/down).
+	- Files: docker-compose.test.yml, Makefile
+- [x] Implement: minimal acceptance app and first smoke test.
+	- Files: tests/acceptance/app.py, tests/acceptance/test_smoke_ping.py, tests/acceptance/conftest.py
+- [x] Implement: wait-for helper (Makefile curl loop) and tester container.
+- [x] Verify: CI job to run acceptance matrix and teardown.
+	- Files: .github/workflows/acceptance.yml
+- [x] Docs: docs/acceptance.md and docs/acceptance-matrix.md updated for tester and profiles.
  - [ ] Supply-chain: generate SBOM and image scan (Trivy/Grype) with severity gate; upload SBOM as artifact.
  - [ ] Provenance: sign/attest images (cosign/SLSA provenance) — best-effort for v1.
- - [ ] Backend matrix: run acceptance against in-memory stores AND Redis+Postgres.
+ - [x] Backend matrix: run acceptance against in-memory stores AND Redis+Postgres (via COMPOSE_PROFILES).
 
 ### 0. Backfill Coverage for Pre-Existing Modules (prior to this plan)
 Owner: TBD

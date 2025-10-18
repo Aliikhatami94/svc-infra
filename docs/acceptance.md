@@ -3,7 +3,7 @@
 This guide describes the acceptance harness that runs post-build against an ephemeral stack. Artifacts are promoted only if acceptance checks pass.
 
 ## Stack
-- docker-compose.test.yml: api (image from CI), db, redis
+- docker-compose.test.yml: api (uvicorn serving tests.acceptance.app), optional db/redis (via profiles), and a tester container to run pytest inside
 - Makefile targets: accept, compose_up, wait, seed, down
 - Health probes: /healthz (liveness), /readyz (readiness), /startupz (startup)
 
@@ -11,15 +11,15 @@ This guide describes the acceptance harness that runs post-build against an ephe
 1. Build image
 2. docker compose up -d (test stack)
 3. Seed acceptance data (admin, user, tenants, API key)
-4. pytest -m "acceptance or smoke" -q
+4. Run pytest inside tester: docker compose run --rm tester (Makefile wires this)
 5. OpenAPI lint & API Doctor
 6. Teardown
 
 ## Supply-chain & Matrix (v1 scope)
 - SBOM: generate and upload as artifact; image scan (Trivy/Grype) with severity gate.
 - Provenance: sign/attest images (cosign/SLSA) on best-effort basis.
-- Backend matrix: run acceptance against two stacks:
-	1) in-memory stores, 2) Redis + Postgres.
+- Backend matrix: run acceptance against two stacks via COMPOSE_PROFILES:
+	1) in-memory stores (default), 2) Redis + Postgres (COMPOSE_PROFILES=pg-redis).
 
 ## Additional Acceptance Checks (fast wins)
 - Headers/CORS: assert HSTS, X-Content-Type-Options, Referrer-Policy, X-Frame-Options/SameSite; OPTIONS preflight behavior.
@@ -30,7 +30,9 @@ This guide describes the acceptance harness that runs post-build against an ephe
 
 ## Local usage
 - make accept (runs the full flow locally)
-- pytest -m acceptance (against a running local stack) with BASE_URL=http://localhost:8000
+- make down (tears down the stack)
+- To run tests manually: docker compose run --rm tester
+- To target a different backend: COMPOSE_PROFILES=pg-redis make accept
 
 ## Files
 - tests/acceptance/conftest.py: BASE_URL, httpx client, fixtures
