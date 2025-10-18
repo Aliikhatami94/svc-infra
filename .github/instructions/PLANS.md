@@ -47,9 +47,9 @@ Evidence: (PRs, tests, CI runs)
 
 - CLI (DB/Alembic) and Core CLIs
 	- [~] Research: existing commands (src/svc_infra/cli/cmds/db/sql/alembic_cmds.py; tests/unit/db/sql/*; dx/add.py).
-	- [ ] Implement: backfill unit tests for help flags and error paths (bad dotted paths, missing DB).
-	- [ ] Docs: CLI reference snippets in docs (db workflow, dx helpers).
-	- [ ] Acceptance (pre-deploy): migrate/rollback/seed exit 0 in ephemeral stack (A10-01).
+	- [x] Implement: backfill unit tests for help flags and error paths (bad dotted paths, missing DB). (tests/unit/cli/test_cli_help_and_errors.py)
+	- [x] Docs: CLI reference snippets in docs (db workflow, dx helpers). (docs/cli.md)
+	- [x] Acceptance (pre-deploy): migrate/rollback/seed exit 0 in ephemeral stack (A10-01). (Makefile runs sql-setup-and-migrate/current/downgrade/upgrade against ephemeral sqlite; then sql-seed no-op)
 
 - Observability (obs add + CLI)
 	- [~] Research: add_observability and obs CLI (src/svc_infra/obs/*; tests/unit/obs/*).
