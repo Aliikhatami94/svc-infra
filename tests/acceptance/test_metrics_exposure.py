@@ -5,6 +5,7 @@ import os
 import pytest
 
 
+@pytest.mark.acceptance
 @pytest.mark.ops
 def test_metrics_endpoint_exposes_basic_series(client):
     # Ensure observability is enabled in acceptance env

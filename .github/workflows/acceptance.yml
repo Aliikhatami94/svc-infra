@@ -2,6 +2,12 @@ name: A0 Acceptance
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'feature/**'
+      - 'release/**'
   pull_request:
     branches: ["*"]
 
