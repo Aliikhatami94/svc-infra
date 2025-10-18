@@ -33,14 +33,17 @@ pytest_accept:
 
 accept:
 	@echo "[accept] Running full acceptance (with auto-clean)"
-	@set -e; \
-	{ \
-		$(MAKE) compose_up; \
-		$(MAKE) wait; \
-		$(MAKE) seed; \
-		$(MAKE) pytest_accept; \
-	}; \
-	status=$$?; \
+	@status=0; \
+	$(MAKE) compose_up || status=$$?; \
+	if [ $$status -eq 0 ]; then \
+		$(MAKE) wait || status=$$?; \
+	fi; \
+	if [ $$status -eq 0 ]; then \
+		$(MAKE) seed || status=$$?; \
+	fi; \
+	if [ $$status -eq 0 ]; then \
+		$(MAKE) pytest_accept || status=$$?; \
+	fi; \
 	echo "[accept] Cleaning acceptance stack (containers, volumes, images)"; \
 	docker compose -f docker-compose.test.yml down --rmi $(RMI) -v --remove-orphans || true; \
 	if [ $$status -eq 0 ]; then \
