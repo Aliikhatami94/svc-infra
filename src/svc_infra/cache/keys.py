@@ -88,12 +88,32 @@ def build_key_variants_renderer(template: str) -> Callable[..., list[str]]:
 
 
 def resolve_tags(tags, *args, **kwargs) -> list[str]:
-    """Resolve tags from static list or callable."""
+    """Resolve tags from static list or callable and render templates with kwargs.
+
+    Supports entries like "thing:{id}" which will be formatted using provided kwargs.
+    Non-string items are passed through as str(). Missing keys are skipped with a warning.
+    """
     try:
+        # 1) Obtain raw tags list
         if callable(tags):
-            result = tags(*args, **kwargs)
-            return list(result) if result is not None else []
-        return list(tags)
+            raw = tags(*args, **kwargs)
+            raw_list = list(raw) if raw is not None else []
+        else:
+            raw_list = list(tags)
+
+        # 2) Render any templates using kwargs
+        rendered: list[str] = []
+        for t in raw_list:
+            try:
+                if isinstance(t, str) and ("{" in t and "}" in t):
+                    rendered.append(t.format(**kwargs))
+                else:
+                    rendered.append(str(t))
+            except KeyError as e:
+                logger.warning(f"Tag template missing key {e} in '{t}'")
+            except Exception as e:
+                logger.warning(f"Failed to render tag '{t}': {e}")
+        return [r for r in rendered if r]
     except Exception as e:
         logger.error(f"Failed to resolve cache tags: {e}")
         return []

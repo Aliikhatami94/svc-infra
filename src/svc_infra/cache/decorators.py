@@ -98,7 +98,25 @@ def cache_read(
     ttl_val = validate_ttl(ttl)
     template = build_key_template(key)
     namespace = _alias() or ""
-    tags_func = create_tags_function(tags)
+    # Build a tags function that renders any templates against the call kwargs
+    base_tags_func = create_tags_function(tags)
+
+    def tags_func(*_args, **call_kwargs):
+        try:
+            raw = base_tags_func(*_args, **call_kwargs) or []
+            rendered = []
+            for t in raw:
+                if isinstance(t, str) and ("{" in t and "}" in t):
+                    try:
+                        rendered.append(t.format(**call_kwargs))
+                    except Exception:
+                        # Best effort: fall back to original
+                        rendered.append(t)
+                else:
+                    rendered.append(t)
+            return rendered
+        except Exception:
+            return raw if isinstance(raw, list) else []
 
     def _decorator(func: Callable[..., Awaitable[Any]]):
         # Try different cashews cache decorator signatures for compatibility

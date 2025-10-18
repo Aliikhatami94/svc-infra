@@ -80,9 +80,12 @@ def setup_cache(
         logger.info(f"Cache version updated to: {_current_version}")
 
     # Setup backend connection
+    # Newer cashews versions require an explicit settings_url; default to in-memory
+    # backend when no URL is provided so acceptance/unit tests work out of the box.
     try:
-        setup_awaitable = _cache.setup(url) if url else _cache.setup()
-        logger.info(f"Cache backend setup initiated with URL: {url or 'default'}")
+        settings_url = url or "mem://"
+        setup_awaitable = _cache.setup(settings_url)
+        logger.info(f"Cache backend setup initiated with URL: {settings_url}")
     except Exception as e:
         logger.error(f"Failed to setup cache backend: {e}")
         raise

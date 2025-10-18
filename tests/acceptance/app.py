@@ -19,6 +19,7 @@ from svc_infra.api.fastapi.apf_payments.setup import add_payments
 from svc_infra.api.fastapi.auth.security import Principal, _current_principal
 from svc_infra.api.fastapi.db.sql.session import get_session
 from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
+from svc_infra.security.add import add_security
 
 # Minimal acceptance app wiring the library's routers and defaults
 os.environ.setdefault("PAYMENTS_PROVIDER", "fake")
@@ -51,6 +52,9 @@ app = easy_service_app(
         )
     ),
 )
+
+# Install security headers so acceptance can assert their presence
+add_security(app)
 
 
 # Minimal fake payments adapter for acceptance (no external calls).
