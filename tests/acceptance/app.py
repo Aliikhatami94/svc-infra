@@ -112,7 +112,33 @@ add_payments(app, prefix="/payments", register_default_providers=False, adapters
 
 
 # Replace the DB session dependency with a no-op stub so tests stay self-contained.
+class _StubScalarResult:
+    def __init__(self, rows: list | None = None):
+        self._rows = rows or []
+
+    def all(self):
+        return list(self._rows)
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+    def one(self):  # pragma: no cover - best effort stub behaviour
+        if not self._rows:
+            raise ValueError("No rows available")
+        if len(self._rows) > 1:
+            raise ValueError("Multiple rows available")
+        return self._rows[0]
+
+
+class _StubResult(_StubScalarResult):
+    def scalars(self):
+        return _StubScalarResult(self._rows)
+
+
 class _StubSession:
+    async def execute(self, _statement):
+        return _StubResult([])
+
     async def scalar(self, _statement):
         return None
 
