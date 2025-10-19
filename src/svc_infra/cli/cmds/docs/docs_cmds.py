@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
@@ -24,31 +25,50 @@ def _discover_fs_topics(docs_dir: Path) -> Dict[str, Path]:
 def _discover_pkg_topics() -> Dict[str, Path]:
     """Discover docs packaged under 'docs/' in the installed distribution.
 
-    This lets 'svc-infra docs' work from external projects that don't have a
-    local docs/ directory by falling back to files shipped in the wheel.
+    Works in external projects without a local docs/ by inspecting the wheel
+    metadata and, as a fallback, searching for a top-level docs/ next to the
+    installed package directory in site-packages.
     """
     topics: Dict[str, Path] = {}
-    try:
-        dist = distribution("svc-infra")
-    except PackageNotFoundError:
-        return topics
 
-    files = getattr(dist, "files", None) or []
-    for f in files:
-        # f is a PackagePath; string form like 'docs/topic.md'
-        s = str(f)
-        if not s.startswith("docs/") or not s.endswith(".md"):
-            continue
-        name = Path(s).stem.replace(" ", "-")
+    # 1) Prefer distribution metadata (RECORD) for both hyphen/underscore names
+    dist = None
+    for name in ("svc-infra", "svc_infra"):
         try:
-            abs_path = dist.locate_file(f)
-            # Ensure it's a file before adding
-            abs_p = Path(abs_path)
-            if abs_p.exists() and abs_p.is_file():
-                topics[name] = abs_p
-        except Exception:
-            # best-effort; skip unreadable entries
-            continue
+            dist = distribution(name)
+            break
+        except PackageNotFoundError:
+            dist = None
+
+    if dist is not None:
+        files = getattr(dist, "files", None) or []
+        for f in files:
+            s = str(f)
+            if not s.startswith("docs/") or not s.endswith(".md"):
+                continue
+            topic_name = Path(s).stem.replace(" ", "-")
+            try:
+                abs_path = Path(dist.locate_file(f))
+                if abs_path.exists() and abs_path.is_file():
+                    topics[topic_name] = abs_path
+            except Exception:
+                # Best effort; continue to next
+                continue
+
+    # 2) Fallback: site-packages sibling 'docs/' directory
+    try:
+        spec = importlib.util.find_spec("svc_infra")
+        if spec and spec.submodule_search_locations:
+            pkg_dir = Path(next(iter(spec.submodule_search_locations)))
+            candidate = pkg_dir.parent / "docs"
+            if candidate.exists() and candidate.is_dir():
+                for p in sorted(candidate.glob("*.md")):
+                    if p.is_file():
+                        topics.setdefault(p.stem.replace(" ", "-"), p)
+    except Exception:
+        # Optional fallback only
+        pass
+
     return topics
 
 
@@ -57,19 +77,21 @@ def _resolve_docs_dir(ctx: click.Context) -> Path | None:
     # executes subcommands in child contexts that do not inherit params.
     current: click.Context | None = ctx
     while current is not None:
-        docs_dir = (current.params or {}).get("docs_dir")
-        if docs_dir:
-            path = docs_dir if isinstance(docs_dir, Path) else Path(docs_dir)
+        docs_dir_opt = (current.params or {}).get("docs_dir")
+        if docs_dir_opt:
+            path = docs_dir_opt if isinstance(docs_dir_opt, Path) else Path(docs_dir_opt)
             path = path.expanduser()
             if path.exists():
                 return path
         current = current.parent
+
     # Env var next
     env_dir = os.getenv("SVC_INFRA_DOCS_DIR")
     if env_dir:
         p = Path(env_dir).expanduser()
         if p.exists():
             return p
+
     # Project docs
     root = resolve_project_root()
     proj_docs = root / "docs"
@@ -88,16 +110,15 @@ class DocsGroup(TyperGroup):
         names.extend([k for k in fs.keys()])
         names.extend([k for k in pkg.keys() if k not in fs])
         # Deduplicate and sort
-        uniq = sorted({*names})
-        return uniq
+        return sorted({*names})
 
     def get_command(self, ctx: click.Context, name: str) -> click.Command | None:
-        # Built-ins first (e.g., list)
+        # Built-ins first (e.g., list, show)
         cmd = super().get_command(ctx, name)
         if cmd is not None:
             return cmd
 
-        # Dynamic topic resolution
+        # Dynamic topic resolution from FS
         dir_to_use = _resolve_docs_dir(ctx)
         fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
         if name in fs:
@@ -144,6 +165,10 @@ def register(app: typer.Typer) -> None:
             fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
             if topic in fs:
                 typer.echo(fs[topic].read_text(encoding="utf-8", errors="replace"))
+                raise typer.Exit(code=0)
+            pkg = _discover_pkg_topics()
+            if topic in pkg:
+                typer.echo(pkg[topic].read_text(encoding="utf-8", errors="replace"))
                 raise typer.Exit(code=0)
             raise typer.BadParameter(f"Unknown topic: {topic}")
 
