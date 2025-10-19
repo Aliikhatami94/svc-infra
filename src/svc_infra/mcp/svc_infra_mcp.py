@@ -3,6 +3,8 @@ from __future__ import annotations
 from enum import Enum
 
 from ai_infra.llm.tools.custom.cli import cli_cmd_help, cli_subcmd_help
+from svc_infra.app.env import prepare_env
+from svc_infra.cli.foundation.runner import run_from_root
 from ai_infra.mcp.server.tools import mcp_from_functions
 
 CLI_PROG = "svc-infra"
@@ -53,7 +55,19 @@ async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict:
     Get help text for a specific subcommand of svc-infra CLI.
     (Enum keeps a tight schema; function signature remains simple.)
     """
-    return await cli_subcmd_help(CLI_PROG, subcommand)
+    tokens = subcommand.value.split()
+    if len(tokens) == 1:
+        return await cli_subcmd_help(CLI_PROG, subcommand)
+
+    root = prepare_env()
+    text = await run_from_root(root, CLI_PROG, [*tokens, "--help"])
+    return {
+        "ok": True,
+        "action": "subcommand_help",
+        "subcommand": subcommand.value,
+        "project_root": str(root),
+        "help": text,
+    }
 
 
 mcp = mcp_from_functions(
