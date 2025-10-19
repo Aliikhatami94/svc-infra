@@ -20,17 +20,23 @@ from svc_infra.cli.foundation.typer_bootstrap import pre_cli
 app = typer.Typer(no_args_is_help=True, add_completion=False, help=_HELP)
 pre_cli(app)
 
-# --- sql commands ---
-register_alembic(app)
-register_sql_scaffold(app)
-register_sql_export(app)
+# --- sql group ---
+sql_app = typer.Typer(no_args_is_help=True, add_completion=False, help="SQL commands")
+register_alembic(sql_app)
+register_sql_scaffold(sql_app)
+register_sql_export(sql_app)
+app.add_typer(sql_app, name="sql")
 
-# --- nosql commands ---
-register_mongo(app)
-register_mongo_scaffold(app)
+# --- mongo group ---
+mongo_app = typer.Typer(no_args_is_help=True, add_completion=False, help="MongoDB commands")
+register_mongo(mongo_app)
+register_mongo_scaffold(mongo_app)
+app.add_typer(mongo_app, name="mongo")
 
-# -- observability commands ---
-register_obs(app)
+# -- obs group ---
+obs_app = typer.Typer(no_args_is_help=True, add_completion=False, help="Observability commands")
+register_obs(obs_app)
+app.add_typer(obs_app, name="obs")
 
 # -- dx commands ---
 register_dx(app)

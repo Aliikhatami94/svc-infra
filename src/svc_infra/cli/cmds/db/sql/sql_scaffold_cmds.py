@@ -134,6 +134,6 @@ def cmd_scaffold_schemas(
 
 
 def register(app: typer.Typer) -> None:
-    app.command("sql-scaffold")(cmd_scaffold)
-    app.command("sql-scaffold-models")(cmd_scaffold_models)
-    app.command("sql-scaffold-schemas")(cmd_scaffold_schemas)
+    app.command("scaffold")(cmd_scaffold)
+    app.command("scaffold-models")(cmd_scaffold_models)
+    app.command("scaffold-schemas")(cmd_scaffold_schemas)

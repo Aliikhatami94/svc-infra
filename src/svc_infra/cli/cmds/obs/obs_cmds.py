@@ -182,6 +182,7 @@ def scaffold(target: str = typer.Option(..., help="compose|railway|k8s|fly")):
 
 
 def register(app: typer.Typer) -> None:
-    app.command("obs-up")(up)
-    app.command("obs-down")(down)
-    app.command("obs-scaffold")(scaffold)
+    # Attach to 'obs' group app
+    app.command("up")(up)
+    app.command("down")(down)
+    app.command("scaffold")(scaffold)

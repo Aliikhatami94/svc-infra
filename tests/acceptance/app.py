@@ -39,6 +39,7 @@ from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, eas
 from svc_infra.api.fastapi.middleware.ratelimit import (
     SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
 )
+from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
 from svc_infra.obs import metrics as _metrics
 from svc_infra.security.add import add_security
 from svc_infra.security.passwords import PasswordValidationError, validate_password
@@ -736,11 +737,27 @@ app.include_router(_auth_router)
 # ---------------- Acceptance-only Rate Limiting (A2) -----------------
 _rl = APIRouter(prefix="/rl", tags=["acceptance-ratelimit"])
 
+# Scope dependency-based RL state by a per-process salt to avoid any cross-run/window
+# collisions when re-running acceptance within the same Python process/time window.
+_RL_PREFIX = f"acc:{secrets.token_hex(4)}:"
+
+
+class _PrefixedStore:
+    def __init__(self, inner: InMemoryRateLimitStore, prefix: str) -> None:
+        self._inner = inner
+        self._prefix = prefix
+
+    def incr(self, key: str, window: int):
+        return self._inner.incr(f"{self._prefix}{key}", window)
+
+
 _dep_rate_limit = rate_limiter(
     limit=3,
     window=60,
     # Allow tests to override the bucket key to avoid cross-test interference.
     key_fn=lambda r: (r.headers.get("X-RL-Key") or "dep"),
+    # Use a store wrapper that namespaces keys uniquely per acceptance app instance.
+    store=_PrefixedStore(InMemoryRateLimitStore(limit=3), _RL_PREFIX),
 )
 
 

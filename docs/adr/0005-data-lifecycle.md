@@ -12,7 +12,7 @@ We need a coherent Data Lifecycle story in svc-infra that covers:
 - Backups/PITR verification: a job that exercises restore checks or at least validates backup health signals.
 
 Existing building blocks:
-- Migrations CLI with end-to-end "setup-and-migrate" and new `sql-seed` command for executing a user-specified seed callable.
+- Migrations CLI with end-to-end "setup-and-migrate" and new `sql seed` command for executing a user-specified seed callable.
   - Code: `src/svc_infra/cli/cmds/db/sql/alembic_cmds.py` (cmd_setup_and_migrate, cmd_seed)
 - Soft delete support in repository and scaffold:
   - Repo filtering: `src/svc_infra/db/sql/repository.py` (soft_delete flags, `deleted_at` timestamp, optional active flag)
