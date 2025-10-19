@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from typing import Dict, List
 
@@ -20,9 +21,35 @@ def _discover_fs_topics(docs_dir: Path) -> Dict[str, Path]:
     return topics
 
 
-def _discover_pkg_topics() -> Dict[str, object]:
-    # No bundled fallback; docs are packaged from repo root 'docs/'
-    return {}
+def _discover_pkg_topics() -> Dict[str, Path]:
+    """Discover docs packaged under 'docs/' in the installed distribution.
+
+    This lets 'svc-infra docs' work from external projects that don't have a
+    local docs/ directory by falling back to files shipped in the wheel.
+    """
+    topics: Dict[str, Path] = {}
+    try:
+        dist = distribution("svc-infra")
+    except PackageNotFoundError:
+        return topics
+
+    files = getattr(dist, "files", None) or []
+    for f in files:
+        # f is a PackagePath; string form like 'docs/topic.md'
+        s = str(f)
+        if not s.startswith("docs/") or not s.endswith(".md"):
+            continue
+        name = Path(s).stem.replace(" ", "-")
+        try:
+            abs_path = dist.locate_file(f)
+            # Ensure it's a file before adding
+            abs_p = Path(abs_path)
+            if abs_p.exists() and abs_p.is_file():
+                topics[name] = abs_p
+        except Exception:
+            # best-effort; skip unreadable entries
+            continue
+    return topics
 
 
 def _resolve_docs_dir(ctx: click.Context) -> Path | None:
@@ -56,7 +83,10 @@ class DocsGroup(TyperGroup):
         names: List[str] = list(super().list_commands(ctx) or [])
         dir_to_use = _resolve_docs_dir(ctx)
         fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
-        names.extend(fs.keys())
+        pkg = _discover_pkg_topics()
+        # FS topics win on conflicts; add both for visibility
+        names.extend([k for k in fs.keys()])
+        names.extend([k for k in pkg.keys() if k not in fs])
         # Deduplicate and sort
         uniq = sorted({*names})
         return uniq
@@ -79,7 +109,16 @@ class DocsGroup(TyperGroup):
 
             return _show_fs
 
-        # No packaged fallback
+        # Packaged fallback
+        pkg = _discover_pkg_topics()
+        if name in pkg:
+            file_path = pkg[name]
+
+            @click.command(name=name)
+            def _show_pkg() -> None:
+                click.echo(file_path.read_text(encoding="utf-8", errors="replace"))
+
+            return _show_pkg
 
         return None
 
@@ -114,12 +153,22 @@ def register(app: typer.Typer) -> None:
         root = resolve_project_root()
         dir_to_use = _resolve_docs_dir(ctx)
         fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
-        for name, path in fs.items():
+        pkg = _discover_pkg_topics()
+
+        # Print FS topics first (project/env/option), then packaged topics not shadowed by FS
+        def _print(name: str, path: Path) -> None:
             try:
                 rel = path.relative_to(root)
                 typer.echo(f"{name}\t{rel}")
             except Exception:
+                # For packaged topics, path will be site-packages absolute path
                 typer.echo(f"{name}\t{path}")
+
+        for name, path in fs.items():
+            _print(name, path)
+        for name, path in pkg.items():
+            if name not in fs:
+                _print(name, path)
 
     # Also support a generic "show" command
     @docs_app.command("show", help="Show docs for a topic (alternative to dynamic subcommand)")
@@ -129,6 +178,10 @@ def register(app: typer.Typer) -> None:
         fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
         if topic in fs:
             typer.echo(fs[topic].read_text(encoding="utf-8", errors="replace"))
+            return
+        pkg = _discover_pkg_topics()
+        if topic in pkg:
+            typer.echo(pkg[topic].read_text(encoding="utf-8", errors="replace"))
             return
         raise typer.BadParameter(f"Unknown topic: {topic}")
 
