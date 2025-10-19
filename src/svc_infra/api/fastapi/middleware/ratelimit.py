@@ -27,6 +27,10 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
         limit_resolver=None,
         # If True, automatically scopes the bucket key by tenant id when available
         scope_by_tenant: bool = False,
+        # When True, allows unresolved tenant IDs to fall back to an "X-Tenant-Id" header value.
+        # Disabled by default to avoid trusting arbitrary client-provided headers which could
+        # otherwise be used to evade per-tenant limits when authentication fails.
+        allow_untrusted_tenant_header: bool = False,
         store: RateLimitStore | None = None,
     ):
         super().__init__(app)
@@ -34,6 +38,7 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
         self.key_fn = key_fn or (lambda r: r.headers.get("X-API-Key") or r.client.host)
         self._limit_resolver = limit_resolver
         self.scope_by_tenant = scope_by_tenant
+        self._allow_untrusted_tenant_header = allow_untrusted_tenant_header
         self.store = store or InMemoryRateLimitStore(limit=limit)
 
     async def dispatch(self, request, call_next):
@@ -45,6 +50,9 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
                     tenant_id = await _resolve_tenant_id(request)
             except Exception:
                 tenant_id = None
+            # Fallback: read from header only if explicitly trusted
+            if not tenant_id and self._allow_untrusted_tenant_header:
+                tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get("X-Tenant-ID")
 
         key = self.key_fn(request)
         if self.scope_by_tenant and tenant_id:

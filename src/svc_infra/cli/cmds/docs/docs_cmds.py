@@ -21,17 +21,8 @@ def _discover_fs_topics(docs_dir: Path) -> Dict[str, Path]:
 
 
 def _discover_pkg_topics() -> Dict[str, object]:
-    topics: Dict[str, object] = {}
-    try:
-        import importlib.resources as ir
-
-        pkg_docs = ir.files("svc_infra.bundled_docs")
-        for res in pkg_docs.iterdir():
-            if res.name.endswith(".md"):
-                topics[Path(res.name).stem.replace(" ", "-")] = res
-    except Exception:
-        pass
-    return topics
+    # No bundled fallback; docs are packaged from repo root 'docs/'
+    return {}
 
 
 def _resolve_docs_dir(ctx: click.Context) -> Path | None:
@@ -65,9 +56,7 @@ class DocsGroup(TyperGroup):
         names: List[str] = list(super().list_commands(ctx) or [])
         dir_to_use = _resolve_docs_dir(ctx)
         fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
-        pkg = _discover_pkg_topics() if not fs else {}
         names.extend(fs.keys())
-        names.extend(pkg.keys())
         # Deduplicate and sort
         uniq = sorted({*names})
         return uniq
@@ -90,27 +79,7 @@ class DocsGroup(TyperGroup):
 
             return _show_fs
 
-        if not fs:
-            pkg = _discover_pkg_topics()
-            if name in pkg:
-                res = pkg[name]
-
-                @click.command(name=name)
-                def _show_pkg() -> None:
-                    try:
-                        import importlib.resources as ir
-
-                        content = getattr(res, "read_text", None)
-                        if callable(content):
-                            text = content(encoding="utf-8", errors="replace")
-                        else:
-                            with ir.as_file(res) as p:
-                                text = Path(p).read_text(encoding="utf-8", errors="replace")
-                        click.echo(text)
-                    except Exception as e:  # pragma: no cover
-                        raise click.ClickException(f"Failed to load bundled doc: {e}")
-
-                return _show_pkg
+        # No packaged fallback
 
         return None
 
@@ -137,23 +106,6 @@ def register(app: typer.Typer) -> None:
             if topic in fs:
                 typer.echo(fs[topic].read_text(encoding="utf-8", errors="replace"))
                 raise typer.Exit(code=0)
-            if not fs:
-                pkg = _discover_pkg_topics()
-                if topic in pkg:
-                    try:
-                        import importlib.resources as ir
-
-                        res = pkg[topic]
-                        content = getattr(res, "read_text", None)
-                        if callable(content):
-                            text = content(encoding="utf-8", errors="replace")
-                        else:
-                            with ir.as_file(res) as p:
-                                text = Path(p).read_text(encoding="utf-8", errors="replace")
-                        typer.echo(text)
-                        raise typer.Exit(code=0)
-                    except Exception as e:  # pragma: no cover
-                        raise typer.BadParameter(f"Failed to load bundled topic '{topic}': {e}")
             raise typer.BadParameter(f"Unknown topic: {topic}")
 
     @docs_app.command("list", help="List available documentation topics")
@@ -162,15 +114,12 @@ def register(app: typer.Typer) -> None:
         root = resolve_project_root()
         dir_to_use = _resolve_docs_dir(ctx)
         fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
-        pkg = _discover_pkg_topics() if not fs else {}
         for name, path in fs.items():
             try:
                 rel = path.relative_to(root)
                 typer.echo(f"{name}\t{rel}")
             except Exception:
                 typer.echo(f"{name}\t{path}")
-        for name in sorted(pkg.keys()):
-            typer.echo(f"{name}\t(bundled)")
 
     # Also support a generic "show" command
     @docs_app.command("show", help="Show docs for a topic (alternative to dynamic subcommand)")
@@ -181,23 +130,6 @@ def register(app: typer.Typer) -> None:
         if topic in fs:
             typer.echo(fs[topic].read_text(encoding="utf-8", errors="replace"))
             return
-        if not fs:
-            pkg = _discover_pkg_topics()
-            if topic in pkg:
-                try:
-                    import importlib.resources as ir
-
-                    res = pkg[topic]
-                    content = getattr(res, "read_text", None)
-                    if callable(content):
-                        text = content(encoding="utf-8", errors="replace")
-                    else:
-                        with ir.as_file(res) as p:
-                            text = Path(p).read_text(encoding="utf-8", errors="replace")
-                    typer.echo(text)
-                    return
-                except Exception as e:  # pragma: no cover
-                    raise typer.BadParameter(f"Failed to load bundled topic '{topic}': {e}")
         raise typer.BadParameter(f"Unknown topic: {topic}")
 
     app.add_typer(docs_app, name="docs")

@@ -36,6 +36,9 @@ from svc_infra.api.fastapi.auth.security import (
 from svc_infra.api.fastapi.db.sql.session import get_session
 from svc_infra.api.fastapi.dependencies.ratelimit import rate_limiter
 from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
+from svc_infra.api.fastapi.middleware.ratelimit import (
+    SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
+)
 from svc_infra.obs import metrics as _metrics
 from svc_infra.security.add import add_security
 from svc_infra.security.passwords import PasswordValidationError, validate_password
@@ -75,6 +78,37 @@ app = easy_service_app(
 
 # Install security headers so acceptance can assert their presence
 add_security(app)
+
+# Replace the default global rate limit middleware with a high-limit, path-scoped variant
+# to avoid cross-test interference from sharing the same client IP within a short window.
+# We still keep header behavior intact for acceptance assertions.
+try:
+    # Remove any pre-installed SimpleRateLimitMiddleware
+    app.user_middleware = [
+        m for m in app.user_middleware if getattr(m, "cls", None) is not _SimpleRateLimitMiddleware
+    ]
+
+    def _accept_rl_key_fn(r):
+        try:
+            client = getattr(r, "client", None)
+            host = getattr(client, "host", None)
+        except Exception:
+            host = None
+        key = r.headers.get("X-API-Key") or (host or "client")
+        # Scope by path to prevent one hot test from starving the rest
+        try:
+            path = str(getattr(r.url, "path", "") or "")
+        except Exception:
+            path = ""
+        return f"{key}:{path}"
+
+    # Add back with very high limit so suite-wide traffic doesn't hit 429s spuriously
+    app.add_middleware(_SimpleRateLimitMiddleware, limit=10000, window=60, key_fn=_accept_rl_key_fn)
+    # Rebuild middleware stack to apply changes immediately
+    app.middleware_stack = app.build_middleware_stack()
+except Exception:
+    # Best-effort: if FastAPI/Starlette internals change, do not break acceptance app
+    pass
 
 
 # Minimal fake payments adapter for acceptance (no external calls).
