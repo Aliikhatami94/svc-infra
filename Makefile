@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 RMI ?= all
 
-.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean test
+.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache test
 
 compose_up:
 	@echo "[accept] Starting test stack..."
@@ -89,6 +89,11 @@ unitv:
 clean:
 	@echo "[clean] Removing Python caches, build artifacts, and logs"
 	rm -rf **/__pycache__ __pycache__ .pytest_cache .mypy_cache .ruff_cache build dist *.egg-info *.log
+
+# Remove only Python __pycache__ directories (recursive)
+clean-pycache:
+	@echo "[clean] Removing all __pycache__ directories recursively"
+	@find . -type d -name '__pycache__' -prune -exec rm -rf {} +
 
 # --- Combined test target ---
 test:

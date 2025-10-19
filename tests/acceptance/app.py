@@ -34,7 +34,9 @@ from svc_infra.api.fastapi.auth.security import (
     resolve_bearer_or_cookie_principal,
 )
 from svc_infra.api.fastapi.db.sql.session import get_session
+from svc_infra.api.fastapi.dependencies.ratelimit import rate_limiter
 from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
+from svc_infra.obs import metrics as _metrics
 from svc_infra.security.add import add_security
 from svc_infra.security.passwords import PasswordValidationError, validate_password
 from svc_infra.security.permissions import RequireABAC, RequirePermission, owns_resource
@@ -696,3 +698,58 @@ async def _accept_apikey_delete(key_id: str, request: Request, force: bool = Fal
 
 # Include all acceptance auth endpoints under /auth after defining them
 app.include_router(_auth_router)
+
+# ---------------- Acceptance-only Rate Limiting (A2) -----------------
+_rl = APIRouter(prefix="/rl", tags=["acceptance-ratelimit"])
+
+_dep_rate_limit = rate_limiter(
+    limit=3,
+    window=60,
+    # Allow tests to override the bucket key to avoid cross-test interference.
+    key_fn=lambda r: (r.headers.get("X-RL-Key") or "dep"),
+)
+
+
+@_rl.get("/dep")
+async def rl_dep_echo(request: Request):
+    # Enforce dependency-based rate limit (3 per minute) using a fixed test key
+    await _dep_rate_limit(request)
+    return {"ok": True}
+
+
+# For middleware-based RL, we rely on global SimpleRateLimitMiddleware already added by easy_service_app
+# and use a path-specific key by overriding X-API-Key in the request in tests; no code change needed.
+
+app.include_router(_rl)
+
+# ---------------- Acceptance-only Abuse Heuristics (A2-03) -----------------
+_abuse = APIRouter(prefix="/_accept/abuse", tags=["acceptance-abuse"])
+
+_rate_limit_events: list[dict] = []
+
+
+def _record_rate_limit_event(key: str, limit: int, retry_after: int) -> None:
+    _rate_limit_events.append({"key": key, "limit": int(limit), "retry_after": int(retry_after)})
+
+
+@_abuse.post("/hooks/rate-limit/enable")
+def abuse_enable_rate_limit_hook():
+    """Enable capture of rate limit events into an in-memory list for acceptance tests."""
+    global _rate_limit_events
+    _rate_limit_events = []
+    _metrics.on_rate_limit_exceeded = _record_rate_limit_event  # type: ignore[assignment]
+    return {"enabled": True}
+
+
+@_abuse.post("/hooks/rate-limit/disable")
+def abuse_disable_rate_limit_hook():
+    _metrics.on_rate_limit_exceeded = None
+    return {"enabled": False}
+
+
+@_abuse.get("/hooks/rate-limit/events")
+def abuse_get_rate_limit_events():
+    return {"events": list(_rate_limit_events)}
+
+
+app.include_router(_abuse)

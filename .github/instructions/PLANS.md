@@ -135,7 +135,16 @@ Owner: TBD
 - [x] Tests: bucket depletion/reset, per-route override, Retry-After presence. (tests added)
 - [x] Verify: rate limiting test marker. (`-m ratelimit` available; auto-tagged tests)
 - [x] Docs: usage & tuning. (see docs/rate-limiting.md)
-- [ ] Acceptance (pre-deploy): A2-01..A2-03 green in CI (see docs/acceptance-matrix.md)
+- [x] Acceptance (pre-deploy): A2-01..A2-03 green in CI (see docs/acceptance-matrix.md)
+	- [x] A2-01: Dependency rate limit returns 429 with Retry-After
+		- Files: tests/acceptance/test_rate_limiting_acceptance.py (/rl/dep using rate_limiter)
+		- Result: test added; exercises 429 + Retry-After headers (uses header-isolated key)
+	- [x] A2-02: Middleware sets X-RateLimit-* headers on success
+		- Files: tests/acceptance/test_rate_limiting_acceptance.py (/ping with X-API-Key)
+		- Result: test added; asserts presence of X-RateLimit-Limit/Remaining/Reset
+	- [x] A2-03: Abuse heuristics acceptance (metrics hook)
+		- Files: tests/acceptance/test_abuse_heuristics_acceptance.py; tests/acceptance/app.py (acceptance-only hooks under /_accept/abuse)
+		- Result: metrics hook captures rate-limit events; acceptance asserts key/limit/retry_after. All acceptance tests pass.
 Evidence: (PRs, tests, CI runs)
 
 ### 3. Idempotency & Concurrency Controls

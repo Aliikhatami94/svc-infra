@@ -46,6 +46,7 @@ def problem_response(
     code: str | None = None,
     errors: list[dict] | None = None,
     trace_id: str | None = None,
+    headers: dict[str, str] | None = None,
 ) -> Response:
     body: Dict[str, Any] = {
         "type": type_uri,
@@ -62,7 +63,7 @@ def problem_response(
         body["errors"] = errors
     if trace_id:
         body["trace_id"] = trace_id
-    return JSONResponse(status_code=status, content=body, media_type=PROBLEM_MT)
+    return JSONResponse(status_code=status, content=body, media_type=PROBLEM_MT, headers=headers)
 
 
 def register_error_handlers(app):
@@ -104,14 +105,25 @@ def register_error_handlers(app):
     @app.exception_handler(HTTPException)
     async def handle_http_exception(request: Request, exc: HTTPException):
         trace_id = _trace_id_from_request(request)
-        title = {401: "Unauthorized", 403: "Forbidden", 404: "Not Found"}.get(
-            exc.status_code, "Error"
-        )
+        title = {
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            429: "Too Many Requests",
+        }.get(exc.status_code, "Error")
         detail = (
             exc.detail
             if not IS_PROD or exc.status_code < 500
             else "Something went wrong. Please contact support."
         )
+        # Preserve headers set on the exception (e.g., Retry-After for rate limits)
+        hdrs: dict[str, str] | None = None
+        try:
+            if getattr(exc, "headers", None):
+                # FastAPI/Starlette exceptions store headers as a dict[str, str]
+                hdrs = dict(getattr(exc, "headers"))  # type: ignore[arg-type]
+        except Exception:
+            hdrs = None
         return problem_response(
             status=exc.status_code,
             title=title,
@@ -119,19 +131,29 @@ def register_error_handlers(app):
             code=title.replace(" ", "_").upper(),
             instance=str(request.url),
             trace_id=trace_id,
+            headers=hdrs,
         )
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_starlette_http_exception(request: Request, exc: StarletteHTTPException):
         trace_id = _trace_id_from_request(request)
-        title = {401: "Unauthorized", 403: "Forbidden", 404: "Not Found"}.get(
-            exc.status_code, "Error"
-        )
+        title = {
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            429: "Too Many Requests",
+        }.get(exc.status_code, "Error")
         detail = (
             exc.detail
             if not IS_PROD or exc.status_code < 500
             else "Something went wrong. Please contact support."
         )
+        hdrs: dict[str, str] | None = None
+        try:
+            if getattr(exc, "headers", None):
+                hdrs = dict(getattr(exc, "headers"))  # type: ignore[arg-type]
+        except Exception:
+            hdrs = None
         return problem_response(
             status=exc.status_code,
             title=title,
@@ -139,6 +161,7 @@ def register_error_handlers(app):
             code=title.replace(" ", "_").upper(),
             instance=str(request.url),
             trace_id=trace_id,
+            headers=hdrs,
         )
 
     @app.exception_handler(IntegrityError)
