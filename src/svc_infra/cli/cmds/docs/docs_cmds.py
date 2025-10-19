@@ -1,69 +1,203 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
+import click
 import typer
+from typer.core import TyperGroup
 
 from svc_infra.app.root import resolve_project_root
 
 
-def _discover_docs(root: Path) -> List[Tuple[str, Path]]:
-    """Return a list of (topic, file_path) for top-level Markdown files under docs/.
-
-    Topic is the filename stem (e.g. security.md -> "security").
-    """
-    docs_dir = root / "docs"
-    topics: List[Tuple[str, Path]] = []
-    if not docs_dir.exists() or not docs_dir.is_dir():
-        return topics
-    for p in sorted(docs_dir.glob("*.md")):
-        if p.is_file():
-            topics.append((p.stem.replace(" ", "-"), p))
+def _discover_fs_topics(docs_dir: Path) -> Dict[str, Path]:
+    topics: Dict[str, Path] = {}
+    if docs_dir.exists() and docs_dir.is_dir():
+        for p in sorted(docs_dir.glob("*.md")):
+            if p.is_file():
+                topics[p.stem.replace(" ", "-")] = p
     return topics
 
 
-def register(app: typer.Typer) -> None:
-    """Register the `docs` command group and dynamic topic subcommands."""
+def _discover_pkg_topics() -> Dict[str, object]:
+    topics: Dict[str, object] = {}
+    try:
+        import importlib.resources as ir
 
+        pkg_docs = ir.files("svc_infra.bundled_docs")
+        for res in pkg_docs.iterdir():
+            if res.name.endswith(".md"):
+                topics[Path(res.name).stem.replace(" ", "-")] = res
+    except Exception:
+        pass
+    return topics
+
+
+def _resolve_docs_dir(ctx: click.Context) -> Path | None:
+    # CLI option takes precedence; walk up parent contexts because Typer
+    # executes subcommands in child contexts that do not inherit params.
+    current: click.Context | None = ctx
+    while current is not None:
+        docs_dir = (current.params or {}).get("docs_dir")
+        if docs_dir:
+            path = docs_dir if isinstance(docs_dir, Path) else Path(docs_dir)
+            path = path.expanduser()
+            if path.exists():
+                return path
+        current = current.parent
+    # Env var next
+    env_dir = os.getenv("SVC_INFRA_DOCS_DIR")
+    if env_dir:
+        p = Path(env_dir).expanduser()
+        if p.exists():
+            return p
+    # Project docs
     root = resolve_project_root()
-    discovered = _discover_docs(root)
+    proj_docs = root / "docs"
+    if proj_docs.exists():
+        return proj_docs
+    return None
 
-    # Build help text listing available topics
-    if discovered:
-        topic_names = ", ".join(name for name, _ in discovered)
-        docs_help = (
-            f"Show docs from the repository's docs/ directory.\n\nAvailable topics: {topic_names}"
-        )
-    else:
-        docs_help = "Show docs from the repository's docs/ directory.\n\nNo topics discovered."
 
-    docs_app = typer.Typer(no_args_is_help=True, help=docs_help, add_completion=False)
+class DocsGroup(TyperGroup):
+    def list_commands(self, ctx: click.Context) -> List[str]:
+        names: List[str] = list(super().list_commands(ctx) or [])
+        dir_to_use = _resolve_docs_dir(ctx)
+        fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
+        pkg = _discover_pkg_topics() if not fs else {}
+        names.extend(fs.keys())
+        names.extend(pkg.keys())
+        # Deduplicate and sort
+        uniq = sorted({*names})
+        return uniq
+
+    def get_command(self, ctx: click.Context, name: str) -> click.Command | None:
+        # Built-ins first (e.g., list)
+        cmd = super().get_command(ctx, name)
+        if cmd is not None:
+            return cmd
+
+        # Dynamic topic resolution
+        dir_to_use = _resolve_docs_dir(ctx)
+        fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
+        if name in fs:
+            file_path = fs[name]
+
+            @click.command(name=name)
+            def _show_fs() -> None:
+                click.echo(file_path.read_text(encoding="utf-8", errors="replace"))
+
+            return _show_fs
+
+        if not fs:
+            pkg = _discover_pkg_topics()
+            if name in pkg:
+                res = pkg[name]
+
+                @click.command(name=name)
+                def _show_pkg() -> None:
+                    try:
+                        import importlib.resources as ir
+
+                        content = getattr(res, "read_text", None)
+                        if callable(content):
+                            text = content(encoding="utf-8", errors="replace")
+                        else:
+                            with ir.as_file(res) as p:
+                                text = Path(p).read_text(encoding="utf-8", errors="replace")
+                        click.echo(text)
+                    except Exception as e:  # pragma: no cover
+                        raise click.ClickException(f"Failed to load bundled doc: {e}")
+
+                return _show_pkg
+
+        return None
+
+
+def register(app: typer.Typer) -> None:
+    """Register the `docs` command group with dynamic topic subcommands."""
+
+    docs_app = typer.Typer(no_args_is_help=True, add_completion=False, cls=DocsGroup)
+
+    @docs_app.callback(invoke_without_command=True)
+    def _docs_options(
+        docs_dir: Path | None = typer.Option(
+            None,
+            "--docs-dir",
+            help="Path to a docs directory to read from (overrides env/project root)",
+        ),
+        topic: str | None = typer.Option(None, "--topic", help="Topic to show directly"),
+    ) -> None:
+        """Support --docs-dir and --topic at group level."""
+        if topic:
+            ctx = click.get_current_context()
+            dir_to_use = _resolve_docs_dir(ctx)
+            fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
+            if topic in fs:
+                typer.echo(fs[topic].read_text(encoding="utf-8", errors="replace"))
+                raise typer.Exit(code=0)
+            if not fs:
+                pkg = _discover_pkg_topics()
+                if topic in pkg:
+                    try:
+                        import importlib.resources as ir
+
+                        res = pkg[topic]
+                        content = getattr(res, "read_text", None)
+                        if callable(content):
+                            text = content(encoding="utf-8", errors="replace")
+                        else:
+                            with ir.as_file(res) as p:
+                                text = Path(p).read_text(encoding="utf-8", errors="replace")
+                        typer.echo(text)
+                        raise typer.Exit(code=0)
+                    except Exception as e:  # pragma: no cover
+                        raise typer.BadParameter(f"Failed to load bundled topic '{topic}': {e}")
+            raise typer.BadParameter(f"Unknown topic: {topic}")
 
     @docs_app.command("list", help="List available documentation topics")
     def list_topics() -> None:
-        for name, path in discovered:
-            typer.echo(f"{name}\t{path.relative_to(root)}")
+        ctx = click.get_current_context()
+        root = resolve_project_root()
+        dir_to_use = _resolve_docs_dir(ctx)
+        fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
+        pkg = _discover_pkg_topics() if not fs else {}
+        for name, path in fs.items():
+            try:
+                rel = path.relative_to(root)
+                typer.echo(f"{name}\t{rel}")
+            except Exception:
+                typer.echo(f"{name}\t{path}")
+        for name in sorted(pkg.keys()):
+            typer.echo(f"{name}\t(bundled)")
 
-    # Freeze mapping for use in dynamic commands and generic fallback
-    topic_map: Dict[str, Path] = {name: path for name, path in discovered}
+    # Also support a generic "show" command
+    @docs_app.command("show", help="Show docs for a topic (alternative to dynamic subcommand)")
+    def show(topic: str) -> None:
+        ctx = click.get_current_context()
+        dir_to_use = _resolve_docs_dir(ctx)
+        fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
+        if topic in fs:
+            typer.echo(fs[topic].read_text(encoding="utf-8", errors="replace"))
+            return
+        if not fs:
+            pkg = _discover_pkg_topics()
+            if topic in pkg:
+                try:
+                    import importlib.resources as ir
 
-    def _make_topic_cmd(topic: str, file_path: Path):
-        @docs_app.command(name=topic, help=f"Show docs for topic: {topic}")
-        def _show_topic() -> None:  # noqa: WPS430 (nested function OK for closure)
-            content = file_path.read_text(encoding="utf-8", errors="replace")
-            typer.echo(content)
-
-    for name, path in discovered:
-        _make_topic_cmd(name, path)
-
-    # Optional generic fallback: allow `svc-infra docs --topic <name>`
-    @docs_app.callback(invoke_without_command=True)
-    def _maybe_show_topic(topic: str = typer.Option(None, "--topic", help="Topic to show")) -> None:  # type: ignore[no-redef]
-        if topic:
-            p = topic_map.get(topic)
-            if not p:
-                raise typer.BadParameter(f"Unknown topic: {topic}")
-            typer.echo(p.read_text(encoding="utf-8", errors="replace"))
+                    res = pkg[topic]
+                    content = getattr(res, "read_text", None)
+                    if callable(content):
+                        text = content(encoding="utf-8", errors="replace")
+                    else:
+                        with ir.as_file(res) as p:
+                            text = Path(p).read_text(encoding="utf-8", errors="replace")
+                    typer.echo(text)
+                    return
+                except Exception as e:  # pragma: no cover
+                    raise typer.BadParameter(f"Failed to load bundled topic '{topic}': {e}")
+        raise typer.BadParameter(f"Unknown topic: {topic}")
 
     app.add_typer(docs_app, name="docs")

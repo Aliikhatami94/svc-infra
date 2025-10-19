@@ -39,3 +39,41 @@ def test_docs_topic_option_and_unknown_topic_error():
     # Typer shows error text in either stdout or exception depending on version
     combined = (bad.stdout or "") + (getattr(bad, "output", "") or "") + (bad.stderr or "")
     assert "Unknown topic" in combined or (bad.exception and "Unknown topic" in str(bad.exception))
+
+
+def test_docs_env_override(monkeypatch, tmp_path):
+    # Create a custom docs dir with a unique topic
+    custom_docs = tmp_path / "docs"
+    custom_docs.mkdir()
+    f = custom_docs / "custom-topic.md"
+    f.write_text("# Custom Topic\nThis is custom docs.")
+
+    # Point CLI at this docs dir via env var
+    monkeypatch.setenv("SVC_INFRA_DOCS_DIR", str(custom_docs))
+
+    # list should include custom-topic
+    res_list = runner.invoke(cli_app, ["docs", "list"])
+    assert res_list.exit_code == 0
+    assert "custom-topic\t" in res_list.stdout
+
+    # topic should render content
+    res_topic = runner.invoke(cli_app, ["docs", "custom-topic"])
+    assert res_topic.exit_code == 0
+    assert "Custom Topic" in res_topic.stdout
+
+
+def test_docs_dir_option_propagates_to_subcommands(tmp_path: Path):
+    custom_docs = tmp_path / "docs"
+    custom_docs.mkdir()
+    f = custom_docs / "option-topic.md"
+    f.write_text("# Option Topic\nDocs from option.")
+
+    docs_dir_arg = str(custom_docs)
+
+    result_list = runner.invoke(cli_app, ["docs", "--docs-dir", docs_dir_arg, "list"])
+    assert result_list.exit_code == 0
+    assert "option-topic\t" in result_list.stdout
+
+    result_topic = runner.invoke(cli_app, ["docs", "--docs-dir", docs_dir_arg, "option-topic"])
+    assert result_topic.exit_code == 0
+    assert "Option Topic" in result_topic.stdout
