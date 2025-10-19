@@ -60,3 +60,20 @@ def test_docs_env_override(monkeypatch, tmp_path):
     res_topic = runner.invoke(cli_app, ["docs", "custom-topic"])
     assert res_topic.exit_code == 0
     assert "Custom Topic" in res_topic.stdout
+
+
+def test_docs_dir_option_propagates_to_subcommands(tmp_path: Path):
+    custom_docs = tmp_path / "docs"
+    custom_docs.mkdir()
+    f = custom_docs / "option-topic.md"
+    f.write_text("# Option Topic\nDocs from option.")
+
+    docs_dir_arg = str(custom_docs)
+
+    result_list = runner.invoke(cli_app, ["docs", "--docs-dir", docs_dir_arg, "list"])
+    assert result_list.exit_code == 0
+    assert "option-topic\t" in result_list.stdout
+
+    result_topic = runner.invoke(cli_app, ["docs", "--docs-dir", docs_dir_arg, "option-topic"])
+    assert result_topic.exit_code == 0
+    assert "Option Topic" in result_topic.stdout

@@ -35,10 +35,17 @@ def _discover_pkg_topics() -> Dict[str, object]:
 
 
 def _resolve_docs_dir(ctx: click.Context) -> Path | None:
-    # CLI option takes precedence
-    docs_dir = ctx.params.get("docs_dir")
-    if isinstance(docs_dir, Path) and docs_dir.exists():
-        return docs_dir
+    # CLI option takes precedence; walk up parent contexts because Typer
+    # executes subcommands in child contexts that do not inherit params.
+    current: click.Context | None = ctx
+    while current is not None:
+        docs_dir = (current.params or {}).get("docs_dir")
+        if docs_dir:
+            path = docs_dir if isinstance(docs_dir, Path) else Path(docs_dir)
+            path = path.expanduser()
+            if path.exists():
+                return path
+        current = current.parent
     # Env var next
     env_dir = os.getenv("SVC_INFRA_DOCS_DIR")
     if env_dir:
