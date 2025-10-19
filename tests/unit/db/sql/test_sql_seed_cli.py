@@ -15,6 +15,6 @@ def test_sql_seed_cli():
     runner = CliRunner()
     # Use this module's dotted path so the test is location-agnostic
     dotted = f"{__name__}:my_seed"
-    result = runner.invoke(app, ["sql-seed", dotted])  # type: ignore[arg-type]
+    result = runner.invoke(app, ["sql", "seed", dotted])  # type: ignore[arg-type]
     assert result.exit_code == 0, result.output
     assert called["seed"] == 1

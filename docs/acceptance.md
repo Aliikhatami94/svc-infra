@@ -10,7 +10,7 @@ This guide describes the acceptance harness that runs post-build against an ephe
 ## Workflow
 1. Build image
 2. docker compose up -d (test stack)
-3. CLI DB checks & seed: run `sql-setup-and-migrate`, `sql-current`, `sql-downgrade -1`, `sql-upgrade head` against an ephemeral SQLite DB, then call `sql-seed tests.acceptance._seed:acceptance_seed` (no-op by default)
+3. CLI DB checks & seed: run `sql setup-and-migrate`, `sql current`, `sql downgrade -1`, `sql upgrade head` against an ephemeral SQLite DB, then call `sql seed tests.acceptance._seed:acceptance_seed` (no-op by default)
 4. Run pytest inside tester: docker compose run --rm tester (Makefile wires this)
 5. OpenAPI lint & API Doctor
 6. Teardown

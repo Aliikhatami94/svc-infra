@@ -24,23 +24,23 @@ You should see groups for SQL, Mongo, Observability, DX, Jobs, and SDK.
 Example with SQLite for quick smoke tests:
 
 ```
-python -m svc_infra.cli sql-setup-and-migrate --database-url sqlite+aiosqlite:///./accept.db \
+python -m svc_infra.cli sql setup-and-migrate --database-url sqlite+aiosqlite:///./accept.db \
   --discover-packages "app.models" --with-payments false
 ```
 
 - Current revision, history, upgrade/downgrade:
 
 ```
-python -m svc_infra.cli sql-current
+python -m svc_infra.cli sql current
 python -m svc_infra.cli sql-history
-python -m svc_infra.cli sql-upgrade head
-python -m svc_infra.cli sql-downgrade -1
+python -m svc_infra.cli sql upgrade head
+python -m svc_infra.cli sql downgrade -1
 ```
 
 - Seed fixtures/reference data with your callable:
 
 ```
-python -m svc_infra.cli sql-seed path.to.module:seed_func
+python -m svc_infra.cli sql seed path.to.module:seed_func
 ```
 
 Notes:

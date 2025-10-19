@@ -188,6 +188,7 @@ def cmd_ping(
 
 
 def register(app: typer.Typer) -> None:
-    app.command("mongo-prepare")(cmd_prepare)
-    app.command("mongo-setup-and-prepare")(cmd_setup_and_prepare)
-    app.command("mongo-ping")(cmd_ping)
+    # Attach to 'mongo' group app
+    app.command("prepare")(cmd_prepare)
+    app.command("setup-and-prepare")(cmd_setup_and_prepare)
+    app.command("ping")(cmd_ping)

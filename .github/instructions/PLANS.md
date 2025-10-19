@@ -49,7 +49,7 @@ Evidence: (PRs, tests, CI runs)
 	- [~] Research: existing commands (src/svc_infra/cli/cmds/db/sql/alembic_cmds.py; tests/unit/db/sql/*; dx/add.py).
 	- [x] Implement: backfill unit tests for help flags and error paths (bad dotted paths, missing DB). (tests/unit/cli/test_cli_help_and_errors.py)
 	- [x] Docs: CLI reference snippets in docs (db workflow, dx helpers). (docs/cli.md)
-	- [x] Acceptance (pre-deploy): migrate/rollback/seed exit 0 in ephemeral stack (A10-01). (Makefile runs sql-setup-and-migrate/current/downgrade/upgrade against ephemeral sqlite; then sql-seed no-op)
+	- [x] Acceptance (pre-deploy): migrate/rollback/seed exit 0 in ephemeral stack (A10-01). (Makefile runs sql setup-and-migrate/current/downgrade/upgrade against ephemeral sqlite; then sql seed no-op)
 
 - Observability (obs add + CLI)
 	- [~] Research: add_observability and obs CLI (src/svc_infra/obs/*; tests/unit/obs/*).
@@ -216,9 +216,9 @@ Evidence: (PRs, tests, CI runs)
 
 ### 7. Data Lifecycle
 Owner: TBD
-- [x] Research: migrations tooling & soft delete usage. (repo soft-delete filtering in `src/svc_infra/db/sql/repository.py`; model scaffolding for `deleted_at` in `src/svc_infra/db/sql/scaffold.py`; lifecycle helper in `src/svc_infra/data/add.py`; migrations & `sql-seed` in `src/svc_infra/cli/cmds/db/sql/alembic_cmds.py`)
+- [x] Research: migrations tooling & soft delete usage. (repo soft-delete filtering in `src/svc_infra/db/sql/repository.py`; model scaffolding for `deleted_at` in `src/svc_infra/db/sql/scaffold.py`; lifecycle helper in `src/svc_infra/data/add.py`; migrations & `sql seed` in `src/svc_infra/cli/cmds/db/sql/alembic_cmds.py`)
 - [x] Design: soft delete pattern & retention registry. (ADR-0005)
-- [x] Implement: migrator CLI (status/apply/rollback/seed). (seed via sql-seed command)
+- [x] Implement: migrator CLI (status/apply/rollback/seed). (seed via `sql seed` command)
 - [x] Implement: fixture/reference loader (idempotent). (see data/fixtures.py and add_data_lifecycle async support)
 - [x] Implement: GDPR erasure workflow (queued + audit entry). (see data/erasure.py with ErasurePlan/Step and audit hook)
 - [x] Implement: retention purge job. (see data/retention.py with RetentionPolicy + run_retention_purge)

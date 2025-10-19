@@ -17,10 +17,7 @@ try:  # SQLAlchemy async extras are optional
 except Exception:  # pragma: no cover - fallback when async extras unavailable
     AsyncEngine = None  # type: ignore[assignment]
 
-app = typer.Typer(help="SQL data export commands")
 
-
-@app.command("export-tenant")
 def export_tenant(
     table: str = typer.Argument(..., help="Qualified table name to export (e.g., public.items)"),
     tenant_id: str = typer.Option(..., "--tenant-id", help="Tenant id value to filter by."),
@@ -79,4 +76,5 @@ def export_tenant(
 
 
 def register(app_root: typer.Typer) -> None:
-    app_root.add_typer(app, name="sql")
+    # Attach directly to the provided 'sql' group app
+    app_root.command("export-tenant")(export_tenant)

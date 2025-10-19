@@ -127,7 +127,7 @@ def register(app: typer.Typer) -> None:
       • mongo-scaffold-schemas
       • mongo-scaffold-resources
     """
-    app.command("mongo-scaffold")(cmd_scaffold)
-    app.command("mongo-scaffold-documents")(cmd_scaffold_documents)
-    app.command("mongo-scaffold-schemas")(cmd_scaffold_schemas)
-    app.command("mongo-scaffold-resources")(cmd_scaffold_resources)
+    app.command("scaffold")(cmd_scaffold)
+    app.command("scaffold-documents")(cmd_scaffold_documents)
+    app.command("scaffold-schemas")(cmd_scaffold_schemas)
+    app.command("scaffold-resources")(cmd_scaffold_resources)

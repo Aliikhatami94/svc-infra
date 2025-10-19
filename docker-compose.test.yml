@@ -28,12 +28,12 @@ services:
       start_period: 60s
     command: >-
       bash -lc "set -euxo pipefail
-      && python -m pip install --no-cache-dir -U pip
-      && python -m pip install --no-cache-dir uvicorn
-      && python -m pip install --no-cache-dir asyncpg
-      && python -m pip install --no-cache-dir aiosqlite
-      && python -m pip install --no-cache-dir prometheus-client
-      && python -m pip install --no-cache-dir /workspace
+      && python -m pip install --root-user-action=ignore --no-cache-dir -U pip
+      && python -m pip install --root-user-action=ignore --no-cache-dir uvicorn
+      && python -m pip install --root-user-action=ignore --no-cache-dir asyncpg
+      && python -m pip install --root-user-action=ignore --no-cache-dir aiosqlite
+      && python -m pip install --root-user-action=ignore --no-cache-dir prometheus-client
+      && python -m pip install --root-user-action=ignore --no-cache-dir /workspace
       && uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000"
 
   redis:
@@ -75,9 +75,9 @@ services:
       - -lc
       - |
         set -euxo pipefail
-        python -m pip install --no-cache-dir -U pip
-        python -m pip install --no-cache-dir pytest
-        python -m pip install --no-cache-dir /workspace
+        python -m pip install --root-user-action=ignore --no-cache-dir -U pip
+        python -m pip install --root-user-action=ignore --no-cache-dir pytest
+        python -m pip install --root-user-action=ignore --no-cache-dir /workspace
         cat >/tmp/wait_api.py <<'PY'
         import sys, time, urllib.request
         url = 'http://api:8000/ping'

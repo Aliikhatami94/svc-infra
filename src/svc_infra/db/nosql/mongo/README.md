@@ -29,17 +29,17 @@ We provide four CLI commands. You can register them on your Typer app or invoke 
 
 ### Commands
 
-- `mongo-scaffold` — create both document **and** CRUD schemas
-- `mongo-scaffold-documents` — create only the **document** model (Pydantic)
-- `mongo-scaffold-schemas` — create only the **CRUD schemas**
-- `mongo-scaffold-resources` — create a starter `resources.py` with a `RESOURCES` list
+- `mongo scaffold` — create both document **and** CRUD schemas
+- `mongo scaffold-documents` — create only the **document** model (Pydantic)
+- `mongo scaffold-schemas` — create only the **CRUD schemas**
+- `mongo scaffold-resources` — create a starter `resources.py` with a `RESOURCES` list
 
 ### Typical usage
 
 #### A) Scaffold documents + schemas together
 
 ```bash
-yourapp mongo-scaffold \
+yourapp mongo scaffold \
   --entity-name Product \
   --documents-dir ./src/your_app/products \
   --schemas-dir ./src/your_app/products \
@@ -57,7 +57,7 @@ src/your_app/products/schemas.py     # ProductRead/ProductCreate/ProductUpdate
 B) Documents only
 
 ```bash
-yourapp mongo-scaffold-documents \
+yourapp mongo scaffold-documents \
   --dest-dir ./src/your_app/products \
   --entity-name Product \
   --documents-filename product_doc.py
@@ -66,7 +66,7 @@ yourapp mongo-scaffold-documents \
 C) Schemas only
 
 ```bash
-yourapp mongo-scaffold-schemas \
+yourapp mongo scaffold-schemas \
   --dest-dir ./src/your_app/products \
   --entity-name Product \
   --schemas-filename product_schemas.py
@@ -75,7 +75,7 @@ yourapp mongo-scaffold-schemas \
 D) Starter resources.py
 
 ```bash
-yourapp mongo-scaffold-resources \
+yourapp mongo scaffold-resources \
   --dest-dir ./src/your_app/mongo \
   --filename resources.py \
   --overwrite
@@ -131,7 +131,7 @@ There are two flavors:
 A) Async, minimal (connect, create collections, apply indexes)
 
 ```bash
-yourapp mongo-prepare \
+yourapp mongo prepare \
   --resources your_app.mongo.resources:RESOURCES \
   --mongo-url "$MONGO_URL" \
   --mongo-db "$MONGO_DB"
@@ -140,7 +140,7 @@ yourapp mongo-prepare \
 B) Synchronous wrapper (end-to-end convenience)
 
 ```bash
-yourapp mongo-setup-and-prepare \
+yourapp mongo setup-and-prepare \
   --resources your_app.mongo.resources:RESOURCES \
   --mongo-url "$MONGO_URL" \
   --mongo-db "$MONGO_DB"
@@ -149,7 +149,7 @@ yourapp mongo-setup-and-prepare \
 You can also ping connectivity:
 
 ```bash
-yourapp mongo-ping --mongo-url "$MONGO_URL" --mongo-db "$MONGO_DB"
+yourapp mongo ping --mongo-url "$MONGO_URL" --mongo-db "$MONGO_DB"
 ```
 
 Behind the scenes, preparation also locks a service ID to a DB name to prevent accidental cross-DB usage. You can pass --allow-rebind if you intentionally move environments.
@@ -430,9 +430,9 @@ NoSqlResource(
 	•	If using explicit schemas with PyObjectId, make sure model_config.json_encoders includes {PyObjectId: str}.
 	•	When using auto-schemas, we expose ObjectId-like fields as str so no custom encoder is needed.
 	•	Connected to wrong DB name
-	•	The system locks a service_id to the DB name once prepared. If you change DBs, run mongo-prepare with --allow-rebind.
+  •	The system locks a service_id to the DB name once prepared. If you change DBs, run `mongo prepare` with --allow-rebind.
 	•	Indexes not created
-	•	Double-check RESOURCES[indexes]. Run mongo-prepare again and inspect the output dictionary of created indexes.
+  •	Double-check RESOURCES[indexes]. Run `mongo prepare` again and inspect the output dictionary of created indexes.
 
 ⸻
 

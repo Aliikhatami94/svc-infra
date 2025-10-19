@@ -201,16 +201,17 @@ def cmd_setup_and_migrate(
 
 
 def register(app: typer.Typer) -> None:
-    app.command("sql-init")(cmd_init)
-    app.command("sql-revision")(cmd_revision)
-    app.command("sql-upgrade")(cmd_upgrade)
-    app.command("sql-downgrade")(cmd_downgrade)
-    app.command("sql-current")(cmd_current)
-    app.command("sql-history")(cmd_history)
-    app.command("sql-stamp")(cmd_stamp)
-    app.command("sql-merge-heads")(cmd_merge_heads)
-    app.command("sql-setup-and-migrate")(cmd_setup_and_migrate)
-    app.command("sql-seed")(cmd_seed)
+    # Register under the 'sql' group app
+    app.command("init")(cmd_init)
+    app.command("revision")(cmd_revision)
+    app.command("upgrade")(cmd_upgrade)
+    app.command("downgrade")(cmd_downgrade)
+    app.command("current")(cmd_current)
+    app.command("history")(cmd_history)
+    app.command("stamp")(cmd_stamp)
+    app.command("merge-heads")(cmd_merge_heads)
+    app.command("setup-and-migrate")(cmd_setup_and_migrate)
+    app.command("seed")(cmd_seed)
 
 
 def _import_callable(path: str):

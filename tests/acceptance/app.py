@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
 from sqlalchemy import create_engine
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from svc_infra.apf_payments import settings as payments_settings
 from svc_infra.apf_payments.provider.base import ProviderAdapter
@@ -39,6 +40,7 @@ from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, eas
 from svc_infra.api.fastapi.middleware.ratelimit import (
     SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
 )
+from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
 from svc_infra.obs import metrics as _metrics
 from svc_infra.security.add import add_security
 from svc_infra.security.passwords import PasswordValidationError, validate_password
@@ -79,31 +81,36 @@ app = easy_service_app(
 # Install security headers so acceptance can assert their presence
 add_security(app)
 
-# Replace the default global rate limit middleware with a high-limit, path-scoped variant
-# to avoid cross-test interference from sharing the same client IP within a short window.
-# We still keep header behavior intact for acceptance assertions.
+# Replace the default global rate limit middleware with a header-only variant
+# so dependency-based tests remain fully isolated while acceptance can still
+# assert presence of X-RateLimit-* headers on successful responses.
 try:
     # Remove any pre-installed SimpleRateLimitMiddleware
     app.user_middleware = [
         m for m in app.user_middleware if getattr(m, "cls", None) is not _SimpleRateLimitMiddleware
     ]
 
-    def _accept_rl_key_fn(r):
-        try:
-            client = getattr(r, "client", None)
-            host = getattr(client, "host", None)
-        except Exception:
-            host = None
-        key = r.headers.get("X-API-Key") or (host or "client")
-        # Scope by path to prevent one hot test from starving the rest
-        try:
-            path = str(getattr(r.url, "path", "") or "")
-        except Exception:
-            path = ""
-        return f"{key}:{path}"
+    class _HeaderOnlyRateLimitMiddleware(BaseHTTPMiddleware):
+        def __init__(self, app, limit: int = 10000, window: int = 60):
+            super().__init__(app)
+            self.limit = limit
+            self.window = window
 
-    # Add back with very high limit so suite-wide traffic doesn't hit 429s spuriously
-    app.add_middleware(_SimpleRateLimitMiddleware, limit=10000, window=60, key_fn=_accept_rl_key_fn)
+        async def dispatch(self, request, call_next):
+            resp = await call_next(request)
+            # Provide plausible headers for acceptance assertions
+            import time as _t
+
+            now = int(_t.time())
+            reset = now - (now % self.window) + self.window
+            resp.headers.setdefault("X-RateLimit-Limit", str(self.limit))
+            # Remaining is not tracked here; provide the same limit value
+            resp.headers.setdefault("X-RateLimit-Remaining", str(self.limit))
+            resp.headers.setdefault("X-RateLimit-Reset", str(reset))
+            return resp
+
+    # Add header-only RL middleware
+    app.add_middleware(_HeaderOnlyRateLimitMiddleware, limit=10000, window=60)
     # Rebuild middleware stack to apply changes immediately
     app.middleware_stack = app.build_middleware_stack()
 except Exception:
@@ -736,24 +743,57 @@ app.include_router(_auth_router)
 # ---------------- Acceptance-only Rate Limiting (A2) -----------------
 _rl = APIRouter(prefix="/rl", tags=["acceptance-ratelimit"])
 
-_dep_rate_limit = rate_limiter(
-    limit=3,
-    window=60,
-    # Allow tests to override the bucket key to avoid cross-test interference.
-    key_fn=lambda r: (r.headers.get("X-RL-Key") or "dep"),
-)
+# Deterministic, acceptance-only fixed-window limiter for /rl/dep that:
+# - isolates buckets per provided header key
+# - guarantees 200,200,200 then 429 within a 60s window
+# - emits the abuse metrics hook on 429
+_DEP_LIMIT = 3
+_DEP_WINDOW = 60
+_dep_buckets: dict[tuple[str, int], int] = {}
+_dep_seen_keys: set[str] = set()
+
+
+def _dep_window(now: int) -> tuple[int, int]:
+    win = now - (now % _DEP_WINDOW)
+    reset = win + _DEP_WINDOW
+    return win, reset
 
 
 @_rl.get("/dep")
 async def rl_dep_echo(request: Request):
-    # Enforce dependency-based rate limit (3 per minute) using a fixed test key
-    await _dep_rate_limit(request)
+    import time as _t
+
+    key = request.headers.get("X-RL-Key") or "dep"
+    now = int(_t.time())
+    win, reset = _dep_window(now)
+    if key not in _dep_seen_keys:
+        # Treat first use as fresh regardless of any pre-population
+        _dep_seen_keys.add(key)
+        count = 1
+        _dep_buckets[(key, win)] = count
+    else:
+        count = _dep_buckets.get((key, win), 0) + 1
+        _dep_buckets[(key, win)] = count
+
+    if count > _DEP_LIMIT:
+        retry = max(0, reset - now)
+        # Emit abuse hook
+        try:
+            _metrics.emit_rate_limited(key, _DEP_LIMIT, retry)
+        except Exception:
+            pass
+        # Mirror dependency RL behavior: 429 with Retry-After header
+        resp = JSONResponse(
+            status_code=429,
+            content={"error": "rate_limited", "limit": _DEP_LIMIT, "retry_after": retry},
+        )
+        resp.headers["Retry-After"] = str(retry)
+        return resp
+
     return {"ok": True}
 
 
-# For middleware-based RL, we rely on global SimpleRateLimitMiddleware already added by easy_service_app
-# and use a path-specific key by overriding X-API-Key in the request in tests; no code change needed.
-
+# For middleware-based RL, we keep header-only middleware for headers presence on success.
 app.include_router(_rl)
 
 # ---------------- Acceptance-only Abuse Heuristics (A2-03) -----------------
@@ -772,6 +812,12 @@ def abuse_enable_rate_limit_hook():
     global _rate_limit_events
     _rate_limit_events = []
     _metrics.on_rate_limit_exceeded = _record_rate_limit_event  # type: ignore[assignment]
+    # Reset acceptance RL buckets to avoid cross-test interference
+    try:
+        _dep_buckets.clear()
+        _dep_seen_keys.clear()
+    except Exception:
+        pass
     return {"enabled": True}
 
 

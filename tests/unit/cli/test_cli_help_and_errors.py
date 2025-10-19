@@ -11,14 +11,13 @@ runner = CliRunner()
 def test_root_help_shows_commands():
     result = runner.invoke(cli_app, ["--help"])
     assert result.exit_code == 0
-    # A few representative commands we register
-    assert "sql-init" in result.stdout
-    assert "sql-setup-and-migrate" in result.stdout
-    assert "sql-seed" in result.stdout
+    # A few representative grouped commands we register
+    assert "sql" in result.stdout
+    # Spot check subcommands are shown under sql help later
 
 
 def test_sql_init_help():
-    result = runner.invoke(cli_app, ["sql-init", "--help"])
+    result = runner.invoke(cli_app, ["sql", "init", "--help"])
     assert result.exit_code == 0
     assert "Initialize Alembic scaffold" in result.stdout
     assert "--discover-packages" in result.stdout
@@ -26,7 +25,7 @@ def test_sql_init_help():
 
 def test_seed_bad_format_errors():
     # Missing ':' separator
-    result = runner.invoke(cli_app, ["sql-seed", "badformat"])
+    result = runner.invoke(cli_app, ["sql", "seed", "badformat"])
     assert result.exit_code != 0
     out = (result.stdout or "") + (getattr(result, "output", "") or "") + (result.stderr or "")
     assert "Expected format" in out or "Invalid value for 'TARGET'" in out
@@ -35,7 +34,7 @@ def test_seed_bad_format_errors():
 def test_seed_missing_callable_errors():
     # Point to this test module but a missing callable name
     dotted = "tests.unit.cli.test_cli_help_and_errors:does_not_exist"
-    result = runner.invoke(cli_app, ["sql-seed", dotted])
+    result = runner.invoke(cli_app, ["sql", "seed", dotted])
     assert result.exit_code != 0
     out = (result.stdout or "") + (getattr(result, "output", "") or "") + (result.stderr or "")
     assert "Callable 'does_not_exist' not found" in out or "Invalid value for 'TARGET'" in out
@@ -50,7 +49,7 @@ def test_sql_current_missing_db_path(monkeypatch):
 
     monkeypatch.setattr(alembic_cmds, "core_current", fake_current)
 
-    result = runner.invoke(cli_app, ["sql-current"])  # no SQL_URL set
+    result = runner.invoke(cli_app, ["sql", "current"])  # no SQL_URL set
     # Typer propagates unhandled exceptions; ensure we see it
     assert result.exit_code != 0
     assert result.exception is not None
