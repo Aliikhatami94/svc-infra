@@ -77,3 +77,45 @@ def test_docs_dir_option_propagates_to_subcommands(tmp_path: Path):
     result_topic = runner.invoke(cli_app, ["docs", "--docs-dir", docs_dir_arg, "option-topic"])
     assert result_topic.exit_code == 0
     assert "Option Topic" in result_topic.stdout
+
+
+def test_docs_topic_name_normalization_with_option(tmp_path: Path):
+    # Create docs with mixed case and underscores/spaces
+    custom_docs = tmp_path / "docs"
+    custom_docs.mkdir()
+    f = custom_docs / "Mixed_Name Topic.md"
+    f.write_text("# Normalized Topic\nThis should be found via normalized key.")
+
+    docs_dir_arg = str(custom_docs)
+
+    # Dynamic subcommand with normalized name should work
+    res_topic = runner.invoke(cli_app, ["docs", "--docs-dir", docs_dir_arg, "mixed-name-topic"])
+    assert res_topic.exit_code == 0
+    assert "Normalized Topic" in res_topic.stdout
+
+    # --topic should also work with un-normalized input
+    res_topic_flag = runner.invoke(
+        cli_app, ["docs", "--docs-dir", docs_dir_arg, "--topic", "Mixed_Name Topic"]
+    )
+    assert res_topic_flag.exit_code == 0
+    assert "Normalized Topic" in res_topic_flag.stdout
+
+
+def test_docs_dir_option_precedes_env(monkeypatch, tmp_path: Path):
+    # Prepare two docs directories; CLI should pick --docs-dir over env
+    env_docs = tmp_path / "env_docs"
+    env_docs.mkdir()
+    (env_docs / "from-env.md").write_text("# From Env\n")
+
+    opt_docs = tmp_path / "opt_docs"
+    opt_docs.mkdir()
+    (opt_docs / "from-opt.md").write_text("# From Option\n")
+
+    monkeypatch.setenv("SVC_INFRA_DOCS_DIR", str(env_docs))
+
+    # list should include only from-opt when --docs-dir is provided (first hit wins)
+    res_list = runner.invoke(cli_app, ["docs", "--docs-dir", str(opt_docs), "list"])
+    assert res_list.exit_code == 0
+    out = res_list.stdout
+    assert "from-opt\t" in out
+    assert "from-env\t" not in out
