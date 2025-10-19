@@ -6,6 +6,7 @@ from svc_infra.cli.cmds import (
     _HELP,
     jobs_app,
     register_alembic,
+    register_docs,
     register_dx,
     register_mongo,
     register_mongo_scaffold,
@@ -39,6 +40,9 @@ app.add_typer(jobs_app, name="jobs")
 
 # -- sdk commands ---
 register_sdk(app)
+
+# -- docs commands ---
+register_docs(app)
 
 
 def main():
