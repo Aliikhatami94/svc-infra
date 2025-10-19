@@ -45,6 +45,9 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
                     tenant_id = await _resolve_tenant_id(request)
             except Exception:
                 tenant_id = None
+            # Fallback: read from header if tenancy context isn't available
+            if not tenant_id:
+                tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get("X-Tenant-ID")
 
         key = self.key_fn(request)
         if self.scope_by_tenant and tenant_id:
