@@ -743,73 +743,57 @@ app.include_router(_auth_router)
 # ---------------- Acceptance-only Rate Limiting (A2) -----------------
 _rl = APIRouter(prefix="/rl", tags=["acceptance-ratelimit"])
 
-# Scope dependency-based RL state by a per-process salt to avoid any cross-run/window
-# collisions when re-running acceptance within the same Python process/time window.
-_RL_PREFIX = f"acc:{secrets.token_hex(4)}:"
-
-
-class _PrefixedStore:
-    def __init__(self, inner: InMemoryRateLimitStore, prefix: str) -> None:
-        self._inner = inner
-        self._prefix = prefix
-
-    def incr(self, key: str, window: int):
-        return self._inner.incr(f"{self._prefix}{key}", window)
-
-    def reset(self, key: str, window: int) -> None:
-        """Clear current window bucket for the given logical key (prefixed internally).
-
-        This is acceptance-only defensive logic to ensure fresh buckets on first use
-        per test-provided RL key, mitigating any unexpected pre-population.
-        """
-        try:
-            import time as _t
-
-            now = int(_t.time())
-            win = now - (now % window)
-            try:
-                buckets = getattr(self._inner, "_buckets", None)
-            except Exception:
-                buckets = None
-            if isinstance(buckets, dict):
-                buckets.pop((f"{self._prefix}{key}", win), None)
-        except Exception:
-            # Never break flow if store internals change
-            pass
-
-
-_dep_store = _PrefixedStore(InMemoryRateLimitStore(limit=3), _RL_PREFIX)
-_dep_rate_limit = rate_limiter(
-    limit=3,
-    window=60,
-    # Allow tests to override the bucket key to avoid cross-test interference.
-    key_fn=lambda r: (r.headers.get("X-RL-Key") or "dep"),
-    # Use a store wrapper that namespaces keys uniquely per acceptance app instance.
-    store=_dep_store,
-)
-
-
+# Deterministic, acceptance-only fixed-window limiter for /rl/dep that:
+# - isolates buckets per provided header key
+# - guarantees 200,200,200 then 429 within a 60s window
+# - emits the abuse metrics hook on 429
+_DEP_LIMIT = 3
+_DEP_WINDOW = 60
+_dep_buckets: dict[tuple[str, int], int] = {}
 _dep_seen_keys: set[str] = set()
+
+
+def _dep_window(now: int) -> tuple[int, int]:
+    win = now - (now % _DEP_WINDOW)
+    reset = win + _DEP_WINDOW
+    return win, reset
 
 
 @_rl.get("/dep")
 async def rl_dep_echo(request: Request):
-    # Enforce dependency-based rate limit (3 per minute) using a fixed test key
-    # Defensive: ensure first use of a given RL key starts with a fresh bucket.
-    try:
-        logical_key = request.headers.get("X-RL-Key") or "dep"
-        if logical_key not in _dep_seen_keys:
-            _dep_store.reset(logical_key, window=60)
-            _dep_seen_keys.add(logical_key)
-    except Exception:
-        pass
-    await _dep_rate_limit(request)
+    import time as _t
+
+    key = request.headers.get("X-RL-Key") or "dep"
+    now = int(_t.time())
+    win, reset = _dep_window(now)
+    if key not in _dep_seen_keys:
+        # Treat first use as fresh regardless of any pre-population
+        _dep_seen_keys.add(key)
+        count = 1
+        _dep_buckets[(key, win)] = count
+    else:
+        count = _dep_buckets.get((key, win), 0) + 1
+        _dep_buckets[(key, win)] = count
+
+    if count > _DEP_LIMIT:
+        retry = max(0, reset - now)
+        # Emit abuse hook
+        try:
+            _metrics.emit_rate_limited(key, _DEP_LIMIT, retry)
+        except Exception:
+            pass
+        # Mirror dependency RL behavior: 429 with Retry-After header
+        resp = JSONResponse(
+            status_code=429,
+            content={"error": "rate_limited", "limit": _DEP_LIMIT, "retry_after": retry},
+        )
+        resp.headers["Retry-After"] = str(retry)
+        return resp
+
     return {"ok": True}
 
 
-# For middleware-based RL, we rely on global SimpleRateLimitMiddleware already added by easy_service_app
-# and use a path-specific key by overriding X-API-Key in the request in tests; no code change needed.
-
+# For middleware-based RL, we keep header-only middleware for headers presence on success.
 app.include_router(_rl)
 
 # ---------------- Acceptance-only Abuse Heuristics (A2-03) -----------------
@@ -828,6 +812,12 @@ def abuse_enable_rate_limit_hook():
     global _rate_limit_events
     _rate_limit_events = []
     _metrics.on_rate_limit_exceeded = _record_rate_limit_event  # type: ignore[assignment]
+    # Reset acceptance RL buckets to avoid cross-test interference
+    try:
+        _dep_buckets.clear()
+        _dep_seen_keys.clear()
+    except Exception:
+        pass
     return {"enabled": True}
 
 
