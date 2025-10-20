@@ -3,9 +3,10 @@ from __future__ import annotations
 from enum import Enum
 
 from ai_infra.llm.tools.custom.cli import cli_cmd_help, cli_subcmd_help
+from ai_infra.mcp.server.tools import mcp_from_functions
+
 from svc_infra.app.env import prepare_env
 from svc_infra.cli.foundation.runner import run_from_root
-from ai_infra.mcp.server.tools import mcp_from_functions
 
 CLI_PROG = "svc-infra"
 
@@ -34,6 +35,7 @@ class Subcommand(str, Enum):
     sql_scaffold_models = "sql scaffold-models"
     sql_scaffold_schemas = "sql scaffold-schemas"
     sql_export_tenant = "sql export-tenant"
+    sql_seed = "sql seed"
 
     # Mongo group commands
     mongo_prepare = "mongo prepare"
@@ -48,6 +50,24 @@ class Subcommand(str, Enum):
     obs_up = "obs up"
     obs_down = "obs down"
     obs_scaffold = "obs scaffold"
+
+    # Docs group
+    docs_list = "docs list"
+    docs_show = "docs show"
+
+    # DX group
+    dx_openapi = "dx openapi"
+    dx_migrations = "dx migrations"
+    dx_changelog = "dx changelog"
+    dx_ci = "dx ci"
+
+    # Jobs group
+    jobs_run = "jobs run"
+
+    # SDK group
+    sdk_ts = "sdk ts"
+    sdk_py = "sdk py"
+    sdk_postman = "sdk postman"
 
 
 async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict:
