@@ -1,7 +1,7 @@
 # svc-infra
 
 [![PyPI](https://img.shields.io/pypi/v/svc-infra.svg)](https://pypi.org/project/svc-infra/)
-[![Docs](https://img.shields.io/badge/docs-reference-blue)](docs/)
+[![Docs](https://img.shields.io/badge/docs-reference-blue)](src/svc_infra/docs/)
 
 svc-infra packages the shared building blocks we use to ship production FastAPI services fast—HTTP APIs with secure auth, durable persistence, background execution, cache, observability, and webhook plumbing that all share the same batteries-included defaults.
 
@@ -9,17 +9,17 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 
 | Helper | What it covers | Guide |
 | --- | --- | --- |
-| API | FastAPI bootstrap, envelopes, middleware, docs wiring | [FastAPI guide](docs/api.md) |
-| Auth | Sessions, OAuth/OIDC, MFA, SMTP delivery | [Auth settings](docs/auth.md) |
-| Database | SQL + Mongo wiring, Alembic helpers, inbox/outbox patterns | [Database guide](docs/database.md) |
-| Jobs | JobQueue, scheduler, CLI worker | [Jobs quickstart](docs/jobs.md) |
-| Cache | cashews decorators, namespace management, TTL helpers | [Cache guide](docs/cache.md) |
-| Observability | Prometheus middleware, Grafana automation, OTEL hooks | [Observability guide](docs/observability.md) |
-| Ops | Probes, breaker, SLOs & dashboards | [SLOs & Ops](docs/ops.md) |
-| Webhooks | Subscription store, signing, retry worker | [Webhooks framework](docs/webhooks.md) |
-| Security | Password policy, lockout, signed cookies, headers | [Security hardening](docs/security.md) |
-| Contributing | Dev setup and quality gates | [Contributing guide](docs/contributing.md) |
-| Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](docs/data-lifecycle.md) |
+| API | FastAPI bootstrap, envelopes, middleware, docs wiring | [FastAPI guide](src/svc_infra/docs/api.md) |
+| Auth | Sessions, OAuth/OIDC, MFA, SMTP delivery | [Auth settings](src/svc_infra/docs/auth.md) |
+| Database | SQL + Mongo wiring, Alembic helpers, inbox/outbox patterns | [Database guide](src/svc_infra/docs/database.md) |
+| Jobs | JobQueue, scheduler, CLI worker | [Jobs quickstart](src/svc_infra/docs/jobs.md) |
+| Cache | cashews decorators, namespace management, TTL helpers | [Cache guide](src/svc_infra/docs/cache.md) |
+| Observability | Prometheus middleware, Grafana automation, OTEL hooks | [Observability guide](src/svc_infra/docs/observability.md) |
+| Ops | Probes, breaker, SLOs & dashboards | [SLOs & Ops](src/svc_infra/docs/ops.md) |
+| Webhooks | Subscription store, signing, retry worker | [Webhooks framework](src/svc_infra/docs/webhooks.md) |
+| Security | Password policy, lockout, signed cookies, headers | [Security hardening](src/svc_infra/docs/security.md) |
+| Contributing | Dev setup and quality gates | [Contributing guide](src/svc_infra/docs/contributing.md) |
+| Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](src/svc_infra/docs/data-lifecycle.md) |
 
 ## Minimal FastAPI bootstrap
 
@@ -47,8 +47,8 @@ async def handle_webhook(payload = Depends(require_signature(lambda: ["current",
 - **API** – toggle logging/observability and docs exposure with `ENABLE_LOGGING`, `LOG_LEVEL`, `LOG_FORMAT`, `ENABLE_OBS`, `METRICS_PATH`, `OBS_SKIP_PATHS`, and `CORS_ALLOW_ORIGINS`. 【F:src/svc_infra/api/fastapi/ease.py†L67-L111】【F:src/svc_infra/api/fastapi/setup.py†L47-L88】
 - **Auth** – configure JWT secrets, SMTP, cookies, and policy using the `AUTH_…` settings family (e.g., `AUTH_JWT__SECRET`, `AUTH_SMTP_HOST`, `AUTH_SESSION_COOKIE_SECURE`). 【F:src/svc_infra/api/fastapi/auth/settings.py†L23-L91】
 - **Database** – set connection URLs or components via `SQL_URL`/`SQL_URL_FILE`, `DB_DIALECT`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, plus Mongo knobs like `MONGO_URL`, `MONGO_DB`, and `MONGO_URL_FILE`. 【F:src/svc_infra/api/fastapi/db/sql/add.py†L55-L114】【F:src/svc_infra/db/sql/utils.py†L85-L206】【F:src/svc_infra/db/nosql/mongo/settings.py†L9-L13】【F:src/svc_infra/db/nosql/utils.py†L56-L113】
-- **Jobs** – choose the queue backend with `JOBS_DRIVER` and provide Redis via `REDIS_URL`; interval schedules can be declared with `JOBS_SCHEDULE_JSON`. 【F:src/svc_infra/jobs/easy.py†L11-L27】【F:docs/jobs.md†L11-L48】
+- **Jobs** – choose the queue backend with `JOBS_DRIVER` and provide Redis via `REDIS_URL`; interval schedules can be declared with `JOBS_SCHEDULE_JSON`. 【F:src/svc_infra/jobs/easy.py†L11-L27】【F:src/svc_infra/docs/jobs.md†L11-L48】
 - **Cache** – namespace keys and lifetimes through `CACHE_PREFIX`, `CACHE_VERSION`, and TTL overrides `CACHE_TTL_DEFAULT`, `CACHE_TTL_SHORT`, `CACHE_TTL_LONG`. 【F:src/svc_infra/cache/README.md†L20-L173】【F:src/svc_infra/cache/ttl.py†L26-L55】
 - **Observability** – turn metrics on/off or adjust scrape paths with `ENABLE_OBS`, `METRICS_PATH`, `OBS_SKIP_PATHS`, and Prometheus/Grafana flags like `SVC_INFRA_DISABLE_PROMETHEUS`, `SVC_INFRA_RATE_WINDOW`, `SVC_INFRA_DASHBOARD_REFRESH`, `SVC_INFRA_DASHBOARD_RANGE`. 【F:src/svc_infra/api/fastapi/ease.py†L67-L111】【F:src/svc_infra/obs/metrics/asgi.py†L49-L206】【F:src/svc_infra/obs/cloud_dash.py†L85-L108】
-- **Webhooks** – reuse the jobs envs (`JOBS_DRIVER`, `REDIS_URL`) for the delivery worker and queue configuration. 【F:docs/webhooks.md†L32-L53】
-- **Security** – enforce password policy, MFA, and rotation with auth prefixes such as `AUTH_PASSWORD_MIN_LENGTH`, `AUTH_PASSWORD_REQUIRE_SYMBOL`, `AUTH_JWT__SECRET`, and `AUTH_JWT__OLD_SECRETS`. 【F:docs/security.md†L24-L70】
+- **Webhooks** – reuse the jobs envs (`JOBS_DRIVER`, `REDIS_URL`) for the delivery worker and queue configuration. 【F:src/svc_infra/docs/webhooks.md†L32-L53】
+- **Security** – enforce password policy, MFA, and rotation with auth prefixes such as `AUTH_PASSWORD_MIN_LENGTH`, `AUTH_PASSWORD_REQUIRE_SYMBOL`, `AUTH_JWT__SECRET`, and `AUTH_JWT__OLD_SECRETS`. 【F:src/svc_infra/docs/security.md†L24-L70】
