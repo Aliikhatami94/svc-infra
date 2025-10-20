@@ -12,7 +12,8 @@ include = [
     "src/svc_infra/db/templates/**/*",
     "src/svc_infra/obs/templates/**/*",
     "src/svc_infra/obs/grafana/templates/**/*",
-    "src/svc_infra/obs/grafana/dashboards/**/*"
+    "src/svc_infra/obs/grafana/dashboards/**/*",
+    "src/svc_infra/docs/**/*"
 ]
 
 classifiers = [
