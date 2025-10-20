@@ -16,7 +16,17 @@ from fastapi.responses import JSONResponse
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
 from httpx import ASGITransport
-from sqlalchemy import create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    select,
+    text,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from svc_infra.apf_payments import settings as payments_settings
@@ -383,6 +393,163 @@ async def reset_tenancy_state():
 
 
 app.include_router(_ten_router)
+
+# --- Data Lifecycle acceptance wiring (A7) ---
+_dl_router = APIRouter(prefix="/data", tags=["acceptance-data-lifecycle"])  # test-only
+
+# Use a file-backed SQLite so state persists across endpoints in the API container
+_dl_db_path = "/tmp/svc-infra-accept/data_lifecycle.db"
+_dl_engine = create_engine(f"sqlite:///{_dl_db_path}", future=True)
+_dl_meta = MetaData()
+
+_users = Table(
+    "users",
+    _dl_meta,
+    Column("id", String, primary_key=True),
+    Column("email", String, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+)
+
+# Create tables if not exist
+try:
+    _dl_meta.create_all(_dl_engine)
+except Exception:
+    pass
+
+
+@_dl_router.post("/_reset")
+async def _dl_reset():
+    try:
+        with _dl_engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS users"))
+            _dl_meta.create_all(conn)
+    except Exception:
+        pass
+    # Clean fixtures sentinel
+    try:
+        import os
+
+        os.remove("/tmp/svc-infra-accept/fixtures.ran")
+    except Exception:
+        pass
+    return {"ok": True}
+
+
+@_dl_router.post("/fixtures/run-once")
+async def run_fixtures_once():
+    from datetime import datetime, timezone
+
+    # Simulate fixture loader that inserts a default user only once
+    sentinel = "/tmp/svc-infra-accept/fixtures.ran"
+    if not os.path.exists(sentinel):
+        with _dl_engine.begin() as conn:
+            conn.execute(
+                _users.insert().values(
+                    id="u1",
+                    email="alpha@example.com",
+                    created_at=datetime.now(timezone.utc),
+                    deleted_at=None,
+                )
+            )
+        os.makedirs(os.path.dirname(sentinel), exist_ok=True)
+        with open(sentinel, "w") as f:
+            f.write("ok")
+
+    # Return all users for visibility
+    with _dl_engine.begin() as conn:
+        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
+        return {"users": [dict(r._mapping) for r in rows]}
+
+
+@_dl_router.post("/erasure/run")
+async def run_erasure_endpoint(principal_id: str = Body(..., embed=True)):
+    from svc_infra.data.erasure import ErasurePlan, ErasureStep, run_erasure
+
+    class _SyncToAsyncSession:
+        def __init__(self, engine):
+            self.engine = engine
+
+        async def execute(self, stmt):
+            # run in thread/blocking; safe for sqlite in this acceptance context
+            with self.engine.begin() as conn:
+                return conn.execute(stmt)
+
+    async def _delete_user(session, pid: str):
+        stmt = _users.delete().where(_users.c.id == pid)
+        res = await session.execute(stmt)
+        return getattr(res, "rowcount", 0)
+
+    plan = ErasurePlan(steps=[ErasureStep(name="delete_user", run=_delete_user)])
+    session = _SyncToAsyncSession(_dl_engine)
+    affected = await run_erasure(session, principal_id, plan)
+    return {"affected": affected}
+
+
+@_dl_router.post("/retention/purge")
+async def run_retention_purge_endpoint(
+    days: int = Body(30, embed=True), hard: bool = Body(False, embed=True)
+):
+    from datetime import datetime, timedelta, timezone
+
+    from svc_infra.data.retention import RetentionPolicy, run_retention_purge
+
+    # Seed: ensure we have a mix of old/new rows
+    now = datetime.now(timezone.utc)
+    with _dl_engine.begin() as conn:
+        # Insert two users if table is empty
+        count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0
+        if count == 0:
+            conn.execute(
+                _users.insert(),
+                [
+                    {
+                        "id": "old",
+                        "email": "old@example.com",
+                        "created_at": now - timedelta(days=days + 5),
+                        "deleted_at": None,
+                    },
+                    {
+                        "id": "new",
+                        "email": "new@example.com",
+                        "created_at": now,
+                        "deleted_at": None,
+                    },
+                ],
+            )
+
+    class _SyncToAsyncSession:
+        def __init__(self, engine):
+            self.engine = engine
+
+        async def execute(self, stmt):
+            with self.engine.begin() as conn:
+                return conn.execute(stmt)
+
+    # Build policy: use users table model-like shim
+    class _ModelShim:
+        delete = _users.delete
+        update = _users.update
+        created_at = _users.c.created_at
+        deleted_at = _users.c.deleted_at
+
+    policy = RetentionPolicy(
+        name="users",
+        model=_ModelShim,
+        older_than_days=days,
+        soft_delete_field="deleted_at",
+        extra_where=None,
+        hard_delete=bool(hard),
+    )
+
+    affected = await run_retention_purge(_SyncToAsyncSession(_dl_engine), [policy])
+    # Return current table state for visibility
+    with _dl_engine.begin() as conn:
+        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
+        return {"affected": affected, "users": [dict(r._mapping) for r in rows]}
+
+
+app.include_router(_dl_router)
 # --- Acceptance-only security demo routers ---
 _sec = APIRouter(prefix="/secure", tags=["acceptance-security"])  # test-only
 

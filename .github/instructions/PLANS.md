@@ -238,7 +238,9 @@ Owner: TBD
 - [x] Verify: data lifecycle test marker. (pytest -m data_lifecycle)
 - [x] Docs: lifecycle & retention policies. (see docs/data-lifecycle.md; linked from README)
  - [x] Implement: easy-setup helpers for migrator/fixtures/retention/erasure wiring. (see data/add.py:add_data_lifecycle)
-- [ ] Acceptance (pre-deploy): A7-01..A7-04 green in CI (see docs/acceptance-matrix.md)
+ - [x] Acceptance (pre-deploy): A7-01..A7-04 green in CI (see docs/acceptance-matrix.md)
+ 	- Files: tests/acceptance/test_data_lifecycle_acceptance.py; tests/acceptance/app.py (/data/* endpoints)
+ 	- Result: acceptance harness green on 2025-10-20 (make accept → 36/36)
 Evidence: (PRs, tests, CI runs)
 
 ### 8. SLOs & Ops
