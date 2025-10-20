@@ -22,18 +22,15 @@ services:
       - "8000:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/ping', timeout=2).status==200 else sys.exit(1)"]
-      interval: 2s
-      timeout: 2s
-      retries: 60
-      start_period: 60s
+      interval: 3s
+      timeout: 3s
+      retries: 120
+      start_period: 180s
     command: >-
       bash -lc "set -euxo pipefail
       && python -m pip install --root-user-action=ignore --no-cache-dir -U pip
-      && python -m pip install --root-user-action=ignore --no-cache-dir uvicorn
-      && python -m pip install --root-user-action=ignore --no-cache-dir asyncpg
-      && python -m pip install --root-user-action=ignore --no-cache-dir aiosqlite
-      && python -m pip install --root-user-action=ignore --no-cache-dir prometheus-client
-      && python -m pip install --root-user-action=ignore --no-cache-dir /workspace
+      && python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary uvicorn asyncpg aiosqlite prometheus-client
+      && python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary /workspace
       && uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000"
 
   redis:

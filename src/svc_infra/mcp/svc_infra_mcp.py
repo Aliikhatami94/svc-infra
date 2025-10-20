@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from ai_infra.llm.tools.custom.cli import cli_cmd_help, cli_subcmd_help, run_cli
+from ai_infra.llm.tools.custom.cli import cli_cmd_help, cli_subcmd_help
 from ai_infra.mcp.server.tools import mcp_from_functions
 
 from svc_infra.app.env import prepare_env
@@ -20,22 +20,22 @@ async def svc_infra_cmd_help() -> dict:
     return await cli_cmd_help(CLI_PROG)
 
 
-async def svc_infra_docs_list() -> dict:
-    """Run `svc-infra docs list` and return its output.
+# No dedicated 'docs list' function — users can use 'docs --help' to discover topics.
 
-    Uses run_cli with the project root as cwd; falls back to run_from_root if needed.
+
+async def svc_infra_docs_help() -> dict:
+    """
+    Run 'svc-infra docs --help' and return its output.
+    Prepares the project environment and executes from the repo root so
+    environment-provided docs directories and local topics are discoverable.
     """
     root = prepare_env()
-    try:
-        text = await run_cli(CLI_PROG, ["docs", "list"], cwd=str(root))
-    except TypeError:
-        # Fallback for older run_cli signatures
-        text = await run_from_root(root, CLI_PROG, ["docs", "list"])
+    text = await run_from_root(root, CLI_PROG, ["docs", "--help"])
     return {
         "ok": True,
-        "action": "docs_list",
+        "action": "docs_help",
         "project_root": str(root),
-        "output": text,
+        "help": text,
     }
 
 
@@ -71,7 +71,7 @@ class Subcommand(str, Enum):
     obs_scaffold = "obs scaffold"
 
     # Docs group
-    docs_list = "docs list"
+    docs_help = "docs --help"
     docs_show = "docs show"
 
     # DX group
@@ -114,12 +114,8 @@ mcp = mcp_from_functions(
     functions=[
         svc_infra_cmd_help,
         svc_infra_subcmd_help,
-        svc_infra_docs_list,
-        # Utility: list docs topics via `svc-infra docs list`
-        # Exposed as a dedicated MCP function for quick discovery in clients.
-        # See: svc_infra.cli.cmds.docs.docs_cmds
-        # NOTE: Prefer run_cli with cwd=project root; fallback to run_from_root if signature differs.
-        # Implemented as an inline wrapper to keep the API surface minimal.
+        svc_infra_docs_help,
+        # Docs listing is available via 'docs --help'; no separate MCP function needed.
     ],
 )
 
