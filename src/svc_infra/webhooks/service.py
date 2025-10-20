@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, List
-
 from uuid import uuid4
 
 from svc_infra.db.outbox import OutboxStore
@@ -22,7 +21,16 @@ class InMemoryWebhookSubscriptions:
         self._subs: Dict[str, List[WebhookSubscription]] = {}
 
     def add(self, topic: str, url: str, secret: str) -> None:
-        self._subs.setdefault(topic, []).append(WebhookSubscription(topic, url, secret))
+        # Upsert semantics per (topic, url): if a subscription already exists
+        # for this topic and URL, rotate its secret instead of adding a new row.
+        # This mirrors typical real-world secret rotation flows where the
+        # endpoint remains the same but the signing secret changes.
+        lst = self._subs.setdefault(topic, [])
+        for sub in lst:
+            if sub.url == url:
+                sub.secret = secret
+                return
+        lst.append(WebhookSubscription(topic, url, secret))
 
     def get_for_topic(self, topic: str) -> List[WebhookSubscription]:
         return list(self._subs.get(topic, []))
