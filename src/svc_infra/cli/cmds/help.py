@@ -21,4 +21,8 @@ How to run (pick what fits your workflow):
 Notes:
 * Make sure you’re in the right virtual environment (or use `pipx`).
 * You can point `--project-root` at your Alembic root; if omitted we auto-detect.
+
+Learn more:
+* For full integration guides and all topics, run: `svc-infra docs list`
+* To explore docs commands, run: `svc-infra docs --help`
 """
