@@ -51,29 +51,17 @@ def _discover_pkg_topics() -> Dict[str, Path]:
 def _resolve_docs_dir(ctx: click.Context) -> Path | None:
     """
     Optional override precedence:
-      1) --docs-dir CLI option
-      2) SVC_INFRA_DOCS_DIR env var
-      3) *Only when working inside the svc-infra repo itself*: repo-root /docs
+      1) SVC_INFRA_DOCS_DIR env var
+      2) *Only when working inside the svc-infra repo itself*: repo-root /docs
     """
-    # 1) CLI option on this or parent contexts
-    current: click.Context | None = ctx
-    while current is not None:
-        docs_dir_opt = (current.params or {}).get("docs_dir")
-        if docs_dir_opt:
-            path = docs_dir_opt if isinstance(docs_dir_opt, Path) else Path(docs_dir_opt)
-            path = path.expanduser()
-            if path.exists():
-                return path
-        current = current.parent
-
-    # 2) Env var
+    # 1) Env var
     env_dir = os.getenv("SVC_INFRA_DOCS_DIR")
     if env_dir:
         p = Path(env_dir).expanduser()
         if p.exists():
             return p
 
-    # 3) In-repo convenience (so `svc-infra docs` works inside this repo)
+    # 2) In-repo convenience (so `svc-infra docs` works inside this repo)
     try:
         root = resolve_project_root()
         proj_docs = root / "docs"
@@ -130,46 +118,9 @@ def register(app: typer.Typer) -> None:
     docs_app = typer.Typer(no_args_is_help=True, add_completion=False, cls=DocsGroup)
 
     @docs_app.callback(invoke_without_command=True)
-    def _docs_options(
-        docs_dir: Path | None = typer.Option(
-            None,
-            "--docs-dir",
-            help="Path to a docs directory to read from (overrides packaged docs)",
-        ),
-        topic: str | None = typer.Option(None, "--topic", help="Topic to show directly"),
-    ) -> None:
-        if topic:
-            key = _norm(topic)
-            ctx = click.get_current_context()
-            dir_to_use = _resolve_docs_dir(ctx)
-            fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
-            if key in fs:
-                typer.echo(fs[key].read_text(encoding="utf-8", errors="replace"))
-                raise typer.Exit(code=0)
-            pkg = _discover_pkg_topics()
-            if key in pkg:
-                typer.echo(pkg[key].read_text(encoding="utf-8", errors="replace"))
-                raise typer.Exit(code=0)
-            raise typer.BadParameter(f"Unknown topic: {topic}")
-
-    @docs_app.command("list", help="List available documentation topics")
-    def list_topics() -> None:
-        ctx = click.get_current_context()
-        dir_to_use = _resolve_docs_dir(ctx)
-        fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
-        pkg = _discover_pkg_topics()
-
-        def _print(name: str, path: Path) -> None:
-            try:
-                typer.echo(f"{name}\t{path}")
-            except Exception:
-                typer.echo(name)
-
-        for name, path in fs.items():
-            _print(name, path)
-        for name, path in pkg.items():
-            if name not in fs:
-                _print(name, path)
+    def _docs_options() -> None:
+        # No group-level options; dynamic commands and 'show' handle topics.
+        return None
 
     @docs_app.command("show", help="Show docs for a topic (alternative to dynamic subcommand)")
     def show(topic: str) -> None:

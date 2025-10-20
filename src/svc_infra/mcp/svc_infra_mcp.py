@@ -20,23 +20,19 @@ async def svc_infra_cmd_help() -> dict:
     return await cli_cmd_help(CLI_PROG)
 
 
-async def svc_infra_docs_list() -> dict:
-    """Run `svc-infra docs list` and return its output.
+# No dedicated 'docs list' function — users can use 'docs --help' to discover topics.
 
-    Uses run_cli with the project root as cwd; falls back to run_from_root if needed.
+
+async def svc_infra_docs_help() -> dict:
     """
-    root = prepare_env()
-    try:
-        text = await run_cli(CLI_PROG, ["docs", "list"], cwd=str(root))
-    except TypeError:
-        # Fallback for older run_cli signatures
-        text = await run_from_root(root, CLI_PROG, ["docs", "list"])
-    return {
-        "ok": True,
-        "action": "docs_list",
-        "project_root": str(root),
-        "output": text,
-    }
+    Run 'svc-infra docs --help' and return its output.
+    Uses the generic run_cli helper for portability.
+    """
+    result = await run_cli(CLI_PROG, ["docs", "--help"])
+    # Normalize to a dict with a 'help' field if run_cli returns raw text
+    if isinstance(result, dict):
+        return result
+    return {"ok": True, "action": "docs_help", "help": result}
 
 
 class Subcommand(str, Enum):
@@ -71,7 +67,7 @@ class Subcommand(str, Enum):
     obs_scaffold = "obs scaffold"
 
     # Docs group
-    docs_list = "docs list"
+    docs_help = "docs --help"
     docs_show = "docs show"
 
     # DX group
@@ -114,12 +110,8 @@ mcp = mcp_from_functions(
     functions=[
         svc_infra_cmd_help,
         svc_infra_subcmd_help,
-        svc_infra_docs_list,
-        # Utility: list docs topics via `svc-infra docs list`
-        # Exposed as a dedicated MCP function for quick discovery in clients.
-        # See: svc_infra.cli.cmds.docs.docs_cmds
-        # NOTE: Prefer run_cli with cwd=project root; fallback to run_from_root if signature differs.
-        # Implemented as an inline wrapper to keep the API surface minimal.
+        svc_infra_docs_help,
+        # Docs listing is available via 'docs --help'; no separate MCP function needed.
     ],
 )
 
