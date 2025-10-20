@@ -7,6 +7,7 @@ services:
       - BACKEND=${BACKEND:-}
       - APP_ENV=dev
       - PYTHONUNBUFFERED=1
+      - PIP_DEFAULT_TIMEOUT=120
       - PYTHONPATH=/workspace/src:/workspace
       - LOG_LEVEL=INFO
       - ENABLE_LOGGING=true
@@ -26,12 +27,19 @@ services:
       timeout: 3s
       retries: 120
       start_period: 180s
-    command: >-
-      bash -lc "set -euxo pipefail
-      && python -m pip install --root-user-action=ignore --no-cache-dir -U pip
-      && python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary uvicorn asyncpg aiosqlite prometheus-client
-      && python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary /workspace
-      && uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000"
+    command:
+      - bash
+      - -lc
+      - |
+        set -euxo pipefail
+        python -m pip install --root-user-action=ignore --no-cache-dir -U pip
+        # Install the project to bring all required runtime deps (fastapi, sqlalchemy, etc.)
+        python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary /workspace
+        # Ensure optional runtime deps used by acceptance are present
+        python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary aiosqlite prometheus-client pyjwt
+        # Optional drivers for Postgres profiles
+        if [ "${BACKEND:-}" = "pg" ] || [ "${BACKEND:-}" = "pg-redis" ]; then python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary asyncpg; fi
+        uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000
 
   redis:
     image: redis:7-alpine
@@ -61,6 +69,7 @@ services:
       - BACKEND=${BACKEND:-}
       - APP_ENV=test
       - PYTHONUNBUFFERED=1
+      - PIP_DEFAULT_TIMEOUT=120
       - PYTHONPATH=/workspace/src:/workspace
       - BASE_URL=http://api:8000
     volumes:
@@ -73,8 +82,11 @@ services:
       - |
         set -euxo pipefail
         python -m pip install --root-user-action=ignore --no-cache-dir -U pip
-        python -m pip install --root-user-action=ignore --no-cache-dir pytest
-        python -m pip install --root-user-action=ignore --no-cache-dir /workspace
+        # Install the project to ensure FastAPI/Starlette and all runtime deps are present
+        python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary /workspace
+        # Test-only deps
+        python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary pytest httpx pyjwt
+        if [ "${BACKEND:-}" = "pg" ] || [ "${BACKEND:-}" = "pg-redis" ]; then python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary asyncpg; fi
         cat >/tmp/wait_api.py <<'PY'
         import sys, time, urllib.request
         url = 'http://api:8000/ping'

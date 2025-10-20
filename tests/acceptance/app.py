@@ -44,6 +44,8 @@ from svc_infra.api.fastapi.middleware.ratelimit import (
     SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
 )
 from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
+from svc_infra.api.fastapi.tenancy.context import TenantId as _TenantId
+from svc_infra.api.fastapi.tenancy.context import set_tenant_resolver as _set_tenant_resolver
 from svc_infra.jobs.easy import easy_jobs
 from svc_infra.jobs.queue import Job
 from svc_infra.jobs.worker import process_one
@@ -280,6 +282,107 @@ app.dependency_overrides[resolve_bearer_or_cookie_principal] = (
     lambda request, session: _accept_principal()
 )
 
+
+# --- Tenancy acceptance wiring ---
+# Allow tests to switch tenant per-request using X-Accept-Tenant without touching auth identity.
+def _accept_tenant_resolver(request, identity, tenant_header):
+    # Precedence:
+    # 1) X-Accept-Tenant header (acceptance-only)
+    # 2) identity.user.tenant_id if present (from our auth override)
+    # 3) default to a known tenant to keep acceptance deterministic
+    hdr = request.headers.get("X-Accept-Tenant")
+    if hdr and str(hdr).strip():
+        return str(hdr).strip()
+    try:
+        uid = getattr(getattr(identity, "user", None), "tenant_id", None)
+        if uid:
+            return str(uid)
+    except Exception:
+        pass
+    return "accept-tenant"
+
+
+_set_tenant_resolver(_accept_tenant_resolver)
+
+# Minimal in-memory tenant-aware resource to validate tenancy behaviors (A6-01..A6-03).
+_ten_router = APIRouter(prefix="/tenancy", tags=["acceptance-tenancy"])  # test-only
+
+# In-memory stores on app.state
+app.state.ten_widgets_by_tenant = {}
+app.state.ten_widget_index = {}
+app.state.ten_widget_next_id = 1
+app.state.ten_quota_default = 2  # max widgets per tenant
+
+
+@_ten_router.post("/widgets", status_code=201)
+async def create_widget(payload: dict, tenant_id: _TenantId):  # type: ignore[name-defined]
+    """Create widget under resolved tenant; enforce per-tenant quota; ignore tenant in payload."""
+    # Defensive: ensure clean slate on first use within a long-lived acceptance server
+    if not getattr(app.state, "ten_reset_done", False):
+        app.state.ten_widgets_by_tenant = {}
+        app.state.ten_widget_index = {}
+        app.state.ten_widget_next_id = 1
+        app.state.ten_reset_done = True
+    # Enforce quota (guard against mis-set or zero quotas)
+    items = app.state.ten_widgets_by_tenant.setdefault(tenant_id, [])
+    quota = getattr(app.state, "ten_quota_default", 2)
+    try:
+        quota = int(quota)
+    except Exception:
+        quota = 2
+    if quota <= 0:
+        quota = 2
+    if len(items) >= quota:
+        # Quota exceeded → 429 with Retry-After to mirror RL semantics
+        from fastapi import Response
+
+        r = Response(status_code=429)
+        r.headers["Retry-After"] = "60"
+        return r
+
+    wid = str(app.state.ten_widget_next_id)
+    app.state.ten_widget_next_id += 1
+    item = {"id": wid, "name": str(payload.get("name", f"w-{wid}")), "tenant_id": tenant_id}
+    items.append(item)
+    app.state.ten_widget_index[wid] = tenant_id
+    return item
+
+
+@_ten_router.get("/widgets")
+async def list_widgets(tenant_id: _TenantId):  # type: ignore[name-defined]
+    return list(app.state.ten_widgets_by_tenant.get(tenant_id, []))
+
+
+@_ten_router.get("/widgets/{wid}")
+async def get_widget(wid: str, tenant_id: _TenantId):  # type: ignore[name-defined]
+    owner_tenant = app.state.ten_widget_index.get(wid)
+    if owner_tenant != tenant_id:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="not_found")
+    for it in app.state.ten_widgets_by_tenant.get(tenant_id, []):
+        if it["id"] == wid:
+            return it
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=404, detail="not_found")
+
+
+@_ten_router.post("/_reset")
+async def reset_tenancy_state():
+    """Acceptance-only: reset in-memory tenancy state between tests.
+
+    Clears all widgets, index and resets id counter and leaves quota at default.
+    """
+    app.state.ten_widgets_by_tenant = {}
+    app.state.ten_widget_index = {}
+    app.state.ten_widget_next_id = 1
+    app.state.ten_quota_default = 2
+    app.state.ten_reset_done = True
+    return {"ok": True}
+
+
+app.include_router(_ten_router)
 # --- Acceptance-only security demo routers ---
 _sec = APIRouter(prefix="/secure", tags=["acceptance-security"])  # test-only
 

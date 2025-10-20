@@ -9,32 +9,10 @@ from typing import Any, Generator
 import httpx
 import pytest
 
-from .app import app as acceptance_app
-
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-
-
-@pytest.fixture(scope="session")
-def _acceptance_app_ready():
-    """Ensure FastAPI startup/shutdown handlers run for the in-process app."""
-
-    try:
-        prev_loop = asyncio.get_running_loop()
-    except RuntimeError:
-        prev_loop = None
-
-    loop = asyncio.new_event_loop()
-    try:
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(acceptance_app.router.startup())
-        yield acceptance_app
-    finally:
-        loop.run_until_complete(acceptance_app.router.shutdown())
-        loop.close()
-        asyncio.set_event_loop(prev_loop)
 
 
 class _SyncASGIClient:
@@ -72,7 +50,7 @@ class _SyncASGIClient:
 
 
 @pytest.fixture(scope="session")
-def client(_acceptance_app_ready) -> Generator[httpx.Client, None, None]:
+def client() -> Generator[httpx.Client, None, None]:
     """HTTPX client for acceptance scenarios.
 
     If ``BASE_URL`` is provided we target that network endpoint so the
@@ -87,9 +65,74 @@ def client(_acceptance_app_ready) -> Generator[httpx.Client, None, None]:
     if base_url:
         with httpx.Client(base_url=base_url, timeout=10.0) as c:
             yield c
-    else:
-        client = _SyncASGIClient(_acceptance_app_ready)
+        return
+
+    # In-process fallback: lazily import acceptance app and run startup/shutdown
+    from .app import app as acceptance_app  # lazy to avoid deps when BASE_URL is set
+
+    try:
+        prev_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        prev_loop = None
+
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(acceptance_app.router.startup())
+        client = _SyncASGIClient(acceptance_app)
         try:
             yield client
         finally:
             client.close()
+            loop.run_until_complete(acceptance_app.router.shutdown())
+    finally:
+        loop.close()
+        asyncio.set_event_loop(prev_loop)
+
+
+@pytest.fixture(autouse=True)
+def _reset_tenancy_between_tests(request, client: httpx.Client):
+    """When running acceptance against a long-lived API (BASE_URL),
+    reset the in-memory tenancy state before each tenancy-marked test.
+
+    This prevents quota/state from leaking across tests in the API container.
+    """
+    base_url = os.getenv("BASE_URL")
+    if not base_url:
+        # In-process app already resets per test session
+        return
+    # Only for tests marked 'tenancy'
+    if request.node.get_closest_marker("tenancy") is None:
+        return
+    try:
+        r = client.post("/tenancy/_reset")
+        assert r.status_code in (200, 204)
+    except Exception:
+        # Best-effort; don't fail test collection if reset isn't available
+        pass
+
+
+@pytest.fixture(scope="session")
+def _acceptance_app_ready():
+    """Provide the acceptance FastAPI app with startup/shutdown executed.
+
+    This is used by a subset of acceptance tests that still rely on
+    Starlette's TestClient directly rather than the shared httpx client.
+    """
+
+    from .app import app as acceptance_app  # lazy import
+
+    try:
+        prev_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        prev_loop = None
+
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(acceptance_app.router.startup())
+        yield acceptance_app
+        loop.run_until_complete(acceptance_app.router.shutdown())
+    finally:
+        loop.close()
+        asyncio.set_event_loop(prev_loop)

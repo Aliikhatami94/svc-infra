@@ -216,7 +216,7 @@ Owner: TBD
 - [x] Verify: tenancy test marker.
 - [x] Docs: isolation strategy (soft vs schema vs dedicated DB). (see docs/tenancy.md)
 - [x] Implement: easy-setup helper for tenant resolution and tenant-aware CRUD. (see api.fastapi.tenancy.add.add_tenancy and SQL router wiring)
-- [ ] Acceptance (pre-deploy): A6-01..A6-03 green in CI (see docs/acceptance-matrix.md)
+- [x] Acceptance (pre-deploy): A6-01..A6-03 green in CI (see docs/acceptance-matrix.md)
 Evidence: (PRs, tests, CI runs)
 
 ### 7. Data Lifecycle

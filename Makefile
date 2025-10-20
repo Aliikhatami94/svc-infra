@@ -9,8 +9,8 @@ compose_up:
 
 wait:
 	@echo "[accept] Waiting for API to become ready (inside api container)..."
-		@ : "Poll the API from inside the running api container to avoid host/port quirks"; \
-		end=$$(($(shell date +%s) + 240)); \
+			@ : "Poll the API from inside the running api container to avoid host/port quirks"; \
+			end=$$(($(shell date +%s) + 420)); \
 		while [ $$(date +%s) -lt $$end ]; do \
 			if docker compose -f docker-compose.test.yml exec -T api \
 				python -c "import sys,urllib.request; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/ping', timeout=2).status==200 else sys.exit(1)" >/dev/null 2>&1; then \
@@ -20,7 +20,7 @@ wait:
 			sleep 2; \
 		done; \
 		echo "[accept] Timeout waiting for API"; \
-		(docker compose -f docker-compose.test.yml logs --no-color api | tail -n 120 || true); \
+			(docker compose -f docker-compose.test.yml logs --no-color api | tail -n 200 || true); \
 		exit 1
 
 seed:
