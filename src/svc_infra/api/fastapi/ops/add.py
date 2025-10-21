@@ -34,7 +34,12 @@ def add_probes(
     app.include_router(router)
 
 
-def add_maintenance_mode(app: FastAPI, *, env_var: str = "MAINTENANCE_MODE") -> None:
+def add_maintenance_mode(
+    app: FastAPI,
+    *,
+    env_var: str = "MAINTENANCE_MODE",
+    exempt_prefixes: tuple[str, ...] | None = None,
+) -> None:
     """Enable a simple maintenance gate controlled by an env var.
 
     When MAINTENANCE_MODE is truthy, all non-GET requests return 503.
@@ -44,6 +49,9 @@ def add_maintenance_mode(app: FastAPI, *, env_var: str = "MAINTENANCE_MODE") -> 
     async def _maintenance_gate(request: Request, call_next):  # noqa: ANN001, ANN202
         flag = str(os.getenv(env_var, "")).lower() in {"1", "true", "yes", "on"}
         if flag and request.method not in {"GET", "HEAD", "OPTIONS"}:
+            path = request.scope.get("path", "")
+            if exempt_prefixes and any(path.startswith(p) for p in exempt_prefixes):
+                return await call_next(request)
             return JSONResponse({"detail": "maintenance"}, status_code=503)
         return await call_next(request)
 

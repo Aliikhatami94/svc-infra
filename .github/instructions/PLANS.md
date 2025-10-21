@@ -254,8 +254,10 @@ Owner: TBD
 - [x] Verify: ops test marker. (pytest -m ops)
 - [x] Docs: SLO definitions & ops playbook. (see docs/ops.md; linked from README)
  - [x] Implement: easy-setup helpers for probes/maintenance-mode/circuit-breaker. (see api/fastapi/ops/add.py)
-- [ ] Acceptance (pre-deploy): A8-01..A8-03 green in CI (see docs/acceptance-matrix.md)
-	(note) A8-01 satisfied by tests/acceptance/test_metrics_exposure.py; A8-02..A8-03 pending.
+ - [x] Acceptance (pre-deploy): A8-01..A8-03 green in CI (see docs/acceptance-matrix.md)
+ 	- Implemented probes under /_ops (live/ready/startup), maintenance middleware with targeted exemptions, and circuit breaker dependency injected via Depends.
+ 	- Acceptance app defaults MAINTENANCE_MODE=false and exempts only /_ops/maintenance/set and /_ops/circuit/set while blocking other non-GETs during maintenance.
+ 	- Evidence: make accept → 39 passed in ~1.4s after fixes.
 Evidence: (PRs, tests, CI runs)
 
 ### 9. DX & Quality Gates
@@ -270,7 +272,11 @@ Owner: TBD
 - [x] Verify: CI dry-run locally. (dx ci command prints plan and can run steps)
 - [x] Docs: contributing & release process. (docs/contributing.md; linked from README)
  - [x] Implement: easy-setup helper/CLI to scaffold CI, checks, and OpenAPI lint steps. (see dx/add.py)
-- [ ] Acceptance (pre-deploy): A9-01..A9-03 green in CI (see docs/acceptance-matrix.md)
+- [x] Acceptance (pre-deploy): A9-01..A9-03 green in CI (see docs/acceptance-matrix.md)
+	- Implemented acceptance tests validating OpenAPI presence, servers/components, Problem schema and examples.
+	- Verified Problem+JSON conformance using dx.checks.check_openapi_problem_schema on live /openapi.json.
+	- Applied simple lints equivalent to Spectral rules: response $ref without siblings; application/problem+json referencing #/components/schemas/Problem.
+	- Evidence: pytest -q -W error → 378 passed in ~25s on macOS (Poetry env). New tests: tests/acceptance/test_dx_openapi_acceptance.py
 Evidence: (PRs, tests, CI runs)
 
 ### 10. Docs & SDKs

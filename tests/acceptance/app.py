@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import httpx
 import jwt
 import pyotp
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
@@ -54,6 +54,9 @@ from svc_infra.api.fastapi.middleware.ratelimit import (
     SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
 )
 from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
+from svc_infra.api.fastapi.ops.add import add_maintenance_mode as _add_maintenance_mode
+from svc_infra.api.fastapi.ops.add import add_probes as _add_probes
+from svc_infra.api.fastapi.ops.add import circuit_breaker_dependency as _circuit_breaker_dependency
 from svc_infra.api.fastapi.tenancy.context import TenantId as _TenantId
 from svc_infra.api.fastapi.tenancy.context import set_tenant_resolver as _set_tenant_resolver
 from svc_infra.jobs.easy import easy_jobs
@@ -100,6 +103,50 @@ app = easy_service_app(
 
 # Install security headers so acceptance can assert their presence
 add_security(app)
+
+# --- Ops (A8): probes + maintenance mode + circuit breaker dependency ---
+# Mount liveness/readiness/startup probes under /_ops
+_add_probes(app, prefix="/_ops", include_in_schema=False)
+# Ensure maintenance defaults OFF for the acceptance server
+os.environ.setdefault("MAINTENANCE_MODE", "false")
+# Enable maintenance mode via env flag; we also add test-only toggles below
+# Exempt only the specific toggle endpoints so POSTs like /_ops/echo are still blocked under maintenance
+_add_maintenance_mode(
+    app,
+    env_var="MAINTENANCE_MODE",
+    exempt_prefixes=(
+        "/_ops/maintenance/set",
+        "/_ops/circuit/set",
+    ),
+)
+
+# Acceptance-only ops router for toggles and circuit-breaker check
+_ops_router = APIRouter(prefix="/_ops", tags=["acceptance-ops"])  # test-only
+
+
+@_ops_router.post("/maintenance/set")
+async def _ops_set_maintenance(on: bool = Body(..., embed=True)):
+    os.environ["MAINTENANCE_MODE"] = "true" if on else "false"
+    return {"on": bool(on)}
+
+
+@_ops_router.post("/circuit/set")
+async def _ops_set_circuit(open: bool = Body(..., embed=True)):
+    os.environ["CIRCUIT_OPEN"] = "true" if open else "false"
+    return {"open": bool(open)}
+
+
+@_ops_router.get("/cb-check", dependencies=[Depends(_circuit_breaker_dependency())])
+async def _ops_cb_check():
+    return {"ok": True}
+
+
+@_ops_router.post("/echo")
+async def _ops_echo(payload: dict = Body(default={})):
+    return {"echo": payload}
+
+
+app.include_router(_ops_router)
 
 # Replace the default global rate limit middleware with a header-only variant
 # so dependency-based tests remain fully isolated while acceptance can still
@@ -397,8 +444,15 @@ app.include_router(_ten_router)
 # --- Data Lifecycle acceptance wiring (A7) ---
 _dl_router = APIRouter(prefix="/data", tags=["acceptance-data-lifecycle"])  # test-only
 
-# Use a file-backed SQLite so state persists across endpoints in the API container
-_dl_db_path = "/tmp/svc-infra-accept/data_lifecycle.db"
+# Use a file-backed SQLite so state persists across endpoints in the API container.
+# Important: avoid /tmp/svc-infra-accept which the harness wipes for CLI migrations.
+_DL_BASE_DIR = os.environ.get("ACCEPT_DATA_DIR", "/tmp/svc-infra-accept-data")
+_dl_db_path = os.path.join(_DL_BASE_DIR, "data_lifecycle.db")
+# Ensure directory exists for file-backed SQLite
+try:
+    os.makedirs(os.path.dirname(_dl_db_path), exist_ok=True)
+except Exception:
+    pass
 _dl_engine = create_engine(f"sqlite:///{_dl_db_path}", future=True)
 _dl_meta = MetaData()
 
@@ -430,7 +484,7 @@ async def _dl_reset():
     try:
         import os
 
-        os.remove("/tmp/svc-infra-accept/fixtures.ran")
+        os.remove(os.path.join(_DL_BASE_DIR, "fixtures.ran"))
     except Exception:
         pass
     return {"ok": True}
@@ -441,7 +495,12 @@ async def run_fixtures_once():
     from datetime import datetime, timezone
 
     # Simulate fixture loader that inserts a default user only once
-    sentinel = "/tmp/svc-infra-accept/fixtures.ran"
+    # Defensive: ensure tables exist (idempotent)
+    try:
+        _dl_meta.create_all(_dl_engine)
+    except Exception:
+        pass
+    sentinel = os.path.join(_DL_BASE_DIR, "fixtures.ran")
     if not os.path.exists(sentinel):
         with _dl_engine.begin() as conn:
             conn.execute(
@@ -493,6 +552,12 @@ async def run_retention_purge_endpoint(
     from datetime import datetime, timedelta, timezone
 
     from svc_infra.data.retention import RetentionPolicy, run_retention_purge
+
+    # Defensive: ensure tables exist (idempotent)
+    try:
+        _dl_meta.create_all(_dl_engine)
+    except Exception:
+        pass
 
     # Seed: ensure we have a mix of old/new rows
     now = datetime.now(timezone.utc)

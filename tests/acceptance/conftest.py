@@ -40,6 +40,15 @@ class _SyncASGIClient:
     def post(self, url: str, **kwargs: Any) -> httpx.Response:
         return self.request("POST", url, **kwargs)
 
+    def put(self, url: str, **kwargs: Any) -> httpx.Response:
+        return self.request("PUT", url, **kwargs)
+
+    def delete(self, url: str, **kwargs: Any) -> httpx.Response:
+        return self.request("DELETE", url, **kwargs)
+
+    def patch(self, url: str, **kwargs: Any) -> httpx.Response:
+        return self.request("PATCH", url, **kwargs)
+
     def options(self, url: str, **kwargs: Any) -> httpx.Response:
         return self.request("OPTIONS", url, **kwargs)
 
@@ -92,15 +101,11 @@ def client() -> Generator[httpx.Client, None, None]:
 
 @pytest.fixture(autouse=True)
 def _reset_tenancy_between_tests(request, client: httpx.Client):
-    """When running acceptance against a long-lived API (BASE_URL),
-    reset the in-memory tenancy state before each tenancy-marked test.
+    """Reset in-memory tenancy state before each tenancy-marked test.
 
-    This prevents quota/state from leaking across tests in the API container.
+    Applies to both in-process and external (BASE_URL) modes to prevent state leakage
+    across tests when a shared server process persists.
     """
-    base_url = os.getenv("BASE_URL")
-    if not base_url:
-        # In-process app already resets per test session
-        return
     # Only for tests marked 'tenancy'
     if request.node.get_closest_marker("tenancy") is None:
         return
