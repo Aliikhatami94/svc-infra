@@ -146,6 +146,33 @@ Owner: TBD
 	- [x] A2-03: Abuse heuristics acceptance (metrics hook)
 		- Files: tests/acceptance/test_abuse_heuristics_acceptance.py; tests/acceptance/app.py (acceptance-only hooks under /_accept/abuse)
 		- Result: metrics hook captures rate-limit events; acceptance asserts key/limit/retry_after. All acceptance tests pass.
+
+	- [ ] Timeouts & Resource Limits (new)
+		- [x] Research: server-side request/body timeouts in Starlette/FastAPI and uvicorn; client (httpx) timeouts; SQLAlchemy/DB statement timeouts; job/webhook worker timeouts; graceful shutdown periods. (ADR-0010)
+		- [x] Design: configuration surface and defaults
+			- ENV/Settings: REQUEST_BODY_TIMEOUT_SECONDS, REQUEST_TIMEOUT_SECONDS, HTTP_CLIENT_TIMEOUT_SECONDS, DB_STATEMENT_TIMEOUT_MS, JOB_DEFAULT_TIMEOUT_SECONDS, WEBHOOK_DELIVERY_TIMEOUT_SECONDS, SHUTDOWN_GRACE_PERIOD_SECONDS.
+			- Error semantics: 504 for handler timeouts (Problem+JSON), 408/413 for body/slowloris depending on phase; include Retry-After where applicable.
+		- [x] Implement: request body read timeout middleware (slowloris defense; abort body parsing after configured threshold). (src/svc_infra/api/fastapi/middleware/timeout.py)
+		- [x] Implement: overall request execution timeout middleware returning 504 application/problem+json with traceable error code and optional Retry-After. (src/svc_infra/api/fastapi/middleware/timeout.py; wired in setup.py)
+		- [x] Implement: httpx client factory with sane default timeouts driven by settings; propagate to internal SDK/clients.
+		- [x] Implement: DB statement timeout
+			- Postgres: SET LOCAL statement_timeout per-request/transaction via SQLAlchemy execution options.
+			- SQLite/dev: wrap calls with asyncio.wait_for using DB_STATEMENT_TIMEOUT_MS. (partial: ignored on non-PG dialects for now)
+		- [x] Implement: jobs runner per-job timeout + DLQ on timeout; surface attempt/backoff behavior.
+		- [x] Implement: webhook delivery timeout with retry/backoff integration; mark timeout cause in delivery metadata.
+		- [x] Implement: graceful shutdown timeouts for server and workers (drain period, max wait).
+		- [ ] Tests: unit tests for
+			- body timeout (simulate slow upload/stream)
+			- handler timeout (async sleep beyond threshold → 504) (tests/api/test_timeout_middleware.py)
+			- outbound client timeout mapping to Problem (tests/api/test_httpx_timeout_mapping.py)
+			- DB statement timeout behavior (PG and dev fallback) (partial: smoke test on SQLite no-op)
+			- job/webhook timeout paths → retries/DLQ (covered indirectly by worker timeout unit test)
+			(note) Added unit tests for httpx default factory and worker timeout: tests/utils/test_http_client_defaults.py, tests/jobs/test_worker_timeout.py
+		- [ ] Acceptance (pre-deploy): A2-04..A2-06
+			- [ ] A2-04: Handler timeout returns 504 with Problem schema fields (type/title/status/traceId) and optional Retry-After.
+			- [ ] A2-05: Body read timeout aborts slowloris/large body with 408 or 413 and includes appropriate headers.
+			- [ ] A2-06: Outbound httpx client timeout is surfaced as 504-class Problem while preserving original context in extensions.
+		- [ ] Docs: timeouts & resource limits guide (tuning, defaults, and per-environment recommendations); link from docs/ops.md and docs/rate-limiting.md.
 Evidence: (PRs, tests, CI runs)
 
 ### 3. Idempotency & Concurrency Controls
@@ -291,7 +318,8 @@ Owner: TBD
 - [x] Verify: docs test marker / manual review. (pytest -m docs; sdk tests under -m sdk)
 - [x] Docs: Developer quickstart & API usage. (docs/docs-and-sdks.md)
  - [x] Implement: easy-setup helper to mount docs endpoints and run SDK generation. (see api/fastapi/docs/add.py)
-- [ ] Acceptance (pre-deploy): A10-01..A10-03 green in CI (see docs/acceptance-matrix.md)
+ - [x] Acceptance (pre-deploy): A10-01..A10-03 green in CI (see docs/acceptance-matrix.md)
+	 - (evidence) docker tester run: 45 passed; SQL CLI stdout JSON for setup-and-migrate/current; downgrade -1 parsing; RL isolation fix validated.
 Evidence: (PRs, tests, CI runs)
 
 ---

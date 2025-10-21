@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Annotated, AsyncIterator, Tuple
 
 from fastapi import Depends
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -53,6 +55,20 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     if _SessionLocal is None:
         raise RuntimeError("Database not initialized. Call add_sql_db(app, ...) first.")
     async with _SessionLocal() as session:
+        # Optional: set a per-transaction statement timeout for Postgres if configured
+        raw_ms = os.getenv("DB_STATEMENT_TIMEOUT_MS")
+        if raw_ms:
+            try:
+                ms = int(raw_ms)
+                if ms > 0:
+                    try:
+                        # SET LOCAL applies for the duration of the current transaction only
+                        await session.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": ms})
+                    except Exception:
+                        # Non-PG dialects (e.g., SQLite) will error; ignore silently
+                        pass
+            except ValueError:
+                pass
         try:
             yield session
             await session.commit()

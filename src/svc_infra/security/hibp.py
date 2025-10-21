@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-import httpx
+from svc_infra.http import new_httpx_client
 
 
 def sha1_hex(data: str) -> str:
@@ -39,7 +39,11 @@ class HIBPClient:
         self.timeout = timeout
         self.user_agent = user_agent
         self._cache: Dict[str, CacheEntry] = {}
-        self._http = httpx.Client(timeout=self.timeout, headers={"User-Agent": self.user_agent})
+        # Use central factory for consistent defaults; retain explicit timeout override
+        self._http = new_httpx_client(
+            timeout_seconds=self.timeout,
+            headers={"User-Agent": self.user_agent},
+        )
 
     def _get_cached(self, prefix: str) -> Optional[str]:
         now = time.time()

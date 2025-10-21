@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import httpx
+import os
 
 from svc_infra.db.inbox import InboxStore
 from svc_infra.db.outbox import OutboxStore
+from svc_infra.http import get_default_timeout_seconds, new_async_httpx_client
 from svc_infra.jobs.queue import Job
 from svc_infra.webhooks.signing import sign
 
@@ -65,7 +66,18 @@ def make_webhook_handler(
             version = delivery_payload.get("version")
         if version is not None:
             headers["X-Payload-Version"] = str(version)
-        async with httpx.AsyncClient(timeout=10) as client:
+        # Derive timeout: dedicated WEBHOOK_DELIVERY_TIMEOUT_SECONDS or default HTTP client timeout
+        timeout_seconds = None
+        env_timeout = os.getenv("WEBHOOK_DELIVERY_TIMEOUT_SECONDS")
+        if env_timeout:
+            try:
+                timeout_seconds = float(env_timeout)
+            except ValueError:
+                timeout_seconds = get_default_timeout_seconds()
+        else:
+            timeout_seconds = get_default_timeout_seconds()
+
+        async with new_async_httpx_client(timeout_seconds=timeout_seconds) as client:
             resp = await client.post(url, json=delivery_payload, headers=headers)
             if 200 <= resp.status_code < 300:
                 # record delivery and mark processed

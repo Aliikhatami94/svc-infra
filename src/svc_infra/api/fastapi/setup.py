@@ -14,9 +14,14 @@ from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_inde
 from svc_infra.api.fastapi.docs.scoped import DOC_SCOPES
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
 from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
+from svc_infra.api.fastapi.middleware.graceful_shutdown import install_graceful_shutdown
 from svc_infra.api.fastapi.middleware.idempotency import IdempotencyMiddleware
 from svc_infra.api.fastapi.middleware.ratelimit import SimpleRateLimitMiddleware
 from svc_infra.api.fastapi.middleware.request_id import RequestIdMiddleware
+from svc_infra.api.fastapi.middleware.timeout import (
+    BodyReadTimeoutMiddleware,
+    HandlerTimeoutMiddleware,
+)
 from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.api.fastapi.openapi.mutators import setup_mutators
 from svc_infra.api.fastapi.openapi.pipeline import apply_mutators
@@ -79,11 +84,16 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
 
 def _setup_middlewares(app: FastAPI):
     app.add_middleware(RequestIdMiddleware)
+    # Timeouts: enforce body read timeout first, then total handler timeout
+    app.add_middleware(BodyReadTimeoutMiddleware)
+    app.add_middleware(HandlerTimeoutMiddleware)
     app.add_middleware(CatchAllExceptionMiddleware)
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(SimpleRateLimitMiddleware)
     register_error_handlers(app)
     _add_route_logger(app)
+    # Graceful shutdown: track in-flight and wait on shutdown
+    install_graceful_shutdown(app)
 
 
 def _coerce_list(value: str | Iterable[str] | None) -> list[str]:
