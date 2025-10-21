@@ -37,6 +37,8 @@ services:
         python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary /workspace
         # Ensure optional runtime deps used by acceptance are present
         python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary aiosqlite prometheus-client pyjwt
+        # Explicitly install uvicorn which is not a project dependency but required for the test server
+        python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary uvicorn
         # Optional drivers for Postgres profiles
         if [ "${BACKEND:-}" = "pg" ] || [ "${BACKEND:-}" = "pg-redis" ]; then python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary asyncpg; fi
         uvicorn tests.acceptance.app:app --host 0.0.0.0 --port 8000
