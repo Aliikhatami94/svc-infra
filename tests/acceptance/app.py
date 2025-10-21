@@ -153,9 +153,19 @@ app.include_router(_ops_router)
 # assert presence of X-RateLimit-* headers on successful responses.
 try:
     # Remove any pre-installed SimpleRateLimitMiddleware
-    app.user_middleware = [
-        m for m in app.user_middleware if getattr(m, "cls", None) is not _SimpleRateLimitMiddleware
-    ]
+    def _is_simple_rl(mw) -> bool:
+        try:
+            cls = getattr(mw, "cls", None)
+            if cls is None:
+                return False
+            # Match by identity OR class name to be robust across import paths
+            if cls is _SimpleRateLimitMiddleware:
+                return True
+            return getattr(cls, "__name__", "") == "SimpleRateLimitMiddleware"
+        except Exception:
+            return False
+
+    app.user_middleware = [m for m in app.user_middleware if not _is_simple_rl(m)]
 
     class _HeaderOnlyRateLimitMiddleware(BaseHTTPMiddleware):
         def __init__(self, app, limit: int = 10000, window: int = 60):
@@ -176,7 +186,7 @@ try:
             resp.headers.setdefault("X-RateLimit-Reset", str(reset))
             return resp
 
-    # Add header-only RL middleware
+    # Add header-only RL middleware (very high limit so it never 429s)
     app.add_middleware(_HeaderOnlyRateLimitMiddleware, limit=10000, window=60)
     # Rebuild middleware stack to apply changes immediately
     app.middleware_stack = app.build_middleware_stack()
