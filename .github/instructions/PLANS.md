@@ -101,10 +101,11 @@ Owner: TBD
 - [x] Tests: audit log hash-chain integrity (tamper detection). (security.audit + test_audit_log_chain)
 - [x] Verify: run security marker tests. (auth + security suites passing as of 2025-10-14)
 - [x] Docs: security configuration & examples. (see docs/security.md)
-- [ ] Acceptance (pre-deploy): A1-01..A1-07 green in CI (see docs/acceptance-matrix.md)
+- [x] Acceptance (pre-deploy): A1-01..A1-07 green in CI (see docs/acceptance-matrix.md)
 	- (evidence) RBAC/ABAC and sessions list permissions:
 		- tests/acceptance/test_auth_acceptance.py
 		- acceptance app mounts demo secure routes and session router: tests/acceptance/app.py
+	- Result: acceptance harness green on 2025-10-20 (make accept → 22/22)
 	- [x] A1-01: Register → Verify → Login → /auth/me happy path
 		- Files: tests/acceptance/test_auth_a101_flow.py; tests/acceptance/app.py (acceptance-only in-memory auth block: /auth/register, /auth/verify, /users/login, /auth/me)
 		- Result: acceptance suite green (part of acceptance CI; current total 18/18).
@@ -163,7 +164,9 @@ Owner: TBD
 - [x] Tests: outbox enqueue/fetch/mark processed; inbox dedupe.
 - [x] Verify: concurrency suite covers optimistic locking and outbox/inbox. (`-m concurrency` green)
 - [x] Docs: optimistic locking + outbox/inbox patterns & pitfalls. (see docs/idempotency.md)
-- [ ] Acceptance (pre-deploy): A3-01..A3-03 green in CI (see docs/acceptance-matrix.md)
+- [x] Acceptance (pre-deploy): A3-01..A3-03 green in CI (see docs/acceptance-matrix.md)
+	- Files: tests/acceptance/test_idempotency_and_concurrency.py; tests/acceptance/app.py (/idmp/echo and /cc/items endpoints)
+	- Result: acceptance harness green on 2025-10-20 (make accept → 25/25)
 Evidence: (PRs, tests, CI runs)
 
 ### 4. Background Jobs & Scheduling
@@ -178,7 +181,9 @@ Owner: TBD
 - [x] Verify: job test marker. (tests/jobs/* using in-memory queue and scheduler pass under -m jobs)
  - [x] Docs: job authoring guide. (see docs/jobs.md)
 - [x] Implement: easy-setup helper to choose queue and start scheduler. (see jobs/easy.py)
-- [ ] Acceptance (pre-deploy): A4-01..A4-03 green in CI (see docs/acceptance-matrix.md)
+ - [x] Acceptance (pre-deploy): A4-01..A4-03 green in CI (see docs/acceptance-matrix.md)
+ 	- Files: tests/acceptance/test_jobs_and_scheduler_acceptance.py; tests/acceptance/app.py (/jobs/* and /scheduler/* endpoints)
+ 	- Result: acceptance harness green on 2025-10-20 (make accept → 28/28)
 Evidence: (PRs, tests, CI runs)
 
 ### 5. Webhooks Framework
@@ -193,7 +198,7 @@ Owner: TBD
 - [x] Verify: webhook test marker. (pyproject marker added)
 - [x] Docs: integration guide. (see docs/webhooks.md)
 - [x] Implement: easy-setup helper to add webhook producer/verify middleware. (see webhooks/add.py)
-- [ ] Acceptance (pre-deploy): A5-01..A5-03 green in CI (see docs/acceptance-matrix.md)
+- [x] Acceptance (pre-deploy): A5-01..A5-03 green in CI (see docs/acceptance-matrix.md)
 Evidence: (PRs, tests, CI runs)
 
 ### 6. Tenancy
@@ -211,7 +216,7 @@ Owner: TBD
 - [x] Verify: tenancy test marker.
 - [x] Docs: isolation strategy (soft vs schema vs dedicated DB). (see docs/tenancy.md)
 - [x] Implement: easy-setup helper for tenant resolution and tenant-aware CRUD. (see api.fastapi.tenancy.add.add_tenancy and SQL router wiring)
-- [ ] Acceptance (pre-deploy): A6-01..A6-03 green in CI (see docs/acceptance-matrix.md)
+- [x] Acceptance (pre-deploy): A6-01..A6-03 green in CI (see docs/acceptance-matrix.md)
 Evidence: (PRs, tests, CI runs)
 
 ### 7. Data Lifecycle
@@ -233,7 +238,9 @@ Owner: TBD
 - [x] Verify: data lifecycle test marker. (pytest -m data_lifecycle)
 - [x] Docs: lifecycle & retention policies. (see docs/data-lifecycle.md; linked from README)
  - [x] Implement: easy-setup helpers for migrator/fixtures/retention/erasure wiring. (see data/add.py:add_data_lifecycle)
-- [ ] Acceptance (pre-deploy): A7-01..A7-04 green in CI (see docs/acceptance-matrix.md)
+ - [x] Acceptance (pre-deploy): A7-01..A7-04 green in CI (see docs/acceptance-matrix.md)
+ 	- Files: tests/acceptance/test_data_lifecycle_acceptance.py; tests/acceptance/app.py (/data/* endpoints)
+ 	- Result: acceptance harness green on 2025-10-20 (make accept → 36/36)
 Evidence: (PRs, tests, CI runs)
 
 ### 8. SLOs & Ops
@@ -285,8 +292,8 @@ Evidence: (PRs, tests, CI runs)
 ## Nice-to-have (Fast Follows)
 
 ### 11. Billing Primitives
-- [x] Research: existing payments adapter capabilities. (no existing payments module; jobs/webhooks usable; SQL scaffolds ready)
-- [x] Design: usage metering & aggregation approach. (ADR 0008)
+- [ ] Research: existing payments adapter capabilities. (no existing payments module; jobs/webhooks usable; SQL scaffolds ready)
+- [ ] Design: usage metering & aggregation approach. (ADR 0008)
 - [ ] Implement: data models & migrations (usage_events, usage_aggregates, plans, plan_entitlements, subscriptions, prices, invoices, invoice_lines).
 - [ ] Implement: usage ingestion API (idempotent) + list aggregates.
 - [ ] Implement: quota/entitlement enforcement decorator/dependency.

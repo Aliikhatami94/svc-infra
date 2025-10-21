@@ -6,14 +6,27 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from urllib.parse import urlparse
 
+import httpx
 import jwt
 import pyotp
 from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
-from sqlalchemy import create_engine
+from httpx import ASGITransport
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    select,
+    text,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from svc_infra.apf_payments import settings as payments_settings
@@ -41,10 +54,17 @@ from svc_infra.api.fastapi.middleware.ratelimit import (
     SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
 )
 from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
+from svc_infra.api.fastapi.tenancy.context import TenantId as _TenantId
+from svc_infra.api.fastapi.tenancy.context import set_tenant_resolver as _set_tenant_resolver
+from svc_infra.jobs.easy import easy_jobs
+from svc_infra.jobs.queue import Job
+from svc_infra.jobs.worker import process_one
 from svc_infra.obs import metrics as _metrics
 from svc_infra.security.add import add_security
 from svc_infra.security.passwords import PasswordValidationError, validate_password
 from svc_infra.security.permissions import RequireABAC, RequirePermission, owns_resource
+from svc_infra.webhooks.add import add_webhooks
+from svc_infra.webhooks.signing import verify_any
 
 # Minimal acceptance app wiring the library's routers and defaults
 os.environ.setdefault("PAYMENTS_PROVIDER", "fake")
@@ -272,6 +292,264 @@ app.dependency_overrides[resolve_bearer_or_cookie_principal] = (
     lambda request, session: _accept_principal()
 )
 
+
+# --- Tenancy acceptance wiring ---
+# Allow tests to switch tenant per-request using X-Accept-Tenant without touching auth identity.
+def _accept_tenant_resolver(request, identity, tenant_header):
+    # Precedence:
+    # 1) X-Accept-Tenant header (acceptance-only)
+    # 2) identity.user.tenant_id if present (from our auth override)
+    # 3) default to a known tenant to keep acceptance deterministic
+    hdr = request.headers.get("X-Accept-Tenant")
+    if hdr and str(hdr).strip():
+        return str(hdr).strip()
+    try:
+        uid = getattr(getattr(identity, "user", None), "tenant_id", None)
+        if uid:
+            return str(uid)
+    except Exception:
+        pass
+    return "accept-tenant"
+
+
+_set_tenant_resolver(_accept_tenant_resolver)
+
+# Minimal in-memory tenant-aware resource to validate tenancy behaviors (A6-01..A6-03).
+_ten_router = APIRouter(prefix="/tenancy", tags=["acceptance-tenancy"])  # test-only
+
+# In-memory stores on app.state
+app.state.ten_widgets_by_tenant = {}
+app.state.ten_widget_index = {}
+app.state.ten_widget_next_id = 1
+app.state.ten_quota_default = 2  # max widgets per tenant
+
+
+@_ten_router.post("/widgets", status_code=201)
+async def create_widget(payload: dict, tenant_id: _TenantId):  # type: ignore[name-defined]
+    """Create widget under resolved tenant; enforce per-tenant quota; ignore tenant in payload."""
+    # Defensive: ensure clean slate on first use within a long-lived acceptance server
+    if not getattr(app.state, "ten_reset_done", False):
+        app.state.ten_widgets_by_tenant = {}
+        app.state.ten_widget_index = {}
+        app.state.ten_widget_next_id = 1
+        app.state.ten_reset_done = True
+    # Enforce quota (guard against mis-set or zero quotas)
+    items = app.state.ten_widgets_by_tenant.setdefault(tenant_id, [])
+    quota = getattr(app.state, "ten_quota_default", 2)
+    try:
+        quota = int(quota)
+    except Exception:
+        quota = 2
+    if quota <= 0:
+        quota = 2
+    if len(items) >= quota:
+        # Quota exceeded → 429 with Retry-After to mirror RL semantics
+        from fastapi import Response
+
+        r = Response(status_code=429)
+        r.headers["Retry-After"] = "60"
+        return r
+
+    wid = str(app.state.ten_widget_next_id)
+    app.state.ten_widget_next_id += 1
+    item = {"id": wid, "name": str(payload.get("name", f"w-{wid}")), "tenant_id": tenant_id}
+    items.append(item)
+    app.state.ten_widget_index[wid] = tenant_id
+    return item
+
+
+@_ten_router.get("/widgets")
+async def list_widgets(tenant_id: _TenantId):  # type: ignore[name-defined]
+    return list(app.state.ten_widgets_by_tenant.get(tenant_id, []))
+
+
+@_ten_router.get("/widgets/{wid}")
+async def get_widget(wid: str, tenant_id: _TenantId):  # type: ignore[name-defined]
+    owner_tenant = app.state.ten_widget_index.get(wid)
+    if owner_tenant != tenant_id:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="not_found")
+    for it in app.state.ten_widgets_by_tenant.get(tenant_id, []):
+        if it["id"] == wid:
+            return it
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=404, detail="not_found")
+
+
+@_ten_router.post("/_reset")
+async def reset_tenancy_state():
+    """Acceptance-only: reset in-memory tenancy state between tests.
+
+    Clears all widgets, index and resets id counter and leaves quota at default.
+    """
+    app.state.ten_widgets_by_tenant = {}
+    app.state.ten_widget_index = {}
+    app.state.ten_widget_next_id = 1
+    app.state.ten_quota_default = 2
+    app.state.ten_reset_done = True
+    return {"ok": True}
+
+
+app.include_router(_ten_router)
+
+# --- Data Lifecycle acceptance wiring (A7) ---
+_dl_router = APIRouter(prefix="/data", tags=["acceptance-data-lifecycle"])  # test-only
+
+# Use a file-backed SQLite so state persists across endpoints in the API container
+_dl_db_path = "/tmp/svc-infra-accept/data_lifecycle.db"
+_dl_engine = create_engine(f"sqlite:///{_dl_db_path}", future=True)
+_dl_meta = MetaData()
+
+_users = Table(
+    "users",
+    _dl_meta,
+    Column("id", String, primary_key=True),
+    Column("email", String, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+)
+
+# Create tables if not exist
+try:
+    _dl_meta.create_all(_dl_engine)
+except Exception:
+    pass
+
+
+@_dl_router.post("/_reset")
+async def _dl_reset():
+    try:
+        with _dl_engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS users"))
+            _dl_meta.create_all(conn)
+    except Exception:
+        pass
+    # Clean fixtures sentinel
+    try:
+        import os
+
+        os.remove("/tmp/svc-infra-accept/fixtures.ran")
+    except Exception:
+        pass
+    return {"ok": True}
+
+
+@_dl_router.post("/fixtures/run-once")
+async def run_fixtures_once():
+    from datetime import datetime, timezone
+
+    # Simulate fixture loader that inserts a default user only once
+    sentinel = "/tmp/svc-infra-accept/fixtures.ran"
+    if not os.path.exists(sentinel):
+        with _dl_engine.begin() as conn:
+            conn.execute(
+                _users.insert().values(
+                    id="u1",
+                    email="alpha@example.com",
+                    created_at=datetime.now(timezone.utc),
+                    deleted_at=None,
+                )
+            )
+        os.makedirs(os.path.dirname(sentinel), exist_ok=True)
+        with open(sentinel, "w") as f:
+            f.write("ok")
+
+    # Return all users for visibility
+    with _dl_engine.begin() as conn:
+        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
+        return {"users": [dict(r._mapping) for r in rows]}
+
+
+@_dl_router.post("/erasure/run")
+async def run_erasure_endpoint(principal_id: str = Body(..., embed=True)):
+    from svc_infra.data.erasure import ErasurePlan, ErasureStep, run_erasure
+
+    class _SyncToAsyncSession:
+        def __init__(self, engine):
+            self.engine = engine
+
+        async def execute(self, stmt):
+            # run in thread/blocking; safe for sqlite in this acceptance context
+            with self.engine.begin() as conn:
+                return conn.execute(stmt)
+
+    async def _delete_user(session, pid: str):
+        stmt = _users.delete().where(_users.c.id == pid)
+        res = await session.execute(stmt)
+        return getattr(res, "rowcount", 0)
+
+    plan = ErasurePlan(steps=[ErasureStep(name="delete_user", run=_delete_user)])
+    session = _SyncToAsyncSession(_dl_engine)
+    affected = await run_erasure(session, principal_id, plan)
+    return {"affected": affected}
+
+
+@_dl_router.post("/retention/purge")
+async def run_retention_purge_endpoint(
+    days: int = Body(30, embed=True), hard: bool = Body(False, embed=True)
+):
+    from datetime import datetime, timedelta, timezone
+
+    from svc_infra.data.retention import RetentionPolicy, run_retention_purge
+
+    # Seed: ensure we have a mix of old/new rows
+    now = datetime.now(timezone.utc)
+    with _dl_engine.begin() as conn:
+        # Insert two users if table is empty
+        count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0
+        if count == 0:
+            conn.execute(
+                _users.insert(),
+                [
+                    {
+                        "id": "old",
+                        "email": "old@example.com",
+                        "created_at": now - timedelta(days=days + 5),
+                        "deleted_at": None,
+                    },
+                    {
+                        "id": "new",
+                        "email": "new@example.com",
+                        "created_at": now,
+                        "deleted_at": None,
+                    },
+                ],
+            )
+
+    class _SyncToAsyncSession:
+        def __init__(self, engine):
+            self.engine = engine
+
+        async def execute(self, stmt):
+            with self.engine.begin() as conn:
+                return conn.execute(stmt)
+
+    # Build policy: use users table model-like shim
+    class _ModelShim:
+        delete = _users.delete
+        update = _users.update
+        created_at = _users.c.created_at
+        deleted_at = _users.c.deleted_at
+
+    policy = RetentionPolicy(
+        name="users",
+        model=_ModelShim,
+        older_than_days=days,
+        soft_delete_field="deleted_at",
+        extra_where=None,
+        hard_delete=bool(hard),
+    )
+
+    affected = await run_retention_purge(_SyncToAsyncSession(_dl_engine), [policy])
+    # Return current table state for visibility
+    with _dl_engine.begin() as conn:
+        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
+        return {"affected": affected, "users": [dict(r._mapping) for r in rows]}
+
+
+app.include_router(_dl_router)
 # --- Acceptance-only security demo routers ---
 _sec = APIRouter(prefix="/secure", tags=["acceptance-security"])  # test-only
 
@@ -833,3 +1111,423 @@ def abuse_get_rate_limit_events():
 
 
 app.include_router(_abuse)
+
+# ---------------- Acceptance-only Idempotency & Concurrency (A3) -----------------
+_idmp = APIRouter(prefix="/idmp", tags=["acceptance-idempotency"])  # test-only
+
+
+@_idmp.post("/echo")
+async def idmp_echo(payload: dict = Body(...)):
+    """Return a body that includes a server nonce.
+
+    With IdempotencyMiddleware enabled globally, the first request will
+    compute and cache the response. Subsequent requests with the same
+    Idempotency-Key and identical payload should replay the exact same
+    response, including the nonce value, without re-executing the handler.
+    """
+    return {"ok": True, "echo": payload, "nonce": uuid.uuid4().hex}
+
+
+app.include_router(_idmp)
+
+_cc = APIRouter(prefix="/cc", tags=["acceptance-concurrency"])  # test-only
+
+
+class _Item(SimpleNamespace):
+    id: str
+    value: str
+    version: int
+
+
+_items: dict[str, _Item] = {}
+
+
+@_cc.post("/items", status_code=201)
+async def cc_create_item(payload: dict = Body(...)):
+    iid = payload.get("id") or uuid.uuid4().hex
+    val = payload.get("value") or ""
+    if iid in _items:
+        # treat as idempotent create returning existing
+        item = _items[iid]
+        return {"id": item.id, "value": item.value, "version": item.version}
+    item = _Item(id=iid, value=val, version=1)
+    _items[iid] = item
+    return {"id": item.id, "value": item.value, "version": item.version}
+
+
+@_cc.get("/items/{item_id}")
+async def cc_get_item(item_id: str):
+    item = _items.get(item_id)
+    if not item:
+        raise HTTPException(404, "not_found")
+    return {"id": item.id, "value": item.value, "version": item.version}
+
+
+@_cc.put("/items/{item_id}")
+async def cc_update_item(item_id: str, payload: dict = Body(...)):
+    item = _items.get(item_id)
+    if not item:
+        raise HTTPException(404, "not_found")
+    provided_ver = int(payload.get("version") or 0)
+    if provided_ver != item.version:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "type": "about:blank",
+                "title": "Conflict",
+                "detail": "Version mismatch",
+                "expected": item.version,
+            },
+        )
+    item.value = payload.get("value") or item.value
+    item.version += 1
+    return {"id": item.id, "value": item.value, "version": item.version}
+
+
+app.include_router(_cc)
+
+# ---------------- Acceptance-only Jobs & Scheduler (A4) -----------------
+_jobs = APIRouter(prefix="/jobs", tags=["acceptance-jobs"])  # test-only
+
+# Initialize a jobs queue and scheduler using easy helpers (in-memory by default)
+_queue, _scheduler = easy_jobs()
+
+# In-memory state for the acceptance job handler
+_job_results: list[dict] = []
+_job_failures: dict[str, int] = {}  # job name -> remaining failures before success
+
+
+def _accept_jobs_reset():
+    """Acceptance-only helper to reset in-memory jobs/results state between tests.
+
+    The acceptance harness runs a single API process for multiple tests. Make sure
+    queued jobs and recorded results don't leak across tests.
+    """
+    try:
+        _job_results.clear()
+    except Exception:
+        pass
+    try:
+        _job_failures.clear()
+    except Exception:
+        pass
+    try:
+        # Clear any pending jobs in the in-memory queue
+        if hasattr(_queue, "_jobs"):
+            getattr(_queue, "_jobs").clear()
+    except Exception:
+        pass
+
+
+async def _accept_job_handler(job: Job) -> None:
+    """Acceptance job handler with programmable failures.
+
+    - If configured, will fail the first N attempts per job name by raising.
+    - On success, records a result with name, payload, and current attempts.
+    """
+    # Route outbox jobs to the webhooks delivery handler.
+    # Important: do NOT swallow exceptions from the handler – let them
+    # propagate so the worker marks the job as failed and retries with backoff.
+    handler = None
+    try:
+        if job.name.startswith("outbox."):
+            handler = getattr(app.state, "webhooks_delivery_handler", None)
+    except Exception:
+        handler = None
+    if handler:
+        # Ensure webhook delivery jobs use a short but non-zero backoff so an
+        # immediate subsequent process attempt does not re-run the same job.
+        # This makes retries deterministic for acceptance tests.
+        try:
+            if job.name.startswith("outbox."):
+                # Use a slightly larger backoff to account for fast environments
+                # and the scheduler tick happening in the same moment.
+                job.backoff_seconds = 2  # type: ignore[assignment]
+        except Exception:
+            # Best-effort; if mutation fails we still proceed
+            pass
+        await handler(job)
+        return
+
+    # Fail first N attempts for this job name if configured
+    remain = _job_failures.get(job.name, 0)
+    if remain > 0:
+        _job_failures[job.name] = remain - 1
+        raise RuntimeError(f"configured-failure:{job.name}:{remain}")
+    # Record successful processing
+    _job_results.append(
+        {
+            "id": job.id,
+            "name": job.name,
+            "payload": dict(job.payload),
+            "attempts": job.attempts,
+        }
+    )
+
+
+@_jobs.post("/enqueue")
+async def jobs_enqueue(payload: dict = Body(...)):
+    name = (payload.get("name") or "accept.job").strip()
+    data = dict(payload.get("payload") or {})
+    delay = int(payload.get("delay_seconds") or 0)
+    job = _queue.enqueue(name, data, delay_seconds=delay)
+    # Allow overriding backoff_seconds for test speed
+    if "backoff_seconds" in payload:
+        try:
+            job.backoff_seconds = int(payload["backoff_seconds"])  # type: ignore[assignment]
+        except Exception:
+            pass
+    return {
+        "id": job.id,
+        "name": job.name,
+        "attempts": job.attempts,
+        "available_at": job.available_at.isoformat(),
+    }
+
+
+@_jobs.post("/process-one")
+async def jobs_process_one():
+    processed = await process_one(_queue, _accept_job_handler)
+    return {"processed": bool(processed)}
+
+
+@_jobs.get("/results")
+async def jobs_results():
+    return {"results": list(_job_results)}
+
+
+@_jobs.post("/config/failures")
+async def jobs_config_failures(payload: dict = Body(...)):
+    # Reset acceptance jobs state to avoid leakage across tests; the
+    # acceptance tests call this endpoint at the start of each scenario.
+    _accept_jobs_reset()
+    name = (payload.get("name") or "accept.job").strip()
+    times = int(payload.get("times") or 0)
+    _job_failures[name] = max(0, times)
+    return {"name": name, "failures": _job_failures[name]}
+
+
+@_jobs.get("/peek")
+async def jobs_peek():
+    rows = []
+    try:
+        # Access in-memory queue internals for acceptance visibility
+        for j in getattr(_queue, "_jobs", []):
+            rows.append(
+                {
+                    "id": j.id,
+                    "name": j.name,
+                    "attempts": j.attempts,
+                    "available_at": j.available_at.isoformat(),
+                    "last_error": j.last_error,
+                }
+            )
+    except Exception:
+        pass
+    return {"jobs": rows}
+
+
+@_jobs.post("/make-due")
+async def jobs_make_due(payload: dict = Body(...)):
+    target_id = payload.get("id")
+    count = 0
+    try:
+        now = datetime.now(timezone.utc)
+        for j in getattr(_queue, "_jobs", []):
+            if not target_id or j.id == str(target_id):
+                j.available_at = now  # type: ignore[assignment]
+                count += 1
+    except Exception:
+        pass
+    return {"updated": count}
+
+
+@_jobs.post("/set-backoff")
+async def jobs_set_backoff(payload: dict = Body(...)):
+    target_id = str(payload.get("id") or "").strip()
+    seconds = int(payload.get("seconds") or 1)
+    updated = False
+    try:
+        for j in getattr(_queue, "_jobs", []):
+            if j.id == target_id:
+                j.backoff_seconds = seconds  # type: ignore[assignment]
+                updated = True
+                break
+    except Exception:
+        pass
+    return {"ok": updated}
+
+
+app.include_router(_jobs)
+
+_sched = APIRouter(prefix="/scheduler", tags=["acceptance-scheduler"])  # test-only
+_sched_counters: dict[str, int] = {}
+
+
+@_sched.post("/add")
+async def sched_add(payload: dict = Body(...)):
+    name = (payload.get("name") or "accept.tick").strip()
+    interval = int(payload.get("interval_seconds") or 0)
+
+    async def _tick():
+        _sched_counters[name] = _sched_counters.get(name, 0) + 1
+
+    _scheduler.add_task(name, interval, _tick)
+    return {"name": name, "interval_seconds": interval}
+
+
+@_sched.post("/tick")
+async def sched_tick():
+    # Reset jobs/results state on every scheduler tick call that the acceptance
+    # tests make at the beginning of their flows. This avoids cross-test state.
+    _accept_jobs_reset()
+    await _scheduler.tick()
+    return {"ok": True}
+
+
+@_sched.get("/counters")
+async def sched_counters():
+    return {"counters": dict(_sched_counters)}
+
+
+app.include_router(_sched)
+
+# ---------------- Acceptance-only Webhooks (A5) -----------------
+# Wire library router and delivery job to the in-memory queue/scheduler
+add_webhooks(app, queue=_queue, scheduler=_scheduler, schedule_tick=True)
+
+# Make the webhooks outbox tick runnable immediately on every tick for deterministic tests.
+# The helper above schedules it at 1s intervals; rapid acceptance tests may call
+# /scheduler/tick within that window. Overwrite the task with a 0s interval.
+try:
+    _tick = getattr(app.state, "webhooks_outbox_tick", None)
+    if _tick is not None:
+        _scheduler.add_task("webhooks.outbox", 0, _tick)
+except Exception:
+    pass
+
+_wh = APIRouter(prefix="/_accept/webhooks", tags=["acceptance-webhooks"])  # test-only
+
+# Receiver configuration/state
+_wh_secrets: list[str] = []
+_wh_failures_left: int = 0
+_wh_deliveries: list[dict] = []
+
+
+def _should_use_asgi_transport(url: str) -> bool:
+    try:
+        u = urlparse(url)
+        return (u.hostname or "").lower() == "testserver"
+    except Exception:
+        return False
+
+
+async def _local_post(url: str, json_body: dict, headers: dict) -> httpx.Response:
+    # Use ASGITransport to avoid real network when targeting testserver
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        # Strip scheme+host if present to avoid double host
+        path = urlparse(url).path or "/"
+        return await client.post(path, json=json_body, headers=headers)
+
+
+# Override the webhooks delivery handler to use ASGITransport in-process
+async def _accept_webhook_delivery(job: Job) -> None:
+    data = job.payload or {}
+    outbox_id = data.get("outbox_id")
+    topic = data.get("topic")
+    payload = data.get("payload") or {}
+    if not outbox_id or not topic:
+        return
+    # The built-in handler signs payload and posts over HTTP; we emulate but allow ASGITransport
+    from svc_infra.webhooks.signing import sign
+
+    subscription = payload.get("subscription") if isinstance(payload, dict) else None
+    event = payload.get("event") if isinstance(payload, dict) else None
+    if event is not None and subscription is not None:
+        delivery_payload = event
+        url = subscription.get("url")
+        secret = subscription.get("secret")
+        subscription_id = subscription.get("id")
+    else:
+        # Fallback to router-level lookup via app.state
+        def url_lookup(t):
+            return app.state.webhooks_subscriptions.get_for_topic(t)[0].url
+
+        def secret_lookup(t):
+            return app.state.webhooks_subscriptions.get_for_topic(t)[0].secret
+
+        delivery_payload = payload
+        url = url_lookup(topic)
+        secret = secret_lookup(topic)
+        subscription_id = None
+    sig = sign(secret, delivery_payload)
+    headers = {
+        "X-Signature": sig,
+        "X-Event-Id": str(outbox_id),
+        "X-Topic": str(topic),
+        "X-Attempt": str(job.attempts or 1),
+        "X-Signature-Alg": "hmac-sha256",
+        "X-Signature-Version": "v1",
+    }
+    if subscription_id:
+        headers["X-Webhook-Subscription"] = str(subscription_id)
+    if isinstance(delivery_payload, dict) and delivery_payload.get("version") is not None:
+        headers["X-Payload-Version"] = str(delivery_payload.get("version"))
+    # Post using ASGI when targeting testserver, else real HTTP
+    if _should_use_asgi_transport(url):
+        resp = await _local_post(url, delivery_payload, headers)
+    else:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(url, json=delivery_payload, headers=headers)
+    if 200 <= resp.status_code < 300:
+        app.state.webhooks_inbox.mark_if_new(f"webhook:{outbox_id}", ttl_seconds=24 * 3600)
+        app.state.webhooks_outbox.mark_processed(int(outbox_id))
+        return
+    raise RuntimeError(f"webhook delivery failed: {resp.status_code}")
+
+
+# Install our override handler
+app.state.webhooks_delivery_handler = _accept_webhook_delivery
+
+
+@_wh.post("/config")
+async def webhook_config(payload: dict = Body(...)):
+    global _wh_secrets, _wh_failures_left, _wh_deliveries
+    secrets = payload.get("secrets") or []
+    fails = int(payload.get("fail_first") or 0)
+    _wh_secrets = list(secrets)
+    _wh_failures_left = max(0, fails)
+    _wh_deliveries = []
+    return {"secrets": _wh_secrets, "fail_first": _wh_failures_left}
+
+
+@_wh.post("/receiver")
+async def webhook_receiver(payload: dict = Body(...), request: Request = None):
+    global _wh_failures_left
+    sig = request.headers.get("X-Signature") or ""
+    # Verify against configured secrets list
+    ok = verify_any(_wh_secrets, payload, sig) if _wh_secrets else False
+    if not ok:
+        return JSONResponse(status_code=400, content={"error": "bad_signature"})
+    # Simulate transient failure for first N attempts
+    if _wh_failures_left > 0:
+        _wh_failures_left -= 1
+        return JSONResponse(status_code=500, content={"error": "transient"})
+    # Record delivery
+    _wh_deliveries.append(
+        {
+            "payload": dict(payload),
+            "headers": {k: v for k, v in request.headers.items()},
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    return {"ok": True}
+
+
+@_wh.get("/deliveries")
+async def webhook_deliveries():
+    return {"deliveries": list(_wh_deliveries)}
+
+
+app.include_router(_wh)

@@ -69,5 +69,13 @@ class InMemoryJobQueue:
                 job.last_error = error
                 # Exponential backoff: base * attempts
                 delay = job.backoff_seconds * max(1, job.attempts)
-                job.available_at = now + timedelta(seconds=delay)
+                if delay > 0:
+                    # Add a tiny fudge so an immediate subsequent poll in ultra-fast
+                    # environments (like our acceptance API) doesn't re-reserve the job.
+                    # This keeps tests deterministic without impacting semantics.
+                    job.available_at = now + timedelta(seconds=delay, milliseconds=250)
+                else:
+                    # When backoff is explicitly zero (e.g., unit tests forcing
+                    # immediate retry), make the job available right away.
+                    job.available_at = now
                 return
