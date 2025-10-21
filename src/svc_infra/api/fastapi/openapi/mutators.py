@@ -1172,6 +1172,9 @@ def ensure_problem_examples_mutator():
                     continue
                 if ic < 400:
                     continue
+                # Do not add content if response is a $ref; avoid creating siblings
+                if "$ref" in resp:
+                    continue
                 content = resp.setdefault("content", {})
                 # prefer problem+json but also set application/json if present
                 for mt in ("application/problem+json", "application/json"):
