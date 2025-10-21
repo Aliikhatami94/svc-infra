@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from importlib import import_module
 from typing import List, Optional
@@ -124,7 +125,11 @@ def cmd_current(
 ):
     """Display the current revision for each database."""
     apply_database_url(database_url)
-    core_current(verbose=verbose)
+    result = core_current(verbose=verbose)
+    try:
+        typer.echo(json.dumps(result))
+    except Exception:
+        typer.echo(str(result))
 
 
 def cmd_history(
@@ -189,7 +194,7 @@ def cmd_setup_and_migrate(
     Async vs. sync is inferred from SQL_URL.
     """
     final_pkgs = _find_pkgs(with_payments, discover_packages)
-    core_setup_and_migrate(
+    result = core_setup_and_migrate(
         overwrite_scaffold=overwrite_scaffold,
         create_db_if_missing=create_db_if_missing,
         create_followup_revision=create_followup_revision,
@@ -198,6 +203,12 @@ def cmd_setup_and_migrate(
         discover_packages=final_pkgs or None,
         database_url=database_url,
     )
+    # Echo a concise JSON result so tests and users can introspect outcome
+    try:
+        typer.echo(json.dumps(result))
+    except Exception:
+        # Fallback to plain string if not JSON-serializable for any reason
+        typer.echo(str(result))
 
 
 def register(app: typer.Typer) -> None:
@@ -205,7 +216,11 @@ def register(app: typer.Typer) -> None:
     app.command("init")(cmd_init)
     app.command("revision")(cmd_revision)
     app.command("upgrade")(cmd_upgrade)
-    app.command("downgrade")(cmd_downgrade)
+    # Allow unknown options so users can pass "-1" like Alembic without Click treating it as an option
+    app.command(
+        "downgrade",
+        context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+    )(cmd_downgrade)
     app.command("current")(cmd_current)
     app.command("history")(cmd_history)
     app.command("stamp")(cmd_stamp)
