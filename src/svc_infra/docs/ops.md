@@ -31,3 +31,7 @@ This guide explains how to use svc-infra’s probes, circuit breaker, and metric
 
 - Prometheus middleware is enabled unless `SVC_INFRA_DISABLE_PROMETHEUS=1`.
 - Observability settings: `METRICS_ENABLED`, `METRICS_PATH`, and optional histogram buckets.
+
+## See also
+
+- Timeouts & Resource Limits: `./timeouts-and-resource-limits.md` — request/body/handler timeouts, outbound client timeouts, DB statement timeouts, jobs/webhooks, and graceful shutdown.

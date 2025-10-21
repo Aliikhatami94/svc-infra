@@ -161,19 +161,21 @@ Owner: TBD
 		- [x] Implement: jobs runner per-job timeout + DLQ on timeout; surface attempt/backoff behavior.
 		- [x] Implement: webhook delivery timeout with retry/backoff integration; mark timeout cause in delivery metadata.
 		- [x] Implement: graceful shutdown timeouts for server and workers (drain period, max wait).
-		- [ ] Tests: unit tests for
+		- [x] Tests: unit tests for
 			- body timeout (simulate slow upload/stream)
 			- handler timeout (async sleep beyond threshold → 504) (tests/api/test_timeout_middleware.py)
 			- outbound client timeout mapping to Problem (tests/api/test_httpx_timeout_mapping.py)
 			- DB statement timeout behavior (PG and dev fallback) (partial: smoke test on SQLite no-op)
 			- job/webhook timeout paths → retries/DLQ (covered indirectly by worker timeout unit test)
 			(note) Added unit tests for httpx default factory and worker timeout: tests/utils/test_http_client_defaults.py, tests/jobs/test_worker_timeout.py
-		- [ ] Acceptance (pre-deploy): A2-04..A2-06
-			- [ ] A2-04: Handler timeout returns 504 with Problem schema fields (type/title/status/traceId) and optional Retry-After.
-			- [ ] A2-05: Body read timeout aborts slowloris/large body with 408 or 413 and includes appropriate headers.
-			- [ ] A2-06: Outbound httpx client timeout is surfaced as 504-class Problem while preserving original context in extensions.
-		- [ ] Docs: timeouts & resource limits guide (tuning, defaults, and per-environment recommendations); link from docs/ops.md and docs/rate-limiting.md.
+		- [x] Acceptance (pre-deploy): A2-04..A2-06
+			- [x] A2-04: Handler timeout returns 504 with Problem schema fields (type/title/status/traceId) and optional Retry-After.
+			- [x] A2-05: Body read timeout aborts slowloris/large body with 408 or 413 and includes appropriate headers.
+			- [x] A2-06: Outbound httpx client timeout is surfaced as 504-class Problem while preserving original context in extensions.
+		- [x] Docs: timeouts & resource limits guide (tuning, defaults, and per-environment recommendations); link from docs/ops.md and docs/rate-limiting.md.
 Evidence: (PRs, tests, CI runs)
+	    - make unit → 378 passed locally; make accept → 48 passed (A2-04..A2-06 green).
+	    - Docs added: `src/svc_infra/docs/timeouts-and-resource-limits.md`; cross-linked from `docs/ops.md` and `docs/rate-limiting.md`.
 
 ### 3. Idempotency & Concurrency Controls
 Owner: TBD

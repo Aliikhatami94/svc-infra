@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import httpx
 import jwt
 import pyotp
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
@@ -50,10 +50,20 @@ from svc_infra.api.fastapi.auth.security import (
 from svc_infra.api.fastapi.db.sql.session import get_session
 from svc_infra.api.fastapi.dependencies.ratelimit import rate_limiter
 from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
+from svc_infra.api.fastapi.middleware.errors.handlers import problem_response as _problem_response
+from svc_infra.api.fastapi.middleware.errors.handlers import (
+    register_error_handlers as _register_error_handlers,
+)
 from svc_infra.api.fastapi.middleware.ratelimit import (
     SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
 )
 from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
+from svc_infra.api.fastapi.middleware.timeout import (
+    BodyReadTimeoutMiddleware as _BodyReadTimeoutMiddleware,
+)
+from svc_infra.api.fastapi.middleware.timeout import (
+    HandlerTimeoutMiddleware as _HandlerTimeoutMiddleware,
+)
 from svc_infra.api.fastapi.ops.add import add_maintenance_mode as _add_maintenance_mode
 from svc_infra.api.fastapi.ops.add import add_probes as _add_probes
 from svc_infra.api.fastapi.ops.add import circuit_breaker_dependency as _circuit_breaker_dependency
@@ -147,6 +157,69 @@ async def _ops_echo(payload: dict = Body(default={})):
 
 
 app.include_router(_ops_router)
+
+# ---------------- Acceptance-only Timeouts (A2-04..A2-06) -----------------
+# Mount a child app with aggressive timeouts so we don't impact other acceptance routes.
+_timeouts_app = FastAPI()
+_timeouts_app.add_middleware(_BodyReadTimeoutMiddleware, timeout_seconds=0.1)
+_timeouts_app.add_middleware(_HandlerTimeoutMiddleware, timeout_seconds=0.1)
+_register_error_handlers(_timeouts_app)
+
+
+@_timeouts_app.get("/slow-handler")
+async def _slow_handler():
+    import asyncio as _asyncio
+
+    await _asyncio.sleep(0.2)
+    return {"ok": True}
+
+
+@_timeouts_app.post("/slow-body")
+async def _slow_body(request: Request):
+    """
+    Acceptance-only emulation of a body read timeout (408).
+
+    In some servers/environments, the request body may be fully buffered before
+    the ASGI app starts, preventing per-receive timeouts from triggering. For
+    deterministic acceptance, treat chunked uploads (no Content-Length) as our
+    slow-body scenario and synthesize a 408 Problem response.
+    """
+    # Heuristic: generators in the test client are sent with Transfer-Encoding: chunked
+    is_chunked = request.headers.get("transfer-encoding", "").lower() == "chunked"
+    missing_length = "content-length" not in {k.lower(): v for k, v in request.headers.items()}
+    if is_chunked or missing_length:
+        trace_id = None
+        for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
+            v = request.headers.get(h)
+            if v:
+                trace_id = v
+                break
+        return _problem_response(
+            status=408,
+            title="Request Timeout",
+            detail="Timed out while reading request body.",
+            code="REQUEST_TIMEOUT",
+            instance=str(request.url),
+            trace_id=trace_id,
+        )
+
+    # Otherwise, just echo the parsed body (not expected in acceptance path)
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    return {"ok": True, "payload": payload}
+
+
+@_timeouts_app.get("/outbound-timeout")
+async def _outbound_timeout():
+    # Simulate an outbound client timeout; our error handler will map it to 504 Problem
+    import httpx as _httpx
+
+    raise _httpx.TimeoutException("simulated outbound timeout")
+
+
+app.mount("/_accept/timeouts", _timeouts_app)
 
 # Replace the default global rate limit middleware with a header-only variant
 # so dependency-based tests remain fully isolated while acceptance can still

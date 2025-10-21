@@ -84,25 +84,34 @@ class BodyReadTimeoutMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Wrap the receive channel to apply a timeout while the body is being read
-        body_complete = False
-
-        async def _timeout_receive() -> dict:
-            nonlocal body_complete
-            try:
-                message = await asyncio.wait_for(receive(), timeout=self.timeout_seconds)
-            except asyncio.TimeoutError as e:
-                raise e
-
-            if message.get("type") == "http.request":
-                if not message.get("more_body", False):
-                    body_complete = True
-            return message
+        # Strategy: greedily drain the incoming request body here while enforcing
+        # per-receive timeout, then replay it to the downstream app from a buffer.
+        # This ensures we can detect slowloris-style uploads even if the app only
+        # reads the body later (after the server has finished buffering).
+        buffered = bytearray()
 
         try:
-            await self.app(scope, _timeout_receive, send)
+            while True:
+                message = await asyncio.wait_for(receive(), timeout=self.timeout_seconds)
+
+                mtype = message.get("type")
+                if mtype == "http.request":
+                    chunk = message.get("body", b"") or b""
+                    if chunk:
+                        buffered.extend(chunk)
+                    # Stop when server indicates no more body
+                    if not message.get("more_body", False):
+                        break
+                    # else: continue reading remaining chunks with timeout
+                    continue
+
+                if mtype == "http.disconnect":  # client disconnected mid-upload
+                    # Treat as end of body for the purposes of replay; downstream
+                    # will see an empty body. No timeout response needed here.
+                    break
+                # Ignore other message types and continue
         except asyncio.TimeoutError:
-            # If timing out during body read, respond with 408
+            # Timed out while waiting for the next body chunk → return 408
             request = Request(scope, receive=receive)
             trace_id = None
             for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
@@ -119,3 +128,17 @@ class BodyReadTimeoutMiddleware:
                 trace_id=trace_id,
             )
             await resp(scope, receive, send)
+            return
+
+        # Replay the drained body to the app as a single http.request message.
+        sent = False
+
+        async def _replay_receive() -> dict:
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {"type": "http.request", "body": bytes(buffered), "more_body": False}
+            # Subsequent calls return an empty terminal body event
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        await self.app(scope, _replay_receive, send)
