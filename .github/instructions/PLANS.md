@@ -353,11 +353,11 @@ Evidence: (PRs, tests, CI runs)
  	- Files: tests/acceptance/test_billing_acceptance.py; tests/acceptance/app.py mounts `/_billing` via add_billing.
 
 ### 12. Admin
-- [ ] Research: existing admin endpoints/tools.
-- [ ] Design: admin scope & permission alignment.
-- [ ] Implement: admin API & impersonation (audit logging).
-- [ ] Implement: easy-setup helper (add_admin) to mount admin routers, impersonation endpoints, and necessary guards; support pluggable backends/providers.
-- [ ] Tests: impersonation logging & role restrictions.
+- [x] Research: existing admin endpoints/tools. (roles_router and guards present; permission registry maps 'admin' to billing/security/user perms; acceptance shows admin-only route; no dedicated admin module or impersonation yet)
+- [x] Design: admin scope & permission alignment. (ADR 0011 — src/svc_infra/docs/adr/0011-admin-scope-and-impersonation.md)
+- [x] Implement: admin API & impersonation (audit logging).
+- [x] Implement: easy-setup helper (add_admin) to mount admin routers, impersonation endpoints, and necessary guards; support pluggable backends/providers.
+ - [x] Tests: impersonation logging & role restrictions.
 - [ ] Verify: admin test marker.
 - [ ] Docs: admin usage & guardrails.
 

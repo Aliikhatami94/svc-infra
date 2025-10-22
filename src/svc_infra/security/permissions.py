@@ -16,6 +16,7 @@ PERMISSION_REGISTRY: Dict[str, Set[str]] = {
         "billing.write",
         "security.session.revoke",
         "security.session.list",
+        "admin.impersonate",
     },
     "support": {"user.read", "billing.read"},
     "auditor": {"user.read", "billing.read", "audit.read"},
