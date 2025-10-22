@@ -31,6 +31,7 @@ Evidence: (PRs, tests, CI runs)
 
 - API Scaffolding (FastAPI easy setup)
 	- [~] Research: existing setup helpers (src/svc_infra/api/fastapi/*, tests/unit/api/*).
+	- [~] Implement: easy-setup helpers already exist (easy_service_app/easy_service_api). (path: src/svc_infra/api/fastapi/ease.py)
 	- [x] Design: targeted unit tests for env-driven easy builders and router mounting coverage (matrix recorded 2025-10-17).
 	- [x] Implement: backfill unit tests for easy builders and include-api-key inference (tests/unit/api/test_fastapi_setup.py).
 	- [x] Tests: pytest -q tests/unit/api/test_fastapi_setup.py (→ covered in full suite).
@@ -40,6 +41,7 @@ Evidence: (PRs, tests, CI runs)
 
 - APF Payments (existing sample module)
 	- [~] Research: existing router and tests (src/svc_infra/api/fastapi/apf_payments/router.py; tests/unit/payments/*).
+	- [~] Implement: easy-setup helper already exists (add_payments). (path: src/svc_infra/api/fastapi/apf_payments/setup.py)
 	- [x] Implement: expand unit tests for edge cases (tenant resolver override, webhook replay, pagination limits). (tests/unit/payments/test_payments_tenant_resolution.py, test_payments_routes_webhook_replay.py, test_payments_pagination_limits.py)
 	- [x] Tests: unit + integration against in-memory providers.
 	- [x] Docs: minimal usage and extension points. (src/svc_infra/apf_payments/README.md updated; examples for easy_service_app + add_payments, tenant resolver override, custom adapters)
@@ -53,6 +55,7 @@ Evidence: (PRs, tests, CI runs)
 
 - Observability (obs add + CLI)
 	- [~] Research: add_observability and obs CLI (src/svc_infra/obs/*; tests/unit/obs/*).
+	- [~] Implement: easy-setup helper already exists (add_observability). (path: src/svc_infra/obs/add.py)
 	- [x] Implement: unit tests for route classification and metrics labels.
 		- Files: tests/unit/obs/test_add_observability.py (added classifier resolver test)
 	- [x] Docs: metrics quickstart and dashboard JSON linkage.
@@ -62,14 +65,18 @@ Evidence: (PRs, tests, CI runs)
 
 - Cache
 	- [~] Research: cache module and decorators (src/svc_infra/cache/*; tests/unit/cache/*).
+	- [x] Design: add_cache helper contract — idempotent, env-driven init (CACHE_URL/REDIS_URL, CACHE_PREFIX, CACHE_VERSION, APP_ENV), alias consistency, readiness probe + startup/shutdown hooks, and optional app.state exposure; startup hooks are optional for correctness but recommended for production reliability. (recorded in docs/cache.md; ADR TBD)
+	- [x] Implement: easy-setup helper (add_cache) to initialize cache from settings and expose common resource helpers; preserve direct API for advanced use.
 	- [x] Implement: unit tests for tags/recache and TTL interplay where missing.
 		- Files: tests/unit/cache/test_ttl_and_recache.py (TTL and recache key variants); tests/unit/cache/test_cache_decorators.py (existing)
 	- [x] Docs: cache patterns and caveats. (expanded in docs/cache.md)
 	- [x] Acceptance (pre-deploy): smoke read/write path (in-memory); headers unaffected N/A (no HTTP hook).
+		- Note: add_cache acceptance to verify idempotent wiring and readiness/shutdown behavior once implemented (startup not required but supported).
 		- Files: tests/acceptance/test_cache_smoke.py
 
 - Logging helpers
 	- [~] Research: logging setup (src/svc_infra/app/logging/*); unit coverage state.
+	- [~] Implement: easy-setup helper already exists (setup_logging). (path: src/svc_infra/app/logging/__init__.py)
 	- [x] Research: logging setup and existing tests/docs (src/svc_infra/app/logging/{add.py,formats.py,filter.py}; tests/unit/app/logging/test_logging_setup.py; src/svc_infra/app/README.md).
 	- [x] Implement: unit tests for JSON/plain modes, drop paths. (tests/unit/app/logging/test_logging_setup.py extended)
 	- [x] Docs: logging modes and environment detection. (src/svc_infra/app/README.md import fixes + examples)
@@ -147,7 +154,7 @@ Owner: TBD
 		- Files: tests/acceptance/test_abuse_heuristics_acceptance.py; tests/acceptance/app.py (acceptance-only hooks under /_accept/abuse)
 		- Result: metrics hook captures rate-limit events; acceptance asserts key/limit/retry_after. All acceptance tests pass.
 
-	- [ ] Timeouts & Resource Limits (new)
+	- [x] Timeouts & Resource Limits (new)
 		- [x] Research: server-side request/body timeouts in Starlette/FastAPI and uvicorn; client (httpx) timeouts; SQLAlchemy/DB statement timeouts; job/webhook worker timeouts; graceful shutdown periods. (ADR-0010)
 		- [x] Design: configuration surface and defaults
 			- ENV/Settings: REQUEST_BODY_TIMEOUT_SECONDS, REQUEST_TIMEOUT_SECONDS, HTTP_CLIENT_TIMEOUT_SECONDS, DB_STATEMENT_TIMEOUT_MS, JOB_DEFAULT_TIMEOUT_SECONDS, WEBHOOK_DELIVERY_TIMEOUT_SECONDS, SHUTDOWN_GRACE_PERIOD_SECONDS.
@@ -349,6 +356,7 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Research: existing admin endpoints/tools.
 - [ ] Design: admin scope & permission alignment.
 - [ ] Implement: admin API & impersonation (audit logging).
+- [ ] Implement: easy-setup helper (add_admin) to mount admin routers, impersonation endpoints, and necessary guards; support pluggable backends/providers.
 - [ ] Tests: impersonation logging & role restrictions.
 - [ ] Verify: admin test marker.
 - [ ] Docs: admin usage & guardrails.
@@ -357,6 +365,7 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Research: current flags or env toggles.
 - [ ] Design: flag storage & evaluation order; experiment bucketing.
 - [ ] Implement: flag service + decorator.
+- [ ] Implement: easy-setup helper (add_flags) to configure flag backend and decorators quickly; support custom evaluators.
 - [ ] Implement: experiment allocation helper.
 - [ ] Tests: rollout % stability, flag precedence.
 - [ ] Verify: flags test marker.
@@ -366,6 +375,7 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Research: timezone handling & formatting utilities.
 - [ ] Design: locale extraction & file structure.
 - [ ] Implement: translation pipeline & currency helpers.
+- [ ] Implement: easy-setup helper (add_i18n) to load locales and mount translation endpoints/middleware.
 - [ ] Tests: formatting & fallback.
 - [ ] Verify: i18n test marker.
 - [ ] Docs: i18n usage notes.
@@ -374,6 +384,7 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Research: existing search indices.
 - [ ] Design: PG TSV/trigram vs external engine decision.
 - [ ] Implement: search abstraction & indexing jobs.
+- [ ] Implement: easy-setup helper (add_search) to configure search backend and indexer jobs.
 - [ ] Tests: relevance & idempotent indexing.
 - [ ] Verify: search test marker.
 - [ ] Docs: query examples.
@@ -382,6 +393,7 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Research: existing file handling.
 - [ ] Design: signed URL strategy & virus scan integration.
 - [ ] Implement: upload/download endpoints & thumbnailer.
+- [ ] Implement: easy-setup helper (add_media) to mount file routes and integrate with storage providers; pluggable scanners.
 - [ ] Tests: signature validity, scan hook, lifecycle transitions.
 - [ ] Verify: file test marker.
 - [ ] Docs: media lifecycle.
@@ -390,6 +402,7 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Research: current emailing utilities.
 - [ ] Design: provider abstraction & template layer.
 - [ ] Implement: sending API + sandbox mode + bounce tracking.
+- [ ] Implement: easy-setup helper (add_comms) to wire providers, sandbox, rate limits, and templates.
 - [ ] Tests: sandbox suppression, template rendering, rate limits.
 - [ ] Verify: comms test marker.
 - [ ] Docs: messaging & templates.
@@ -398,6 +411,7 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Research: existing compliance artifacts.
 - [ ] Design: SOC2 checklist & access review workflow.
 - [ ] Implement: access review CLI & data map docs.
+- [ ] Implement: easy-setup helper (add_compliance) to expose compliance checks, exports, and reports.
 - [ ] Tests: access review script behavior.
 - [ ] Verify: compliance test marker.
 - [ ] Docs: DPIA template & compliance overview.
@@ -437,3 +451,65 @@ Prioritize Must-have top to bottom. Interleave Quick Wins if they unlock infrast
 - [ ] Tag version & generate changelog.
 
 Updated: Enhanced production readiness plan with research/design/tests/verify subtasks.
+
+---
+### 20. Examples & Reference Service (Option A)
+Owner: TBD
+
+Goal: Provide a fully runnable example service within this repo that showcases end-to-end usage of the library (API scaffolding, logging, observability, caching, jobs, webhooks, CRUD via SQL, rate limiting, billing router, and payments fake adapter) as a practical guide for adopters.
+
+- [ ] Research: inventory what the current acceptance app already wires and identify gaps to make a great example.
+	- Inputs: `tests/acceptance/app.py`, acceptance Make targets, and docker-compose profiles.
+	- Output: list of example features and minimal dependencies per profile (sqlite-only default; pg+redis profile).
+
+- [ ] Design: structure and files under `examples/reference-service/` mirroring the plan’s stage gates, using real library wiring (production-like) as the canonical guide.
+	- App wiring: `app/main.py` uses easy builders plus real middleware/routers from this package (no acceptance-only shortcuts).
+	- Auth (real): use `add_auth_users(...)` to mount library routers under `/auth` and `/users` (sessions, account, password flows), enable API Keys and MFA endpoints; include a minimal SQLAlchemy `User` model + Pydantic schemas.
+	- Data & CRUD (real): `app/models.py`, `app/schemas.py` for a demo model and expose CRUD via `SqlResource` under `/_sql/demo`.
+	- Jobs/Webhooks (real): `app/jobs.py` uses `easy_jobs()`; register billing ticks and `add_webhooks(...)` for publisher+delivery workers (in-memory by default).
+	- Payments: mount via `add_payments(...)` with the Fake adapter as a realistic surface.
+	- Observability/Logging: enable `add_observability` and `setup_logging` with env-driven defaults.
+	- Rate limiting: add `SimpleRateLimitMiddleware` globally (in-memory store by default; Redis store under pg-redis profile).
+	- Runtime assets: `.env.example`, `docker-compose.yml` (default sqlite + optional pg-redis profile), `Makefile` (run, migrate via `python -m svc_infra.db setup-and-migrate`, start jobs, optional smoke).
+	- Tests (lightweight): `examples/reference-service/tests/` smoke tests for `/ping`, CRUD, caching, billing usage+aggregates, API keys, MFA status, and webhook echo.
+	- Docs: `README.md` with a 10‑minute quickstart (sqlite-only first), explaining each mounted router and how to switch to pg-redis.
+
+- [ ] Implement: create the example service with real integrations and minimal defaults.
+	- Default profile uses sqlite+aiosqlite (no external services required) and mounts:
+		- API scaffolding and middlewares (RequestId, CatchAllException, SimpleRateLimitMiddleware).
+		- Observability (`add_observability` with metrics path) and logging (`setup_logging`).
+		- Auth routers via `add_auth_users` (password flows, sessions, account) with real API Keys + MFA enabled; back by a file-backed sqlite DB and a migration run via `svc_infra.db setup-and-migrate` (example ships a first migration or relies on auto-setup path).
+		- CRUD via `SqlResource` for one demo model under `/_sql/demo`.
+		- Caching: initialize cache and include a small endpoint using `@cache_read`/`@cache_write` decorators.
+		- Billing router under `/_billing` (usage ingest + aggregates), plus jobs that emit billing webhooks.
+		- Webhooks: `add_webhooks(...)` with in-memory subscriptions/outbox and a background delivery worker; include a `/webhooks/echo` receiver.
+		- Jobs: in-memory queue/scheduler with billing aggregate + invoice enqueue helpers and a periodic tick.
+	- Profile `pg-redis` adds Redis + Postgres services and switches rate limit store and cache to Redis-backed implementations.
+
+- [ ] Tests: add small example smoke tests (kept light; validates real routers).
+	- `test_smoke.py`: `/ping` 200; metrics present; RL blocks 4th request.
+	- `test_crud.py`: basic create/list/update/delete on demo resource via `/_sql/demo`.
+	- `test_auth.py`: register/verify/login + `/auth/me`; API keys create/list/revoke; `/auth/mfa/status` happy path.
+	- `test_billing.py`: POST usage 202 + GET aggregates; webhook delivery recorded to `/webhooks/echo`.
+
+- [ ] Verify: ensure `make run` (sqlite-only) and `docker compose up` (pg-redis profile) work on macOS; document commands.
+	- Validate DB setup with `python -m svc_infra.db setup-and-migrate --project-root .` against example’s models/migrations.
+	- Confirm auth routers are present (sessions, account, API keys, MFA), RL blocks as configured, webhooks deliver locally, and billing jobs emit events.
+
+- [ ] Docs: write `examples/reference-service/README.md`; link from top-level README and relevant guides (API scaffolding, jobs, webhooks, billing, caching, observability).
+	- Include troubleshooting notes (ports, envs) and how to toggle features.
+
+Evidence: (future) PR adding `examples/reference-service/*`; local run logs; optional smoke test results.
+
+---
+### 21. Easy Integration Helpers Backfill (cross-cutting)
+Owner: TBD
+
+Goal: Ensure every domain exposes a one-line integration helper (add_*/easy_*) with sensible defaults and escape hatches.
+
+- [ ] Inventory helpers and gaps across domains; produce matrix with function name, file path, and status.
+- [ ] Implement missing helpers: add_cache, add_admin, add_flags, add_i18n, add_search, add_media, add_comms, add_compliance.
+- [ ] Design principles for helpers: idempotent wiring, env-driven defaults, lifecycle hooks (startup/readiness/shutdown) when applicable, and optional app.state handle exposure.
+- [ ] Tests: each helper has a minimal integration test exercising defaults and an override example.
+- [ ] Docs: add a “Easy Integration Helpers” guide listing all add_* entrypoints with examples; link from domain docs.
+- [ ] Verify: run marker subsets per domain and full suite; include acceptance smoke for at least one helper (e.g., add_admin under sqlite profile).

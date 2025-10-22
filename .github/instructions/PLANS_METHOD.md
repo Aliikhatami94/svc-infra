@@ -23,7 +23,7 @@ Deliverable: Domain list with headings.
 
 ---
 ## 3. Standard Subtask Pattern
-Each domain should follow the same subtask lifecycle:
+Each domain should follow the same subtask lifecycle (and include an explicit "Easy Integration Helper" subtask when applicable):
 1. Research – Verify if functionality already exists; list existing code references for reuse or mark as skipped (~).
 2. Design – Produce ADR or schema proposal; define interfaces & data models.
 3. Implement – Code changes; keep atomic and reference PR links.
@@ -32,7 +32,9 @@ Each domain should follow the same subtask lifecycle:
 6. Docs – Update developer guides, API references, or operational runbooks.
 7. Acceptance (pre-deploy) – Run acceptance scenarios (A-IDs) in an ephemeral stack in CI; gate artifact promotion on success.
 
-Represent these steps as individual checklist items.
+Represent these steps as individual checklist items. Additionally, add a subtask to expose a one-line integration helper (add_* or easy_*) for the domain where it makes sense. If one already exists, mark it as [~] Skipped and reference the path.
+
+Examples of helpers: add_auth_users, add_payments, add_observability, add_webhooks, add_tenancy, add_data_lifecycle, easy_jobs, setup_logging, and planned add_cache/add_admin/add_flags/add_i18n/add_search/add_media/add_comms/add_compliance.
 
 ---
 ## 3.1 Hard Gates Between Stages (MANDATORY)
@@ -60,6 +62,23 @@ Example (proper ordering with evidence):
 - [x] Docs: docs/rate-limiting.md updated with examples
 - [x] Acceptance: A2-01..A2-03 green in CI (run: build-and-accept #123, link)
 ```
+
+---
+## 3.2 Easy Integration Helpers (add_*/easy_*)
+To improve developer ergonomics, each domain should provide a thin, optional one-line helper that wires sensible defaults while preserving escape hatches for full customization.
+
+Guidelines:
+- Naming: prefer add_<domain>() or easy_<domain>(). Keep parameters keyword-only; accept providers/backends via typed factories or callables.
+- Defaults: configure safe, production-leaning defaults; allow overrides via function params and/or ENV settings.
+- Extensibility: support multiple providers (e.g., Redis vs in-memory, Stripe vs Fake) by accepting adapter instances/factories.
+- Idempotency: helpers should be safe to call once; document repeated-call behavior if supported.
+- Composition: return handles/hooks (routers, shutdown callables) for advanced customization.
+- Tests: include at least one unit test per helper (defaults) and one with overrides/provider swap.
+- Docs: add a usage snippet and link from the relevant domain guide.
+
+If a helper already exists, include a [~] Skipped subtask in the domain with the code path; otherwise add a Pending subtask to implement it.
+
+Examples: add_auth_users, add_payments, add_observability, add_webhooks, add_tenancy, add_data_lifecycle, easy_jobs, setup_logging; planned: add_cache, add_admin, add_flags, add_i18n, add_search, add_media, add_comms, add_compliance.
 
 ---
 ## 4. Check Types & Notation
