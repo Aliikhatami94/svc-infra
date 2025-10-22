@@ -136,6 +136,7 @@ def make_billing_job_handler(
             async with session_factory() as session:
                 svc = AsyncBillingService(session=session, tenant_id=tenant_id)
                 total = await svc.aggregate_daily(metric=metric, day_start=day_start)
+                await session.commit()
             webhooks.publish(
                 "billing.usage_aggregated",
                 {
@@ -160,6 +161,7 @@ def make_billing_job_handler(
                 invoice_id = await svc.generate_monthly_invoice(
                     period_start=period_start, period_end=period_end, currency=currency
                 )
+                await session.commit()
             webhooks.publish(
                 "billing.invoice.created",
                 {
