@@ -357,7 +357,8 @@ Evidence: (PRs, tests, CI runs)
 - [x] Design: admin scope & permission alignment. (ADR 0011 — src/svc_infra/docs/adr/0011-admin-scope-and-impersonation.md)
 - [x] Implement: admin API & impersonation (audit logging).
 - [x] Implement: easy-setup helper (add_admin) to mount admin routers, impersonation endpoints, and necessary guards; support pluggable backends/providers.
- - [x] Tests: impersonation logging & role restrictions.
+ - [x] Tests (unit): impersonation logging & role restrictions. (files: tests/unit/admin/test_admin_impersonation.py)
+ - [x] Tests (acceptance): impersonation start/stop and ABAC effect. (files: tests/acceptance/test_admin_impersonation.py)
 - [ ] Verify: admin test marker.
 - [ ] Docs: admin usage & guardrails.
 
@@ -367,7 +368,8 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Implement: flag service + decorator.
 - [ ] Implement: easy-setup helper (add_flags) to configure flag backend and decorators quickly; support custom evaluators.
 - [ ] Implement: experiment allocation helper.
-- [ ] Tests: rollout % stability, flag precedence.
+ - [ ] Tests (unit): rollout % stability, flag precedence.
+ - [ ] Tests (acceptance): basic flag on/off behavior on a demo route.
 - [ ] Verify: flags test marker.
 - [ ] Docs: lifecycle & experiment design.
 
@@ -376,7 +378,8 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Design: locale extraction & file structure.
 - [ ] Implement: translation pipeline & currency helpers.
 - [ ] Implement: easy-setup helper (add_i18n) to load locales and mount translation endpoints/middleware.
-- [ ] Tests: formatting & fallback.
+ - [ ] Tests (unit): formatting & fallback.
+ - [ ] Tests (acceptance): end-to-end locale extraction affecting responses.
 - [ ] Verify: i18n test marker.
 - [ ] Docs: i18n usage notes.
 
@@ -385,7 +388,8 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Design: PG TSV/trigram vs external engine decision.
 - [ ] Implement: search abstraction & indexing jobs.
 - [ ] Implement: easy-setup helper (add_search) to configure search backend and indexer jobs.
-- [ ] Tests: relevance & idempotent indexing.
+ - [ ] Tests (unit): relevance functions & idempotent indexing logic.
+ - [ ] Tests (acceptance): search endpoint returns expected results for seeded data.
 - [ ] Verify: search test marker.
 - [ ] Docs: query examples.
 
@@ -394,7 +398,8 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Design: signed URL strategy & virus scan integration.
 - [ ] Implement: upload/download endpoints & thumbnailer.
 - [ ] Implement: easy-setup helper (add_media) to mount file routes and integrate with storage providers; pluggable scanners.
-- [ ] Tests: signature validity, scan hook, lifecycle transitions.
+ - [ ] Tests (unit): signature validity, scan hook, lifecycle transitions.
+ - [ ] Tests (acceptance): upload/download flows with signed URLs and basic scanner stub.
 - [ ] Verify: file test marker.
 - [ ] Docs: media lifecycle.
 
@@ -403,7 +408,8 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Design: provider abstraction & template layer.
 - [ ] Implement: sending API + sandbox mode + bounce tracking.
 - [ ] Implement: easy-setup helper (add_comms) to wire providers, sandbox, rate limits, and templates.
-- [ ] Tests: sandbox suppression, template rendering, rate limits.
+ - [ ] Tests (unit): sandbox suppression, template rendering, rate limits.
+ - [ ] Tests (acceptance): end-to-end send in sandbox mode with delivery stub/recording.
 - [ ] Verify: comms test marker.
 - [ ] Docs: messaging & templates.
 
@@ -412,7 +418,8 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Design: SOC2 checklist & access review workflow.
 - [ ] Implement: access review CLI & data map docs.
 - [ ] Implement: easy-setup helper (add_compliance) to expose compliance checks, exports, and reports.
-- [ ] Tests: access review script behavior.
+ - [ ] Tests (unit): access review script behavior.
+ - [ ] Tests (acceptance): CLI/report end-to-end run produces expected artifacts.
 - [ ] Verify: compliance test marker.
 - [ ] Docs: DPIA template & compliance overview.
 
@@ -431,7 +438,8 @@ Evidence: (PRs, tests, CI runs)
 - [ ] Implement: error code registry + linter.
 - [ ] Implement: core CLI commands (admin create, rotate keys, seed, backfill, export tenant, run scheduled).
 - [ ] Implement: ops templates (Terraform skeleton, blue/green deploy, backup verification job).
-- [ ] Tests: each quick win feature (unit + small integration).
+ - [ ] Tests (unit): each quick win feature.
+ - [ ] Tests (acceptance): smoke validation of one representative route per quick win.
 - [ ] Verify: quick wins marker.
 - [ ] Docs: quick win usage notes.
 
