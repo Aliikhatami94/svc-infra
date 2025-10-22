@@ -5,6 +5,8 @@ This module offers high-level decorators for read/write caching, cache invalidat
 and resource-based cache management.
 """
 
+from .add import add_cache
+
 # Core decorators - main public API
 from .decorators import cached  # alias for cache_read
 from .decorators import mutates  # alias for cache_write
@@ -32,4 +34,6 @@ __all__ = [
     # Resource-based caching
     "resource",
     "entity",
+    # Easy integration helper
+    "add_cache",
 ]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
@@ -123,6 +124,17 @@ def make_billing_job_handler(
       → emits topic 'billing.invoice.created'
     """
 
+    async def _maybe_commit(session: Any) -> None:
+        """Commit if the session exposes a commit method (await if coroutine).
+
+        This makes the handler resilient in tests/dev where a dummy session is used.
+        """
+        commit = getattr(session, "commit", None)
+        if callable(commit):
+            result = commit()
+            if inspect.isawaitable(result):
+                await result
+
     async def _handler(job: Job) -> None:
         name = job.name
         data: Dict[str, Any] = job.payload or {}
@@ -136,7 +148,7 @@ def make_billing_job_handler(
             async with session_factory() as session:
                 svc = AsyncBillingService(session=session, tenant_id=tenant_id)
                 total = await svc.aggregate_daily(metric=metric, day_start=day_start)
-                await session.commit()
+                await _maybe_commit(session)
             webhooks.publish(
                 "billing.usage_aggregated",
                 {
@@ -161,7 +173,7 @@ def make_billing_job_handler(
                 invoice_id = await svc.generate_monthly_invoice(
                     period_start=period_start, period_end=period_end, currency=currency
                 )
-                await session.commit()
+                await _maybe_commit(session)
             webhooks.publish(
                 "billing.invoice.created",
                 {
