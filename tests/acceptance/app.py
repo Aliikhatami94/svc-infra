@@ -39,6 +39,7 @@ from svc_infra.apf_payments.schemas import (
     PaymentMethodAttachIn,
     PaymentMethodOut,
 )
+from svc_infra.api.fastapi.admin import add_admin
 from svc_infra.api.fastapi.apf_payments.setup import add_payments
 from svc_infra.api.fastapi.auth.routers.session_router import build_session_router
 from svc_infra.api.fastapi.auth.security import (
@@ -118,6 +119,15 @@ add_security(app)
 # --- Ops (A8): probes + maintenance mode + circuit breaker dependency ---
 # Mount liveness/readiness/startup probes under /_ops
 _add_probes(app, prefix="/_ops", include_in_schema=False)
+
+
+# --- Admin (A12): minimal wiring with impersonation for acceptance ---
+def _accept_user_getter(_request, user_id: str):
+    # For acceptance, we just need an object with an id attribute.
+    return SimpleNamespace(id=user_id)
+
+
+add_admin(app, impersonation_user_getter=_accept_user_getter)
 # Ensure maintenance defaults OFF for the acceptance server
 os.environ.setdefault("MAINTENANCE_MODE", "false")
 # Enable maintenance mode via env flag; we also add test-only toggles below

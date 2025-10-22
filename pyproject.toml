@@ -123,6 +123,7 @@ python_classes = ["Test*",]
 python_functions = ["test_*"]
 markers = [
     "acceptance: End-to-end acceptance tests running against the acceptance app or BASE_URL",
+    "unit: Unit tests",
     "security: Security and auth hardening tests",
     "ratelimit: Rate limiting and abuse protection tests",
     "concurrency: Idempotency and concurrency control tests",
