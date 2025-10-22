@@ -16,14 +16,20 @@ class RateLimitStore(Protocol):
 class InMemoryRateLimitStore:
     def __init__(self, limit: int = 120):
         self.limit = limit
-        self._buckets: dict[tuple[str, int], int] = {}
+        # Track per-key rolling windows: key -> (count, window_start_epoch)
+        self._state: dict[str, tuple[int, float]] = {}
 
     def incr(self, key: str, window: int) -> Tuple[int, int, int]:
-        now = int(time.time())
-        win = now - (now % window)
-        count = self._buckets.get((key, win), 0) + 1
-        self._buckets[(key, win)] = count
-        reset = win + window
+        now = time.time()
+        count, window_start = self._state.get(key, (0, now))
+        # If outside the rolling window, reset
+        if now >= window_start + window:
+            count = 1
+            window_start = now
+        else:
+            count += 1
+        self._state[key] = (count, window_start)
+        reset = int(window_start + window)
         return count, self.limit, reset
 
 

@@ -14,6 +14,40 @@ We need shared billing primitives to support both usage-based and subscription f
 
 Non-goals for v1: taxes/VAT, complex proration rules, refunds/credits automation, dunning flows, provider-specific webhooks/end-to-end reconciliation.
 
+## Analysis: APF Payments vs Billing Primitives
+
+What APF Payments already covers (provider-facing):
+- Subscriptions lifecycle via provider adapters and HTTP router
+  - Endpoints: create/update/cancel/get/list under `/payments/subscriptions` (see `api/fastapi/apf_payments/router.py`).
+  - Local mirror rows (e.g., `PaySubscription`) are persisted for reference, but state is owned by the provider (Stripe/Aiydan).
+- Plans as Product + Price on the provider side
+  - APF Payments exposes products (`/payments/products`) and prices (`/payments/prices`). In Stripe semantics, a “plan” is represented by a product+price pair.
+  - There is no first-class internal Plan entity in APF Payments; plan semantics are encapsulated as provider product/price metadata.
+- Invoices, invoice line items, and previews
+  - Create/finalize/void/pay invoices; add/list invoice lines; preview invoices — all via provider adapters.
+- Usage records (metered billing) at the provider
+  - Create/list/get usage records mapped to provider subscription items or prices (`/payments/usage_records`).
+- Cross-cutting:
+  - Tenant resolution, pagination, idempotency, and Problem+JSON errors are integrated.
+
+What APF Payments does not cover (gaps filled by Billing Primitives):
+- An internal, provider-agnostic Plan and Entitlement registry (keys, windows, limits).
+- Quota enforcement at runtime (soft/hard limits) against internal entitlements.
+- Internal usage ingestion and aggregation store independent of provider APIs
+  - `UsageEvent` and `UsageAggregate` tables, with idempotent ingestion and windowed rollups.
+- Internal invoice modeling and generation from aggregates (not just provider invoices)
+  - `Invoice` and `InvoiceLine` entities produced from internal totals (jobs-based lifecycle).
+- A dedicated `/_billing` router for usage ingestion and aggregate reads (tenant-scoped, RBAC-protected).
+
+Where they intersect and can complement each other:
+- You can continue to use APF Payments for provider-side subscriptions/invoices and also use Billing Primitives to meter internal features and enforce quotas.
+- Optional bridging: a provider sync hook can map internally generated invoices/lines to provider invoices or payment intents when you want unified billing.
+- Usage: internal `UsageEvent` can be mirrored to provider usage-records if desired, but internal aggregation enables analytics and quota decisions without provider round-trips.
+
+Answering “Are plans and subscriptions covered in APF Payments?”
+- Subscriptions: Yes — fully supported via `/payments/subscriptions` endpoints with adapters (Stripe/Aiydan). APF also persists a local `PaySubscription` record for reference.
+- Plans: APF Payments does not expose a standalone internal Plan model. Instead, providers represent plans as Product + Price. Billing Primitives introduces an internal `Plan` and `PlanEntitlement` registry to support provider-agnostic limits and quotas.
+
 ## Decisions
 
 1) Internal-first data model with optional provider adapters

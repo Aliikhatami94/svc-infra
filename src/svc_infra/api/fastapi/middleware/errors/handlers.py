@@ -2,6 +2,7 @@ import logging
 import traceback
 from typing import Any, Dict, Optional
 
+import httpx
 from fastapi import Request
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse, Response
@@ -67,6 +68,20 @@ def problem_response(
 
 
 def register_error_handlers(app):
+    @app.exception_handler(httpx.TimeoutException)
+    async def handle_httpx_timeout(request: Request, exc: httpx.TimeoutException):
+        trace_id = _trace_id_from_request(request)
+        # Map outbound HTTP client timeouts to 504 Gateway Timeout
+        # Keep details generic in prod
+        return problem_response(
+            status=504,
+            title="Gateway Timeout",
+            detail=("Upstream request timed out." if IS_PROD else (str(exc) or "httpx timeout")),
+            code="GATEWAY_TIMEOUT",
+            instance=str(request.url),
+            trace_id=trace_id,
+        )
+
     @app.exception_handler(FastApiException)
     async def handle_app_exception(request: Request, exc: FastApiException):
         trace_id = _trace_id_from_request(request)

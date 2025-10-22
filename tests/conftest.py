@@ -39,6 +39,7 @@ def pytest_configure(config):
         ("concurrency", "Idempotency and concurrency control tests"),
         ("jobs", "Background jobs and scheduling tests"),
         ("webhooks", "Webhooks framework tests"),
+        ("billing", "Billing primitives tests"),
         ("tenancy", "Tenancy isolation and enforcement tests"),
         ("data_lifecycle", "Data lifecycle (fixtures, retention, erasure, backups)"),
         ("ops", "SLOs & Ops tests (probes, breaker, instrumentation)"),

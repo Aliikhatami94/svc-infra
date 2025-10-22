@@ -115,6 +115,10 @@ metrics.on_suspect_payload = lambda path, size: logger.warning(
 - Consider separate limits for read vs write routes.
 - Combine with request size limits and auth lockout for layered defense.
 
+## Related
+
+- Timeouts & Resource Limits: `./timeouts-and-resource-limits.md` — complements rate limits by bounding slow uploads, long handlers, and downstream timeouts.
+
 ## Testing
 
 - Use `-m ratelimit` to select rate-limiting tests.

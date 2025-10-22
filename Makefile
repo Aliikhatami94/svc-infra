@@ -69,21 +69,31 @@ down:
 # --- Unit tests ---
 unit:
 	@echo "[unit] Running unit tests (quiet)"
-	@if ! command -v poetry >/dev/null 2>&1; then \
-		echo "[unit] Poetry is not installed. Please install Poetry (https://python-poetry.org/docs/#installation)"; \
-		exit 2; \
-	fi; \
-	poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
-	poetry run pytest -q tests/unit
+	@if command -v poetry >/dev/null 2>&1; then \
+		poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+		poetry run pytest -q tests/unit; \
+	else \
+		echo "[unit] Poetry not found; falling back to system pytest"; \
+		if command -v pytest >/dev/null 2>&1; then \
+			pytest -q tests/unit; \
+		else \
+			python -m pytest -q tests/unit; \
+		fi; \
+	fi
 
 unitv:
 	@echo "[unit] Running unit tests (verbose)"
-	@if ! command -v poetry >/dev/null 2>&1; then \
-		echo "[unit] Poetry is not installed. Please install Poetry (https://python-poetry.org/docs/#installation)"; \
-		exit 2; \
-	fi; \
-	poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
-	poetry run pytest -vv tests/unit
+	@if command -v poetry >/dev/null 2>&1; then \
+		poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+		poetry run pytest -vv tests/unit; \
+	else \
+		echo "[unit] Poetry not found; falling back to system pytest"; \
+		if command -v pytest >/dev/null 2>&1; then \
+			pytest -vv tests/unit; \
+		else \
+			python -m pytest -vv tests/unit; \
+		fi; \
+	fi
 
 # --- Cleanup helpers ---
 clean:
