@@ -171,7 +171,10 @@ def add_admin(
     # re-compose at startup to capture late overrides.
     def _compose_override():
         existing = app.dependency_overrides.get(_current_principal)
-        dep_provider = existing or _current_principal
+        if existing and getattr(existing, "_is_admin_impersonation_override", False):
+            dep_provider = getattr(existing, "_admin_impersonation_base", _current_principal)
+        else:
+            dep_provider = existing or _current_principal
 
         async def _override_current_principal(
             base: Principal = Depends(dep_provider),
@@ -212,6 +215,8 @@ def add_admin(
             return base
 
         app.dependency_overrides[_current_principal] = _override_current_principal
+        _override_current_principal._is_admin_impersonation_override = True  # type: ignore[attr-defined]
+        _override_current_principal._admin_impersonation_base = dep_provider  # type: ignore[attr-defined]
 
     # Compose now (best-effort) and again on startup to wrap any later overrides
     _compose_override()
