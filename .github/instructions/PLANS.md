@@ -328,16 +328,22 @@ Evidence: (PRs, tests, CI runs)
 ## Nice-to-have (Fast Follows)
 
 ### 11. Billing Primitives
-- [ ] Research: existing payments adapter capabilities. (no existing payments module; jobs/webhooks usable; SQL scaffolds ready)
-- [ ] Design: usage metering & aggregation approach. (ADR 0008)
-- [ ] Implement: data models & migrations (usage_events, usage_aggregates, plans, plan_entitlements, subscriptions, prices, invoices, invoice_lines).
-- [ ] Implement: usage ingestion API (idempotent) + list aggregates.
-- [ ] Implement: quota/entitlement enforcement decorator/dependency.
-- [ ] Implement: aggregation job + invoice generator job (daily -> monthly cycle) + webhooks.
- - [ ] Implement: provider sync (optional): Stripe adapter skeleton and hooks to sync internal invoices/lines to provider invoices or payment intents.
-- [ ] Tests: ingestion idempotency, aggregation correctness, invoice totals, quota block, webhook flows.
-- [ ] Verify: billing test marker.
-- [ ] Docs: billing overview & plan config.
+- [x] Research: existing payments adapter capabilities and internal billing module.
+	- Findings: APF Payments already covers provider-side primitives (products, prices, subscriptions, invoices, usage records) with adapters and routers. A new internal billing module exists under `src/svc_infra/billing/` with models and a `BillingService` for usage recording, daily aggregation, and monthly invoice generation.
+- [x] Design: usage metering & aggregation approach. (ADR 0008 — src/svc_infra/docs/adr/0008-billing-primitives.md)
+- [x] Implement: data models (usage_events, usage_aggregates, plans, plan_entitlements, subscriptions, prices, invoices, invoice_lines).
+	- Note: Alembic migrations not yet authored; tests currently create tables directly for SQLite. Follow-up to add initial migration covering billing tables.
+- [x] Implement: usage ingestion API (idempotent) + list aggregates (router under `/_billing`).
+- [x] Implement: quota/entitlement enforcement decorator/dependency (soft/hard limit, windowed checks).
+- [x] Implement: aggregation job + invoice generator job (daily -> monthly cycle) + webhooks (`billing.*` events).
+	- Implemented helpers in `svc_infra.billing.jobs` to enqueue and handle jobs; emits `billing.usage_aggregated` and `billing.invoice.created` via webhooks outbox. Added docs and tests.
+ - [~] Implement: provider sync (optional): Stripe adapter skeleton and hooks to sync internal invoices/lines to provider invoices or payment intents.
+	- Current: `BillingService` accepts an optional `provider_sync` hook callable; implement Stripe mapper later.
+- [x] Tests: ingestion idempotency, aggregation correctness, invoice totals (see tests/unit/billing/test_billing_service.py). Added job + webhooks tests (tests/unit/billing/test_billing_jobs.py).
+- [x] Verify: billing test marker (pytest marker + CI selection).
+- [x] Docs: billing overview & plan config (add docs/billing.md and examples).
+ - [x] Acceptance (pre-deploy): billing router smoke (usage ingest 202 + aggregates list) in acceptance app.
+ 	- Files: tests/acceptance/test_billing_acceptance.py; tests/acceptance/app.py mounts `/_billing` via add_billing.
 
 ### 12. Admin
 - [ ] Research: existing admin endpoints/tools.

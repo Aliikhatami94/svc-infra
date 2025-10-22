@@ -122,11 +122,13 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*",]
 python_functions = ["test_*"]
 markers = [
+    "acceptance: End-to-end acceptance tests running against the acceptance app or BASE_URL",
     "security: Security and auth hardening tests",
     "ratelimit: Rate limiting and abuse protection tests",
     "concurrency: Idempotency and concurrency control tests",
     "jobs: Background jobs and scheduling tests",
     "webhooks: Webhooks framework tests",
+    "billing: Billing primitives tests",
     "tenancy: Tenancy isolation and enforcement tests",
     "data_lifecycle: Data lifecycle (fixtures, retention, erasure, backups)",
     "ops: SLOs & Ops tests (probes, breaker, instrumentation)",

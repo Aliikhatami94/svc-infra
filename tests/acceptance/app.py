@@ -47,6 +47,7 @@ from svc_infra.api.fastapi.auth.security import (
     _optional_principal,
     resolve_bearer_or_cookie_principal,
 )
+from svc_infra.api.fastapi.billing.setup import add_billing as _add_billing
 from svc_infra.api.fastapi.db.sql.session import get_session
 from svc_infra.api.fastapi.dependencies.ratelimit import rate_limiter
 from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
@@ -344,6 +345,9 @@ class FakeAdapter(ProviderAdapter):
 
 # Install payments under /payments using the fake adapter (skip default provider registration).
 add_payments(app, prefix="/payments", register_default_providers=False, adapters=[FakeAdapter()])
+
+# Mount internal billing router under /_billing for acceptance smoke tests
+_add_billing(app)
 
 
 # Replace the DB session dependency with a no-op stub so tests stay self-contained.
