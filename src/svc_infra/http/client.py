@@ -46,7 +46,11 @@ def new_httpx_client(
     Callers can override timeout_seconds; remaining kwargs are forwarded to httpx.Client.
     """
     timeout = make_timeout(timeout_seconds)
-    return httpx.Client(timeout=timeout, headers=headers, base_url=base_url, **kwargs)
+    # httpx doesn't accept base_url=None; only pass if non-None
+    client_kwargs = {"timeout": timeout, "headers": headers, **kwargs}
+    if base_url is not None:
+        client_kwargs["base_url"] = base_url
+    return httpx.Client(**client_kwargs)
 
 
 def new_async_httpx_client(
@@ -61,4 +65,8 @@ def new_async_httpx_client(
     Callers can override timeout_seconds; remaining kwargs are forwarded to httpx.AsyncClient.
     """
     timeout = make_timeout(timeout_seconds)
-    return httpx.AsyncClient(timeout=timeout, headers=headers, base_url=base_url, **kwargs)
+    # httpx doesn't accept base_url=None; only pass if non-None
+    client_kwargs = {"timeout": timeout, "headers": headers, **kwargs}
+    if base_url is not None:
+        client_kwargs["base_url"] = base_url
+    return httpx.AsyncClient(**client_kwargs)

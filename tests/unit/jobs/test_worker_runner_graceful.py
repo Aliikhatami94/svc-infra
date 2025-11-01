@@ -17,6 +17,8 @@ async def test_worker_runner_graceful_stop_allows_inflight_to_finish():
 
     runner = WorkerRunner(q, handler, poll_interval=0.01)
     runner.start()
+    # Give runner a moment to start processing the job
+    await asyncio.sleep(0.02)
     t0 = time.time()
     await runner.stop(grace_seconds=0.5)
     t1 = time.time()
