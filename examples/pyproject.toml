@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "svc-infra-template"
+version = "0.1.0"
+description = "Example service template demonstrating svc-infra utilities"
+authors = ["Ali Khatami <aliikhatami94@gmail.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+
+# Choose one based on usage:
+# 1. When used as standalone project (copy to your workspace):
+# svc-infra = "^0.1.0"
+
+# 2. When used inside svc-infra repo (at examples/ level):
+svc-infra = { path = "../", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
