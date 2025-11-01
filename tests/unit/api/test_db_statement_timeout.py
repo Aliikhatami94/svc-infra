@@ -5,6 +5,9 @@ from sqlalchemy import text
 
 from svc_infra.api.fastapi.db.sql.session import dispose_session, get_session, initialize_session
 
+# Skip test if aiosqlite is not installed (it's an optional dependency)
+pytest.importorskip("aiosqlite")
+
 
 @pytest.mark.asyncio
 async def test_db_statement_timeout_env_smoke_on_sqlite(monkeypatch):

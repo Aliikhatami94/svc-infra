@@ -10,7 +10,7 @@ from svc_infra.api.fastapi.admin import add_admin
 from svc_infra.api.fastapi.auth.security import Principal, _current_principal
 from svc_infra.api.fastapi.db.sql.session import get_session
 
-pytestmark = [pytest.mark.security]
+pytestmark = [pytest.mark.admin, pytest.mark.security]
 
 
 def _make_app(with_admin: bool) -> FastAPI:

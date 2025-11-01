@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from starlette.testclient import TestClient
 
-pytestmark = [pytest.mark.acceptance, pytest.mark.security]
+pytestmark = [pytest.mark.acceptance, pytest.mark.admin, pytest.mark.security]
 
 
 @pytest.fixture()
