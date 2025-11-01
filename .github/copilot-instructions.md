@@ -64,6 +64,7 @@
 - Keep templates/config in `src/svc_infra/**` in sync with code changes.
 - Add/update tests for behavioral changes; keep `pytest` clean of warnings, `flake8` and `mypy` passing before merge.
 - Prefer exposing a one-line easy integration helper (add_* or easy_*) for new domains. If a domain lacks one, add a plan item to backfill and implement it with defaults, override hooks, tests, and docs.
+- **Documentation location**: All domain and feature documentation must be stored in `src/svc_infra/docs/` (not at the root `docs/` directory). Examples: `src/svc_infra/docs/admin.md`, `src/svc_infra/docs/adr/0011-admin-scope-and-impersonation.md`. Root-level `docs/` is reserved for repo-wide meta documentation only.
 
 ## Agent workflow expectations
 - Plan first: before any edits, write a clear, step-by-step task plan and keep it updated as you progress.

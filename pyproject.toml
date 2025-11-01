@@ -134,6 +134,7 @@ markers = [
     "data_lifecycle: Data lifecycle (fixtures, retention, erasure, backups)",
     "ops: SLOs & Ops tests (probes, breaker, instrumentation)",
     "dx: Developer experience and quality gates tests",
+    "admin: Admin scope and impersonation tests",
 ]
 filterwarnings = [
     "ignore:The `route` decorator is deprecated:DeprecationWarning:starlette.*",

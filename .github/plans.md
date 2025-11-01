@@ -359,8 +359,8 @@ Evidence: (PRs, tests, CI runs)
 - [x] Implement: easy-setup helper (add_admin) to mount admin routers, impersonation endpoints, and necessary guards; support pluggable backends/providers.
  - [x] Tests (unit): impersonation logging & role restrictions. (files: tests/unit/admin/test_admin_impersonation.py)
  - [x] Tests (acceptance): impersonation start/stop and ABAC effect. (files: tests/acceptance/test_admin_impersonation.py)
-- [ ] Verify: admin test marker.
-- [ ] Docs: admin usage & guardrails.
+- [x] Verify: admin test marker. (pytest.ini and pyproject.toml; pytest -m admin runs 2 tests successfully)
+- [x] Docs: admin usage & guardrails. (docs/admin.md with quickstart, permissions, impersonation flow, security guardrails, troubleshooting, and API reference)
 
 ### 13. Feature Flags & Experiments
 - [ ] Research: current flags or env toggles.
