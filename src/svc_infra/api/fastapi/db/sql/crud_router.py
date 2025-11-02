@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Optional, Sequence, Type, TypeVar, cast
+from typing import Annotated, Any, Optional, Sequence, Type, TypeVar
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
@@ -73,7 +73,7 @@ def make_crud_router_plus_sql(
     # -------- LIST --------
     @router.get(
         "",
-        response_model=cast(Any, Page[Any]),
+        response_model=Page[read_schema],
         description=f"List items of type {model.__name__}",
     )
     async def list_items(
@@ -104,7 +104,7 @@ def make_crud_router_plus_sql(
     # -------- GET by id --------
     @router.get(
         "/{item_id}",
-        response_model=cast(Any, Any),
+        response_model=read_schema,
         description=f"Get item of type {model.__name__}",
     )
     async def get_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
@@ -116,7 +116,7 @@ def make_crud_router_plus_sql(
     # -------- CREATE --------
     @router.post(
         "",
-        response_model=cast(Any, Any),
+        response_model=read_schema,
         status_code=201,
         description=f"Create item of type {model.__name__}",
     )
@@ -135,7 +135,7 @@ def make_crud_router_plus_sql(
     # -------- UPDATE --------
     @router.patch(
         "/{item_id}",
-        response_model=cast(Any, Any),
+        response_model=read_schema,
         description=f"Update item of type {model.__name__}",
     )
     async def update_item(
@@ -227,7 +227,7 @@ def make_tenant_crud_router_plus_sql(
         svc: Any = TenantSqlService(repo_or_service, tenant_id=tenant_id, tenant_field=tenant_field)  # type: ignore[arg-type]
         return svc  # type: ignore[return-value]
 
-    @router.get("", response_model=cast(Any, Page[Any]))
+    @router.get("", response_model=Page[read_schema])
     async def list_items(
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
