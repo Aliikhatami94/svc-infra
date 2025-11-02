@@ -3,9 +3,15 @@
 
 set -e
 
+# Get script directory (examples/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Load environment variables from .env if it exists
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  echo "Loading environment variables from $SCRIPT_DIR/.env"
+  set -a  # Automatically export all variables
+  source "$SCRIPT_DIR/.env"
+  set +a  # Stop auto-exporting
 fi
 
 # Start the service with Poetry
