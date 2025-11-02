@@ -1,9 +1,10 @@
 """Enhanced API routes (v1) showcasing svc-infra features."""
 
-from fastapi import APIRouter
 from svc_infra_template.settings import settings
 
-router = APIRouter()
+from svc_infra.api.fastapi.dual.public import public_router
+
+router = public_router()
 
 
 @router.get("/ping")

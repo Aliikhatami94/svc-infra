@@ -99,11 +99,15 @@ unitv:
 clean:
 	@echo "[clean] Removing Python caches, build artifacts, and logs"
 	rm -rf **/__pycache__ __pycache__ .pytest_cache .mypy_cache .ruff_cache build dist *.egg-info *.log
+	@echo "[clean] Cleaning examples directory"
+	@cd examples && rm -rf **/__pycache__ __pycache__ .pytest_cache .mypy_cache .ruff_cache build dist *.egg-info *.log 2>/dev/null || true
 
 # Remove only Python __pycache__ directories (recursive)
 clean-pycache:
-	@echo "[clean] Removing all __pycache__ directories recursively"
+	@echo "[clean] Removing all __pycache__ directories recursively from project"
 	@find . -type d -name '__pycache__' -prune -exec rm -rf {} +
+	@echo "[clean] Removing all __pycache__ directories recursively from examples"
+	@cd examples && find . -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
 
 # --- Template example ---
 run-template:

@@ -21,7 +21,6 @@ Each feature can be enabled/disabled via environment variables (.env file).
 # Import settings for configuration
 from svc_infra_template.settings import settings
 
-from svc_infra.api import DualAPIRouter
 from svc_infra.api.fastapi import APIVersionSpec, ServiceInfo, setup_service_api
 from svc_infra.api.fastapi.openapi.models import Contact, License
 from svc_infra.api.fastapi.ops.add import add_maintenance_mode, add_probes
@@ -357,7 +356,8 @@ print("✅ Operations features enabled")
 if settings.docs_enabled:
     from svc_infra.api.fastapi.docs.add import add_docs
 
-    add_docs(app)
+    # Disable the built-in landing page since we have our own custom root endpoint below
+    add_docs(app, include_landing=False)
 
     # Adds enhanced documentation features:
     #   - Scoped docs per API version
@@ -445,36 +445,11 @@ if settings.sentry_dsn:
 
     print("✅ Sentry error tracking enabled")
 
-# --- 5.4 Custom Root Router ---
-# Add routes outside of versioned APIs
-
-root_router = DualAPIRouter(tags=["Root"])
-
-
-@root_router.get("/")
-async def root():
-    """Root endpoint with service information."""
-    return {
-        "service": "svc-infra-template",
-        "version": "0.2.0",
-        "environment": settings.app_env,
-        "features": {
-            "database": settings.database_configured,
-            "cache": settings.cache_configured,
-            "metrics": settings.metrics_enabled,
-            "webhooks": settings.webhooks_enabled,
-            "payments": settings.payment_provider != "fake",
-            "admin": settings.admin_enabled,
-            "jobs": settings.jobs_enabled,
-        },
-        "docs": f"http://{settings.api_host}:{settings.api_port}/docs",
-    }
-
-
-app.include_router(root_router)
-
 # =============================================================================
 # That's it! Your service is fully configured with ALL svc-infra features.
+#
+# Note: setup_service_api() already provides a nice landing page at "/" with
+# links to all API documentation (root and versioned). No custom root endpoint needed.
 #
 # To start:
 #   1. Configure .env file with your settings
