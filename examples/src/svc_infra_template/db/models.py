@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text
+from sqlalchemy import String, Text, inspect
 from sqlalchemy.orm import Mapped, mapped_column
 from svc_infra_template.db.base import Base, SoftDeleteMixin, TimestampMixin
 
@@ -29,6 +29,9 @@ class Project(Base, TimestampMixin, SoftDeleteMixin):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     def __repr__(self) -> str:
+        state = inspect(self)
+        if state.detached or state.expired:
+            return f"<Project at {hex(id(self))}>"
         return f"<Project(id={self.id}, name={self.name!r})>"
 
 
@@ -64,6 +67,9 @@ class Task(Base, TimestampMixin):
     completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     def __repr__(self) -> str:
+        state = inspect(self)
+        if state.detached or state.expired:
+            return f"<Task at {hex(id(self))}>"
         return f"<Task(id={self.id}, title={self.title!r}, status={self.status})>"
 
 
