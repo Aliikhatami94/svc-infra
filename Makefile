@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 RMI ?= all
 
-.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache test
+.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache run-template test
 
 compose_up:
 	@echo "[accept] Starting test stack..."
@@ -104,6 +104,13 @@ clean:
 clean-pycache:
 	@echo "[clean] Removing all __pycache__ directories recursively"
 	@find . -type d -name '__pycache__' -prune -exec rm -rf {} +
+
+# --- Template example ---
+run-template:
+	@echo "[template] Installing dependencies for svc-infra-template..."
+	@cd examples && poetry install --no-interaction --quiet 2>/dev/null || true
+	@echo "[template] Running svc-infra-template example..."
+	@cd examples && env -i HOME="$$HOME" USER="$$USER" TERM="$$TERM" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" bash -c 'exec ./run.sh'
 
 # --- Combined test target ---
 test:

@@ -16,6 +16,12 @@ python = ">=3.11,<4.0"
 # 2. When used inside svc-infra repo (at examples/ level):
 svc-infra = { path = "../", develop = true }
 
+# SQLite driver (included for easy local development)
+aiosqlite = "^0.20.0"
+
+# Optional: Add pydantic-settings for settings management
+pydantic-settings = "^2.0.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
