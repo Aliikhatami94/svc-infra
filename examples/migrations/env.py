@@ -1,0 +1,403 @@
+# Alembic async env.py
+from __future__ import annotations
+
+import importlib
+import logging
+import os
+import pathlib
+import pkgutil
+import sys
+import traceback
+from typing import List, Tuple
+
+from alembic import context
+from sqlalchemy.engine import URL, make_url
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from svc_infra.db.sql.utils import _ensure_ssl_default_async as _ensure_ssl_default
+from svc_infra.db.sql.utils import get_database_url_from_env
+
+try:
+    from svc_infra.db.sql.types import GUID as _GUID  # type: ignore
+except Exception:
+    _GUID = None
+
+
+def _render_item(type_, obj, autogen_context):
+    if type_ == "type" and (
+        (_GUID is not None and isinstance(obj, _GUID))
+        or getattr(obj, "__class__", None).__name__ == "GUID"
+    ):
+        autogen_context.imports.add("from svc_infra.db.sql.types import GUID")
+        return "GUID()"
+    return False
+
+
+# Logging
+config = context.config
+if config.config_file_name is not None:
+    import logging.config as _lc
+
+    _lc.fileConfig(config.config_file_name)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# sys.path bootstrap (append)
+prepend = config.get_main_option("prepend_sys_path") or ""
+script_loc = config.get_main_option("script_location") or os.path.dirname(__file__)
+migrations_dir = pathlib.Path(script_loc).resolve()
+project_root = migrations_dir.parent
+
+
+def _ensure_on_syspath_end(p: pathlib.Path) -> None:
+    s = str(p)
+    if s and s not in sys.path:
+        sys.path.append(s)
+
+
+if prepend:
+    _ensure_on_syspath_end(pathlib.Path(prepend))
+    src_path = pathlib.Path(prepend) / "src"
+    if src_path.exists():
+        _ensure_on_syspath_end(src_path)
+
+_ensure_on_syspath_end(project_root)
+if (project_root / "src").exists():
+    _ensure_on_syspath_end(project_root / "src")
+
+
+# x-args
+def _x_args_dict() -> dict:
+    try:
+        return context.get_x_argument(as_dictionary=True)  # type: ignore[arg-type]
+    except TypeError:
+        try:
+            xs = context.get_x_argument()
+        except TypeError:
+            xs = []
+    out = {}
+    for item in xs:
+        if "=" in item:
+            k, v = item.split("=", 1)
+            out[k] = v
+        else:
+            out[item] = ""
+    return out
+
+
+# DB URL
+_x = _x_args_dict()
+cli_dburl = _x.get("dburl", "").strip()
+env_dburl = os.getenv("SQL_URL", "").strip()
+try:
+    helper_dburl = get_database_url_from_env(required=False) or ""
+except Exception:
+    helper_dburl = ""
+ini_dburl = (config.get_main_option("sqlalchemy.url") or "").strip()
+
+effective_url = cli_dburl or env_dburl or helper_dburl or ini_dburl
+if not effective_url:
+    raise RuntimeError("No database URL found (env/CLI/ini). Provide one.")
+
+
+def _coerce_to_async(u: URL) -> URL:
+    dn = (u.drivername or "").lower()
+    if "+asyncpg" in dn or "+aiomysql" in dn or "+aiosqlite" in dn:
+        return u
+    backend = (u.get_backend_name() or "").lower()
+    if backend in ("postgresql", "postgres"):
+        return u.set(drivername="postgresql+asyncpg")
+    if backend == "mysql":
+        return u.set(drivername="mysql+aiomysql")
+    if backend == "sqlite":
+        return u.set(drivername="sqlite+aiosqlite")
+    return u
+
+
+u = make_url(effective_url)
+u = _coerce_to_async(u)
+u = _ensure_ssl_default(u)
+config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
+
+# feature flags
+WANT_PAYMENTS = os.getenv("APF_ENABLE_PAYMENTS", "").lower() in {"1", "true", "yes"}
+FORCE_PAYMENTS = os.getenv("ALEMBIC_FORCE_PAYMENTS", "").lower() in {"1", "true", "yes"}
+PAYMENT_TABLES = {"pay_customers", "pay_intents", "pay_events", "ledger_entries"}
+
+# metadata discovery (scan ALL attrs; do not shadow site-packages)
+DISCOVER_PACKAGES: List[str] = []  # do not seed payments by default
+ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
+if ENV_DISCOVER:
+    DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(",") if s.strip()]
+
+
+def _collect_metadata() -> list[object]:
+    tried: list[Tuple[str, str]] = []
+    errors: list[Tuple[str, str]] = []
+    found: list[object] = []
+
+    def _note(name: str, ok: bool, err: str | None = None):
+        tried.append((name, "ok" if ok else "err"))
+        if not ok and err:
+            errors.append((name, err))
+
+    def _maybe_add(obj: object) -> None:
+        md = getattr(obj, "metadata", None) or obj
+        if hasattr(md, "tables") and getattr(md, "tables"):
+            found.append(md)
+
+    def _scan_module_objects(mod: object) -> None:
+        try:
+            for val in vars(mod).values():
+                md = getattr(val, "metadata", None) or None
+                if md is not None and hasattr(md, "tables") and getattr(md, "tables"):
+                    found.append(md)
+        except Exception:
+            pass
+
+    # Force-load payments only when enabled/forced
+    if WANT_PAYMENTS or FORCE_PAYMENTS:
+        try:
+            importlib.import_module("svc_infra.apf_payments.models")
+            context.config.print_stdout(
+                "[alembic env (async)] payments module import: ok (svc_infra.apf_payments.models)"
+            )
+        except Exception:
+            context.config.print_stdout(
+                "[alembic env (async)] payments module import: ERR (svc_infra.apf_payments.models)"
+            )
+            context.config.print_stdout(traceback.format_exc())
+
+    pkgs: list[str] = []
+    if WANT_PAYMENTS or FORCE_PAYMENTS:
+        pkgs.append("svc_infra.apf_payments.models")
+
+    for p in list(DISCOVER_PACKAGES or []):
+        if p and p not in pkgs:
+            pkgs.append(p)
+
+    env_pkgs = os.getenv("ALEMBIC_DISCOVER_PACKAGES", "")
+    if env_pkgs:
+        for p in (x.strip() for x in env_pkgs.split(",") if x.strip()):
+            if p not in pkgs:
+                pkgs.append(p)
+
+    fs_roots: list[pathlib.Path] = []
+    for candidate in {project_root, project_root / "src"}:
+        if candidate.exists():
+            fs_roots.append(candidate)
+    for root in fs_roots:
+        for p in root.iterdir():
+            if p.is_dir() and (p / "__init__.py").exists():
+                name = p.name
+                if name not in pkgs:
+                    pkgs.append(name)
+
+    # Only attempt bare 'models' import if it is discoverable to avoid noisy tracebacks
+    if "models" not in pkgs:
+        try:
+            spec = getattr(importlib, "util", None)
+            if spec is not None and getattr(spec, "find_spec", None) is not None:
+                if spec.find_spec("models") is not None:
+                    pkgs.append("models")
+        except Exception:
+            # Best-effort; if discovery fails, skip adding bare 'models'
+            pass
+
+    def _import_and_collect(modname: str):
+        try:
+            mod = importlib.import_module(modname)
+            _note(modname, True, None)
+        except Exception:
+            _note(modname, False, traceback.format_exc())
+            return None
+        for attr in ("metadata", "MetaData", "Base", "base"):
+            obj = getattr(mod, attr, None)
+            if obj is not None:
+                _maybe_add(obj)
+        _scan_module_objects(mod)
+        return mod
+
+    for pkg_name in pkgs:
+        pkg = _import_and_collect(pkg_name)
+        if pkg is None:
+            continue
+        for subname in ("models", "db", "orm", "entities"):
+            _import_and_collect(f"{pkg_name}.{subname}")
+        mod_path = getattr(pkg, "__path__", None)
+        if not mod_path:
+            continue
+        for _, name, ispkg in pkgutil.walk_packages(mod_path, prefix=pkg_name + "."):
+            if ispkg:
+                continue
+            if not any(x in name for x in (".models", ".db", ".orm", ".entities")):
+                continue
+            _import_and_collect(name)
+
+    try:
+        from svc_infra.db.sql.base import ModelBase  # type: ignore
+
+        mb_md = getattr(ModelBase, "metadata", None)
+        if mb_md is not None and getattr(mb_md, "tables", {}):
+            found.append(mb_md)
+            _note("ModelBase.metadata", True, None)
+        else:
+            _note("ModelBase.metadata(empty)", True, None)
+    except Exception:
+        _note("ModelBase import", False, traceback.format_exc())
+
+    try:
+        from svc_infra.db.sql.apikey import try_autobind_apikey_model
+
+        try_autobind_apikey_model(require_env=False)
+        _note("svc_infra.db.sql.apikey.try_autobind_apikey_model", True, None)
+    except Exception:
+        _note("svc_infra.db.sql.apikey.try_autobind_apikey_model", False, traceback.format_exc())
+
+    uniq: list[object] = []
+    seen: set[int] = set()
+    for md in found:
+        try:
+            if not getattr(md, "tables", {}):
+                continue
+        except Exception:
+            continue
+        if id(md) not in seen:
+            seen.add(id(md))
+            uniq.append(md)
+
+    total_tables = 0
+    try:
+        total_tables = sum(len(getattr(md, "tables", {})) for md in uniq)
+    except Exception:
+        pass
+
+    context.config.print_stdout(
+        f"[alembic env (async)] discovered {len(uniq)} metadata objects with {total_tables} tables total"
+    )
+
+    if WANT_PAYMENTS and not FORCE_PAYMENTS:
+        saw_pay = (
+            any(any(tn in PAYMENT_TABLES for tn in md.tables.keys()) for md in uniq)
+            if uniq
+            else False
+        )
+        if not saw_pay:
+            context.config.print_stdout(
+                "[alembic env (async)] WARNING: APF_ENABLE_PAYMENTS is set but no payments tables were discovered. "
+                "If you still see this, a local package named 'svc_infra' may be shadowing the installed one."
+            )
+
+    if total_tables == 0:
+        context.config.print_stdout("[alembic env (async)] import attempts (ok/err):")
+        for name, status in tried:
+            context.config.print_stdout(f"  - {status:3s}  {name}")
+        for name, tb in errors[:10]:
+            context.config.print_stdout(f"  --- import error: {name} ---")
+            context.config.print_stdout(tb)
+
+    return uniq
+
+
+target_metadata = _collect_metadata()
+
+
+def _want_include_schemas() -> bool:
+    val = _x.get("include_schemas", "") or os.getenv("ALEMBIC_INCLUDE_SCHEMAS", "")
+    if str(val).strip() in {"1", "true", "True", "yes"}:
+        return True
+    try:
+        for md in target_metadata or []:
+            for t in getattr(md, "tables", {}).values():
+                if getattr(t, "schema", None):
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def _system_schemas_for(url: str) -> set[str]:
+    try:
+        backend = make_url(url).get_backend_name().lower()
+    except Exception:
+        backend = ""
+    if backend in {"mysql", "mariadb"}:
+        return {"mysql", "performance_schema", "information_schema", "sys"}
+    if backend in {"postgresql", "postgres"}:
+        return {"pg_catalog", "information_schema"}
+    if backend in {"mssql"}:
+        return {"INFORMATION_SCHEMA", "sys"}
+    if backend in {"snowflake"}:
+        return {"INFORMATION_SCHEMA"}
+    return set()
+
+
+def _include_object_factory(url: str):
+    sys_schemas = _system_schemas_for(url)
+    skip_drops = os.getenv("ALEMBIC_SKIP_DROPS", "").lower() in {"1", "true", "yes"}
+    want_payments = WANT_PAYMENTS or FORCE_PAYMENTS
+
+    def _include_object(obj, name, type_, reflected, compare_to):
+        schema = getattr(obj, "schema", None)
+        if schema and str(schema) in sys_schemas:
+            return False
+
+        version_table = (
+            context.get_x_argument(as_dictionary=True).get("version_table")
+            if hasattr(context, "get_x_argument")
+            else None
+        ) or os.getenv("ALEMBIC_VERSION_TABLE", "alembic_version")
+        if type_ == "table" and name == version_table:
+            return True
+
+        if skip_drops and type_ == "table" and reflected and compare_to is None:
+            return False
+
+        if not want_payments:
+            if type_ == "table" and name in PAYMENT_TABLES:
+                return False
+            if type_ == "index":
+                try:
+                    parent = getattr(obj, "table", None)
+                    if parent is not None and getattr(parent, "name", None) in PAYMENT_TABLES:
+                        return False
+                except Exception:
+                    pass
+
+        return True
+
+    return _include_object
+
+
+def _do_run_migrations(connection):
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        compare_server_default=True,
+        include_schemas=_want_include_schemas(),
+        include_object=_include_object_factory(url),
+        version_table=os.getenv("ALEMBIC_VERSION_TABLE", "alembic_version"),
+        version_table_schema=os.getenv("ALEMBIC_VERSION_SCHEMA") or None,
+        render_item=_render_item,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_migrations_online() -> None:
+    url = config.get_main_option("sqlalchemy.url")
+    engine = create_async_engine(url)
+    async with engine.connect() as connection:
+        await connection.run_sync(_do_run_migrations)
+    await engine.dispose()
+
+
+if context.is_offline_mode():
+    raise SystemExit("Run offline migrations with a sync env.py or set offline to False.")
+else:
+    import asyncio as _asyncio
+
+    _asyncio.run(run_migrations_online())

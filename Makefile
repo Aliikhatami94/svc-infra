@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 RMI ?= all
 
-.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache test
+.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache run-template test
 
 compose_up:
 	@echo "[accept] Starting test stack..."
@@ -99,11 +99,22 @@ unitv:
 clean:
 	@echo "[clean] Removing Python caches, build artifacts, and logs"
 	rm -rf **/__pycache__ __pycache__ .pytest_cache .mypy_cache .ruff_cache build dist *.egg-info *.log
+	@echo "[clean] Cleaning examples directory"
+	@cd examples && rm -rf **/__pycache__ __pycache__ .pytest_cache .mypy_cache .ruff_cache build dist *.egg-info *.log 2>/dev/null || true
 
 # Remove only Python __pycache__ directories (recursive)
 clean-pycache:
-	@echo "[clean] Removing all __pycache__ directories recursively"
+	@echo "[clean] Removing all __pycache__ directories recursively from project"
 	@find . -type d -name '__pycache__' -prune -exec rm -rf {} +
+	@echo "[clean] Removing all __pycache__ directories recursively from examples"
+	@cd examples && find . -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+
+# --- Template example ---
+run-template:
+	@echo "[template] Installing dependencies for svc-infra-template..."
+	@cd examples && poetry install --no-interaction --quiet 2>/dev/null || true
+	@echo "[template] Running svc-infra-template example..."
+	@cd examples && env -i HOME="$$HOME" USER="$$USER" TERM="$$TERM" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" bash -c 'exec ./run.sh'
 
 # --- Combined test target ---
 test:
