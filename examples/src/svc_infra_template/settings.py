@@ -201,6 +201,27 @@ class Settings(BaseSettings):
     smtp_from_name: str = Field(default="SVC Infra Template")
 
     # ========================================================================
+    # Billing & Subscriptions
+    # ========================================================================
+    billing_enabled: bool = Field(default=False)
+    billing_provider: Optional[Literal["stripe", "fake"]] = Field(default=None)
+
+    # Subscription plans
+    billing_plans: str = Field(
+        default="free:0,pro:9.99,enterprise:49.99",
+        description="Comma-separated plan_id:price pairs",
+    )
+
+    # Usage-based billing
+    billing_metered_enabled: bool = Field(default=False)
+    billing_metered_unit: str = Field(
+        default="request", description="Billing unit (e.g., 'request', 'GB', 'hour')"
+    )
+
+    # Quotas
+    billing_quota_enforcement: bool = Field(default=True)
+
+    # ========================================================================
     # External Services
     # ========================================================================
     sentry_dsn: Optional[str] = Field(default=None)
