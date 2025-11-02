@@ -4,7 +4,6 @@ Main FastAPI application using svc-infra utilities - COMPLETE SHOWCASE.
 This example demonstrates ALL svc-infra features with real implementations:
 ✅ Flexible logging setup (environment-aware)
 ✅ Service metadata & versioned APIs
-✅ Security hardening (headers, CORS, HSTS, sessions)
 ✅ Database with SQLAlchemy + Alembic
 ✅ Redis caching with lifecycle management
 ✅ Observability (Prometheus metrics + tracing)
@@ -120,32 +119,6 @@ app = setup_service_api(
     # Configure CORS for browser-based clients
     public_cors_origins=settings.cors_origins_list if settings.cors_enabled else None,
 )
-
-# ============================================================================
-# STEP 3.5: Security Hardening (Headers, CORS, Sessions)
-# ============================================================================
-# Add security middlewares with production-ready defaults
-from svc_infra.security.add import add_security
-
-add_security(
-    app,
-    cors_origins=settings.cors_origins_list if settings.cors_enabled else None,
-    allow_credentials=settings.cors_allow_credentials,
-    enable_hsts_preload=settings.is_production,  # Enable HSTS preload in production
-    install_session_middleware=True,  # Required for some auth flows
-    session_secret_key=settings.auth_secret,
-    session_cookie_https_only=settings.is_production,
-)
-
-# Features added by add_security:
-# - Security headers (CSP, X-Frame-Options, X-Content-Type-Options, etc.)
-# - HSTS with preload for HTTPS enforcement
-# - CORS middleware with environment-aware configuration
-# - Session middleware for stateful auth (cookies)
-#
-# See: src/svc_infra/security/headers.py for defaults
-
-print("✅ Security middlewares enabled")
 
 # ============================================================================
 # STEP 4: Register Lifecycle Events
