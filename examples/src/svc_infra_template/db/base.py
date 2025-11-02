@@ -3,13 +3,12 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
+# Use svc-infra's ModelBase so models are discovered by migrations
+from svc_infra.db.sql.base import ModelBase as Base
 
-class Base(DeclarativeBase):
-    """Base class for all database models."""
-
-    pass
+__all__ = ["Base", "TimestampMixin", "SoftDeleteMixin"]
 
 
 class TimestampMixin:

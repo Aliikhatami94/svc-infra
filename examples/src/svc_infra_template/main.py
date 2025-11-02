@@ -190,7 +190,19 @@ async def shutdown_event():
 
 # --- 4.1 Database (SQLAlchemy 2.0 + Alembic Migrations) ---
 if settings.database_configured:
-    from svc_infra.api.fastapi.db.sql.add import add_sql_db, add_sql_health
+    from svc_infra_template.db import Base, get_engine
+    from svc_infra_template.db.models import Project, Task
+    from svc_infra_template.db.schemas import (
+        ProjectCreate,
+        ProjectRead,
+        ProjectUpdate,
+        TaskCreate,
+        TaskRead,
+        TaskUpdate,
+    )
+
+    from svc_infra.api.fastapi.db.sql.add import add_sql_db, add_sql_health, add_sql_resources
+    from svc_infra.db.sql.resource import SqlResource
 
     # Add database session management
     add_sql_db(app, url=settings.sql_url)
@@ -198,31 +210,53 @@ if settings.database_configured:
     # Add health check endpoint for database
     add_sql_health(app, prefix="/_health/db")
 
-    # Optional: Add automatic CRUD endpoints for models
-    # from svc_infra.api.fastapi.db.sql import SqlResource
-    # from svc_infra_template.db.models import Project, Task
-    #
-    # add_sql_resources(
-    #     app,
-    #     resources=[
-    #         SqlResource(
-    #             model=Project,
-    #             prefix="/projects",
-    #             search_fields=["name", "description"],
-    #             soft_delete=True,  # Uses deleted_at column
-    #         ),
-    #         SqlResource(
-    #             model=Task,
-    #             prefix="/tasks",
-    #             search_fields=["title", "description"],
-    #             order_by_fields=["created_at", "status"],
-    #         ),
-    #     ],
-    # )
-    # This auto-generates: GET, POST, GET /{id}, PUT /{id}, DELETE /{id}
-    # with pagination, search, filtering, and ordering
+    # Create tables on startup (for demo purposes - normally use Alembic migrations)
+    async def _create_db_tables():
+        """Create database tables if they don't exist."""
+        from sqlalchemy.ext.asyncio import AsyncEngine
 
-    print("✅ Database feature enabled")
+        engine: AsyncEngine = get_engine()
+        async with engine.begin() as conn:
+            # Create all tables defined in Base.metadata
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ Database tables created")
+
+    # Register startup function
+    app.add_event_handler("startup", _create_db_tables)
+
+    # Add auto-generated CRUD endpoints for models
+    # These will be available at /_sql/projects and /_sql/tasks
+    add_sql_resources(
+        app,
+        resources=[
+            SqlResource(
+                model=Project,
+                prefix="/projects",
+                tags=["Projects"],
+                soft_delete=True,  # Project has deleted_at field
+                search_fields=["name", "owner_email"],  # Enable search by these fields
+                ordering_default="-created_at",  # Default sort by newest first
+                allowed_order_fields=["id", "name", "created_at", "updated_at"],
+                # Pydantic schemas for serialization/validation
+                read_schema=ProjectRead,
+                create_schema=ProjectCreate,
+                update_schema=ProjectUpdate,
+            ),
+            SqlResource(
+                model=Task,
+                prefix="/tasks",
+                tags=["Tasks"],
+                soft_delete=False,  # Task doesn't use soft delete
+                search_fields=["title", "status"],  # Enable search by these fields
+                ordering_default="-created_at",
+                allowed_order_fields=["id", "title", "status", "created_at", "updated_at"],
+                # Pydantic schemas for serialization/validation
+                read_schema=TaskRead,
+                create_schema=TaskCreate,
+                update_schema=TaskUpdate,
+            ),
+        ],
+    )
 
 # --- 4.2 Observability (Prometheus Metrics + OpenTelemetry Tracing) ---
 if settings.metrics_enabled:
@@ -231,8 +265,6 @@ if settings.metrics_enabled:
     # Get DB engine if database is configured
     db_engines = []
     if settings.database_configured:
-        from svc_infra_template.db import get_engine
-
         db_engines = [get_engine()]
 
     add_observability(

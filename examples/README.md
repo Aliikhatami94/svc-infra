@@ -1,52 +1,43 @@
-# svc-infra-template - Complete Feature Showcase# svc-infra Template
+# svc-infra Template
 
+A comprehensive example demonstrating **ALL** svc-infra features for building production-ready FastAPI services.
 
+## 🎯 What This Template Showcases
 
-A comprehensive example demonstrating **ALL** svc-infra utilities for building production-ready FastAPI services.Example service template demonstrating how to use svc-infra utilities to build a production-ready FastAPI service.
+This is a **complete, working example** that demonstrates:
 
-
-
-## 🎯 What This Template Showcases## 🚀 Quick Start
-
-
-
-This is a **complete, working example** that demonstrates:This template can be used in two ways:
-
-
-
-✅ **Flexible Service Setup** - Using `setup_service_api` for full control  ### Option 1: As a Standalone Project (Recommended)
-
+✅ **Flexible Service Setup** - Using `setup_service_api` for full control  
+✅ **Auto-Generated CRUD** - Zero-code REST endpoints via `SqlResource`  
+✅ **Database Integration** - SQLAlchemy 2.0 + async drivers with proper ModelBase usage  
 ✅ **Environment-Aware Logging** - Auto-configured with the `pick()` helper  
-
-✅ **Type-Safe Configuration** - Pydantic Settings for all environment variables  Copy this template to your own workspace:
-
-✅ **Database Integration** - SQLAlchemy 2.0 + Alembic with SQLite (no setup needed!)  
-
-✅ **Observability** - Prometheus metrics + OpenTelemetry tracing  ```bash
-
-✅ **Security Features** - Rate limiting, idempotency, CORS  # Copy the template to your workspace
-
-✅ **Payment Integration** - Stripe/Adyen/Fake adapters  cp -r svc-infra/examples ~/my-projects/my-service
-
+✅ **Type-Safe Configuration** - Pydantic Settings for all environment variables  
+✅ **Observability** - Prometheus metrics + OpenTelemetry tracing  
+✅ **Security Features** - Rate limiting, idempotency, CORS  
+✅ **Payment Integration** - Stripe/Adyen/Fake adapters  
 ✅ **Webhooks** - Outbound event notifications  
-
-✅ **Health Checks** - Kubernetes-style probes  cd ~/my-projects/my-service
-
-✅ **Custom Middleware** - Request/response processing  
-
-✅ **API Versioning** - Clean routing structure  # Rename the package (optional)
-
-✅ **Lifecycle Management** - Startup/shutdown handlers  mv src/svc_infra_template src/my_service
-
-# Update imports in main.py and other files
+✅ **Health Checks** - Kubernetes-style probes  
+✅ **API Versioning** - Clean routing structure  
+✅ **Lifecycle Management** - Startup/shutdown handlers  
 
 ## 🚀 Quick Start
 
-# Update pyproject.toml dependency:
+### Option 1: Run in Examples Directory
 
-```bash# Change: svc-infra = { path = "../", develop = true }
+```bash
+# 1. Navigate to examples directory
+cd examples
 
-# 1. Navigate to examples directory# To:     svc-infra = "^0.1.0"
+# 2. Install dependencies
+poetry install
+
+# 3. Copy environment template
+cp .env.example .env
+
+# 4. Create database tables
+poetry run python create_tables.py
+
+# 5. Start the server
+./run.sh
 
 cd svc-infra/examples
 
@@ -56,126 +47,122 @@ cd svc-infra/examples
 
 poetry install
 
-# Start the server
-
-# 3. Copy environment filemake run
-
-cp .env.example .env```
-
-
-
-# 4. Initialize database (SQLite - no external setup!)### Option 2: Run Inside svc-infra Project
-
-poetry run python -m svc_infra.db init --project-root .
-
-poetry run python -m svc_infra.db revision -m "Initial" --project-root .If you're working within the svc-infra repo itself:
-
-poetry run python -m svc_infra.db upgrade head --project-root .
-
-```bash
-
-# 5. Start the service# From the svc-infra root
-
-make runcd examples
-
-
-
-# 6. Visit http://localhost:8001/docs# Install dependencies (uses local svc-infra from parent)
-
-```poetry install
-
-
-
-## 📖 Key Features# Start the server
-
-make run
-
-### 1. Flexible Setup Pattern```
-
-
-
-We use `setup_service_api` instead of `easy_service_app` to demonstrate full control:The template uses `svc-infra` as a dependency. When standalone, it fetches from PyPI. When inside the repo, it uses the local development version via `path = "../", develop = true`.
-
-
-
-```python## 📁 Project Structure
-
-app = setup_service_api(
-
-    service=ServiceInfo(name="svc-infra-template", ...),```
-
-    versions=[APIVersionSpec(tag="v1", routers_package="svc_infra_template.api.v1")],examples/                        # In svc-infra repo
-
-    public_cors_origins=settings.cors_origins_list,├── src/
-
-)│   └── svc_infra_template/     # Template package (rename to your service)
-
-```│       ├── __init__.py
-
-│       ├── main.py             # App entry point (300+ lines of educational comments!)
-
-### 2. Environment-Aware Configuration│       └── api/
-
-│           └── v1/
-
-Using the `pick()` helper for clean environment-based settings:│               ├── __init__.py  # v1 router
-
-│               └── routes.py    # v1 endpoints
-
-```python├── pyproject.toml              # Poetry config
-
-setup_logging(├── .env.example                # Environment template
-
-    level=pick(├── run.sh                      # Start script
-
-        prod=LogLevelOptions.INFO,├── Makefile                    # Common commands
-
-        local=LogLevelOptions.DEBUG,├── README.md                   # This file
-
-    )└── USAGE.md                    # Detailed usage guide
-
-)```
-
 ```
 
-## Setup
+Server starts at **http://localhost:8001**
 
-### 3. Type-Safe Settings
+- OpenAPI docs: http://localhost:8001/docs
+- Health check: http://localhost:8001/v1/status
+- Metrics: http://localhost:8001/metrics
+
+### Option 2: Copy as Standalone Project
+
+Copy this template to your own workspace:
 
 ```bash
+# Copy the template
+cp -r svc-infra/examples ~/my-projects/my-service
+cd ~/my-projects/my-service
 
-All configuration in `settings.py` using Pydantic:# Install dependencies and create virtual environment
+# Rename the package (optional)
+mv src/svc_infra_template src/my_service
 
-make install
+# Update imports in main.py and other files
+# Update pyproject.toml dependency:
+# Change: svc-infra = { path = "../", develop = true }
+# To:     svc-infra = "^0.1.0"
+
+# Install and run
+poetry install
+poetry run python create_tables.py
+./run.sh
+```
+
+## 📚 Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes
+- **[Database Guide](docs/DATABASE.md)** - Complete database setup, migrations, auto-CRUD
+- **[CLI Reference](docs/CLI.md)** - svc-infra CLI command documentation
+- **[Usage Guide](USAGE.md)** - Detailed feature usage examples
+
+## 📖 Key Features
+
+### 1. Auto-Generated CRUD
+
+**Zero-code REST endpoints** generated from SQLAlchemy models:
 
 ```python
+from svc_infra.api.fastapi.db.sql.add import add_sql_resources
+from svc_infra.db.sql.resource import SqlResource
 
-class Settings(BaseSettings):# The .env file will be auto-created from .env.example when you run the app
-
-    sql_url: Optional[str] = Field(default=None)# Or manually copy it:
-
-    redis_url: Optional[str] = Field(default=None)cp .env.example .env
-
-    # ... with validation and defaults```
-
+add_sql_resources(app, resources=[
+    SqlResource(
+        model=Project,
+        prefix="/projects",
+        tags=["Projects"],
+        soft_delete=True,
+        search_fields=["name", "owner_email"],
+        ordering_default="-created_at",
+        read_schema=ProjectRead,
+        create_schema=ProjectCreate,
+        update_schema=ProjectUpdate,
+    ),
+])
 ```
 
-## Running the Application
+This automatically generates:
+- `POST /_sql/projects` - Create
+- `GET /_sql/projects` - List with pagination, search, ordering
+- `GET /_sql/projects/{id}` - Get by ID
+- `PATCH /_sql/projects/{id}` - Update
+- `DELETE /_sql/projects/{id}` - Delete (or soft-delete)
 
-### 4. Feature Toggles
+See [Database Guide](docs/DATABASE.md) for complete documentation.
+
+### 2. Flexible Setup Pattern
+
+We use `setup_service_api` instead of `easy_service_app` to demonstrate full control:
+
+```python
+app = setup_service_api(
+    service=ServiceInfo(name="svc-infra-template", ...),
+    versions=[APIVersionSpec(tag="v1", routers_package="svc_infra_template.api.v1")],
+    public_cors_origins=settings.cors_origins_list,
+
+)
+```
+
+### 3. Environment-Aware Configuration
+
+Using the `pick()` helper for clean environment-based settings:
+
+```python
+setup_logging(
+    level=pick(
+        prod=LogLevelOptions.INFO,
+        local=LogLevelOptions.DEBUG,
+    )
+)
+```
+
+### 4. Type-Safe Settings
+
+All configuration in `settings.py` using Pydantic:
+
+```python
+class Settings(BaseSettings):
+    sql_url: Optional[str] = Field(default=None)
+    redis_url: Optional[str] = Field(default=None)
+    # ... with validation and defaults
+```
+
+### 5. Feature Toggles
+
+Enable/disable features via `.env`:
 
 ```bash
-
-Enable/disable features via `.env`:# Start the development server (easiest)
-
-make run
-
-```bash
-
-SQL_URL=sqlite+aiosqlite:///./svc_infra_template.db  # Enable database# Or use the run script directly
-
-# REDIS_URL=redis://localhost:6379/0                 # Enable cache./run.sh
-
+SQL_URL=sqlite+aiosqlite:///./svc_infra_template.db  # Enable database
+# REDIS_URL=redis://localhost:6379/0                 # Enable cache
 METRICS_ENABLED=true                                  # Enable metrics
 
 RATE_LIMIT_ENABLED=true                              # Enable rate limiting# Or manually with uvicorn
@@ -210,106 +197,137 @@ examples/- Docs: http://localhost:8000/docs
 
 │       └── routes.py     # v1 endpoints
 
-├── pyproject.toml        # Dependencies## Extending This Example
-
-├── .env.example          # All configuration options
-
-└── README.md             # This fileThe `main.py` file is organized in 4 clear steps for easy customization:
-
 ```
 
-1. **Logging Setup** - Environment-aware log levels and formats
+## 📁 Project Structure
 
-## 🎓 Learning Path2. **Service Configuration** - Name, version, contact, license, API versions
+```
+examples/
+├── src/
+│   └── svc_infra_template/
+│       ├── __init__.py
+│       ├── main.py              # 484-line feature showcase with inline docs
+│       ├── settings.py          # Type-safe configuration
+│       ├── db/
+│       │   ├── __init__.py
+│       │   ├── base.py          # ModelBase from svc-infra
+│       │   ├── models.py        # SQLAlchemy models (Project, Task)
+│       │   └── schemas.py       # Pydantic schemas for API
+│       └── api/
+│           └── v1/
+│               ├── __init__.py
+│               └── routes.py    # Custom endpoints
+├── docs/
+│   ├── DATABASE.md              # Database setup & auto-CRUD guide
+│   └── CLI.md                   # CLI command reference
+├── create_tables.py             # Simple table creation script
+├── pyproject.toml               # Dependencies
+├── .env.example                 # All configuration options
+├── QUICKSTART.md                # 5-minute getting started guide
+├── USAGE.md                     # Detailed feature usage
+└── README.md                    # This file
+```
 
-3. **Add Features** - Uncomment what you need: DB, auth, payments, observability, etc.
+## 🎓 Learning Path
 
-1. **Read `main.py`** - Heavily commented to explain every feature4. **Custom Extensions** - Add your own middleware, startup logic, etc.
+1. **Read [QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes
+2. **Study `main.py`** - 484 lines of inline documentation explaining every feature
+3. **Read [Database Guide](docs/DATABASE.md)** - Database setup, migrations, auto-CRUD
+4. **Check [CLI Reference](docs/CLI.md)** - svc-infra command-line tools
+5. **Explore `db/models.py`** - SQLAlchemy 2.0 async patterns with ModelBase
+6. **Review `api/v1/routes.py`** - Custom endpoint examples
+7. **Toggle features** - Change `.env` and see how the API adapts
 
-2. **Study `settings.py`** - See Pydantic Settings patterns
+## 🛠️ Available Endpoints
 
-3. **Explore `db/`** - SQLAlchemy 2.0 async patternsEach step has detailed comments and examples. Teams can:
+Visit `/docs` for interactive documentation, or:
 
-4. **Check `api/v1/routes.py`** - Example endpoints- Enable/disable features independently
+**Core:**
+- `GET /` - Service info
+- `GET /v1/status` - System status
+- `GET /v1/features` - Feature flags
+- `GET /v1/stats/summary` - Statistics
 
-5. **Toggle features** - Change `.env` and see API adapt- Customize per environment
+**Auto-Generated CRUD:**
+- `POST /_sql/projects` - Create project
+- `GET /_sql/projects` - List projects (pagination, search, ordering)
+- `GET /_sql/projects/{id}` - Get project
+- `PATCH /_sql/projects/{id}` - Update project
+- `DELETE /_sql/projects/{id}` - Delete project (soft-delete)
+- `POST /_sql/tasks` - Create task
+- `GET /_sql/tasks` - List tasks
 
-- Add team-specific middleware
-
-## 🛠️ Available Endpoints- Control CORS, versioning, and routing
-
-
-
-Visit `/docs` for interactive documentation, or:## Development
-
-
-
-- `GET /` - Service info```bash
-
-- `GET /v1/status` - Feature flags# See all available commands
-
-- `GET /v1/features` - Full feature discoverymake help
-
+**Health & Monitoring:**
 - `GET /_health/live` - Liveness probe
+- `GET /_health/ready` - Readiness probe
+- `GET /_health/db` - Database health
+- `GET /metrics` - Prometheus metrics
 
-- `GET /_health/ready` - Readiness probe# Clean cache files
+## Extending This Example
 
-- `GET /metrics` - Prometheus metrics (if enabled)make clean
+The `main.py` file is organized in 4 clear steps for easy customization:
 
+1. **Logging Setup** - Environment-aware log levels and formats
+2. **Service Configuration** - Name, version, contact, license, API versions
+3. **Add Features** - Toggle via environment: DB, auth, payments, observability, etc.
+4. **Custom Extensions** - Add your own middleware, startup logic, etc.
 
+Each step has detailed comments and examples. Teams can:
+- Enable/disable features independently
+- Customize per environment
+- Add team-specific middleware
+- Control CORS, versioning, and routing
 
-## 📚 Documentation# Update dependencies
+## Development Commands
 
-make update
+```bash
+# See all available commands
+make help
 
-- Main app logic: `src/svc_infra_template/main.py`
+# Install dependencies
+make install
 
-- Configuration: `src/svc_infra_template/settings.py`# Open Poetry shell
+# Start server
+make run
 
-- Database setup: `src/svc_infra_template/db/`make shell
+# Create database tables
+poetry run python create_tables.py
 
-- All options: `.env.example````
+# Run migrations
+poetry run python -m svc_infra.cli sql upgrade head
 
+# Clean cache files
+make clean
 
+# Update dependencies
+poetry update
 
-## 💡 Use Cases## Features & Design Philosophy
+# Open Poetry shell
+poetry shell
+```
 
+## 💡 Design Philosophy
 
+This project demonstrates a **flexible, team-friendly** approach to using svc-infra:
 
-**As a learning tool:**This project demonstrates a **flexible, team-friendly** approach to using svc-infra:
-
-- Study production-ready patterns
-
-- Experiment with features### 🎯 Why This Pattern?
-
-- Understand svc-infra architecture
+### 🎯 Why This Pattern?
 
 - **Pick What You Need**: Enable only the features your team requires (DB, auth, payments, etc.)
-
-**As a project template:**- **Clear Extension Points**: Organized in 4 steps: Logging → Service → Features → Custom
-
-- Copy to your workspace- **Team Autonomy**: Each team can customize service metadata, environment behavior, and feature set
-
-- Rename package- **Production-Ready**: Explicit configuration makes behavior predictable and debuggable
-
-- Add your domain logic- **Gradual Adoption**: Start simple, add features as you grow
-
-- Deploy!
+- **Clear Extension Points**: Organized in 4 steps: Logging → Service → Features → Custom
+- **Team Autonomy**: Each team can customize service metadata, environment behavior, and feature set
+- **Production-Ready**: Explicit configuration makes behavior predictable and debuggable
+- **Gradual Adoption**: Start simple, add features as you grow
 
 ### ✅ Current Setup
 
-**As a testing ground:**
-
-- Test svc-infra features locally- Explicit FastAPI setup with `setup_service_api`
-
-- Prototype integrations- Environment-aware logging with `setup_logging` + `pick()`
-
-- Validate configurations- Versioned API routes (v1) with `APIVersionSpec`
-
+- Explicit FastAPI setup with `setup_service_api`
+- Environment-aware logging with `setup_logging` + `pick()`
+- Versioned API routes (v1) with `APIVersionSpec`
 - Rich OpenAPI docs with contact and license info
+- Auto-generated CRUD via `SqlResource`
+- Database models using svc-infra's `ModelBase`
 
-## 🔧 Customization- Commented examples for all available features
-
+## 🔧 Customization
 
 ### Copy for Your Project
 
@@ -343,20 +361,35 @@ async def my_endpoint():
 
 ```python
 # In db/models.py
+from svc_infra.db.sql.base import ModelBase as Base
+
 class MyModel(Base, TimestampMixin):
     __tablename__ = "my_table"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
 ```
 
-Then create and run migration:
+Then create tables (simple) or migrations (production):
+
+**Simple (Development):**
 ```bash
-poetry run python -m svc_infra.db revision -m "Add MyModel" --project-root .
-poetry run python -m svc_infra.db upgrade head --project-root .
+# Add model to create_tables.py imports
+poetry run python create_tables.py
 ```
+
+**Production (Migrations):**
+```bash
+poetry run python -m svc_infra.cli sql revision \
+  --message "Add MyModel" \
+  --autogenerate \
+  --project-root .
+poetry run python -m svc_infra.cli sql upgrade head --project-root .
+```
+
+See [Database Guide](docs/DATABASE.md) for complete details.
 
 ---
 
 **🎉 You have a complete, production-ready service template with all svc-infra features!**
 
-For questions, check the inline comments in `main.py` - they explain everything!
+For questions, check the inline comments in `main.py` or read the documentation in `docs/`.
