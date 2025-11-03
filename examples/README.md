@@ -2,6 +2,26 @@
 
 A comprehensive example demonstrating **ALL** svc-infra features for building production-ready FastAPI services.
 
+## ⚡ Quick Setup with Scaffolding Scripts
+
+**NEW!** Automated model generation using svc-infra CLI:
+
+```bash
+# One command to generate User/Project/Task models + run migrations
+python scripts/quick_setup.py
+
+# Or manually control each step
+python scripts/scaffold_models.py     # Generate models
+poetry run svc-infra sql init         # Initialize migrations
+poetry run svc-infra sql revision -m "Initial"  # Create migration
+poetry run svc-infra sql upgrade head # Apply migration
+```
+
+📖 **See [`scripts/auth_reference.py`](scripts/auth_reference.py)** - Complete working example of auth integration  
+📚 **See [`SCAFFOLDING.md`](SCAFFOLDING.md)** - Full scaffolding documentation
+
+These scripts call **actual svc-infra CLI commands** (not Python module imports) so you can learn the CLI while setting up your project.
+
 ## 🎯 What This Template Showcases
 
 This is a **complete, working example** that demonstrates **ALL 18 svc-infra features**:
@@ -40,7 +60,9 @@ This is a **complete, working example** that demonstrates **ALL 18 svc-infra fea
 
 ## 🚀 Quick Start
 
-### Option 1: Run in Examples Directory
+### Option 1: Automated Setup (Recommended)
+
+Use our setup scripts to scaffold models and run migrations automatically:
 
 ```bash
 # 1. Navigate to examples directory
@@ -52,27 +74,48 @@ poetry install
 # 3. Copy environment template
 cp .env.example .env
 
-# 4. Create database tables
-poetry run python create_tables.py
+# 4. Run automated setup (generates User, Project, Task models + migrations)
+poetry run python quick_setup.py
 
 # 5. Start the server
-./run.sh
+make run
+```
 
-cd svc-infra/examples
+The `quick_setup.py` script will:
+- Generate User model for authentication
+- Generate Project and Task models for business logic
+- Initialize Alembic migrations
+- Create and apply migrations
+- Provide next steps for enabling features
 
-# Install dependencies
+### Option 2: Manual Setup
 
-# 2. Install dependenciesmake install
+```bash
+# 1. Navigate to examples directory
+cd examples
 
+# 2. Install dependencies
 poetry install
 
+# 3. Copy environment template
+cp .env.example .env
+
+# 4. Scaffold models (optional - for auth/tenancy/GDPR)
+poetry run python scaffold_models.py
+
+# 5. Create database tables
+poetry run python create_tables.py
+
+# 6. Start the server
+make run
 ```
 
 Server starts at **http://localhost:8001**
 
 - OpenAPI docs: http://localhost:8001/docs
-- Health check: http://localhost:8001/v1/status
+- Health check: http://localhost:8001/ping
 - Metrics: http://localhost:8001/metrics
+- CRUD endpoints: http://localhost:8001/_sql/projects
 
 ### Option 2: Copy as Standalone Project
 
@@ -183,40 +226,29 @@ Enable/disable features via `.env`:
 SQL_URL=sqlite+aiosqlite:///./svc_infra_template.db  # Enable database
 # REDIS_URL=redis://localhost:6379/0                 # Enable cache
 METRICS_ENABLED=true                                  # Enable metrics
-
-RATE_LIMIT_ENABLED=true                              # Enable rate limiting# Or manually with uvicorn
-
-```poetry run uvicorn --app-dir src svc_infra_template.main:app --reload --host 0.0.0.0 --port 8000
-
+RATE_LIMIT_ENABLED=true                              # Enable rate limiting
 ```
 
-## 📁 Project Structure
+Or manually with uvicorn:
+
+```bash
+poetry run uvicorn --app-dir src svc_infra_template.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## 🌐 Running the Server
 
 The API will be available at:
 
-```- API: http://localhost:8000 (configurable via `API_PORT` in `.env`)
+- **API**: http://localhost:8000 (configurable via `API_PORT` in `.env`)
+- **Docs**: http://localhost:8000/docs
+- **OpenAPI**: http://localhost:8000/openapi.json
 
-examples/- Docs: http://localhost:8000/docs
+### Available Endpoints
 
-├── src/svc_infra_template/- OpenAPI: http://localhost:8000/openapi.json
-
-│   ├── main.py           # 🎯 400+ lines of educational comments!
-
-│   ├── settings.py       # Type-safe configuration### Available Endpoints
-
-│   ├── db/
-
-│   │   ├── base.py       # SQLAlchemy base, mixins- `GET /v1/ping` - Health check
-
-│   │   ├── session.py    # Session management- `GET /v1/status` - Service status
-
-│   │   └── models.py     # Example models- `GET /ping` - Root health check (added by svc-infra)
-
-│   └── api/v1/- `GET /metrics` - Prometheus metrics (when observability enabled)
-
-│       └── routes.py     # v1 endpoints
-
-```
+- `GET /v1/ping` - Health check
+- `GET /v1/status` - Service status
+- `GET /ping` - Root health check (added by svc-infra)
+- `GET /metrics` - Prometheus metrics (when observability enabled)
 
 ## 📁 Project Structure
 
@@ -297,6 +329,73 @@ Each step has detailed comments and examples. Teams can:
 - Add team-specific middleware
 - Control CORS, versioning, and routing
 
+## �️ Model Scaffolding Scripts
+
+We provide two scripts to automate model generation using svc-infra CLI:
+
+### `quick_setup.py` - All-in-One Setup (Recommended)
+
+Generates models AND runs migrations automatically:
+
+```bash
+# Full automated setup
+poetry run python quick_setup.py
+
+# Only scaffold models (skip migrations)
+poetry run python quick_setup.py --skip-migrations
+
+# Overwrite existing model files
+poetry run python quick_setup.py --overwrite
+```
+
+**What it does:**
+1. ✅ Generates User model (for authentication)
+2. ✅ Generates Project and Task models (business logic)
+3. ✅ Initializes Alembic migrations
+4. ✅ Creates migration file
+5. ✅ Applies migration to database
+6. ✅ Provides next steps for enabling features
+
+### `scaffold_models.py` - Granular Control
+
+Generate models without running migrations:
+
+```bash
+# Generate all models
+poetry run python scaffold_models.py
+
+# Only User model (authentication)
+poetry run python scaffold_models.py --user-only
+
+# Only business entity models
+poetry run python scaffold_models.py --entities-only
+
+# Overwrite existing files
+poetry run python scaffold_models.py --overwrite
+```
+
+**What it generates:**
+
+1. **User Model** (`models/user.py` + `schemas/user.py`)
+   - Inherits from fastapi-users base
+   - Includes: email, hashed_password, is_active, is_superuser, is_verified
+   - Tenant support for multi-tenancy
+   - Soft delete support
+
+2. **Project Model** (`models/project.py` + `schemas/project.py`)
+   - Tenant-aware
+   - Soft delete support
+   - Audit fields (created_at, updated_at)
+
+3. **Task Model** (`models/task.py` + `schemas/task.py`)
+   - Tenant-aware
+   - Standard timestamps
+
+**After scaffolding**, you can:
+- Customize models (add fields, relationships)
+- Run migrations manually
+- Enable features in `.env`
+
 ## 🔓 Enabling Advanced Features
 
 Three powerful features are **included but disabled by default** because they require additional setup:
@@ -305,45 +404,19 @@ Three powerful features are **included but disabled by default** because they re
 
 Full auth with registration, login, OAuth, MFA, API keys.
 
-**⚠️ Status:** Requires User model implementation (see `main.py` comments)
+**Quick Setup:**
+```bash
+# Option 1: Automated (recommended)
+poetry run python quick_setup.py
+# Then uncomment auth section in main.py and set AUTH_ENABLED=true
 
-The `add_auth_users()` function needs:
-1. A SQLAlchemy User model (inheriting from fastapi-users base)
-2. Pydantic schemas (UserRead, UserCreate, UserUpdate)
-3. Database migrations for user tables
-4. JWT secret configuration
-
-**Example Setup (when ready):**
-```python
-# 1. Create models/user.py with User model
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import Column, String, Boolean
-from svc_infra_template.db import Base
-
-class User(SQLAlchemyBaseUserTableUUID, Base):
-    __tablename__ = "users"
-    # Add custom fields here
-
-# 2. Create schemas/user.py with Pydantic schemas
-from fastapi_users import schemas
-
-class UserRead(schemas.BaseUser[UUID]):
-    pass
-
-class UserCreate(schemas.BaseUserCreate):
-    pass
-
-class UserUpdate(schemas.BaseUserUpdate):
-    pass
-
-# 3. Run migrations
+# Option 2: Manual
+poetry run python scaffold_models.py --user-only
 poetry run python -m svc_infra.db init --project-root .
 poetry run python -m svc_infra.db revision -m "add auth tables" --project-root .
 poetry run python -m svc_infra.db upgrade head --project-root .
-
-# 4. Uncomment auth code in main.py and enable
-AUTH_ENABLED=true
-make run
+# Edit main.py to import User model and schemas
+# Set AUTH_ENABLED=true in .env
 ```
 
 **Will Add Routes:**
@@ -355,6 +428,7 @@ make run
 - OAuth endpoints for Google/GitHub
 - MFA/TOTP endpoints
 - API key management
+- Session management
 - Session management
 
 **Reference:** See `tests/acceptance/app.py` for a minimal auth implementation example.
