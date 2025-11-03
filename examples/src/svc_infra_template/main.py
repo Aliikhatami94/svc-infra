@@ -479,45 +479,68 @@ if settings.billing_enabled and settings.database_configured:
     print("✅ Billing & quota enforcement enabled")
 
 # --- 4.12 Authentication (Users, Sessions, OAuth) ---
-if settings.auth_enabled and settings.database_configured:
-    # from svc_infra.api.fastapi.auth.add import add_auth_users
+# The add_auth_users() function requires a complete User model setup:
+#
+# ⚠️ REQUIREMENTS:
+# 1. Define a SQLAlchemy User model (inheriting from fastapi-users' User base)
+# 2. Create Pydantic schemas (UserRead, UserCreate, UserUpdate)
+# 3. Run database migrations to create user tables
+# 4. Configure JWT secret and optional OAuth providers
+#
+# Example implementation (when ready):
+#
+# from svc_infra.api.fastapi.auth.add import add_auth_users
+# from svc_infra_template.models.user import User
+# from svc_infra_template.schemas.user import UserRead, UserCreate, UserUpdate
+#
+# if settings.auth_enabled and settings.database_configured:
+#     add_auth_users(
+#         app,
+#         user_model=User,
+#         schema_read=UserRead,
+#         schema_create=UserCreate,
+#         schema_update=UserUpdate,
+#         enable_password=True,      # Email/password auth
+#         enable_oauth=True,          # Google, GitHub, etc.
+#         enable_api_keys=True,       # Service-to-service auth
+#         post_login_redirect="/",    # Where to redirect after OAuth login
+#     )
+#
+# This will add routes:
+#   POST   /auth/register              - Register new user
+#   POST   /auth/login                 - Login with credentials
+#   POST   /auth/logout                - Logout (invalidate session)
+#   GET    /users/me                   - Get current user
+#   PATCH  /users/me                   - Update current user
+#   POST   /users/verify               - Verify email with token
+#   POST   /users/forgot-password      - Request password reset
+#   POST   /users/reset-password       - Reset password with token
+#   GET    /auth/oauth/{provider}/authorize  - OAuth authorize
+#   GET    /auth/oauth/{provider}/callback   - OAuth callback
+#   POST   /auth/mfa/enable            - Enable MFA/TOTP
+#   POST   /auth/mfa/verify            - Verify MFA code
+#   GET    /auth/sessions/me           - List user's active sessions
+#   DELETE /auth/sessions/{id}         - Revoke a session
+#   POST   /auth/api-keys              - Create API key
+#   GET    /auth/api-keys              - List API keys
+#   DELETE /auth/api-keys/{key_id}     - Revoke API key
+#
+# For a complete example, see:
+#   - tests/acceptance/app.py (minimal auth flow without full User model)
+#   - src/svc_infra/docs/auth.md (full documentation)
+#
+# Setup steps:
+#   1. Create User model: touch src/svc_infra_template/models/user.py
+#   2. Create schemas: touch src/svc_infra_template/schemas/user.py
+#   3. Init migrations: python -m svc_infra.db init --project-root .
+#   4. Create migration: python -m svc_infra.db revision -m "add auth tables" --project-root .
+#   5. Run migrations: python -m svc_infra.db upgrade head --project-root .
+#   6. Enable: Set AUTH_ENABLED=true in .env
 
-    # Add complete authentication system with:
-    # - User registration & login
-    # - Password hashing with bcrypt
-    # - JWT access & refresh tokens
-    # - OAuth providers (Google, GitHub)
-    # - MFA/TOTP support
-    # - Account lockout after failed attempts
-    # - Email verification
-    # - API keys for service-to-service auth
-    # Note: This requires setting up User model and related tables first
-    # Uncomment after running: python -m svc_infra.db revision -m "add auth tables"
-    # add_auth_users(
-    #     app,
-    #     session_secret=settings.auth_secret,
-    #     # Add your configuration here
-    # )
-    # Adds routes:
-    #   POST   /auth/register              - Register new user
-    #   POST   /auth/login                 - Login with credentials
-    #   POST   /auth/refresh               - Refresh access token
-    #   POST   /auth/logout                - Logout (invalidate tokens)
-    #   GET    /auth/me                    - Get current user
-    #   POST   /auth/verify-email          - Verify email with token
-    #   POST   /auth/forgot-password       - Request password reset
-    #   POST   /auth/reset-password        - Reset password with token
-    #   GET    /auth/{provider}/authorize  - OAuth authorize
-    #   GET    /auth/{provider}/callback   - OAuth callback
-    #   POST   /auth/mfa/enable            - Enable MFA
-    #   POST   /auth/mfa/verify            - Verify MFA code
-    #   POST   /auth/api-keys              - Create API key
-    #   GET    /auth/api-keys              - List API keys
-    #   DELETE /auth/api-keys/{key_id}     - Revoke API key
-    #
-    # See: src/svc_infra/docs/auth.md
-
-    print("⚠️  Authentication setup ready (requires User model configuration)")
+if settings.auth_enabled:
+    print("⚠️  Authentication requires User model setup")
+else:
+    print("ℹ️  Authentication disabled (set AUTH_ENABLED=true when User model is ready)")
 
 # --- 4.13 Multi-Tenancy ---
 if settings.tenancy_enabled and settings.database_configured:

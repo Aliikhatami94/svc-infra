@@ -297,6 +297,112 @@ Each step has detailed comments and examples. Teams can:
 - Add team-specific middleware
 - Control CORS, versioning, and routing
 
+## 🔓 Enabling Advanced Features
+
+Three powerful features are **included but disabled by default** because they require additional setup:
+
+### 1. Authentication System
+
+Full auth with registration, login, OAuth, MFA, API keys.
+
+**⚠️ Status:** Requires User model implementation (see `main.py` comments)
+
+The `add_auth_users()` function needs:
+1. A SQLAlchemy User model (inheriting from fastapi-users base)
+2. Pydantic schemas (UserRead, UserCreate, UserUpdate)
+3. Database migrations for user tables
+4. JWT secret configuration
+
+**Example Setup (when ready):**
+```python
+# 1. Create models/user.py with User model
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID
+from sqlalchemy import Column, String, Boolean
+from svc_infra_template.db import Base
+
+class User(SQLAlchemyBaseUserTableUUID, Base):
+    __tablename__ = "users"
+    # Add custom fields here
+
+# 2. Create schemas/user.py with Pydantic schemas
+from fastapi_users import schemas
+
+class UserRead(schemas.BaseUser[UUID]):
+    pass
+
+class UserCreate(schemas.BaseUserCreate):
+    pass
+
+class UserUpdate(schemas.BaseUserUpdate):
+    pass
+
+# 3. Run migrations
+poetry run python -m svc_infra.db init --project-root .
+poetry run python -m svc_infra.db revision -m "add auth tables" --project-root .
+poetry run python -m svc_infra.db upgrade head --project-root .
+
+# 4. Uncomment auth code in main.py and enable
+AUTH_ENABLED=true
+make run
+```
+
+**Will Add Routes:**
+- `POST /auth/register` - User registration
+- `POST /auth/login` - Login with credentials
+- `GET /users/me` - Get current user
+- `POST /users/verify` - Email verification
+- `POST /users/forgot-password` - Password reset
+- OAuth endpoints for Google/GitHub
+- MFA/TOTP endpoints
+- API key management
+- Session management
+
+**Reference:** See `tests/acceptance/app.py` for a minimal auth implementation example.
+
+### 2. Multi-Tenancy
+
+Automatic tenant isolation for SaaS applications.
+
+**Setup Steps:**
+```bash
+# 1. Enable in .env
+TENANCY_ENABLED=true
+TENANCY_HEADER_NAME=X-Tenant-ID
+
+# 2. Restart server
+make run
+
+# 3. Send X-Tenant-ID header with requests
+curl -H "X-Tenant-ID: tenant-123" http://localhost:8001/_sql/projects
+```
+
+**Features:**
+- Automatic tenant_id filtering on all queries
+- Prevents data leakage between tenants
+- Supports header/subdomain/path resolution
+
+### 3. Data Lifecycle & GDPR
+
+Compliance features for data retention and erasure.
+
+**Setup Steps:**
+```bash
+# 1. Enable in .env
+GDPR_ENABLED=true
+DATA_AUTO_MIGRATE=true
+
+# 2. Restart server
+make run
+```
+
+**Features:**
+- Automatic data retention policies
+- Right to erasure (GDPR Article 17)
+- Data export (GDPR Article 20)
+- Automatic migrations on startup
+
+---
+
 ## Development Commands
 
 ```bash
