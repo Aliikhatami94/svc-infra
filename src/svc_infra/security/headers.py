@@ -6,8 +6,21 @@ SECURE_DEFAULTS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "X-XSS-Protection": "0",
-    # CSP kept minimal; allow config override
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    # CSP with practical defaults - allows inline styles/scripts and data URIs for images
+    # Also allows cdn.jsdelivr.net for FastAPI docs (Swagger UI, ReDoc)
+    # Still secure: blocks arbitrary external scripts, prevents framing, restricts form actions
+    # Override via headers_overrides in add_security() for stricter or custom policies
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self'; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    ),
 }
 
 

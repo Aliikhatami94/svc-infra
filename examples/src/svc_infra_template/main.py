@@ -299,11 +299,15 @@ if settings.metrics_enabled:
 if settings.security_enabled:
     # Add security headers and CORS middleware
     # Provides secure defaults for:
-    # - Content-Security-Policy
-    # - X-Frame-Options
-    # - X-Content-Type-Options
-    # - Strict-Transport-Security
-    # - X-XSS-Protection
+    # - Content-Security-Policy (allows inline styles/scripts, data URIs)
+    # - X-Frame-Options (blocks framing)
+    # - X-Content-Type-Options (prevents MIME sniffing)
+    # - Strict-Transport-Security (enforces HTTPS)
+    # - X-XSS-Protection (disabled, CSP is better)
+    #
+    # To override CSP or other headers, pass headers_overrides:
+    # add_security(app, headers_overrides={"Content-Security-Policy": "..."})
+
     add_security(
         app,
         cors_origins=settings.cors_origins_list if settings.cors_enabled else None,

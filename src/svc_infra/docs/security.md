@@ -88,9 +88,30 @@ payload = verify_cookie(sig, secret="k1", old_secrets=["k0"])  # returns dict
 Use `svc_infra.security.add.add_security` to install the default middlewares on any
 FastAPI app. By default it adds:
 
-- `SecurityHeadersMiddleware` with strict defaults (HSTS, X-Frame-Options, etc.).
+- `SecurityHeadersMiddleware` with practical defaults:
+  - **Content-Security-Policy**: Allows same-origin resources, inline styles/scripts, data URI images, and HTTPS images. Blocks external scripts and framing.
+  - **Strict-Transport-Security**: Forces HTTPS with long max-age and subdomain support
+  - **X-Frame-Options**: Blocks framing (DENY)
+  - **X-Content-Type-Options**: Prevents MIME sniffing (nosniff)
+  - **Referrer-Policy**: Limits referrer leakage
+  - **X-XSS-Protection**: Disabled (CSP is the modern protection)
 - A strict `CORSMiddleware` that only enables CORS when origins are provided (via
   parameters or environment variables such as `CORS_ALLOW_ORIGINS`).
+
+The default CSP policy is:
+```
+default-src 'self';
+script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+img-src 'self' data: https:;
+connect-src 'self';
+font-src 'self' https://cdn.jsdelivr.net;
+frame-ancestors 'none';
+base-uri 'self';
+form-action 'self'
+```
+
+This works out-of-the-box for most web applications, including FastAPI's built-in documentation (Swagger UI, ReDoc), while maintaining strong security.
 
 The helper also supports optional toggles so you can match the same cookie and
 header configuration that `setup_service_api` uses.
@@ -105,7 +126,7 @@ app = FastAPI()
 add_security(
     app,
     cors_origins=["https://app.example.com"],
-    headers_overrides={"Content-Security-Policy": "default-src 'self'"},
+    headers_overrides={"Content-Security-Policy": "default-src 'self'; script-src 'self'"},  # Stricter CSP
     install_session_middleware=True,  # adds Starlette's SessionMiddleware
 )
 ```
