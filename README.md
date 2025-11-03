@@ -9,26 +9,26 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 
 | Area | What it covers | Guide |
 | --- | --- | --- |
-| Getting Started | Overview and entry points | [This page](getting-started.md) |
-| Environment | Feature switches and env vars | [Environment](environment.md) |
-| API | FastAPI bootstrap, middleware, docs wiring | [API guide](api.md) |
-| Auth | Sessions, OAuth/OIDC, MFA, SMTP delivery | [Auth](auth.md) |
-| Security | Password policy, lockout, signed cookies, headers | [Security](security.md) |
-| Database | SQL + Mongo wiring, Alembic helpers, inbox/outbox patterns | [Database](database.md) |
-| Tenancy | Multi-tenant boundaries and helpers | [Tenancy](tenancy.md) |
-| Idempotency | Idempotent endpoints and middleware | [Idempotency](idempotency.md) |
-| Rate Limiting | Middleware, dependency limiter, headers | [Rate limiting](rate-limiting.md) |
-| Cache | cashews decorators, namespace management, TTL helpers | [Cache](cache.md) |
-| Jobs | JobQueue, scheduler, CLI worker | [Jobs](jobs.md) |
-| Observability | Prometheus, Grafana, OpenTelemetry | [Observability](observability.md) |
-| Ops | Probes, breakers, SLOs & dashboards | [Ops](ops.md) |
-| Webhooks | Subscription store, signing, retry worker | [Webhooks](webhooks.md) |
-| CLI | Command groups for sql/mongo/obs/docs/dx/sdk/jobs | [CLI](cli.md) |
-| Docs & SDKs | Publishing docs, generating SDKs | [Docs & SDKs](docs-and-sdks.md) |
-| Acceptance | Acceptance harness and flows | [Acceptance](acceptance.md), [Matrix](acceptance-matrix.md) |
-| Contributing | Dev setup and quality gates | [Contributing](contributing.md) |
-| Repo Review | Checklist for releasing/PRs | [Repo review](repo-review.md) |
-| Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](data-lifecycle.md) |
+| Getting Started | Overview and entry points | [This page](src/svc_infra/docs/getting-started.md) |
+| Environment | Feature switches and env vars | [Environment](src/svc_infra/docs/environment.md) |
+| API | FastAPI bootstrap, middleware, docs wiring | [API guide](src/svc_infra/docs/api.md) |
+| Auth | Sessions, OAuth/OIDC, MFA, SMTP delivery | [Auth](src/svc_infra/docs/auth.md) |
+| Security | Password policy, lockout, signed cookies, headers | [Security](ssrc/svc_infra/docs/ecurity.md) |
+| Database | SQL + Mongo wiring, Alembic helpers, inbox/outbox patterns | [Database](src/svc_infra/docs/database.md) |
+| Tenancy | Multi-tenant boundaries and helpers | [Tenancy](src/svc_infra/docs/tenancy.md) |
+| Idempotency | Idempotent endpoints and middleware | [Idempotency](src/svc_infra/docs/idempotency.md) |
+| Rate Limiting | Middleware, dependency limiter, headers | [Rate limiting](rsrc/svc_infra/docs/ate-limiting.md) |
+| Cache | cashews decorators, namespace management, TTL helpers | [Cache](src/svc_infra/docs/cache.md) |
+| Jobs | JobQueue, scheduler, CLI worker | [Jobs](src/svc_infra/docs/jobs.md) |
+| Observability | Prometheus, Grafana, OpenTelemetry | [Observability](src/svc_infra/docs/observability.md) |
+| Ops | Probes, breakers, SLOs & dashboards | [Ops](src/svc_infra/docs/ops.md) |
+| Webhooks | Subscription store, signing, retry worker | [Webhooks](src/svc_infra/docs/webhooks.md) |
+| CLI | Command groups for sql/mongo/obs/docs/dx/sdk/jobs | [CLI](src/svc_infra/docs/cli.md) |
+| Docs & SDKs | Publishing docs, generating SDKs | [Docs & SDKs](src/svc_infra/docs/docs-and-sdks.md) |
+| Acceptance | Acceptance harness and flows | [Acceptance](src/svc_infra/docs/acceptance.md), [Matrix](src/svc_infra/docs/acceptance-matrix.md) |
+| Contributing | Dev setup and quality gates | [Contributing](src/svc_infra/docs/contributing.md) |
+| Repo Review | Checklist for releasing/PRs | [Repo review](src/svc_infra/docs/repo-review.md) |
+| Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](src/svc_infra/docs/data-lifecycle.md) |
 
 ## Minimal FastAPI bootstrap
 
