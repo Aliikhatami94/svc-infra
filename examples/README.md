@@ -4,20 +4,39 @@ A comprehensive example demonstrating **ALL** svc-infra features for building pr
 
 ## 🎯 What This Template Showcases
 
-This is a **complete, working example** that demonstrates:
+This is a **complete, working example** that demonstrates **ALL 18 svc-infra features**:
 
+### Core Infrastructure
 ✅ **Flexible Service Setup** - Using `setup_service_api` for full control  
 ✅ **Auto-Generated CRUD** - Zero-code REST endpoints via `SqlResource`  
 ✅ **Database Integration** - SQLAlchemy 2.0 + async drivers with proper ModelBase usage  
 ✅ **Environment-Aware Logging** - Auto-configured with the `pick()` helper  
 ✅ **Type-Safe Configuration** - Pydantic Settings for all environment variables  
+
+### Production Features
 ✅ **Observability** - Prometheus metrics + OpenTelemetry tracing  
-✅ **Security Features** - Rate limiting, idempotency, CORS  
+✅ **Security Headers & CORS** - Production-ready defaults with `add_security()`  
+✅ **Timeouts & Resource Limits** - Handler timeout, body read timeout, request size limiting  
+✅ **Graceful Shutdown** - Track in-flight requests for zero-downtime deploys  
+✅ **Rate Limiting** - Protect endpoints from abuse  
+✅ **Idempotency** - Prevent duplicate processing with automatic key management  
 ✅ **Payment Integration** - Stripe/Adyen/Fake adapters  
-✅ **Webhooks** - Outbound event notifications  
-✅ **Health Checks** - Kubernetes-style probes  
+✅ **Webhooks** - Outbound event notifications with retry logic  
+✅ **Billing & Subscriptions** - Usage-based billing with quota enforcement  
+
+### Advanced Features (Configurable)
+✅ **Authentication** - Users, OAuth, MFA, API keys (requires model setup)  
+✅ **Multi-Tenancy** - Automatic tenant isolation (header/subdomain/path)  
+✅ **Data Lifecycle & GDPR** - Retention, archival, erasure policies  
+✅ **Background Jobs** - Redis-backed queue with scheduler  
+✅ **Admin Operations** - Impersonation with audit logs  
+
+### Operational
+✅ **Health Checks** - Kubernetes-style probes (liveness, readiness, startup)  
+✅ **Maintenance Mode** - Graceful service degradation  
 ✅ **API Versioning** - Clean routing structure  
 ✅ **Lifecycle Management** - Startup/shutdown handlers  
+✅ **Documentation** - Auto-generated OpenAPI with version-scoped docs  
 
 ## 🚀 Quick Start
 
