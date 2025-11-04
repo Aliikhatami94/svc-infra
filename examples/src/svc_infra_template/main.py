@@ -479,32 +479,7 @@ if settings.billing_enabled and settings.database_configured:
     print("✅ Billing & quota enforcement enabled")
 
 # --- 4.12 Authentication (Users, Sessions, OAuth) ---
-# The add_auth_users() function requires a complete User model setup:
-#
-# ⚠️ REQUIREMENTS:
-# 1. Define a SQLAlchemy User model (inheriting from fastapi-users' User base)
-# 2. Create Pydantic schemas (UserRead, UserCreate, UserUpdate)
-# 3. Run database migrations to create user tables
-# 4. Configure JWT secret and optional OAuth providers
-#
-# Example implementation (when ready):
-#
-# from svc_infra.api.fastapi.auth.add import add_auth_users
-# from svc_infra_template.models.user import User
-# from svc_infra_template.schemas.user import UserRead, UserCreate, UserUpdate
-#
-# if settings.auth_enabled and settings.database_configured:
-#     add_auth_users(
-#         app,
-#         user_model=User,
-#         schema_read=UserRead,
-#         schema_create=UserCreate,
-#         schema_update=UserUpdate,
-#         enable_password=True,      # Email/password auth
-#         enable_oauth=True,          # Google, GitHub, etc.
-#         enable_api_keys=True,       # Service-to-service auth
-#         post_login_redirect="/",    # Where to redirect after OAuth login
-#     )
+# The add_auth_users() function wires up user authentication with your User model.
 #
 # This will add routes:
 #   POST   /auth/register              - Register new user
@@ -524,23 +499,29 @@ if settings.billing_enabled and settings.database_configured:
 #   POST   /auth/api-keys              - Create API key
 #   GET    /auth/api-keys              - List API keys
 #   DELETE /auth/api-keys/{key_id}     - Revoke API key
-#
-# For a complete example, see:
-#   - tests/acceptance/app.py (minimal auth flow without full User model)
-#   - src/svc_infra/docs/auth.md (full documentation)
-#
-# Setup steps:
-#   1. Create User model: touch src/svc_infra_template/models/user.py
-#   2. Create schemas: touch src/svc_infra_template/schemas/user.py
-#   3. Init migrations: python -m svc_infra.db init --project-root .
-#   4. Create migration: python -m svc_infra.db revision -m "add auth tables" --project-root .
-#   5. Run migrations: python -m svc_infra.db upgrade head --project-root .
-#   6. Enable: Set AUTH_ENABLED=true in .env
 
-if settings.auth_enabled:
-    print("⚠️  Authentication requires User model setup")
+if settings.auth_enabled and settings.database_configured:
+    from svc_infra_template.models.user import User
+    from svc_infra_template.schemas.user import UserCreate, UserRead, UserUpdate
+
+    from svc_infra.api.fastapi.auth.add import add_auth_users
+
+    add_auth_users(
+        app,
+        user_model=User,
+        schema_read=UserRead,
+        schema_create=UserCreate,
+        schema_update=UserUpdate,
+        enable_password=True,  # Email/password auth
+        enable_oauth=False,  # Disable OAuth for now (requires provider setup)
+        enable_api_keys=True,  # Service-to-service auth
+        post_login_redirect="/",
+    )
+    print("✅ Authentication enabled with User model")
+elif settings.auth_enabled:
+    print("⚠️  Authentication requires database configuration (SQL_URL)")
 else:
-    print("ℹ️  Authentication disabled (set AUTH_ENABLED=true when User model is ready)")
+    print("ℹ️  Authentication disabled (set AUTH_ENABLED=true to enable)")
 
 # --- 4.13 Multi-Tenancy ---
 if settings.tenancy_enabled and settings.database_configured:

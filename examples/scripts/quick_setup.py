@@ -68,7 +68,7 @@ def main():
     print("-" * 70)
 
     scaffold_script = script_dir / "scaffold_models.py"
-    base_cmd = f"python {scaffold_script}"
+    base_cmd = f"python3 {scaffold_script}"
     if args.overwrite:
         base_cmd += " --overwrite"
 
@@ -79,10 +79,29 @@ def main():
     if args.skip_migrations:
         print("\n✅ Models scaffolded. Skipping migrations (--skip-migrations)")
         print("\nTo run migrations manually (from examples directory):")
-        print("  1. poetry run svc-infra sql init")
-        print("  2. poetry run svc-infra sql revision -m 'Initial'")
-        print("  3. poetry run svc-infra sql upgrade head")
+        print("  1. poetry run svc-infra sql init --project-root .")
+        print("  2. poetry run svc-infra sql revision --project-root . -m 'Initial'")
+        print("  3. poetry run svc-infra sql upgrade --project-root . head")
         return 0
+
+    # Check if SQL_URL is configured
+    env_file = examples_dir / ".env"
+    if env_file.exists():
+        import os
+
+        # Load .env if it exists
+        with open(env_file) as f:
+            for line in f:
+                if line.strip() and not line.startswith("#"):
+                    key, _, value = line.partition("=")
+                    if key.strip() == "SQL_URL" and value.strip():
+                        os.environ["SQL_URL"] = value.strip()
+                        break
+
+    if not os.environ.get("SQL_URL"):
+        print("\n⚠️  SQL_URL not found in environment")
+        print("   Using default: sqlite+aiosqlite:////tmp/svc_infra_template.db")
+        os.environ["SQL_URL"] = "sqlite+aiosqlite:////tmp/svc_infra_template.db"
 
     # Step 2: Initialize Alembic (if not already done)
     print("\n📦 Step 2: Initialize Database Migrations")
@@ -92,8 +111,11 @@ def main():
     if alembic_dir.exists():
         print("   ℹ️  Alembic already initialized, skipping...")
     else:
-        # Run from examples directory
-        if not run(f"cd {examples_dir} && poetry run svc-infra sql init", "Initialize Alembic"):
+        # Run from examples directory with PROJECT_ROOT set
+        if not run(
+            f"cd {examples_dir} && PROJECT_ROOT=. poetry run svc-infra sql init",
+            "Initialize Alembic",
+        ):
             print("\n⚠️  Alembic initialization failed.")
             return 1
 
@@ -102,7 +124,7 @@ def main():
     print("-" * 70)
 
     if not run(
-        f'cd {examples_dir} && poetry run svc-infra sql revision -m "Add user and entity tables"',
+        f'cd {examples_dir} && PROJECT_ROOT=. poetry run svc-infra sql revision -m "Add user and entity tables"',
         "Generate migration for new models",
     ):
         print("\n⚠️  Migration creation failed.")
@@ -116,7 +138,8 @@ def main():
     print("-" * 70)
 
     if not run(
-        f"cd {examples_dir} && poetry run svc-infra sql upgrade head", "Apply migration to database"
+        f"cd {examples_dir} && PROJECT_ROOT=. poetry run svc-infra sql upgrade head",
+        "Apply migration to database",
     ):
         print("\n⚠️  Migration failed.")
         print("Check your database connection and SQL_URL in .env")

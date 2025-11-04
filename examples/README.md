@@ -2,25 +2,24 @@
 
 A comprehensive example demonstrating **ALL** svc-infra features for building production-ready FastAPI services.
 
-## ⚡ Quick Setup with Scaffolding Scripts
+## ⚡ Quick Setup
 
-**NEW!** Automated model generation using svc-infra CLI:
+**Get started in 2 commands:**
 
 ```bash
-# One command to generate User/Project/Task models + run migrations
-python scripts/quick_setup.py
-
-# Or manually control each step
-python scripts/scaffold_models.py     # Generate models
-poetry run svc-infra sql init         # Initialize migrations
-poetry run svc-infra sql revision -m "Initial"  # Create migration
-poetry run svc-infra sql upgrade head # Apply migration
+cd examples
+make setup    # Installs deps, scaffolds models, runs migrations
+make run      # Starts the server at http://localhost:8001
 ```
 
-📖 **See [`scripts/auth_reference.py`](scripts/auth_reference.py)** - Complete working example of auth integration  
-📚 **See [`SCAFFOLDING.md`](SCAFFOLDING.md)** - Full scaffolding documentation
+**✨ Features:**
+- 🛡️ Safe: Won't overwrite existing models (use `--overwrite` if needed)
+- 📚 Educational: Calls actual `svc-infra` CLI commands so you can learn
+- 🎯 Complete: Generates User (auth), Project, and Task models + migrations
 
-These scripts call **actual svc-infra CLI commands** (not Python module imports) so you can learn the CLI while setting up your project.
+📖 **See [`scripts/auth_reference.py`](scripts/auth_reference.py)** - Complete auth integration example  
+📚 **See [`SCAFFOLDING.md`](SCAFFOLDING.md)** - Full scaffolding documentation  
+🛠️ **See [Make Commands](#-available-make-commands)** - All available commands
 
 ## 🎯 What This Template Showcases
 
@@ -60,9 +59,28 @@ This is a **complete, working example** that demonstrates **ALL 18 svc-infra fea
 
 ## 🚀 Quick Start
 
-### Option 1: Automated Setup (Recommended)
+### Option 1: Automated Setup with Make (Recommended)
 
-Use our setup scripts to scaffold models and run migrations automatically:
+The easiest way to get started:
+
+```bash
+cd examples
+make setup    # Installs deps, scaffolds models, runs migrations
+make run      # Starts the server
+```
+
+The `make setup` command will:
+- Install dependencies via Poetry
+- Create .env from template
+- Generate User model for authentication
+- Generate Project and Task models for business logic
+- Initialize Alembic migrations
+- Create and apply migrations
+- Provide next steps for enabling features
+
+### Option 2: Manual Script Execution
+
+If you prefer more control:
 
 ```bash
 # 1. Navigate to examples directory
@@ -75,36 +93,33 @@ poetry install
 cp .env.example .env
 
 # 4. Run automated setup (generates User, Project, Task models + migrations)
-poetry run python quick_setup.py
+python scripts/quick_setup.py
 
 # 5. Start the server
 make run
 ```
 
-The `quick_setup.py` script will:
-- Generate User model for authentication
-- Generate Project and Task models for business logic
-- Initialize Alembic migrations
-- Create and apply migrations
-- Provide next steps for enabling features
+### Option 3: Fully Manual Setup (Step-by-Step)
 
-### Option 2: Manual Setup
+For complete control over each step:
 
 ```bash
 # 1. Navigate to examples directory
 cd examples
 
 # 2. Install dependencies
-poetry install
+make install
 
 # 3. Copy environment template
 cp .env.example .env
 
 # 4. Scaffold models (optional - for auth/tenancy/GDPR)
-poetry run python scaffold_models.py
+make scaffold
 
-# 5. Create database tables
-poetry run python create_tables.py
+# 5. Initialize and run migrations
+poetry run svc-infra sql init
+poetry run svc-infra sql revision -m "Initial tables"
+poetry run svc-infra sql upgrade head
 
 # 6. Start the server
 make run
@@ -117,7 +132,27 @@ Server starts at **http://localhost:8001**
 - Metrics: http://localhost:8001/metrics
 - CRUD endpoints: http://localhost:8001/_sql/projects
 
-### Option 2: Copy as Standalone Project
+## 🛠️ Available Make Commands
+
+```bash
+make help       # Show all available commands
+make install    # Install dependencies with Poetry
+make setup      # Complete setup (install + scaffold + migrations) ⭐
+make scaffold   # Scaffold models only (no migrations)
+make run        # Start the development server
+make clean      # Clean up cache files
+make shell      # Open a Poetry shell
+make update     # Update dependencies
+make test-setup # Test duplicate prevention
+```
+
+**Most common workflow:**
+```bash
+make setup   # First time only
+make run     # Every time you want to start the server
+```
+
+### Option 4: Copy as Standalone Project
 
 Copy this template to your own workspace:
 

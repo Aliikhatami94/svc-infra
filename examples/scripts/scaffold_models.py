@@ -255,9 +255,7 @@ def scaffold_project_model(overwrite: bool = False) -> bool:
         f"--models-dir {models_dir} "
         f"--schemas-dir {schemas_dir} "
         f"--models-filename project.py "
-        f"--schemas-filename project.py "
-        f"--include-tenant "
-        f"--include-soft-delete"
+        f"--schemas-filename project.py"
     )
 
     if overwrite:
@@ -312,9 +310,7 @@ def scaffold_task_model(overwrite: bool = False) -> bool:
         f"--models-dir {models_dir} "
         f"--schemas-dir {schemas_dir} "
         f"--models-filename task.py "
-        f"--schemas-filename task.py "
-        f"--include-tenant "
-        f"--no-include-soft-delete"  # Tasks don't use soft delete
+        f"--schemas-filename task.py"
     )
 
     if overwrite:

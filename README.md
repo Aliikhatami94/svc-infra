@@ -30,6 +30,20 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 | Repo Review | Checklist for releasing/PRs | [Repo review](src/svc_infra/docs/repo-review.md) |
 | Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](src/svc_infra/docs/data-lifecycle.md) |
 
+## Quick Start with Template Example
+
+See **ALL** svc-infra features working together in a complete example:
+
+```bash
+# One-time setup (from repo root)
+make setup-template    # Scaffolds models, runs migrations
+
+# Run the example server
+make run-template      # Starts at http://localhost:8001
+```
+
+See [`examples/README.md`](examples/README.md) for full documentation and manual setup options.
+
 ## Minimal FastAPI bootstrap
 
 ```python

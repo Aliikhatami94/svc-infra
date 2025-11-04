@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from fastapi_users.schemas import BaseUser, BaseUserCreate, BaseUserUpdate
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+# ------------------------------ Base mixin ------------------------------------
+
+
+class Timestamped(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    created_at: datetime
+    updated_at: datetime
+
+
+# ------------------------------ ProviderAccount -------------------------------
+
+
+class ProviderAccountBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    provider: str = Field(
+        ..., json_schema_extra={"examples": ["google", "github", "linkedin", "microsoft"]}
+    )
+    provider_account_id: str
+
+
+class ProviderAccountRead(ProviderAccountBase, Timestamped):
+    id: UUID
+
+
+# Note: provider accounts are created server-side during OAuth callback.
+
+# ------------------------------ User ---------------------------------
+
+
+# (Optional helper; keep if used elsewhere)
+class UserBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    email: EmailStr
+    full_name: Optional[str] = None
+    is_active: bool = True
+    is_superuser: bool = False
+    is_verified: bool = False
+    tenant_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    mfa_enabled: bool = False
+    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")  # matches model.extra
+
+
+class UserRead(BaseUser[UUID], Timestamped):
+    # BaseUser[UUID] already provides: id, email, is_active, is_superuser, is_verified
+    full_name: Optional[str] = None
+    tenant_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    mfa_enabled: bool = False
+    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")
+    provider_accounts: List[ProviderAccountRead] = Field(default_factory=list)
+    last_login: Optional[datetime] = None
+    disabled_reason: Optional[str] = None
+
+
+class UserCreate(BaseUserCreate):
+    # BaseUserCreate already has: email, password
+    full_name: Optional[str] = None
+    tenant_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class UserUpdate(BaseUserUpdate):
+    # BaseUserUpdate already has: email?, password?
+    full_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
+    is_verified: Optional[bool] = None
+    tenant_id: Optional[str] = None
+    roles: Optional[List[str]] = None
+    mfa_enabled: Optional[bool] = None
+    metadata: Optional[Dict[str, Any]] = None
+    disabled_reason: Optional[str] = None
+
+
+class UserPasswordUpdate(BaseModel):
+    current_password: Optional[str] = None
+    new_password: str = Field(min_length=8)
