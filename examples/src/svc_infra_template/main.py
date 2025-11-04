@@ -5,17 +5,26 @@ This example demonstrates ALL svc-infra features with real implementations:
 ✅ Flexible logging setup (environment-aware)
 ✅ Service metadata & versioned APIs
 ✅ Database with SQLAlchemy + Alembic
-✅ Redis caching with decorators
+✅ Redis caching with lifecycle management
 ✅ Observability (Prometheus metrics + tracing)
 ✅ Rate limiting & idempotency
-✅ Webhooks (outbound events)
-✅ Admin operations & impersonation
 ✅ Payments integration (Stripe/Adyen/Fake)
+✅ Webhooks (outbound events)
+✅ Billing & subscriptions (usage-based, quotas)
+✅ Authentication (users, OAuth, MFA, API keys)
+✅ Multi-tenancy (header/subdomain/path resolution)
+✅ Data lifecycle & GDPR compliance
+✅ Admin operations & impersonation
 ✅ Background jobs & scheduling
+✅ Security headers & CORS
+✅ Timeouts & resource limits
+✅ Request size limiting
+✅ Graceful shutdown
 ✅ Custom middleware & extensions
 
 The setup is organized in clear steps for easy learning and customization.
 Each feature can be enabled/disabled via environment variables (.env file).
+Some features are commented out and require additional setup (database models, etc.).
 """
 
 # Import settings for configuration
@@ -25,6 +34,7 @@ from svc_infra.api.fastapi import APIVersionSpec, ServiceInfo, setup_service_api
 from svc_infra.api.fastapi.openapi.models import Contact, License
 from svc_infra.api.fastapi.ops.add import add_maintenance_mode, add_probes
 from svc_infra.app import LogLevelOptions, pick, setup_logging
+from svc_infra.security.add import add_security
 
 # ============================================================================
 # STEP 1: Logging Setup
@@ -140,16 +150,19 @@ async def startup_event():
         get_engine()
         print(f"✅ Database connected: {settings.sql_url.split('@')[-1]}")
 
-    # Cache initialization
+        # Cache initialization (using add_cache for lifecycle management)
     if settings.cache_configured:
-        from svc_infra.cache import init_cache
+        from svc_infra.cache.add import add_cache
 
-        init_cache(
+        # add_cache wires startup/shutdown handlers automatically
+        add_cache(
+            app,
             url=settings.redis_url,
-            prefix=settings.cache_prefix,
-            version=settings.cache_version,
+            prefix="svc-template",
+            version="v1",
+            expose_state=True,  # Exposes at app.state.cache
         )
-        print(f"✅ Cache initialized: {settings.redis_url}")
+        print(f"✅ Cache connected: {settings.redis_url}")
 
     # Background jobs initialization (if enabled)
     if settings.jobs_enabled and settings.jobs_redis_url:
@@ -282,7 +295,78 @@ if settings.metrics_enabled:
 
     print("✅ Observability feature enabled")
 
-# --- 4.3 Rate Limiting ---
+# --- 4.3 Security Headers & CORS ---
+if settings.security_enabled:
+    # Add security headers and CORS middleware
+    # Provides secure defaults for:
+    # - Content-Security-Policy (allows inline styles/scripts, data URIs)
+    # - X-Frame-Options (blocks framing)
+    # - X-Content-Type-Options (prevents MIME sniffing)
+    # - Strict-Transport-Security (enforces HTTPS)
+    # - X-XSS-Protection (disabled, CSP is better)
+    #
+    # To override CSP or other headers, pass headers_overrides:
+    # add_security(app, headers_overrides={"Content-Security-Policy": "..."})
+
+    add_security(
+        app,
+        cors_origins=settings.cors_origins_list if settings.cors_enabled else None,
+        allow_credentials=True,
+        install_session_middleware=True,
+        session_secret_key=settings.auth_secret,
+        session_cookie_name="svc_session",
+        session_cookie_max_age_seconds=4 * 3600,  # 4 hours
+        session_cookie_samesite="lax",
+        session_cookie_https_only=pick(prod=True, test=False, dev=False, local=False),
+    )
+
+    print("✅ Security headers & CORS enabled")
+
+# --- 4.4 Timeouts & Resource Limits ---
+if settings.timeout_handler_seconds or settings.timeout_body_read_seconds:
+    from svc_infra.api.fastapi.middleware.timeout import (
+        BodyReadTimeoutMiddleware,
+        HandlerTimeoutMiddleware,
+    )
+
+    # Add handler timeout middleware (protects against slow endpoints)
+    if settings.timeout_handler_seconds:
+        app.add_middleware(
+            HandlerTimeoutMiddleware,
+            timeout_seconds=settings.timeout_handler_seconds,
+        )
+        print(f"✅ Handler timeout enabled ({settings.timeout_handler_seconds}s)")
+
+    # Add body read timeout middleware (protects against slow clients)
+    if settings.timeout_body_read_seconds:
+        app.add_middleware(
+            BodyReadTimeoutMiddleware,
+            timeout_seconds=settings.timeout_body_read_seconds,
+        )
+        print(f"✅ Body read timeout enabled ({settings.timeout_body_read_seconds}s)")
+
+# --- 4.5 Request Size Limiting ---
+if settings.request_max_size_mb:
+    from svc_infra.api.fastapi.middleware.request_size_limit import RequestSizeLimitMiddleware
+
+    # Protect against large request attacks
+    app.add_middleware(
+        RequestSizeLimitMiddleware,
+        max_size_mb=settings.request_max_size_mb,
+    )
+
+    print(f"✅ Request size limit enabled ({settings.request_max_size_mb}MB)")
+
+# --- 4.6 Graceful Shutdown ---
+if settings.graceful_shutdown_enabled:
+    from svc_infra.api.fastapi.middleware.graceful_shutdown import InflightTrackerMiddleware
+
+    # Track in-flight requests for graceful shutdown
+    app.add_middleware(InflightTrackerMiddleware)
+
+    print("✅ Graceful shutdown tracking enabled")
+
+# --- 4.7 Rate Limiting ---
 if settings.rate_limit_enabled:
     from svc_infra.api.fastapi.middleware.ratelimit import SimpleRateLimitMiddleware
 
@@ -299,7 +383,7 @@ if settings.rate_limit_enabled:
 
     print("✅ Rate limiting feature enabled")
 
-# --- 4.4 Idempotency ---
+# --- 4.8 Idempotency ---
 if settings.idempotency_enabled and settings.cache_configured:
     from svc_infra.api.fastapi.middleware.idempotency import IdempotencyMiddleware
 
@@ -314,7 +398,7 @@ if settings.idempotency_enabled and settings.cache_configured:
 
     print("✅ Idempotency feature enabled")
 
-# --- 4.5 Payments (Stripe, Adyen, or Fake for Testing) ---
+# --- 4.9 Payments (Stripe, Adyen, or Fake for Testing) ---
 # Note: Payments require database setup first
 if settings.database_configured and settings.payment_provider:
     from svc_infra.apf_payments.provider.fake import FakeAdapter
@@ -340,7 +424,7 @@ if settings.database_configured and settings.payment_provider:
         add_payments(app, adapter=adapter)
         print(f"✅ Payments feature enabled (provider: {settings.payment_provider})")
 
-# --- 4.6 Webhooks (Outbound Events) ---
+# --- 4.10 Webhooks (Outbound Events) ---
 if settings.webhooks_enabled and settings.database_configured:
     from svc_infra.webhooks.add import add_webhooks
 
@@ -358,22 +442,202 @@ if settings.webhooks_enabled and settings.database_configured:
 
     print("✅ Webhooks feature enabled")
 
-# --- 4.7 Admin & Impersonation ---
-if settings.admin_enabled:
-    # Note: Admin features typically require auth setup first
-    # from svc_infra.api.fastapi.admin.add import add_admin
-    # add_admin(app, enable_impersonation=settings.admin_impersonation_enabled)
+# --- 4.11 Billing & Subscriptions ---
+if settings.billing_enabled and settings.database_configured:
+    from svc_infra.billing.async_service import BillingService
+    from svc_infra.billing.quotas import QuotaEnforcer
+
+    # Initialize billing service for subscription and usage tracking
+    # This provides the core billing logic but doesn't mount API routes
+    # (you'd add custom routes in your versioned routers)
+    billing_service = BillingService()
+    quota_enforcer = QuotaEnforcer() if settings.billing_quota_enforcement else None
+
+    # Store in app state for access in route handlers
+    app.state.billing_service = billing_service
+    if quota_enforcer:
+        app.state.quota_enforcer = quota_enforcer
+
+    # Note: Billing typically integrates with payment providers (Stripe)
+    # and requires auth to associate subscriptions with users
     #
+    # Features:
+    # - Subscription plans (free, pro, enterprise)
+    # - Usage-based/metered billing
+    # - Quota enforcement and overage detection
+    # - Invoice generation with line items
+    # - Payment history tracking
+    # - Automatic subscription renewal
+    #
+    # Example usage in routes:
+    #   billing_service = request.app.state.billing_service
+    #   await billing_service.record_usage(user_id, "api_calls", 1)
+    #   subscription = await billing_service.get_subscription(user_id)
+    #
+    # See: src/svc_infra/billing/ for full API
+
+    print("✅ Billing & quota enforcement enabled")
+
+# --- 4.12 Authentication (Users, Sessions, OAuth) ---
+# The add_auth_users() function wires up user authentication with your User model.
+#
+# This will add routes:
+#   POST   /auth/register              - Register new user
+#   POST   /auth/login                 - Login with credentials
+#   POST   /auth/logout                - Logout (invalidate session)
+#   GET    /users/me                   - Get current user
+#   PATCH  /users/me                   - Update current user
+#   POST   /users/verify               - Verify email with token
+#   POST   /users/forgot-password      - Request password reset
+#   POST   /users/reset-password       - Reset password with token
+#   GET    /auth/oauth/{provider}/authorize  - OAuth authorize
+#   GET    /auth/oauth/{provider}/callback   - OAuth callback
+#   POST   /auth/mfa/enable            - Enable MFA/TOTP
+#   POST   /auth/mfa/verify            - Verify MFA code
+#   GET    /auth/sessions/me           - List user's active sessions
+#   DELETE /auth/sessions/{id}         - Revoke a session
+#   POST   /auth/api-keys              - Create API key
+#   GET    /auth/api-keys              - List API keys
+#   DELETE /auth/api-keys/{key_id}     - Revoke API key
+
+if settings.auth_enabled and settings.database_configured:
+    from svc_infra_template.models.user import User
+    from svc_infra_template.schemas.user import UserCreate, UserRead, UserUpdate
+
+    from svc_infra.api.fastapi.auth.add import add_auth_users
+
+    add_auth_users(
+        app,
+        user_model=User,
+        schema_read=UserRead,
+        schema_create=UserCreate,
+        schema_update=UserUpdate,
+        enable_password=True,  # Email/password auth
+        enable_oauth=False,  # Disable OAuth for now (requires provider setup)
+        enable_api_keys=True,  # Service-to-service auth
+        post_login_redirect="/",
+    )
+    print("✅ Authentication enabled with User model")
+elif settings.auth_enabled:
+    print("⚠️  Authentication requires database configuration (SQL_URL)")
+else:
+    print("ℹ️  Authentication disabled (set AUTH_ENABLED=true to enable)")
+
+# --- 4.13 Multi-Tenancy ---
+if settings.tenancy_enabled and settings.database_configured:
+    from svc_infra.api.fastapi.tenancy.add import add_tenancy
+    from svc_infra.api.fastapi.tenancy.resolvers import HeaderTenantResolver
+
+    # Add multi-tenancy support with automatic tenant resolution
+    # Resolves tenant from header, subdomain, or path
+    # Example: Use header-based resolution
+    # Clients send X-Tenant-ID: tenant-123 header
+    resolver = HeaderTenantResolver(header_name=settings.tenancy_header_name)
+
+    add_tenancy(
+        app,
+        resolver=resolver,
+    )
+
+    # Automatically adds tenant_id filtering to all database queries
+    # Prevents data leakage between tenants
+    #
+    # See: src/svc_infra/docs/tenancy.md
+
+    print("✅ Multi-tenancy enabled")
+
+# --- 4.14 Data Lifecycle & Compliance (GDPR) ---
+if settings.database_configured and settings.gdpr_enabled:
+    from svc_infra.data.add import add_data_lifecycle
+
+    # Add data lifecycle management:
+    # - Automatic database migrations on startup
+    # - Data retention policies
+    # - GDPR right-to-deletion
+    # - Data export for portability
+    # - Fixture loading
+
+    add_data_lifecycle(
+        app,
+        auto_migrate=settings.data_auto_migrate,
+        database_url=settings.sql_url if settings.database_configured else None,
+        # Optional: Add retention/erasure jobs
+        # retention_jobs=[cleanup_old_logs, archive_old_data],
+        # erasure_job=gdpr_erase_user_data,
+    )
+
+    # Note: Routes for data export/deletion should be added in your API routers
+    # based on your specific requirements
+    #
+    # See: src/svc_infra/docs/data-lifecycle.md
+
+    print("✅ Data lifecycle & GDPR compliance enabled")
+
+# --- 4.15 Admin & Impersonation ---
+if settings.admin_enabled:
+    from svc_infra.api.fastapi.admin.add import add_admin
+
+    # Add admin operations with user impersonation capabilities
+    # Requires auth setup for proper permission checks
+    add_admin(
+        app,
+        enable_impersonation=settings.admin_impersonation_enabled,
+        secret=settings.auth_secret,  # Use auth secret for signing impersonation tokens
+        ttl_seconds=15 * 60,  # 15 minutes impersonation session
+    )
+
     # Adds routes:
-    #   POST   /admin/impersonate/{user_id}     - Start impersonation
-    #   POST   /admin/stop-impersonation        - Stop impersonation
-    #   GET    /admin/audit/impersonation       - View audit log
+    #   POST   /admin/impersonate/start        - Start impersonating a user (admin only)
+    #   POST   /admin/impersonate/stop         - Stop impersonation session
+    #
+    # Features:
+    # - Admin can impersonate any user for troubleshooting
+    # - Audit logging of all impersonation actions
+    # - Time-limited sessions with automatic expiry
+    # - Actor's permissions preserved during impersonation
+    # - Secure token-based implementation with HMAC
     #
     # See: src/svc_infra/docs/admin.md
 
-    print("✅ Admin feature configured (routes require auth setup)")
+    print("✅ Admin & impersonation enabled")
 
-# --- 4.8 Operations & Health Checks ---
+# --- 4.16 Background Jobs & Scheduling ---
+if settings.jobs_enabled:
+    from svc_infra.jobs.easy import easy_jobs
+
+    # Initialize job queue and scheduler
+    # Note: In production, run worker in separate process:
+    #   python -m svc_infra.jobs worker
+    #
+    # easy_jobs() reads from environment:
+    # - JOBS_DRIVER: "redis" or "memory" (default: "memory")
+    # - REDIS_URL: Redis connection string (only needed if driver=redis)
+
+    queue, scheduler = easy_jobs(driver=settings.jobs_driver)
+
+    # Store in app state for access in route handlers
+    app.state.job_queue = queue
+    app.state.job_scheduler = scheduler
+
+    # Example: Enqueue a job from an endpoint
+    # from fastapi import Request
+    #
+    # @app.post("/api/send-email")
+    # async def send_email(request: Request, to: str):
+    #     queue = request.app.state.job_queue
+    #     queue.enqueue("send-email", {"to": to, "subject": "Hello"})
+    #     return {"status": "queued"}
+    #
+    # Example: Schedule recurring job
+    # scheduler.schedule_every(
+    #     interval_seconds=3600,  # Every hour
+    #     task_name="cleanup-old-data",
+    #     task_args={},
+    # )
+
+    print("✅ Background jobs & scheduling enabled")
+
+# --- 4.17 Operations & Health Checks ---
 
 # Add Kubernetes-style health probes
 add_probes(app, prefix="/_ops")
@@ -384,7 +648,7 @@ if settings.maintenance_mode:
 
 print("✅ Operations features enabled")
 
-# --- 4.9 Documentation Enhancements ---
+# --- 4.18 Documentation Enhancements ---
 if settings.docs_enabled:
     from svc_infra.api.fastapi.docs.add import add_docs
 
@@ -396,30 +660,6 @@ if settings.docs_enabled:
     #   - Interactive API explorer
 
     print("✅ Documentation enhancements enabled")
-
-# --- 4.10 Background Jobs (Optional, requires Redis) ---
-if settings.jobs_enabled and settings.jobs_redis_url:
-    # Note: Jobs are typically run in a separate worker process
-    # Start worker: python -m svc_infra.jobs worker
-    #
-    # from svc_infra.jobs.easy import easy_jobs
-    #
-    # worker, scheduler = easy_jobs(
-    #     app,
-    #     redis_url=settings.jobs_redis_url,
-    #     enable_scheduler=settings.scheduler_enabled,
-    # )
-    #
-    # Example job:
-    # @worker.task()
-    # async def send_email(email: str, subject: str, body: str):
-    #     # Send email asynchronously
-    #     pass
-    #
-    # # Enqueue job:
-    # await send_email.kiq(email="user@example.com", subject="Hello", body="World")
-
-    print("✅ Background jobs configured (run worker separately)")
 
 # ============================================================================
 # STEP 6: Custom Extensions (Team-Specific)

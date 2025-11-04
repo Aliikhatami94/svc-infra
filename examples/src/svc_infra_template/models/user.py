@@ -1,0 +1,274 @@
+from __future__ import annotations
+
+import os
+import uuid
+from datetime import datetime
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
+
+from cryptography.fernet import Fernet  # <-- for refresh_token encryption
+from fastapi_users.password import PasswordHelper
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.ext.mutable import MutableDict, MutableList
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from svc_infra.db.sql.base import ModelBase
+from svc_infra.db.sql.repository import SqlRepository
+from svc_infra.db.sql.types import GUID
+from svc_infra.db.sql.uniq import make_unique_sql_indexes
+from svc_infra.db.sql.uniq_hooks import dedupe_sql_service
+
+# --- local password helper must be defined before class (used by property) ---
+_pwd = PasswordHelper()
+
+# --- Fernet setup for refresh_token encryption --------------------------------
+# In prod, provide REFRESH_TOKEN_KEY via env/secret manager.
+# Example key generation (one-off): >>> from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())
+_FERNET_KEY = os.environ.get("REFRESH_TOKEN_KEY")
+if not _FERNET_KEY:
+    # Fallback for local/dev; DO NOT rely on this in prod.
+    _FERNET_KEY = Fernet.generate_key().decode()
+_f = Fernet(_FERNET_KEY.encode())
+
+
+def _encrypt(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return _f.encrypt(value.encode()).decode()
+
+
+def _decrypt(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        return _f.decrypt(value.encode()).decode()
+    except Exception:
+        # If key rotated and old value can’t decrypt, you may want to null it out,
+        # or handle migration/reencryption elsewhere.
+        return None
+
+
+# ------------------------------ Model: User (User) -------------------
+
+
+class User(ModelBase):
+    __tablename__ = "users"
+    __svc_infra_auth_user__ = True
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+
+    email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)
+    full_name: Mapped[Optional[str]] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # auth state
+    password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+
+    # Write-only facade over password
+    @property
+    def password(self) -> str:
+        raise AttributeError("password is write-only")
+
+    @password.setter
+    def password(self, raw: str) -> None:
+        self.password_hash = _pwd.hash(raw)
+
+    @property
+    def hashed_password(self) -> str:
+        return self.password_hash
+
+    @hashed_password.setter
+    def hashed_password(self, value: str) -> None:
+        # Accept pre-hashed assignments (FastAPI Users sets hashed_password directly)
+        self.password_hash = value
+
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    disabled_reason: Mapped[Optional[str]] = mapped_column(Text)
+
+    # org / roles
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    roles: Mapped[list[str]] = mapped_column(MutableList.as_mutable(JSON), default=list)
+
+    # MFA (TOTP)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)  # base32
+    mfa_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mfa_recovery: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True
+    )  # store hashed codes if you want
+
+    # misc (avoid attr name 'metadata' clash)
+    extra: Mapped[dict] = mapped_column("metadata", MutableDict.as_mutable(JSON), default=dict)
+
+    # OAuth links
+    provider_accounts: Mapped[list["ProviderAccount"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # auditing (DB-side timestamps)
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+    )
+    updated_at = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=text("CURRENT_TIMESTAMP"),
+        nullable=False,
+    )
+
+    def __repr__(self) -> str:
+        return f"<User id={self.id} email={self.email!r}>"
+
+
+# --- Uniqueness policy for User ------------------------------------------------
+
+# Unique indexes, including case-insensitive and/or tenant-scoped.
+for _ix in make_unique_sql_indexes(
+    User,
+    unique_ci=["email"],  # case-insensitive unique email
+    tenant_field="tenant_id",  # scoped by tenant if provided
+):
+    # Registered with Table metadata (alembic/autogenerate will pick them up)
+    pass
+
+# ------------------------------ Model: ProviderAccount -------------------------
+
+
+class ProviderAccount(ModelBase):
+    """
+    Links a local user to an external identity provider account.
+
+    - (provider, provider_account_id) is unique
+    - Optionally stores tokens for later API calls (refresh_token encrypted at rest)
+    """
+
+    __tablename__ = "provider_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped["User"] = relationship(
+        back_populates="provider_accounts",
+        lazy="selectin",
+    )
+
+    provider: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # "google"|"github"|"linkedin"|"microsoft"|...
+    provider_account_id: Mapped[str] = mapped_column(
+        String(255), nullable=False
+    )  # sub/oid (OIDC) or id (github/linkedin)
+
+    # Optional token material
+    access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Store encrypted refresh_token in the same column name for DB compatibility.
+    _refresh_token: Mapped[Optional[str]] = mapped_column("refresh_token", Text, nullable=True)
+
+    @property
+    def refresh_token(self) -> Optional[str]:
+        return _decrypt(self._refresh_token)
+
+    @refresh_token.setter
+    def refresh_token(self, value: Optional[str]) -> None:
+        self._refresh_token = _encrypt(value)
+
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    raw_claims: Mapped[Optional[dict]] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
+
+    created_at = mapped_column(
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+    )
+    updated_at = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=text("CURRENT_TIMESTAMP"),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_account_id", name="uq_provider_account"),
+        Index("ix_provider_accounts_user_id", "user_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ProviderAccount provider={self.provider!r} provider_account_id={self.provider_account_id!r} user_id={self.user_id}>"
+
+
+# --- Auth service factory ------------------------------------------------------
+
+PreHook = Callable[[Dict[str, Any]], Dict[str, Any]]
+ColumnSpec = Union[str, Sequence[str]]
+
+
+def _map_auth_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize inbound payload for the auth model."""
+    d = dict(data)
+    # password -> password_hash
+    if "password" in d:
+        d["password_hash"] = _pwd.hash(d.pop("password"))
+    # metadata(alias) -> extra(column)
+    if "metadata" in d:
+        d["extra"] = d.pop("metadata")
+    # roles default
+    d.setdefault("roles", [])
+    return d
+
+
+def _compose(*hooks: Optional[PreHook]) -> PreHook:
+    """Chain multiple pre-hooks left-to-right, skipping Nones."""
+
+    def _runner(payload: Dict[str, Any]) -> Dict[str, Any]:
+        out = payload
+        for h in hooks:
+            if h:
+                out = h(out)
+        return out
+
+    return _runner
+
+
+def create_auth_service(
+    repo: SqlRepository,
+    *,
+    # Uniqueness settings (rarely changed)
+    unique_ci: Iterable[ColumnSpec] = ("email",),
+    tenant_field: Optional[str] = "tenant_id",
+    # Optional: caller can inject extra transforms/validation
+    extra_pre_create: Optional[PreHook] = None,
+    extra_pre_update: Optional[PreHook] = None,
+    # Optional: customize 409 messages per spec if you want
+    messages: Optional[dict[Tuple[str, ...], str]] = None,
+):
+    """
+    Build an auth-aware Service that:
+      • Hashes passwords and maps payload fields (pre_create / pre_update)
+      • Enforces case-insensitive unique email (optionally tenant-scoped)
+      • Returns 409s like: "Record with email='x' already exists."
+    """
+    pre_create = _compose(_map_auth_fields, extra_pre_create)
+    pre_update = _compose(_map_auth_fields, extra_pre_update)
+
+    return dedupe_sql_service(
+        repo,
+        unique_ci=unique_ci,
+        tenant_field=tenant_field,
+        messages=messages,
+        pre_create=pre_create,
+        pre_update=pre_update,
+    )

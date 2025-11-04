@@ -1,7 +1,31 @@
 SHELL := /bin/bash
 RMI ?= all
 
-.PHONY: accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache run-template test
+.PHONY: help accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache setup-template run-template test
+
+help: ## Show available commands
+	@echo "Available commands:"
+	@echo ""
+	@echo "Template Example:"
+	@echo "  setup-template    Set up the example template (first time only)"
+	@echo "  run-template      Run the svc-infra-template example server"
+	@echo ""
+	@echo "Testing:"
+	@echo "  unit              Run unit tests (quiet)"
+	@echo "  unitv             Run unit tests (verbose)"
+	@echo "  accept            Run full acceptance tests (with auto-clean)"
+	@echo "  test              Run all tests (unit + acceptance)"
+	@echo ""
+	@echo "Docker Compose (for acceptance):"
+	@echo "  compose_up        Start test stack"
+	@echo "  wait              Wait for API to be ready"
+	@echo "  seed              Seed test data"
+	@echo "  down              Tear down test stack"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  clean             Remove caches, build artifacts, logs"
+	@echo "  clean-pycache     Remove only __pycache__ directories"
+	@echo ""
 
 compose_up:
 	@echo "[accept] Starting test stack..."
@@ -110,9 +134,21 @@ clean-pycache:
 	@cd examples && find . -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
 
 # --- Template example ---
+setup-template:
+	@echo "[template] Setting up svc-infra-template (install + scaffold + migrations)..."
+	@cd examples && $(MAKE) setup
+
 run-template:
 	@echo "[template] Installing dependencies for svc-infra-template..."
 	@cd examples && poetry install --no-interaction --quiet 2>/dev/null || true
+	@echo "[template] Checking if setup has been run..."
+	@if [ ! -d "examples/migrations" ]; then \
+		echo ""; \
+		echo "⚠️  Template not set up yet!"; \
+		echo "   Run 'make setup-template' first to scaffold models and initialize the database."; \
+		echo ""; \
+		exit 1; \
+	fi
 	@echo "[template] Running svc-infra-template example..."
 	@cd examples && env -i HOME="$$HOME" USER="$$USER" TERM="$$TERM" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" bash -c 'exec ./run.sh'
 

@@ -115,7 +115,7 @@ def render_index_html(*, service_name: str, release: str, cards: Iterable[CardSp
     <section class="grid">
       {grid}
     </section>
-    <footer>Tip: each card exposes Swagger, ReDoc, and a pretty JSON view.</footer>
+    <footer>Tip: each card exposes Swagger, ReDoc, and a JSON view.</footer>
   </div>
 </body>
 </html>

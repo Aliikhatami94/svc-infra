@@ -144,6 +144,38 @@ class Settings(BaseSettings):
     tenancy_header_name: str = Field(default="X-Tenant-ID")
 
     # ========================================================================
+    # Security
+    # ========================================================================
+    security_enabled: bool = Field(default=True)
+
+    # ========================================================================
+    # Timeouts & Resource Limits
+    # ========================================================================
+    timeout_handler_seconds: Optional[int] = Field(
+        default=None,
+        description="Handler timeout in seconds (None = disabled)",
+    )
+    timeout_body_read_seconds: Optional[int] = Field(
+        default=None,
+        description="Body read timeout in seconds (None = disabled)",
+    )
+    request_max_size_mb: Optional[int] = Field(
+        default=None,
+        description="Max request body size in MB (None = unlimited)",
+    )
+
+    # ========================================================================
+    # Graceful Shutdown
+    # ========================================================================
+    graceful_shutdown_enabled: bool = Field(default=True)
+    graceful_shutdown_timeout_seconds: int = Field(default=30)
+
+    # ========================================================================
+    # Authentication
+    # ========================================================================
+    auth_enabled: bool = Field(default=False)
+
+    # ========================================================================
     # Admin & Operations
     # ========================================================================
     admin_enabled: bool = Field(default=True)
@@ -156,9 +188,10 @@ class Settings(BaseSettings):
     # Background Jobs
     # ========================================================================
     jobs_enabled: bool = Field(default=True)
-    jobs_redis_url: Optional[str] = Field(default=None)
-
-    scheduler_enabled: bool = Field(default=True)
+    jobs_driver: str = Field(
+        default="memory",
+        description="Job queue driver: 'memory' or 'redis' (reads REDIS_URL from env)",
+    )
 
     # ========================================================================
     # Data Lifecycle & Compliance
@@ -166,6 +199,7 @@ class Settings(BaseSettings):
     data_retention_days: int = Field(default=365)
     data_archival_enabled: bool = Field(default=False)
     data_archival_s3_bucket: Optional[str] = Field(default=None)
+    data_auto_migrate: bool = Field(default=True, description="Run migrations on startup")
 
     gdpr_enabled: bool = Field(default=False)
     gdpr_auto_delete_after_days: int = Field(default=30)
@@ -199,6 +233,27 @@ class Settings(BaseSettings):
     smtp_password: Optional[str] = Field(default=None)
     smtp_from: Optional[str] = Field(default=None)
     smtp_from_name: str = Field(default="SVC Infra Template")
+
+    # ========================================================================
+    # Billing & Subscriptions
+    # ========================================================================
+    billing_enabled: bool = Field(default=False)
+    billing_provider: Optional[Literal["stripe", "fake"]] = Field(default=None)
+
+    # Subscription plans
+    billing_plans: str = Field(
+        default="free:0,pro:9.99,enterprise:49.99",
+        description="Comma-separated plan_id:price pairs",
+    )
+
+    # Usage-based billing
+    billing_metered_enabled: bool = Field(default=False)
+    billing_metered_unit: str = Field(
+        default="request", description="Billing unit (e.g., 'request', 'GB', 'hour')"
+    )
+
+    # Quotas
+    billing_quota_enforcement: bool = Field(default=True)
 
     # ========================================================================
     # External Services

@@ -89,6 +89,7 @@ class SqlRepository:
         obj = self.model(**filtered)
         session.add(obj)
         await session.flush()
+        await session.refresh(obj)
         return obj
 
     async def update(
@@ -107,6 +108,7 @@ class SqlRepository:
             if k in valid and k not in self.immutable_fields:
                 setattr(obj, k, v)
         await session.flush()
+        await session.refresh(obj)
         return obj
 
     async def delete(

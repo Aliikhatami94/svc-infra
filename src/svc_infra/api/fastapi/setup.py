@@ -242,7 +242,7 @@ def setup_service_api(
         mount_path = f"/{spec.tag.strip('/')}"
         parent.mount(mount_path, child, name=spec.tag.strip("/"))
 
-    @parent.get("/", include_in_schema=False)
+    @parent.get("/", include_in_schema=False, response_class=HTMLResponse)
     def index():
         cards: list[CardSpec] = []
         is_local_dev = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
