@@ -12,9 +12,7 @@ from typing import List, Tuple
 
 from alembic import context
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.ext.asyncio import create_async_engine
 
-from svc_infra.db.sql.utils import _ensure_ssl_default_async as _ensure_ssl_default
 from svc_infra.db.sql.utils import get_database_url_from_env
 
 try:
@@ -117,7 +115,7 @@ def _coerce_to_async(u: URL) -> URL:
 
 u = make_url(effective_url)
 u = _coerce_to_async(u)
-u = _ensure_ssl_default(u)
+# SSL defaults are handled by build_engine() in run_migrations_online()
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
 # feature flags
@@ -389,7 +387,10 @@ def _do_run_migrations(connection):
 
 async def run_migrations_online() -> None:
     url = config.get_main_option("sqlalchemy.url")
-    engine = create_async_engine(url)
+    # Use build_engine to ensure proper driver-specific handling (e.g., asyncpg SSL)
+    from svc_infra.db.sql.utils import build_engine
+
+    engine = build_engine(url)
     async with engine.connect() as connection:
         await connection.run_sync(_do_run_migrations)
     await engine.dispose()
