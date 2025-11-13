@@ -9,8 +9,6 @@ from alembic import context
 from sqlalchemy.engine import make_url, URL
 
 from svc_infra.db.sql.utils import (
-    _coerce_sync_driver,
-    _ensure_ssl_default,
     get_database_url_from_env,
     build_engine,
 )
