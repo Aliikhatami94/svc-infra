@@ -26,3 +26,7 @@ build/
 .eggs/
 pip-wheel-metadata/
 *.log
+
+# Documentation
+.github/AGENTS.md
+.github/PLAN.md
