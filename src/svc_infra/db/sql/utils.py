@@ -196,10 +196,17 @@ def _ensure_timeout_default(u: URL) -> URL:
     """
     Ensure a conservative connection timeout is present for libpq-based drivers.
     For psycopg/psycopg2, 'connect_timeout' is honored via the query string.
+    For asyncpg, timeout is set via connect_args (not query string).
     """
     backend = (u.get_backend_name() or "").lower()
     if backend not in ("postgresql", "postgres"):
         return u
+
+    # asyncpg doesn't support connect_timeout in query string - use connect_args instead
+    dn = (u.drivername or "").lower()
+    if "+asyncpg" in dn:
+        return u
+
     if "connect_timeout" in u.query:
         return u
     # Default 10s unless overridden
@@ -382,9 +389,16 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
                 "Async driver URL provided but SQLAlchemy async extras are not available."
             )
 
-        # asyncpg: honor connection timeout
+        # asyncpg: honor connection timeout and convert ssl=true to sslmode
         if "+asyncpg" in (u.drivername or ""):
             connect_args["timeout"] = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
+
+            # asyncpg needs sslmode, not ssl=true - convert if present
+            if u.query.get("ssl") == "true" and "sslmode" not in u.query:
+                # Remove ssl=true and add sslmode=require
+                new_query = {k: v for k, v in u.query.items() if k != "ssl"}
+                new_query["sslmode"] = "require"
+                u = u.set(query=new_query)
 
         # NEW: aiomysql SSL default
         if "+aiomysql" in (u.drivername or "") and not any(
