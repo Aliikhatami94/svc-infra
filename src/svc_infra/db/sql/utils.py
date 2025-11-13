@@ -344,9 +344,8 @@ def _ensure_ssl_default(u: URL) -> URL:
     mode = (mode_env or "").strip()
 
     if "+asyncpg" in driver:
-        # asyncpg: use 'ssl=true' (SQLAlchemy forwards to asyncpg)
-        if "ssl" not in u.query:
-            return u.set(query={**u.query, "ssl": "true"})
+        # asyncpg: SSL is handled in connect_args in build_engine(), not in URL query
+        # Do not add ssl parameter to URL query for asyncpg
         return u
     else:
         # libpq-based drivers: use sslmode (default 'require' for hosted PG)
