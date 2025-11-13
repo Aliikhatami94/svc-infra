@@ -101,7 +101,6 @@ def _coerce_to_async(u: URL) -> URL:
 
 u = make_url(effective_url)
 u = _coerce_to_async(u)
-u = _ensure_ssl_default(u)
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
 # feature flags
