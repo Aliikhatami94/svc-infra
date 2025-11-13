@@ -393,13 +393,13 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
         if "+asyncpg" in (u.drivername or ""):
             connect_args["timeout"] = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
 
-            # asyncpg uses ssl parameter in connect_args, not sslmode in URL
-            # Remove sslmode from query if present (it gets passed incorrectly as kwarg)
-            if "sslmode" in u.query:
-                new_query = {k: v for k, v in u.query.items() if k != "sslmode"}
+            # asyncpg doesn't accept sslmode or ssl=true in query params
+            # Remove these and set ssl='require' in connect_args
+            if "ssl" in u.query or "sslmode" in u.query:
+                new_query = {k: v for k, v in u.query.items() if k not in ("ssl", "sslmode")}
                 u = u.set(query=new_query)
-                # Set ssl in connect_args instead
-                connect_args["ssl"] = "require"
+            # Set ssl in connect_args - 'require' is safest for hosted databases
+            connect_args["ssl"] = "require"
 
         # NEW: aiomysql SSL default
         if "+aiomysql" in (u.drivername or "") and not any(
