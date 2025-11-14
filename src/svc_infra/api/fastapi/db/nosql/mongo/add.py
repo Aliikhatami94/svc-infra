@@ -62,6 +62,15 @@ def add_mongo_health(
 
 
 def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> None:
+    # Register scoped docs for _mongo prefix (only once)
+    if not getattr(app.state, "_mongo_docs_registered", False):
+        from svc_infra.api.fastapi.docs.scoped import add_prefixed_docs
+
+        add_prefixed_docs(
+            app, prefix="/_mongo", title="MongoDB Resources", auto_exclude_from_root=True
+        )
+        app.state._mongo_docs_registered = True
+
     for r in resources:
         repo = NoSqlRepository(
             collection_name=r.resolved_collection(),
