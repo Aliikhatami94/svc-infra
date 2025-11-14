@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from svc_infra.cache.backend import shutdown_cache
@@ -5,10 +7,12 @@ from svc_infra.cache.decorators import init_cache
 
 
 def setup_caching(app: FastAPI) -> None:
-    @app.on_event("startup")
-    async def _startup():
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
         init_cache()
+        try:
+            yield
+        finally:
+            await shutdown_cache()
 
-    @app.on_event("shutdown")
-    async def _shutdown():
-        await shutdown_cache()
+    app.router.lifespan_context = lifespan
