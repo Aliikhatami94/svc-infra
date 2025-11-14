@@ -74,6 +74,9 @@ class _Session:
     async def flush(self):
         return
 
+    async def refresh(self, obj):
+        return
+
     def delete(self, obj):
         self.store._rows.remove(obj)
 

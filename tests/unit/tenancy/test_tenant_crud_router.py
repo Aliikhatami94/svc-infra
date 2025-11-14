@@ -3,8 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+
+# Skip tests if FastAPI is not installed (optional dependency)
+fastapi = pytest.importorskip("fastapi", reason="FastAPI not installed")
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 
 from svc_infra.api.fastapi.db.sql.crud_router import make_tenant_crud_router_plus_sql
 from svc_infra.api.fastapi.db.sql.session import get_session
@@ -39,13 +43,17 @@ class _FakeService:
 
     @staticmethod
     def _tenant_from_where(where):
-        if (
-            where
-            and isinstance(where, list)
-            and isinstance(where[0], tuple)
-            and where[0][0] == "tenant"
-        ):
-            return where[0][1]
+        if not where or not isinstance(where, list) or len(where) == 0:
+            return None
+        first = where[0]
+        # Handle tuple format: ("tenant_id", value)
+        if isinstance(first, tuple) and len(first) == 2:
+            if first[0] in ("tenant", "tenant_id"):
+                return first[1]
+        # Handle SQLAlchemy BinaryExpression: Model.tenant_id == "t1"
+        # These have .right attribute for the value
+        if hasattr(first, "right") and hasattr(first.right, "value"):
+            return first.right.value
         return None
 
     async def list(self, session, *, limit, offset, order_by=None, where=None):
@@ -59,6 +67,9 @@ class _FakeService:
 
     async def get(self, session, id_value, *, where=None):
         tid = self._tenant_from_where(where)
+        # Coerce string IDs to int for comparison
+        if isinstance(id_value, str) and id_value.isdigit():
+            id_value = int(id_value)
         for r in self.data.get(tid, []):
             if r["id"] == id_value:
                 return r
@@ -73,6 +84,9 @@ class _FakeService:
 
     async def update(self, session, id_value, data, *, where=None):
         tid = self._tenant_from_where(where)
+        # Coerce string IDs to int for comparison
+        if isinstance(id_value, str) and id_value.isdigit():
+            id_value = int(id_value)
         for r in self.data.get(tid, []):
             if r["id"] == id_value:
                 r.update(data)
@@ -81,10 +95,13 @@ class _FakeService:
 
     async def delete(self, session, id_value, *, where=None):
         tid = self._tenant_from_where(where)
+        # Coerce string IDs to int for comparison
+        if isinstance(id_value, str) and id_value.isdigit():
+            id_value = int(id_value)
         rows = self.data.get(tid, [])
         for i, r in enumerate(rows):
             if r["id"] == id_value:
-                rows.pop(i)
+                del rows[i]
                 return True
         return False
 
@@ -98,32 +115,22 @@ class _FakeService:
         return len([r for r in self.data.get(tid, []) if q.lower() in r.get("name", "").lower()])
 
 
-class _Create:
-    def __init__(self, name: str, tenant_id: str | None = None):
-        self.name = name
-        self.tenant_id = tenant_id
-
-    def model_dump(self, *, exclude_unset: bool = False) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            **({} if self.tenant_id is None else {"tenant_id": self.tenant_id}),
-        }
+class _Create(BaseModel):
+    name: str
+    tenant_id: str | None = None
 
 
-class _Update:
-    def __init__(self, name: str | None = None):
-        self.name = name
-
-    def model_dump(self, *, exclude_unset: bool = False) -> dict[str, Any]:
-        out: dict[str, Any] = {}
-        if self.name is not None:
-            out["name"] = self.name
-        return out
+class _Update(BaseModel):
+    name: str | None = None
 
 
-class _Read:
-    def __init__(self, **data):
-        self.__dict__.update(data)
+class _Read(BaseModel):
+    id: int
+    name: str
+    tenant_id: str | None = None
+
+    class Config:
+        from_attributes = True
 
 
 def _service_factory():
