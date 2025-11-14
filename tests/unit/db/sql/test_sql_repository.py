@@ -24,9 +24,10 @@ class TestSqlRepository:
 
     @pytest.mark.asyncio
     async def test_save_success(self, sql_repository, mock_sqlalchemy_session):
-        """Test successful record saving."""
+        """Test successful record save."""
         # Mock the session.flush to simulate successful save
         mock_sqlalchemy_session.flush = AsyncMock()
+        mock_sqlalchemy_session.refresh = AsyncMock()
 
         user_data = {"email": "test@example.com", "name": "Test User"}
         result = await sql_repository.create(mock_sqlalchemy_session, user_data)
@@ -163,6 +164,7 @@ class TestSqlRepository:
 
         # Mock the session.flush to simulate successful update
         mock_sqlalchemy_session.flush = AsyncMock()
+        mock_sqlalchemy_session.refresh = AsyncMock()
 
         update_data = {"name": "New Name", "email": "new@example.com"}
         result = await sql_repository.update(mock_sqlalchemy_session, 1, update_data)
