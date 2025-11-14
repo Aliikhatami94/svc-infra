@@ -247,14 +247,13 @@ def setup_service_api(
         cards: list[CardSpec] = []
         is_local_dev = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
 
-        if is_local_dev:
-            # Root card
-            cards.append(
-                CardSpec(
-                    tag="",
-                    docs=DocTargets(swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"),
-                )
+        # Root card - always show in all environments
+        cards.append(
+            CardSpec(
+                tag="",
+                docs=DocTargets(swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"),
             )
+        )
 
         # Version cards
         for spec in versions:
