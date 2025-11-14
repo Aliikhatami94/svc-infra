@@ -38,8 +38,8 @@ def add_mongo_db_with_url(app: FastAPI, url: str, db_name: str) -> None:
 
 
 def add_mongo_db(app: FastAPI, *, dsn_env: str = "MONGO_URL") -> None:
-    @app.on_event("startup")
-    async def _startup() -> None:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
         if not os.getenv(dsn_env):
             raise RuntimeError(f"Missing environment variable {dsn_env} for Mongo URL")
         await init_mongo()
@@ -47,10 +47,12 @@ def add_mongo_db(app: FastAPI, *, dsn_env: str = "MONGO_URL") -> None:
         db = await acquire_db()
         if expected and db.name != expected:
             raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
+        try:
+            yield
+        finally:
+            await close_mongo()
 
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:
-        await close_mongo()
+    app.router.lifespan_context = lifespan
 
 
 def add_mongo_health(

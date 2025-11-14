@@ -158,8 +158,7 @@ def _build_parent_app(
     root_server_url: str | None = None,
     root_include_api_key: bool = False,
 ) -> FastAPI:
-    show_root_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
-
+    # Root docs are now enabled in all environments to match root card visibility
     parent = FastAPI(
         title=service.name,
         version=service.release,
@@ -167,9 +166,9 @@ def _build_parent_app(
         license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
         description=service.description,
-        docs_url=("/docs" if show_root_docs else None),
-        redoc_url=("/redoc" if show_root_docs else None),
-        openapi_url=("/openapi.json" if show_root_docs else None),
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
     )
 
     _setup_cors(parent, public_cors_origins)
