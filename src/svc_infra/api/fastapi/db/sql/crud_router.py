@@ -122,7 +122,7 @@ def make_crud_router_plus_sql(
     )
     async def create_item(
         session: SqlSessionDep,  # type: ignore[name-defined]
-        payload: Any = Body(...),
+        payload: create_schema = Body(...),
     ):
         if isinstance(payload, BaseModel):
             data = payload.model_dump(exclude_unset=True)
@@ -141,7 +141,7 @@ def make_crud_router_plus_sql(
     async def update_item(
         item_id: Any,
         session: SqlSessionDep,  # type: ignore[name-defined]
-        payload: Any = Body(...),
+        payload: update_schema = Body(...),
     ):
         if isinstance(payload, BaseModel):
             data = payload.model_dump(exclude_unset=True)
@@ -266,7 +266,7 @@ def make_tenant_crud_router_plus_sql(
     async def create_item(
         session: SqlSessionDep,  # type: ignore[name-defined]
         tenant_id: TenantId,
-        payload: Any = Body(...),
+        payload: create_schema = Body(...),
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
@@ -282,7 +282,7 @@ def make_tenant_crud_router_plus_sql(
         item_id: Any,
         session: SqlSessionDep,  # type: ignore[name-defined]
         tenant_id: TenantId,
-        payload: Any = Body(...),
+        payload: update_schema = Body(...),
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
