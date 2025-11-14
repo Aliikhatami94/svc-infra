@@ -175,11 +175,23 @@ def add_prefixed_docs(
     auto_exclude_from_root: bool = True,
     visible_envs: Optional[Iterable[Environment | str]] = (LOCAL_ENV, DEV_ENV),
 ) -> None:
+    scope = prefix.rstrip("/") or "/"
+
+    # Always exclude from root if requested, regardless of environment
+    if auto_exclude_from_root:
+        _ensure_original_openapi_saved(app)
+        # Add to exclusion list for root docs
+        if not hasattr(app.state, "_scoped_root_exclusions"):
+            app.state._scoped_root_exclusions = []
+        if scope not in app.state._scoped_root_exclusions:
+            app.state._scoped_root_exclusions.append(scope)
+            _install_root_filter(app, app.state._scoped_root_exclusions)
+
+    # Only create scoped docs in allowed environments
     allow = _normalize_envs(visible_envs)
     if allow is not None and CURRENT_ENVIRONMENT not in allow:
         return
 
-    scope = prefix.rstrip("/") or "/"
     openapi_path = f"{scope}/openapi.json"
     swagger_path = f"{scope}/docs"
     redoc_path = f"{scope}/redoc"
@@ -210,9 +222,6 @@ def add_prefixed_docs(
         return get_redoc_html(openapi_url=openapi_path, title=f"{title} • ReDoc")
 
     DOC_SCOPES.append((scope, swagger_path, redoc_path, openapi_path, title))
-
-    if auto_exclude_from_root:
-        _ensure_root_excludes_registered_scopes(app)
 
 
 def replace_root_openapi_with_exclusions(app: FastAPI, *, exclude_prefixes: List[str]) -> None:
