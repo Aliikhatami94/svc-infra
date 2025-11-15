@@ -17,7 +17,6 @@ from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, USER_PREFIX
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
 from svc_infra.db.sql.apikey import bind_apikey_model
 
-from ..docs.scoped import add_prefixed_docs
 from .policy import AuthPolicy, DefaultAuthPolicy
 from .providers import providers_from_settings
 from .settings import get_auth_settings
@@ -292,9 +291,6 @@ def add_auth_users(
             same_site=same_site_lit,
             https_only=bool(getattr(settings_obj, "session_cookie_secure", False)),
         )
-
-    add_prefixed_docs(app, prefix=user_prefix, title="Users")
-    add_prefixed_docs(app, prefix=auth_prefix, title="Auth")
 
     if enable_password:
         setup_password_authentication(

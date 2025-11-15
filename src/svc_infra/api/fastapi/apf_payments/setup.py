@@ -7,7 +7,6 @@ from fastapi import FastAPI
 
 from svc_infra.apf_payments.provider.registry import get_provider_registry
 from svc_infra.api.fastapi.apf_payments.router import build_payments_routers
-from svc_infra.api.fastapi.docs.scoped import add_prefixed_docs
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,6 @@ def add_payments(
     - Reuses your OpenAPI defaults (security + responses) via DualAPIRouter factories.
     """
     _maybe_register_default_providers(register_default_providers, adapters)
-    add_prefixed_docs(app, prefix=prefix, title="Payments")
 
     for r in build_payments_routers(prefix=prefix):
         app.include_router(
