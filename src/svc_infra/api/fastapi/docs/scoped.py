@@ -65,10 +65,17 @@ def _close_over_component_refs(
 
 
 def _prune_to_paths(
-    full_schema: Dict, keep_paths: Dict[str, dict], title_suffix: Optional[str]
+    full_schema: Dict,
+    keep_paths: Dict[str, dict],
+    title_suffix: Optional[str],
+    server_prefix: Optional[str] = None,
 ) -> Dict:
     schema = copy.deepcopy(full_schema)
     schema["paths"] = keep_paths
+
+    # Set server URL for scoped docs
+    if server_prefix is not None:
+        schema["servers"] = [{"url": server_prefix}]
 
     used_tags: Set[str] = set()
     direct_refs: Set[Tuple[str, str]] = set()
@@ -124,7 +131,26 @@ def _build_filtered_schema(
     keep_paths = {
         p: v for p, v in paths.items() if _path_included(p, include_prefixes, exclude_prefixes)
     }
-    return _prune_to_paths(full_schema, keep_paths, title_suffix)
+
+    # Determine the server prefix for scoped docs
+    server_prefix = None
+    if include_prefixes and len(include_prefixes) == 1:
+        # Single include prefix = scoped docs
+        server_prefix = include_prefixes[0].rstrip("/") or "/"
+
+        # Strip prefix from paths to make them relative to the server
+        stripped_paths = {}
+        for path, spec in keep_paths.items():
+            if path.startswith(server_prefix) and path != server_prefix:
+                # Remove prefix, keeping the leading slash
+                relative_path = path[len(server_prefix) :]
+                stripped_paths[relative_path] = spec
+            else:
+                # Path equals prefix or doesn't start with it
+                stripped_paths[path] = spec
+        keep_paths = stripped_paths
+
+    return _prune_to_paths(full_schema, keep_paths, title_suffix, server_prefix=server_prefix)
 
 
 def _ensure_original_openapi_saved(app: FastAPI) -> None:
