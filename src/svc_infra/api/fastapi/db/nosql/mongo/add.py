@@ -64,55 +64,50 @@ def add_mongo_health(
 
 
 def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> None:
-    # Register scoped docs for _mongo prefix (only once)
-    if not getattr(app.state, "_mongo_docs_registered", False):
-        from svc_infra.api.fastapi.docs.scoped import add_prefixed_docs
-
-        add_prefixed_docs(
-            app, prefix="/_mongo", title="MongoDB Resources", auto_exclude_from_root=True
-        )
-        app.state._mongo_docs_registered = True
-
-    for r in resources:
+    for resource in resources:
         repo = NoSqlRepository(
-            collection_name=r.resolved_collection(),
-            id_field=r.id_field,
-            soft_delete=r.soft_delete,
-            soft_delete_field=r.soft_delete_field,
-            soft_delete_flag_field=r.soft_delete_flag_field,
+            collection_name=resource.resolved_collection(),
+            id_field=resource.id_field,
+            soft_delete=resource.soft_delete,
+            soft_delete_field=resource.soft_delete_field,
+            soft_delete_flag_field=resource.soft_delete_flag_field,
         )
-        svc = r.service_factory(repo) if r.service_factory else NoSqlService(repo)
+        svc = resource.service_factory(repo) if resource.service_factory else NoSqlService(repo)
 
-        if r.read_schema and r.create_schema and r.update_schema:
-            Read, Create, Update = r.read_schema, r.create_schema, r.update_schema
-        elif r.document_model is not None:
+        if resource.read_schema and resource.create_schema and resource.update_schema:
+            Read, Create, Update = (
+                resource.read_schema,
+                resource.create_schema,
+                resource.update_schema,
+            )
+        elif resource.document_model is not None:
             # CRITICAL: teach Pydantic to dump ObjectId/PyObjectId
             Read, Create, Update = make_document_crud_schemas(
-                r.document_model,
-                create_exclude=r.create_exclude,
-                read_name=r.read_name,
-                create_name=r.create_name,
-                update_name=r.update_name,
-                read_exclude=r.read_exclude,
-                update_exclude=r.update_exclude,
+                resource.document_model,
+                create_exclude=resource.create_exclude,
+                read_name=resource.read_name,
+                create_name=resource.create_name,
+                update_name=resource.update_name,
+                read_exclude=resource.read_exclude,
+                update_exclude=resource.update_exclude,
                 json_encoders={ObjectId: str, PyObjectId: str},
             )
         else:
             raise RuntimeError(
-                f"Resource for collection '{r.collection}' requires either explicit schemas "
+                f"Resource for collection '{resource.collection}' requires either explicit schemas "
                 f"(read/create/update) or a 'document_model' to derive them."
             )
 
         router = make_crud_router_plus_mongo(
-            collection=r.resolved_collection(),
+            collection=resource.resolved_collection(),
             repo=repo,
             service=svc,
             read_schema=Read,
             create_schema=Create,
             update_schema=Update,
-            prefix=r.prefix,
-            tags=r.tags,
-            search_fields=r.search_fields,
+            prefix=resource.prefix,
+            tags=resource.tags,
+            search_fields=resource.search_fields,
             default_ordering=None,
             allowed_order_fields=None,
         )

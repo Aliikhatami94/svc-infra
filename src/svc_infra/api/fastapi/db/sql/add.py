@@ -16,13 +16,6 @@ from .session import dispose_session, initialize_session
 
 
 def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
-    # Register scoped docs for _sql prefix (only once)
-    if not getattr(app.state, "_sql_docs_registered", False):
-        from svc_infra.api.fastapi.docs.scoped import add_prefixed_docs
-
-        add_prefixed_docs(app, prefix="/_sql", title="SQL Resources", auto_exclude_from_root=True)
-        app.state._sql_docs_registered = True
-
     for r in resources:
         repo = SqlRepository(model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete)
 
