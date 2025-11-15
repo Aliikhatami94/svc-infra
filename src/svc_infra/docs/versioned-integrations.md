@@ -6,15 +6,15 @@ By default, `add_*` functions from svc-infra and fin-infra mount routes at root 
 
 ## Simple Solution (Recommended)
 
-Use the `capture_add_function_router()` helper:
+Use the `extract_router()` helper:
 
 ```python
 # src/your_api/routers/v0/banking.py
-from svc_infra.api.fastapi.versioned import capture_add_function_router
+from svc_infra.api.fastapi.versioned import extract_router
 from fin_infra.banking import add_banking
 
-# One-liner: capture router and provider
-router, banking_provider = capture_add_function_router(
+# Extract router and provider from add_banking()
+router, banking_provider = extract_router(
     add_banking,
     prefix="/banking",
     provider="plaid",
@@ -45,10 +45,10 @@ your_api/
 
 # banking.py - Clean and simple
 """Banking integration under v0 routing."""
-from svc_infra.api.fastapi.versioned import capture_add_function_router
+from svc_infra.api.fastapi.versioned import extract_router
 from fin_infra.banking import add_banking
 
-router, banking_provider = capture_add_function_router(
+router, banking_provider = extract_router(
     add_banking,
     prefix="/banking",
     provider="plaid",  # or "teller"
@@ -67,23 +67,23 @@ Any svc-infra or fin-infra function that calls `app.include_router()`:
 ```python
 # Banking integration
 from fin_infra.banking import add_banking
-router, provider = capture_add_function_router(add_banking, prefix="/banking", provider="plaid")
+router, provider = extract_router(add_banking, prefix="/banking", provider="plaid")
 
 # Market data
 from fin_infra.markets import add_market_data
-router, provider = capture_add_function_router(add_market_data, prefix="/markets")
+router, provider = extract_router(add_market_data, prefix="/markets")
 
 # Analytics
 from fin_infra.analytics import add_analytics
-router, provider = capture_add_function_router(add_analytics, prefix="/analytics")
+router, provider = extract_router(add_analytics, prefix="/analytics")
 
 # Budgets
 from fin_infra.budgets import add_budgets
-router, provider = capture_add_function_router(add_budgets, prefix="/budgets")
+router, provider = extract_router(add_budgets, prefix="/budgets")
 
 # Documents
 from fin_infra.documents import add_documents
-router, provider = capture_add_function_router(add_documents, prefix="/documents")
+router, provider = extract_router(add_documents, prefix="/documents")
 
 # Any custom add_* function following the pattern
 ```
@@ -100,40 +100,6 @@ router, provider = capture_add_function_router(add_documents, prefix="/documents
 - Feature should have its own root-level endpoint (e.g., public webhooks at `/webhooks`)
 - Integration is shared across multiple versions (mount at root instead)
 - You only need a subset of endpoints (define manually)
-
-## Advanced Pattern (Manual)
-
-If you need more control, use the manual pattern:
-
-```python
-# routers/v0/banking.py
-from fastapi import FastAPI, APIRouter
-from unittest.mock import patch
-
-_mock_app = FastAPI()
-_captured_router: APIRouter | None = None
-
-def _capture_router(router: APIRouter, **kwargs):
-    global _captured_router
-    _captured_router = router
-
-_mock_app.include_router = _capture_router
-
-def _noop_docs(*args, **kwargs):
-    pass
-
-from fin_infra.banking import add_banking
-
-with patch('svc_infra.api.fastapi.docs.scoped.add_prefixed_docs', _noop_docs):
-    banking_provider = add_banking(_mock_app, prefix="/banking", provider="plaid")
-
-router = _captured_router
-```
-
-Use manual pattern when:
-- Need custom interception logic
-- Want to inspect or modify router before export
-- Debugging router capture issues
 
 ## Alternative: Manual Definition
 
@@ -162,7 +128,7 @@ Use manual definition when:
 
 ## How It Works
 
-The `capture_add_function_router()` helper:
+The `extract_router()` helper:
 
 1. **Creates Mock App**: Temporary FastAPI instance to capture router
 2. **Intercepts Router**: Monkey-patches `include_router()` to capture instead of mount

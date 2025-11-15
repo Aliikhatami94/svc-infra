@@ -14,12 +14,12 @@ from unittest.mock import patch
 
 from fastapi import APIRouter, FastAPI
 
-__all__ = ["capture_add_function_router"]
+__all__ = ["extract_router"]
 
 T = TypeVar("T")
 
 
-def capture_add_function_router(
+def extract_router(
     add_function: Callable[..., T],
     *,
     prefix: str,
@@ -45,10 +45,10 @@ def capture_add_function_router(
     Example:
         ```python
         # In routers/v0/banking.py
-        from svc_infra.api.fastapi.versioned import capture_add_function_router
+        from svc_infra.api.fastapi.versioned import extract_router
         from fin_infra.banking import add_banking
 
-        router, banking_provider = capture_add_function_router(
+        router, banking_provider = extract_router(
             add_banking,
             prefix="/banking",
             provider="plaid",
