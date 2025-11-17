@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from svc_infra.db.sql.base import ModelBase
 from svc_infra.db.sql.types import GUID
+
+if TYPE_CHECKING:
+    from svc_infra.security.models import User
 
 
 class ProviderAccount(ModelBase):
@@ -34,8 +37,8 @@ class ProviderAccount(ModelBase):
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     raw_claims: Mapped[Optional[dict]] = mapped_column(JSON)
 
-    # Relationship to User model (must be defined in consuming app)
-    # user: Mapped["User"] = relationship(back_populates="provider_accounts")
+    # Bidirectional relationship to User model
+    user: Mapped["User"] = relationship(back_populates="provider_accounts")
 
     created_at = mapped_column(
         DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
