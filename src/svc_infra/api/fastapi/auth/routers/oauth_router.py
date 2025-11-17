@@ -373,9 +373,8 @@ async def _update_provider_account(
 def _determine_final_redirect_url(request: Request, provider: str, post_login_redirect: str) -> str:
     """Determine the final redirect URL after successful authentication."""
     st = get_auth_settings()
-    redirect_url = str(
-        getattr(st, "post_login_redirect", post_login_redirect) or post_login_redirect
-    )
+    # Prioritize the parameter passed to the router over settings
+    redirect_url = str(post_login_redirect or getattr(st, "post_login_redirect", "/"))
     allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
     require_https = bool(getattr(st, "session_cookie_secure", False))
 
