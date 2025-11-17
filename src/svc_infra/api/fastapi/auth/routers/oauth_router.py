@@ -668,7 +668,23 @@ def _create_oauth_router(
             ip_hash=None,
         )
 
-        # Create response with auth + refresh cookies
+        # Generate JWT token for the response
+        strategy = auth_backend.get_strategy()
+        jwt_token = await strategy.write_token(user)
+
+        # If redirecting to a different origin, append token as URL fragment for frontend to extract
+        # This handles cross-port scenarios like localhost:8000 -> localhost:3000
+        parsed_redirect = urlparse(redirect_url)
+        request_origin = f"{request.url.scheme}://{request.url.netloc}"
+        redirect_origin = f"{parsed_redirect.scheme}://{parsed_redirect.netloc}"
+
+        if redirect_origin and redirect_origin != request_origin:
+            # Cross-origin redirect: append token as URL fragment
+            # Fragment is not sent to server, only accessible to client-side JS
+            separator = "#" if not parsed_redirect.fragment else "&"
+            redirect_url = f"{redirect_url}{separator}access_token={jwt_token}"
+
+        # Create response with auth + refresh cookies (for same-origin requests)
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
         await _set_cookie_on_response(resp, auth_backend, user, refresh_raw=raw_refresh)
 
