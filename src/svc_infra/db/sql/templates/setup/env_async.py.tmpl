@@ -226,6 +226,14 @@ def _collect_metadata() -> list[object]:
     except Exception:
         _note("ModelBase import", False, traceback.format_exc())
 
+    # OAuth models (opt-in via environment variable)
+    if os.getenv("ALEMBIC_ENABLE_OAUTH", "").lower() in {"1", "true", "yes"}:
+        try:
+            import svc_infra.security.oauth_models  # noqa: F401
+            _note("svc_infra.security.oauth_models", True, None)
+        except Exception:
+            _note("svc_infra.security.oauth_models", False, traceback.format_exc())
+
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model
         try_autobind_apikey_model(require_env=False)

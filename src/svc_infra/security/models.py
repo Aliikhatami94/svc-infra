@@ -196,38 +196,8 @@ class OrganizationInvitation(ModelBase):
 
 
 # ------------------------ OAuth Provider Accounts -----------------------------
-
-
-class ProviderAccount(ModelBase):
-    """OAuth provider account linking (Google, GitHub, etc.)."""
-
-    __tablename__ = "provider_accounts"
-
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
-    )
-    provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    provider_account_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    access_token: Mapped[Optional[str]] = mapped_column(Text)
-    refresh_token: Mapped[Optional[str]] = mapped_column(Text)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    raw_claims: Mapped[Optional[dict]] = mapped_column(JSON)
-
-    created_at = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
-    )
-    updated_at = mapped_column(
-        DateTime(timezone=True),
-        server_default=text("CURRENT_TIMESTAMP"),
-        onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False,
-    )
-
-    __table_args__ = (
-        UniqueConstraint("provider", "provider_account_id", name="uq_provider_account"),
-        Index("ix_provider_accounts_user_provider", "user_id", "provider"),
-    )
+# MOVED to svc_infra.security.oauth_models for opt-in OAuth support
+# Projects that enable OAuth should import ProviderAccount from there
 
 
 # ------------------------ Utilities -------------------------------------------
@@ -287,7 +257,7 @@ __all__ = [
     "Team",
     "OrganizationMembership",
     "OrganizationInvitation",
-    "ProviderAccount",
+    # ProviderAccount moved to svc_infra.security.oauth_models (opt-in)
     "generate_refresh_token",
     "hash_refresh_token",
     "compute_audit_hash",
