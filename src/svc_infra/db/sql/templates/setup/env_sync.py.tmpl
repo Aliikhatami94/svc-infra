@@ -6,6 +6,7 @@ from typing import List, Tuple
 import sys, pathlib, importlib, pkgutil, traceback
 
 from alembic import context
+from sqlalchemy import MetaData
 from sqlalchemy.engine import make_url, URL
 
 from svc_infra.db.sql.utils import (
@@ -139,8 +140,8 @@ def _collect_metadata() -> list[object]:
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        # Only add if it's a SQLAlchemy MetaData object (has tables dict, not a callable/generator)
-        if hasattr(md, "tables") and isinstance(getattr(md, "tables", None), dict):
+        # Strict check: must be actual MetaData instance
+        if isinstance(md, MetaData) and md.tables:
             found.append(md)
 
     def _scan_module_objects(mod: object) -> None:
