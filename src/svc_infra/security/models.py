@@ -6,7 +6,17 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from svc_infra.db.sql.base import ModelBase
@@ -34,7 +44,7 @@ class AuthSession(ModelBase):
     )
 
     created_at = mapped_column(
-        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
     )
 
 
@@ -54,7 +64,7 @@ class RefreshToken(ModelBase):
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
 
     created_at = mapped_column(
-        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
     )
 
     __table_args__ = (UniqueConstraint("token_hash", name="uq_refresh_token_hash"),)
@@ -126,7 +136,7 @@ class Organization(ModelBase):
     slug: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     created_at = mapped_column(
-        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
     )
 
 
@@ -139,7 +149,7 @@ class Team(ModelBase):
     )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at = mapped_column(
-        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
     )
 
 
@@ -155,7 +165,7 @@ class OrganizationMembership(ModelBase):
     )
     role: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     created_at = mapped_column(
-        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
     )
     deactivated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
@@ -177,7 +187,7 @@ class OrganizationInvitation(ModelBase):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     created_at = mapped_column(
-        DateTime(timezone=True), server_default="CURRENT_TIMESTAMP", nullable=False
+        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
     )
     last_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     resend_count: Mapped[int] = mapped_column(default=0)
