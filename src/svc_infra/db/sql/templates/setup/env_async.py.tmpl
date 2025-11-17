@@ -126,14 +126,16 @@ def _collect_metadata() -> list[object]:
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        if hasattr(md, "tables") and getattr(md, "tables"):
+        # Only add if it's a SQLAlchemy MetaData object (has tables dict, not a callable/generator)
+        if hasattr(md, "tables") and isinstance(getattr(md, "tables", None), dict):
             found.append(md)
 
     def _scan_module_objects(mod: object) -> None:
         try:
             for val in vars(mod).values():
                 md = getattr(val, "metadata", None) or None
-                if md is not None and hasattr(md, "tables") and getattr(md, "tables"):
+                # Only add if it's a SQLAlchemy MetaData object (has tables dict, not a callable/generator)
+                if md is not None and hasattr(md, "tables") and isinstance(getattr(md, "tables", None), dict):
                     found.append(md)
         except Exception:
             pass
