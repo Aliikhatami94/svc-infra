@@ -413,13 +413,18 @@ async def _storage_download(request: Request, filename: str):
 @_storage_router.delete("/files/{filename}")
 async def _storage_delete(request: Request, filename: str):
     """Delete a file for acceptance testing."""
+    from fastapi import Response
+
     from svc_infra.storage import get_storage
 
     storage = get_storage(request)
     key = f"test/{filename}"
 
     deleted = await storage.delete(key)
-    return JSONResponse(content={"deleted": deleted}, status_code=204 if deleted else 404)
+    if deleted:
+        return Response(status_code=204)  # 204 No Content must not have a body
+    else:
+        raise HTTPException(status_code=404, detail="File not found")
 
 
 @_storage_router.get("/list")

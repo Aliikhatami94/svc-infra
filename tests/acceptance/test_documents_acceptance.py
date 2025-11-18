@@ -95,7 +95,9 @@ def test_a23_02_list_user_documents_with_pagination(client, sample_file):
     Then all their documents are returned
     And pagination parameters work correctly
     """
-    user_id = "user_a23_02"
+    import time
+
+    user_id = f"user_a23_02_{int(time.time() * 1000)}"  # Unique per test run
 
     # Upload 5 documents
     document_ids = []
