@@ -30,11 +30,36 @@ def test_a1001_cli_migrations_and_seed(tmp_path: Path):
     db_url = f"sqlite+aiosqlite:///{tmp_path}/a10.db"
     env = {"SQL_URL": db_url, "PROJECT_ROOT": str(tmp_path)}
 
+    # Copy User model to tmp_path so it's available for alembic
+    import shutil
+
+    models_source = Path(__file__).parent / "models.py"
+    shutil.copy(models_source, tmp_path / "models.py")
+
     # End-to-end setup and migrate should succeed
     out1 = _py(
         ["sql", "setup-and-migrate", "--overwrite-scaffold", "--create-followup-revision"], env=env
     )
     assert "setup_and_migrate" in out1.stdout
+
+    # Patch env.py to import User model before security models
+    env_py_path = tmp_path / "migrations" / "env.py"
+    env_py_content = env_py_path.read_text()
+    lines = env_py_content.splitlines()
+    # Insert import after line 2 (after "from __future__ import annotations")
+    lines.insert(
+        2, f'import sys; sys.path.insert(0, "{tmp_path}"); import models  # Import User model'
+    )
+    env_py_path.write_text("\n".join(lines))
+
+    # Regenerate migrations with User model
+    versions_dir = tmp_path / "migrations" / "versions"
+    for ver_file in versions_dir.glob("*.py"):
+        ver_file.unlink()
+
+    # Generate new migration with User model
+    _py(["sql", "revision", "--autogenerate", "-m", "initial_with_user"], env=env)
+    _py(["sql", "upgrade", "head"], env=env)
 
     # Current should exit 0
     out2 = _py(["sql", "current"], env=env)

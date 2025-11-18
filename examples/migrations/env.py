@@ -11,6 +11,7 @@ import traceback
 from typing import List, Tuple
 
 from alembic import context
+from sqlalchemy import MetaData
 from sqlalchemy.engine import URL, make_url
 
 from svc_infra.db.sql.utils import get_database_url_from_env
@@ -115,7 +116,6 @@ def _coerce_to_async(u: URL) -> URL:
 
 u = make_url(effective_url)
 u = _coerce_to_async(u)
-# SSL defaults are handled by build_engine() in run_migrations_online()
 config.set_main_option("sqlalchemy.url", u.render_as_string(hide_password=False))
 
 # feature flags
@@ -142,15 +142,16 @@ def _collect_metadata() -> list[object]:
 
     def _maybe_add(obj: object) -> None:
         md = getattr(obj, "metadata", None) or obj
-        if hasattr(md, "tables") and getattr(md, "tables"):
+        # Strict check: must be actual MetaData instance
+        if isinstance(md, MetaData) and md.tables:
             found.append(md)
 
     def _scan_module_objects(mod: object) -> None:
         try:
             for val in vars(mod).values():
-                md = getattr(val, "metadata", None) or None
-                if md is not None and hasattr(md, "tables") and getattr(md, "tables"):
-                    found.append(md)
+                # Strict check: must be actual MetaData instance
+                if isinstance(val, MetaData) and val.tables:
+                    found.append(val)
         except Exception:
             pass
 
@@ -244,6 +245,23 @@ def _collect_metadata() -> list[object]:
             _note("ModelBase.metadata(empty)", True, None)
     except Exception:
         _note("ModelBase import", False, traceback.format_exc())
+
+    # Core security models (AuthSession, RefreshToken, etc.)
+    try:
+        import svc_infra.security.models  # noqa: F401
+
+        _note("svc_infra.security.models", True, None)
+    except Exception:
+        _note("svc_infra.security.models", False, traceback.format_exc())
+
+    # OAuth models (opt-in via environment variable)
+    if os.getenv("ALEMBIC_ENABLE_OAUTH", "").lower() in {"1", "true", "yes"}:
+        try:
+            import svc_infra.security.oauth_models  # noqa: F401
+
+            _note("svc_infra.security.oauth_models", True, None)
+        except Exception:
+            _note("svc_infra.security.oauth_models", False, traceback.format_exc())
 
     try:
         from svc_infra.db.sql.apikey import try_autobind_apikey_model

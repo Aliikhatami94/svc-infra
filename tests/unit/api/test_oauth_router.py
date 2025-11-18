@@ -106,9 +106,13 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
         async def on_login_success(self, user):
             self.success_called = True
 
+    class DummyStrategy:
+        async def write_token(self, user):
+            return "jwt-token"
+
     class DummyBackend:
-        def get_strategy(self):  # pragma: no cover - not used due to stubbed cookie setter
-            raise AssertionError("Strategy should not be accessed in this test")
+        def get_strategy(self):
+            return DummyStrategy()
 
     policy = DummyPolicy()
 
@@ -136,7 +140,8 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
         response = await client.get("/oauth/test/callback?code=abc")
 
     assert response.status_code == 302
-    assert response.headers["location"] == "https://app.example.com/welcome"
+    # Cross-origin redirect appends token as URL fragment for client-side extraction
+    assert response.headers["location"] == "https://app.example.com/welcome#access_token=jwt-token"
     assert response.cookies.get("auth-cookie") == "jwt-token"
     assert response.cookies.get("refresh-cookie") == "refresh-token"
     assert policy.success_called is True

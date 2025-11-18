@@ -1,12 +1,12 @@
 """Add user and entity tables
 
-Revision ID: 5e28b1694124
+Revision ID: 914b6864eff6
 Revises:
-Create Date: 2025-11-03 15:56:13.472454
+Create Date: 2025-11-17 23:02:56.199896
 """
 
 # revision identifiers, used by Alembic.
-revision = "5e28b1694124"
+revision = "914b6864eff6"
 down_revision = None
 branch_labels = None
 depends_on = None

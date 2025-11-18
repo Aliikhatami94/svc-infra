@@ -398,7 +398,51 @@ if settings.idempotency_enabled and settings.cache_configured:
 
     print("✅ Idempotency feature enabled")
 
-# --- 4.9 Payments (Stripe, Adyen, or Fake for Testing) ---
+# --- 4.9 Storage (File Upload/Download with S3/Local/Memory Backends) ---
+# Add storage capabilities for handling file uploads and downloads.
+# Automatically detects backend from environment:
+#   - Railway: uses Railway volume at RAILWAY_VOLUME_MOUNT_PATH
+#   - S3: detects from STORAGE_BACKEND=s3 or AWS credentials
+#   - Memory: fallback for testing
+#
+# Environment variables:
+#   STORAGE_BACKEND=s3|local|memory (explicit backend selection)
+#   STORAGE_S3_BUCKET=my-bucket (S3 configuration)
+#   STORAGE_S3_REGION=us-east-1
+#   STORAGE_S3_ENDPOINT=https://... (for DigitalOcean Spaces, Wasabi, etc.)
+#   STORAGE_LOCAL_BASE_PATH=/data/storage (local file storage)
+#   STORAGE_MEMORY_MAX_SIZE=104857600 (memory backend quota)
+#
+# Routes added:
+#   POST   /storage/upload          - Upload file
+#   GET    /storage/files/{key}     - Download file
+#   DELETE /storage/files/{key}     - Delete file
+#   GET    /storage/files/{key}/url - Get signed/public URL
+#   GET    /storage/files           - List files (with prefix filter)
+#   GET    /storage/health          - Storage backend health check
+if settings.storage_enabled:
+    from svc_infra.storage.add import add_storage
+
+    # Auto-detect and configure storage backend
+    # The easy_storage() builder will:
+    #   1. Check STORAGE_BACKEND env var
+    #   2. Detect Railway volume mount
+    #   3. Check for S3 configuration
+    #   4. Fall back to memory backend
+    add_storage(
+        app,
+        prefix="/storage",
+        tags=["Storage"],
+        max_upload_size_mb=(
+            settings.storage_max_upload_size_mb
+            if hasattr(settings, "storage_max_upload_size_mb")
+            else 100
+        ),
+    )
+
+    print("✅ Storage feature enabled")
+
+# --- 4.10 Payments (Stripe, Adyen, or Fake for Testing) ---
 # Note: Payments require database setup first
 if settings.database_configured and settings.payment_provider:
     from svc_infra.apf_payments.provider.fake import FakeAdapter

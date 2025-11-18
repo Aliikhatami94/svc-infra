@@ -235,6 +235,33 @@ class Settings(BaseSettings):
     smtp_from_name: str = Field(default="SVC Infra Template")
 
     # ========================================================================
+    # Storage (File Upload/Download)
+    # ========================================================================
+    storage_enabled: bool = Field(default=True)
+    storage_backend: Optional[Literal["s3", "local", "memory"]] = Field(
+        default=None,
+        description="Storage backend (auto-detected if not set)",
+    )
+    storage_max_upload_size_mb: int = Field(default=100)
+
+    # Local storage
+    storage_local_base_path: Optional[str] = Field(default=None)
+    storage_local_signing_secret: Optional[str] = Field(default=None)
+
+    # S3-compatible storage (AWS S3, DigitalOcean Spaces, Wasabi, etc.)
+    storage_s3_bucket: Optional[str] = Field(default=None)
+    storage_s3_region: str = Field(default="us-east-1")
+    storage_s3_endpoint: Optional[str] = Field(
+        default=None,
+        description="Custom S3 endpoint for DigitalOcean Spaces, Wasabi, MinIO, etc.",
+    )
+    storage_s3_access_key: Optional[str] = Field(default=None)
+    storage_s3_secret_key: Optional[str] = Field(default=None)
+
+    # Memory storage (for testing)
+    storage_memory_max_size: int = Field(default=104857600, description="Max size in bytes (100MB)")
+
+    # ========================================================================
     # Billing & Subscriptions
     # ========================================================================
     billing_enabled: bool = Field(default=False)
@@ -300,6 +327,20 @@ class Settings(BaseSettings):
     def smtp_configured(self) -> bool:
         """Check if SMTP is configured."""
         return all([self.smtp_host, self.smtp_username, self.smtp_password])
+
+    @property
+    def storage_configured(self) -> bool:
+        """Check if storage is explicitly configured (not relying on auto-detection)."""
+        return (
+            self.storage_backend is not None
+            or self.storage_s3_bucket is not None
+            or self.storage_local_base_path is not None
+        )
+
+    @property
+    def jobs_redis_url(self) -> Optional[str]:
+        """Get Redis URL for jobs (defaults to main Redis URL if not specified)."""
+        return self.redis_url if self.jobs_driver == "redis" else None
 
 
 # Global settings instance

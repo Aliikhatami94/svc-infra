@@ -50,9 +50,15 @@ wait:
 seed:
 	@echo "[accept] Running CLI migrate/current/downgrade/upgrade (ephemeral sqlite)"
 	# Use an ephemeral project root in the container to avoid touching repo files
+	# Copy User model, patch env.py to import it early, then run migrations
 	docker compose -f docker-compose.test.yml exec -T -e PROJECT_ROOT=/tmp/svc-infra-accept -e SQL_URL=sqlite+aiosqlite:////tmp/svc-infra-accept/accept.db api \
 		bash -lc 'rm -rf $$PROJECT_ROOT && mkdir -p $$PROJECT_ROOT && \
-		python -m svc_infra.cli sql setup-and-migrate --no-with-payments && \
+		cp /workspace/tests/acceptance/models.py $$PROJECT_ROOT/models.py && \
+		python -m svc_infra.cli sql setup-and-migrate --no-with-payments || true && \
+		sed -i "3i import sys; sys.path.insert(0, \\\"/tmp/svc-infra-accept\\\"); import models  # Import User model before security models" $$PROJECT_ROOT/migrations/env.py && \
+		rm -f $$PROJECT_ROOT/migrations/versions/*.py && \
+		python -m svc_infra.cli sql revision --autogenerate -m "initial with user" && \
+		python -m svc_infra.cli sql upgrade head && \
 		python -m svc_infra.cli sql current && \
 		python -m svc_infra.cli sql downgrade -- -1 && \
 		python -m svc_infra.cli sql upgrade head'

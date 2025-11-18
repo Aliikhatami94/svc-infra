@@ -125,12 +125,11 @@ class _Update(BaseModel):
 
 
 class _Read(BaseModel):
+    model_config = {"from_attributes": True}
+
     id: int
     name: str
     tenant_id: str | None = None
-
-    class Config:
-        from_attributes = True
 
 
 def _service_factory():
