@@ -359,6 +359,109 @@ add_payments(app, prefix="/payments", register_default_providers=False, adapters
 # Mount internal billing router under /_billing for acceptance smoke tests
 _add_billing(app)
 
+# Mount storage backend for acceptance tests (A22-01 to A22-05)
+from svc_infra.storage import add_storage as _add_storage
+
+# Use memory backend for deterministic acceptance tests
+_storage_backend = _add_storage(app, backend=None)  # Will auto-detect or use memory
+
+# Add storage routes for acceptance testing
+_storage_router = APIRouter(prefix="/_storage", tags=["acceptance-storage"])
+
+
+@_storage_router.post("/upload")
+async def _storage_upload(
+    request: Request,
+    filename: str = Body(...),
+    content: str = Body(...),
+    content_type: str = Body(default="text/plain"),
+):
+    """Upload a file for acceptance testing."""
+    from svc_infra.storage import get_storage
+
+    storage = get_storage(request)
+    data = content.encode("utf-8")
+
+    url = await storage.put(
+        key=f"test/{filename}",
+        data=data,
+        content_type=content_type,
+        metadata={"test": "acceptance", "filename": filename},
+    )
+
+    return {"url": url, "key": f"test/{filename}"}
+
+
+@_storage_router.get("/download/{filename}")
+async def _storage_download(request: Request, filename: str):
+    """Download a file for acceptance testing."""
+    from svc_infra.storage import FileNotFoundError, get_storage
+
+    storage = get_storage(request)
+    key = f"test/{filename}"
+
+    try:
+        data = await storage.get(key)
+        return JSONResponse(
+            content={"content": data.decode("utf-8"), "key": key},
+            status_code=200,
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+
+
+@_storage_router.delete("/files/{filename}")
+async def _storage_delete(request: Request, filename: str):
+    """Delete a file for acceptance testing."""
+    from svc_infra.storage import get_storage
+
+    storage = get_storage(request)
+    key = f"test/{filename}"
+
+    deleted = await storage.delete(key)
+    return JSONResponse(content={"deleted": deleted}, status_code=204 if deleted else 404)
+
+
+@_storage_router.get("/list")
+async def _storage_list(request: Request, prefix: str = ""):
+    """List files for acceptance testing."""
+    from svc_infra.storage import get_storage
+
+    storage = get_storage(request)
+    keys = await storage.list_keys(prefix=prefix)
+
+    return {"keys": keys, "count": len(keys)}
+
+
+@_storage_router.get("/metadata/{filename}")
+async def _storage_metadata(request: Request, filename: str):
+    """Get file metadata for acceptance testing."""
+    from svc_infra.storage import FileNotFoundError, get_storage
+
+    storage = get_storage(request)
+    key = f"test/{filename}"
+
+    try:
+        metadata = await storage.get_metadata(key)
+        return {"key": key, "metadata": metadata}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+
+
+@_storage_router.get("/backend-info")
+async def _storage_backend_info(request: Request):
+    """Get storage backend information."""
+    from svc_infra.storage import get_storage
+
+    storage = get_storage(request)
+    return {
+        "backend": storage.__class__.__name__,
+        "type": storage.__class__.__module__.split(".")[-1],
+    }
+
+
+app.include_router(_storage_router)
+
 
 # Replace the DB session dependency with a no-op stub so tests stay self-contained.
 class _StubScalarResult:

@@ -69,3 +69,20 @@ This document maps Acceptance scenarios (A-IDs) to endpoints, CLIs, fixtures, an
 - A10-01 DB migrate/rollback/seed
 - A10-02 Jobs runner consumes a sample job
 - A10-03 SDK smoke-import and /ping
+
+## A22. Storage System
+- A22-01 Local backend file upload and retrieval
+  - Endpoints: POST /_storage/upload, GET /_storage/download/{filename}
+  - Assertions: Upload returns URL, download returns matching content
+- A22-02 S3 backend operations (memory backend in acceptance)
+  - Endpoints: POST /_storage/upload, GET /_storage/download/{filename}
+  - Assertions: Upload succeeds, download returns correct content
+- A22-03 Storage backend auto-detection
+  - Endpoints: GET /_storage/backend-info, POST /_storage/upload
+  - Assertions: Backend detected (MemoryBackend), app.state.storage configured
+- A22-04 File deletion and cleanup
+  - Endpoints: POST /_storage/upload, DELETE /_storage/files/{filename}, GET /_storage/download/{filename}
+  - Assertions: Upload succeeds, delete returns 204, subsequent GET returns 404
+- A22-05 Metadata and listing
+  - Endpoints: POST /_storage/upload, GET /_storage/list, GET /_storage/metadata/{filename}
+  - Assertions: Metadata stored and retrievable, list returns correct keys, prefix filtering works
