@@ -108,6 +108,35 @@ async def upload_file(
 
 **See**: [Storage Guide](storage.md) for comprehensive documentation.
 
+### Documents (`add_documents`)
+
+Add generic document management with upload, list, get, and delete endpoints.
+
+```python
+from svc_infra.documents import add_documents
+
+app = FastAPI()
+manager = add_documents(app)  # Adds protected /documents/* routes
+
+# Programmatic access
+doc = await manager.upload(
+    user_id="user_123",
+    file=file_bytes,
+    filename="contract.pdf",
+    metadata={"category": "legal"}
+)
+```
+
+**Routes added** (all protected, require authentication):
+- `POST /documents/upload`: Upload document with metadata
+- `GET /documents/{document_id}`: Get document metadata
+- `GET /documents/list`: List user's documents (paginated)
+- `DELETE /documents/{document_id}`: Delete document
+
+**Environment variables**: Inherits from [Storage](#storage-add_storage) configuration.
+
+**See**: [Documents Guide](documents.md) for extension patterns and examples.
+
 ### Database (`add_sql_db`)
 
 Wire SQLAlchemy connection with health checks and lifecycle management.

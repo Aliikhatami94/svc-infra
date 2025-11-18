@@ -16,6 +16,7 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 | Security | Password policy, lockout, signed cookies, headers | [Security](src/svc_infra/docs/security.md) |
 | Database | SQL + Mongo wiring, Alembic helpers, inbox/outbox patterns | [Database](src/svc_infra/docs/database.md) |
 | Storage | File storage with S3, local, memory backends | [Storage](src/svc_infra/docs/storage.md) |
+| Documents | Generic document management with metadata | [Documents](src/svc_infra/docs/documents.md) |
 | Tenancy | Multi-tenant boundaries and helpers | [Tenancy](src/svc_infra/docs/tenancy.md) |
 | Idempotency | Idempotent endpoints and middleware | [Idempotency](src/svc_infra/docs/idempotency.md) |
 | Rate Limiting | Middleware, dependency limiter, headers | [Rate limiting](src/svc_infra/docs/rate-limiting.md) |

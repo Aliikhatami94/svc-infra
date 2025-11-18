@@ -462,6 +462,12 @@ async def _storage_backend_info(request: Request):
 
 app.include_router(_storage_router)
 
+# Mount documents module for acceptance tests (A23-01 to A23-05)
+from svc_infra.documents import add_documents
+
+# Add documents with auto-detected storage backend
+_documents_manager = add_documents(app, storage_backend=_storage_backend)
+
 
 # Replace the DB session dependency with a no-op stub so tests stay self-contained.
 class _StubScalarResult:
