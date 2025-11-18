@@ -431,13 +431,8 @@ if settings.storage_enabled:
     #   4. Fall back to memory backend
     add_storage(
         app,
-        prefix="/storage",
-        tags=["Storage"],
-        max_upload_size_mb=(
-            settings.storage_max_upload_size_mb
-            if hasattr(settings, "storage_max_upload_size_mb")
-            else 100
-        ),
+        serve_files=True,  # Enable file serving for LocalBackend
+        file_route_prefix="/storage/files",
     )
 
     print("✅ Storage feature enabled")

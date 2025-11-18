@@ -10,12 +10,22 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from svc_infra_template.db.models import Project, Task
+
+# Import documents and storage demo routers
+from svc_infra_template.documents import router as documents_router
 from svc_infra_template.settings import settings
+from svc_infra_template.storage import router as storage_demo_router
 
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.dual.public import public_router
 
 router = public_router()
+
+# Include documents management demo
+router.include_router(documents_router, tags=["Documents"])
+
+# Include direct storage operations demo
+router.include_router(storage_demo_router, tags=["Storage Demo"])
 
 
 @router.get("/ping")

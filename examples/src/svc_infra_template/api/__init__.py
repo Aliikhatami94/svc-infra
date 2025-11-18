@@ -1,8 +1,9 @@
 """API v1 routes."""
 
-from fastapi import APIRouter
+from svc_infra.api.fastapi.dual.public import public_router
 
-router = APIRouter()
+# Root API router using svc-infra's public_router
+router = public_router()
 
 
 @router.get("/ping")
