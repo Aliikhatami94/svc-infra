@@ -253,7 +253,115 @@ class Settings(BaseSettings):
     # ... with validation and defaults
 ```
 
-### 5. Feature Toggles
+### 5. Document Management & Storage
+
+**Complete working examples** showing generic file storage and document management:
+
+#### Storage Demo (`/v1/storage/`)
+Direct storage backend operations with any provider (S3, local, memory):
+
+```python
+from svc_infra.storage import easy_storage, add_storage
+
+# Auto-detect backend (Railway volumes, S3, etc.)
+storage = easy_storage()
+
+# Mount storage endpoints
+add_storage(app, storage, serve_files=True)
+```
+
+**Available endpoints:**
+- `POST /v1/storage/upload` - Upload file with metadata
+- `GET /v1/storage/download/{key}` - Download file
+- `DELETE /v1/storage/delete/{key}` - Delete file
+- `GET /v1/storage/exists/{key}` - Check if file exists
+- `POST /v1/storage/signed-url` - Generate signed URL
+- `GET /v1/storage/list` - List stored files
+
+#### Documents Demo (`/v1/documents/`)
+Generic document management built on svc-infra storage:
+
+```python
+from svc_infra.documents import add_documents
+
+# Mount document management endpoints
+add_documents(app, storage)
+```
+
+**Available endpoints:**
+- `POST /v1/documents/upload` - Upload document with metadata tagging
+- `POST /v1/documents/upload-file` - Upload via multipart form
+- `GET /v1/documents/list` - List documents with search/filter
+- `GET /v1/documents/{id}` - Get document metadata
+- `GET /v1/documents/{id}/download` - Download document content
+
+**Features:**
+- Flexible metadata tagging (category, tags, department, project)
+- Search by metadata fields
+- User isolation and access control
+- Checksum validation
+- Content type detection
+- Multiple storage backends (S3, local, Railway volumes, memory)
+
+**Example usage:**
+```python
+# Upload with metadata
+response = client.post(
+    "/v1/documents/upload",
+    files={"file": ("report.pdf", pdf_content, "application/pdf")},
+    data={
+        "category": "report",
+        "tags": "q4,annual",
+        "department": "finance",
+        "project": "budget-2025",
+    }
+)
+
+# List with filters
+response = client.get(
+    "/v1/documents/list",
+    params={"category": "report", "limit": 10}
+)
+```
+
+**Extension pattern:**
+This demonstrates the generic base layer. For domain-specific features (like OCR for tax forms, AI analysis), see `fin-infra/documents/` which extends this base with financial capabilities.
+
+**Storage configuration:**
+```bash
+# Auto-detect (Railway, S3, etc.)
+# STORAGE_BACKEND=auto
+
+# Or specify explicitly:
+STORAGE_BACKEND=local
+STORAGE_BASE_PATH=/data/uploads
+STORAGE_BASE_URL=http://localhost:8001/files
+
+# Or S3-compatible:
+# STORAGE_BACKEND=s3
+# STORAGE_S3_BUCKET=my-bucket
+# STORAGE_S3_REGION=us-east-1
+# STORAGE_S3_ENDPOINT=https://nyc3.digitaloceanspaces.com
+```
+
+**Try it:**
+```bash
+# Upload a document
+curl -F "file=@test.pdf" \
+     -F "category=contract" \
+     -F "tags=legal,2025" \
+     http://localhost:8001/v1/documents/upload
+
+# List documents
+curl http://localhost:8001/v1/documents/list
+
+# Download document
+curl http://localhost:8001/v1/documents/{id}/download -o downloaded.pdf
+```
+
+See [`src/svc_infra_template/documents/`](src/svc_infra_template/documents/) and [`src/svc_infra_template/storage/`](src/svc_infra_template/storage/) for implementation details.
+
+### 6. Feature Toggles
 
 Enable/disable features via `.env`:
 
@@ -262,6 +370,7 @@ SQL_URL=sqlite+aiosqlite:///./svc_infra_template.db  # Enable database
 # REDIS_URL=redis://localhost:6379/0                 # Enable cache
 METRICS_ENABLED=true                                  # Enable metrics
 RATE_LIMIT_ENABLED=true                              # Enable rate limiting
+STORAGE_BACKEND=memory                               # Enable storage (auto/local/s3/memory)
 ```
 
 Or manually with uvicorn:
@@ -284,6 +393,10 @@ The API will be available at:
 - `GET /v1/status` - Service status
 - `GET /ping` - Root health check (added by svc-infra)
 - `GET /metrics` - Prometheus metrics (when observability enabled)
+- `POST /v1/documents/upload` - Upload document with metadata
+- `GET /v1/documents/list` - List documents
+- `GET /v1/storage/list` - List storage files
+- `POST /v1/storage/upload` - Direct storage upload
 
 ## 📁 Project Structure
 
@@ -299,6 +412,14 @@ examples/
 │       │   ├── base.py          # ModelBase from svc-infra
 │       │   ├── models.py        # SQLAlchemy models (Project, Task)
 │       │   └── schemas.py       # Pydantic schemas for API
+│       ├── documents/           # Document management demo
+│       │   ├── __init__.py
+│       │   ├── models.py        # Document models with metadata
+│       │   ├── storage.py       # CRUD operations using svc-infra
+│       │   └── router.py        # FastAPI endpoints
+│       ├── storage/             # Direct storage operations demo
+│       │   ├── __init__.py
+│       │   └── router.py        # Storage backend endpoints
 │       └── api/
 │           └── v1/
 │               ├── __init__.py
@@ -318,11 +439,14 @@ examples/
 
 1. **Read [QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes
 2. **Study `main.py`** - 484 lines of inline documentation explaining every feature
-3. **Read [Database Guide](docs/DATABASE.md)** - Database setup, migrations, auto-CRUD
-4. **Check [CLI Reference](docs/CLI.md)** - svc-infra command-line tools
-5. **Explore `db/models.py`** - SQLAlchemy 2.0 async patterns with ModelBase
-6. **Review `api/v1/routes.py`** - Custom endpoint examples
-7. **Toggle features** - Change `.env` and see how the API adapts
+3. **Try documents demo** - Upload/list/download files at `/v1/documents/`
+4. **Explore storage backends** - Test direct storage operations at `/v1/storage/`
+5. **Read [Database Guide](docs/DATABASE.md)** - Database setup, migrations, auto-CRUD
+6. **Check [CLI Reference](docs/CLI.md)** - svc-infra command-line tools
+7. **Explore `db/models.py`** - SQLAlchemy 2.0 async patterns with ModelBase
+8. **Review `documents/` and `storage/`** - File management patterns
+9. **Review `api/v1/routes.py`** - Custom endpoint examples
+10. **Toggle features** - Change `.env` and see how the API adapts
 
 ## 🛠️ Available Endpoints
 
@@ -333,6 +457,19 @@ Visit `/docs` for interactive documentation, or:
 - `GET /v1/status` - System status
 - `GET /v1/features` - Feature flags
 - `GET /v1/stats/summary` - Statistics
+
+**Documents & Storage:**
+- `POST /v1/documents/upload` - Upload document with metadata tagging
+- `POST /v1/documents/upload-file` - Upload via multipart form
+- `GET /v1/documents/list` - List documents (search, filter, pagination)
+- `GET /v1/documents/{id}` - Get document metadata
+- `GET /v1/documents/{id}/download` - Download document content
+- `POST /v1/storage/upload` - Direct storage upload
+- `GET /v1/storage/download/{key}` - Download file
+- `DELETE /v1/storage/delete/{key}` - Delete file
+- `GET /v1/storage/exists/{key}` - Check file existence
+- `POST /v1/storage/signed-url` - Generate signed URL
+- `GET /v1/storage/list` - List stored files
 
 **Auto-Generated CRUD:**
 - `POST /_sql/projects` - Create project
