@@ -35,6 +35,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         # Skip idempotency for streaming endpoints (incompatible with BaseHTTPMiddleware)
         if any(skip in request.url.path for skip in self.skip_paths):
+            print(f"⏭️  [Idempotency] Skipping path: {request.url.path}")
             return await call_next(request)
 
         if request.method in {"POST", "PATCH", "DELETE"}:

@@ -32,6 +32,7 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
         # otherwise be used to evade per-tenant limits when authentication fails.
         allow_untrusted_tenant_header: bool = False,
         store: RateLimitStore | None = None,
+        skip_paths: list[str] | None = None,
     ):
         super().__init__(app)
         self.limit, self.window = limit, window
@@ -40,8 +41,14 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
         self.scope_by_tenant = scope_by_tenant
         self._allow_untrusted_tenant_header = allow_untrusted_tenant_header
         self.store = store or InMemoryRateLimitStore(limit=limit)
+        self.skip_paths = skip_paths or []
 
     async def dispatch(self, request, call_next):
+        # Skip rate limiting for streaming endpoints (incompatible with BaseHTTPMiddleware)
+        if any(skip in request.url.path for skip in self.skip_paths):
+            print(f"⏭️  [RateLimit] Skipping path: {request.url.path}")
+            return await call_next(request)
+
         # Resolve tenant when possible
         tenant_id = None
         if self.scope_by_tenant or self._limit_resolver:

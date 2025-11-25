@@ -95,7 +95,10 @@ def _setup_middlewares(app: FastAPI, idempotency_skip_paths: list[str] | None = 
         IdempotencyMiddleware,
         skip_paths=idempotency_skip_paths or [],
     )
-    app.add_middleware(SimpleRateLimitMiddleware)
+    app.add_middleware(
+        SimpleRateLimitMiddleware,
+        skip_paths=idempotency_skip_paths or [],  # Reuse same skip paths
+    )
     register_error_handlers(app)
     _add_route_logger(app)
     # Graceful shutdown: track in-flight and wait on shutdown
