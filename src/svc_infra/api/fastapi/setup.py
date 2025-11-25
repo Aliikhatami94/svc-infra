@@ -82,7 +82,7 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
-def _setup_middlewares(app: FastAPI):
+def _setup_middlewares(app: FastAPI, idempotency_skip_paths: list[str] | None = None):
     app.add_middleware(RequestIdMiddleware)  # Now streaming-safe (pure ASGI)
     # Timeouts: enforce body read timeout first, then total handler timeout
     app.add_middleware(BodyReadTimeoutMiddleware)
@@ -91,7 +91,10 @@ def _setup_middlewares(app: FastAPI):
     # NOTE: IdempotencyMiddleware and SimpleRateLimitMiddleware use BaseHTTPMiddleware
     # which breaks streaming. Apply them last so streaming endpoints can bypass if needed.
     # TODO: Rewrite these as pure ASGI middleware for full streaming support
-    app.add_middleware(IdempotencyMiddleware)
+    app.add_middleware(
+        IdempotencyMiddleware,
+        skip_paths=idempotency_skip_paths or [],
+    )
     app.add_middleware(SimpleRateLimitMiddleware)
     register_error_handlers(app)
     _add_route_logger(app)
@@ -160,6 +163,7 @@ def _build_parent_app(
     root_routers: list[str] | str | None,
     root_server_url: str | None = None,
     root_include_api_key: bool = False,
+    idempotency_skip_paths: list[str] | None = None,
 ) -> FastAPI:
     # Root docs are now enabled in all environments to match root card visibility
     parent = FastAPI(
@@ -175,7 +179,7 @@ def _build_parent_app(
     )
 
     _setup_cors(parent, public_cors_origins)
-    _setup_middlewares(parent)
+    _setup_middlewares(parent, idempotency_skip_paths=idempotency_skip_paths)
 
     mutators = setup_mutators(
         service=service,
@@ -221,6 +225,7 @@ def setup_service_api(
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
     root_include_api_key: bool | None = None,
+    idempotency_skip_paths: list[str] | None = None,
 ) -> FastAPI:
     # infer if not explicitly provided
     effective_root_include_api_key = (
@@ -236,6 +241,7 @@ def setup_service_api(
         root_routers=root_routers,
         root_server_url=root_server,
         root_include_api_key=effective_root_include_api_key,
+        idempotency_skip_paths=idempotency_skip_paths,
     )
 
     # Mount each version

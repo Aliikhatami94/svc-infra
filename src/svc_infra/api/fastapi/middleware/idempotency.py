@@ -17,11 +17,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         ttl_seconds: int = 24 * 3600,
         store: Optional[IdempotencyStore] = None,
         header_name: str = "Idempotency-Key",
+        skip_paths: Optional[list[str]] = None,
     ):
         super().__init__(app)
         self.ttl = ttl_seconds
         self.store: IdempotencyStore = store or InMemoryIdempotencyStore()
         self.header_name = header_name
+        self.skip_paths = skip_paths or []
 
     def _cache_key(self, request, idkey: str):
         # The cache key must NOT include the body to allow conflict detection for mismatched payloads.
@@ -31,6 +33,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         return f"idmp:{sig}"
 
     async def dispatch(self, request, call_next):
+        # Skip idempotency for streaming endpoints (incompatible with BaseHTTPMiddleware)
+        if any(skip in request.url.path for skip in self.skip_paths):
+            return await call_next(request)
+
         if request.method in {"POST", "PATCH", "DELETE"}:
             # read & buffer body once
             body = await request.body()
