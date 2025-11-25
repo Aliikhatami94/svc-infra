@@ -83,11 +83,14 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
 
 
 def _setup_middlewares(app: FastAPI):
-    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(RequestIdMiddleware)  # Now streaming-safe (pure ASGI)
     # Timeouts: enforce body read timeout first, then total handler timeout
     app.add_middleware(BodyReadTimeoutMiddleware)
     app.add_middleware(HandlerTimeoutMiddleware)
     app.add_middleware(CatchAllExceptionMiddleware)
+    # NOTE: IdempotencyMiddleware and SimpleRateLimitMiddleware use BaseHTTPMiddleware
+    # which breaks streaming. Apply them last so streaming endpoints can bypass if needed.
+    # TODO: Rewrite these as pure ASGI middleware for full streaming support
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(SimpleRateLimitMiddleware)
     register_error_handlers(app)
