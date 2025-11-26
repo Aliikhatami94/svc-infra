@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRoute
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from svc_infra.api.fastapi.docs.landing import CardSpec, DocTargets, render_index_html
 from svc_infra.api.fastapi.docs.scoped import DOC_SCOPES
@@ -82,25 +83,25 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
-def _setup_middlewares(app: FastAPI, idempotency_skip_paths: list[str] | None = None):
-    app.add_middleware(RequestIdMiddleware)  # Now streaming-safe (pure ASGI)
+def _setup_middlewares(app: FastAPI, skip_paths: list[str] | None = None):
+    """Configure middleware stack. All middlewares are pure ASGI for streaming compatibility.
+
+    Args:
+        app: FastAPI application
+        skip_paths: Paths to skip for certain middlewares (e.g., long-running or streaming endpoints)
+    """
+    paths = skip_paths or []
+
+    app.add_middleware(RequestIdMiddleware)
     # Timeouts: enforce body read timeout first, then total handler timeout
     app.add_middleware(BodyReadTimeoutMiddleware)
-    app.add_middleware(HandlerTimeoutMiddleware)
+    app.add_middleware(HandlerTimeoutMiddleware, skip_paths=paths)
     app.add_middleware(CatchAllExceptionMiddleware)
-    # NOTE: IdempotencyMiddleware and SimpleRateLimitMiddleware use BaseHTTPMiddleware
-    # which breaks streaming. Apply them last so streaming endpoints can bypass if needed.
-    # TODO: Rewrite these as pure ASGI middleware for full streaming support
-    app.add_middleware(
-        IdempotencyMiddleware,
-        skip_paths=idempotency_skip_paths or [],
-    )
-    app.add_middleware(
-        SimpleRateLimitMiddleware,
-        skip_paths=idempotency_skip_paths or [],  # Reuse same skip paths
-    )
+    # Idempotency and rate limiting
+    app.add_middleware(IdempotencyMiddleware, skip_paths=paths)
+    app.add_middleware(SimpleRateLimitMiddleware, skip_paths=paths)
     register_error_handlers(app)
-    _add_route_logger(app)
+    _add_route_logger(app, skip_paths=paths)
     # Graceful shutdown: track in-flight and wait on shutdown
     install_graceful_shutdown(app)
 
@@ -117,7 +118,9 @@ def _dump_or_none(model):
     return model.model_dump(exclude_none=True) if model is not None else None
 
 
-def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
+def _build_child_app(
+    service: ServiceInfo, spec: APIVersionSpec, skip_paths: list[str] | None = None
+) -> FastAPI:
     title = f"{service.name} • {spec.tag}" if getattr(spec, "tag", None) else service.name
     child = FastAPI(
         title=title,
@@ -129,7 +132,7 @@ def _build_child_app(service: ServiceInfo, spec: APIVersionSpec) -> FastAPI:
         generate_unique_id_function=_gen_operation_id_factory(),
     )
 
-    _setup_middlewares(child)
+    _setup_middlewares(child, skip_paths=skip_paths)
 
     # ---- OpenAPI pipeline (DRY!) ----
     include_api_key = bool(spec.include_api_key) if spec.include_api_key is not None else False
@@ -166,7 +169,7 @@ def _build_parent_app(
     root_routers: list[str] | str | None,
     root_server_url: str | None = None,
     root_include_api_key: bool = False,
-    idempotency_skip_paths: list[str] | None = None,
+    skip_paths: list[str] | None = None,
 ) -> FastAPI:
     # Root docs are now enabled in all environments to match root card visibility
     parent = FastAPI(
@@ -182,7 +185,7 @@ def _build_parent_app(
     )
 
     _setup_cors(parent, public_cors_origins)
-    _setup_middlewares(parent, idempotency_skip_paths=idempotency_skip_paths)
+    _setup_middlewares(parent, skip_paths=skip_paths)
 
     mutators = setup_mutators(
         service=service,
@@ -206,18 +209,43 @@ def _build_parent_app(
     return parent
 
 
-def _add_route_logger(app: FastAPI):
-    @app.middleware("http")
-    async def _log_route(request, call_next):
-        resp = await call_next(request)
-        route = request.scope.get("route")
-        # Prefer FastAPI's path_format (shows param patterns), fall back to path
-        path = getattr(route, "path_format", None) or getattr(route, "path", None)
-        if path:
-            # Include mount root_path so mounted children show their full path
-            root_path = request.scope.get("root_path", "") or ""
-            resp.headers["X-Handled-By"] = f"{request.method} {root_path}{path}"
-        return resp
+class RouteLoggerMiddleware:
+    """Pure ASGI middleware to add X-Handled-By header."""
+
+    def __init__(self, app: ASGIApp, skip_paths: list[str] | None = None):
+        self.app = app
+        self.skip_paths = skip_paths or []
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        method = scope.get("method", "")
+
+        # Skip specified paths
+        if any(skip in path for skip in self.skip_paths):
+            await self.app(scope, receive, send)
+            return
+
+        # Wrap send to add header after response starts
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                route = scope.get("route")
+                route_path = getattr(route, "path_format", None) or getattr(route, "path", None)
+                if route_path:
+                    root_path = scope.get("root_path", "") or ""
+                    headers = list(message.get("headers", []))
+                    headers.append((b"x-handled-by", f"{method} {root_path}{route_path}".encode()))
+                    message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
+def _add_route_logger(app: FastAPI, skip_paths: list[str] | None = None):
+    app.add_middleware(RouteLoggerMiddleware, skip_paths=skip_paths)
 
 
 def setup_service_api(
@@ -228,7 +256,7 @@ def setup_service_api(
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
     root_include_api_key: bool | None = None,
-    idempotency_skip_paths: list[str] | None = None,
+    skip_paths: list[str] | None = None,
 ) -> FastAPI:
     # infer if not explicitly provided
     effective_root_include_api_key = (
@@ -244,12 +272,12 @@ def setup_service_api(
         root_routers=root_routers,
         root_server_url=root_server,
         root_include_api_key=effective_root_include_api_key,
-        idempotency_skip_paths=idempotency_skip_paths,
+        skip_paths=skip_paths,
     )
 
     # Mount each version
     for spec in versions:
-        child = _build_child_app(service, spec)
+        child = _build_child_app(service, spec, skip_paths=skip_paths)
         mount_path = f"/{spec.tag.strip('/')}"
         parent.mount(mount_path, child, name=spec.tag.strip("/"))
 

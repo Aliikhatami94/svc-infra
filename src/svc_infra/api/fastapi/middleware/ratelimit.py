@@ -1,7 +1,8 @@
+import json
 import time
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
+from fastapi import Request
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from svc_infra.obs.metrics import emit_rate_limited
 
@@ -14,10 +15,17 @@ except Exception:  # pragma: no cover - fallback for minimal builds
     _resolve_tenant_id = None  # type: ignore
 
 
-class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
+class SimpleRateLimitMiddleware:
+    """
+    Pure ASGI rate limiting middleware.
+
+    Applies per-key rate limits with configurable windows. Use skip_paths for
+    endpoints that should bypass rate limiting (e.g., health checks, webhooks).
+    """
+
     def __init__(
         self,
-        app,
+        app: ASGIApp,
         limit: int = 120,
         window: int = 60,
         key_fn=None,
@@ -34,20 +42,34 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
         store: RateLimitStore | None = None,
         skip_paths: list[str] | None = None,
     ):
-        super().__init__(app)
+        self.app = app
         self.limit, self.window = limit, window
-        self.key_fn = key_fn or (lambda r: r.headers.get("X-API-Key") or r.client.host)
+        self.key_fn = key_fn
         self._limit_resolver = limit_resolver
         self.scope_by_tenant = scope_by_tenant
         self._allow_untrusted_tenant_header = allow_untrusted_tenant_header
         self.store = store or InMemoryRateLimitStore(limit=limit)
         self.skip_paths = skip_paths or []
 
-    async def dispatch(self, request, call_next):
-        # Skip rate limiting for streaming endpoints (incompatible with BaseHTTPMiddleware)
-        if any(skip in request.url.path for skip in self.skip_paths):
-            print(f"⏭️  [RateLimit] Skipping path: {request.url.path}")
-            return await call_next(request)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+
+        # Skip specified paths
+        if any(skip in path for skip in self.skip_paths):
+            await self.app(scope, receive, send)
+            return
+
+        # Create a Request object for key extraction and tenant resolution
+        request = Request(scope, receive)
+
+        # Default key function
+        key_fn = self.key_fn or (
+            lambda r: r.headers.get("X-API-Key") or (r.client.host if r.client else "unknown")
+        )
 
         # Resolve tenant when possible
         tenant_id = None
@@ -57,10 +79,7 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
                     tenant_id = await _resolve_tenant_id(request)
             except Exception:
                 tenant_id = None
-            # Fallback header behavior:
-            # - If tenancy context is unavailable (minimal builds), accept header by default so
-            #   unit/integration tests can exercise per-tenant scoping without full auth state.
-            # - If tenancy is available, only trust the header when explicitly allowed.
+            # Fallback header behavior
             if not tenant_id:
                 if _resolve_tenant_id is None:
                     tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get(
@@ -71,7 +90,7 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
                         "X-Tenant-ID"
                     )
 
-        key = self.key_fn(request)
+        key = key_fn(request)
         if self.scope_by_tenant and tenant_id:
             key = f"{key}:tenant:{tenant_id}"
 
@@ -85,42 +104,56 @@ class SimpleRateLimitMiddleware(BaseHTTPMiddleware):
                 eff_limit = self.limit
 
         now = int(time.time())
-        # Increment counter in store
-        # Update store limit if it differs; stores capture configured limit internally
-        # For in-memory store, we can temporarily adjust per-request by swapping a new store instance
-        # but to keep API simple, we reuse store and clamp by eff_limit below.
         count, store_limit, reset = self.store.incr(str(key), self.window)
-        # Enforce the effective limit selected for this request
         limit = eff_limit
         remaining = max(0, limit - count)
 
-        if remaining < 0:  # defensive clamp
-            remaining = 0
-
         if count > limit:
+            # Rate limited - return 429
             retry = max(0, reset - now)
             try:
                 emit_rate_limited(str(key), limit, retry)
             except Exception:
                 pass
-            return JSONResponse(
-                status_code=429,
-                content={
+
+            body = json.dumps(
+                {
                     "title": "Too Many Requests",
                     "status": 429,
                     "detail": "Rate limit exceeded.",
                     "code": "RATE_LIMITED",
-                },
-                headers={
-                    "X-RateLimit-Limit": str(limit),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(reset),
-                    "Retry-After": str(retry),
-                },
-            )
+                }
+            ).encode("utf-8")
 
-        resp = await call_next(request)
-        resp.headers.setdefault("X-RateLimit-Limit", str(limit))
-        resp.headers.setdefault("X-RateLimit-Remaining", str(remaining))
-        resp.headers.setdefault("X-RateLimit-Reset", str(reset))
-        return resp
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 429,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"x-ratelimit-limit", str(limit).encode()),
+                        (b"x-ratelimit-remaining", b"0"),
+                        (b"x-ratelimit-reset", str(reset).encode()),
+                        (b"retry-after", str(retry).encode()),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": body, "more_body": False})
+            return
+
+        # Not rate limited - add headers to response
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                # Add rate limit headers if not already present
+                header_names = {h[0].lower() for h in headers}
+                if b"x-ratelimit-limit" not in header_names:
+                    headers.append((b"x-ratelimit-limit", str(limit).encode()))
+                if b"x-ratelimit-remaining" not in header_names:
+                    headers.append((b"x-ratelimit-remaining", str(remaining).encode()))
+                if b"x-ratelimit-reset" not in header_names:
+                    headers.append((b"x-ratelimit-reset", str(reset).encode()))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)

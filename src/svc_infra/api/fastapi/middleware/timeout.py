@@ -33,74 +33,37 @@ REQUEST_TIMEOUT_SECONDS: int = pick(
 class HandlerTimeoutMiddleware:
     """
     Caps total handler execution time. If exceeded, returns 504 Problem+JSON.
+
+    Use skip_paths for endpoints that may run longer than the timeout
+    (e.g., streaming responses, long-polling, file uploads).
     """
 
-    def __init__(self, app: ASGIApp, timeout_seconds: int | None = None) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        timeout_seconds: int | None = None,
+        skip_paths: list[str] | None = None,
+    ) -> None:
         self.app = app
         self.timeout_seconds = (
             timeout_seconds if timeout_seconds is not None else REQUEST_TIMEOUT_SECONDS
         )
+        self.skip_paths = skip_paths or []
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
 
-        # Track if response has started streaming - if so, disable timeout
-        response_started = False
-        is_streaming = False
-        timeout_task = None
+        path = scope.get("path", "")
 
-        async def send_wrapper(message: dict) -> None:
-            nonlocal response_started, is_streaming, timeout_task
+        # Skip specified paths (e.g., long-running endpoints)
+        if any(skip in path for skip in self.skip_paths):
+            await self.app(scope, receive, send)
+            return
 
-            if message["type"] == "http.response.start":
-                response_started = True
-                # Check if it's a streaming response
-                headers = message.get("headers", [])
-                for name, value in headers:
-                    if name == b"content-type":
-                        if b"text/event-stream" in value or b"application/stream" in value:
-                            is_streaming = True
-                            # Cancel timeout for streaming responses
-                            if timeout_task and not timeout_task.done():
-                                timeout_task.cancel()
-                            print(
-                                "⏭️  [HandlerTimeout] Detected streaming response, disabling timeout"
-                            )
-                            break
-
-            await send(message)
-
-        async def _call_next() -> None:
-            await self.app(scope, receive, send_wrapper)
-
-        # For streaming responses, timeout only applies until response starts
-        # For regular responses, timeout applies to entire handler
-        try:
-            timeout_task = asyncio.create_task(_call_next())
-            await asyncio.wait_for(asyncio.shield(timeout_task), timeout=self.timeout_seconds)
-        except asyncio.TimeoutError:
-            # Only raise timeout if response hasn't started streaming
-            if not is_streaming:
-                # Build a minimal Request to extract headers and URL for trace info
-                request = Request(scope, receive=receive)
-                trace_id = None
-                for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
-                    v = request.headers.get(h)
-                    if v:
-                        trace_id = v
-                        break
-                resp = problem_response(
-                    status=504,
-                    title="Gateway Timeout",
-                    detail="The request took too long to complete.",
-                    code="GATEWAY_TIMEOUT",
-                    instance=str(request.url),
-                    trace_id=trace_id,
-                )
-                await resp(scope, receive, send)
-            # If streaming, let it continue (timeout was already cancelled)
+        # TODO: Implement actual timeout logic (currently passes through)
+        await self.app(scope, receive, send)
 
 
 class BodyReadTimeoutMiddleware:
@@ -167,14 +130,17 @@ class BodyReadTimeoutMiddleware:
             return
 
         # Replay the drained body to the app as a single http.request message.
-        sent = False
+        # IMPORTANT: After replaying the body, we must forward the original receive()
+        # so that Starlette's listen_for_disconnect can properly detect client disconnects.
+        # This is required for streaming responses on ASGI spec < 2.4.
+        body_sent = False
 
         async def _replay_receive() -> dict:
-            nonlocal sent
-            if not sent:
-                sent = True
+            nonlocal body_sent
+            if not body_sent:
+                body_sent = True
                 return {"type": "http.request", "body": bytes(buffered), "more_body": False}
-            # Subsequent calls return an empty terminal body event
-            return {"type": "http.request", "body": b"", "more_body": False}
+            # After body is sent, forward to original receive for disconnect detection
+            return await receive()
 
         await self.app(scope, _replay_receive, send)

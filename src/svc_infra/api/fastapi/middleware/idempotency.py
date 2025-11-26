@@ -1,118 +1,200 @@
 import base64
 import hashlib
+import json
 import time
-from typing import Annotated, Dict, Optional
+from typing import Annotated, Optional
 
 from fastapi import Header, HTTPException, Request
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .idempotency_store import IdempotencyStore, InMemoryIdempotencyStore
 
 
-class IdempotencyMiddleware(BaseHTTPMiddleware):
+class IdempotencyMiddleware:
+    """
+    Pure ASGI idempotency middleware.
+
+    Caches responses for requests with Idempotency-Key header to ensure
+    duplicate requests return the same response. Use skip_paths for endpoints
+    where idempotency caching is not appropriate (e.g., streaming responses).
+    """
+
     def __init__(
         self,
-        app,
+        app: ASGIApp,
         ttl_seconds: int = 24 * 3600,
         store: Optional[IdempotencyStore] = None,
         header_name: str = "Idempotency-Key",
         skip_paths: Optional[list[str]] = None,
     ):
-        super().__init__(app)
+        self.app = app
         self.ttl = ttl_seconds
         self.store: IdempotencyStore = store or InMemoryIdempotencyStore()
-        self.header_name = header_name
+        self.header_name = header_name.lower()
         self.skip_paths = skip_paths or []
 
-    def _cache_key(self, request, idkey: str):
-        # The cache key must NOT include the body to allow conflict detection for mismatched payloads.
-        sig = hashlib.sha256(
-            (request.method + "|" + request.url.path + "|" + idkey).encode()
-        ).hexdigest()
+    def _cache_key(self, method: str, path: str, idkey: str) -> str:
+        sig = hashlib.sha256((method + "|" + path + "|" + idkey).encode()).hexdigest()
         return f"idmp:{sig}"
 
-    async def dispatch(self, request, call_next):
-        # Skip idempotency for streaming endpoints (incompatible with BaseHTTPMiddleware)
-        if any(skip in request.url.path for skip in self.skip_paths):
-            print(f"⏭️  [Idempotency] Skipping path: {request.url.path}")
-            return await call_next(request)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
 
-        if request.method in {"POST", "PATCH", "DELETE"}:
-            # read & buffer body once
-            body = await request.body()
-            request._body = body
-            idkey = request.headers.get(self.header_name)
-            if idkey:
-                k = self._cache_key(request, idkey)
-                now = time.time()
-                # build request hash to detect mismatched replays
-                req_hash = hashlib.sha256(body or b"").hexdigest()
+        path = scope.get("path", "")
+        method = scope.get("method", "GET")
 
-                existing = self.store.get(k)
-                if existing and existing.exp > now:
-                    # If payload mismatches any existing claim, return conflict
-                    if existing.req_hash and existing.req_hash != req_hash:
-                        return JSONResponse(
-                            status_code=409,
-                            content={
-                                "type": "about:blank",
-                                "title": "Conflict",
-                                "detail": "Idempotency-Key re-used with different request payload.",
-                            },
-                        )
-                    # If response cached and payload matches, replay it
-                    if existing.status is not None and existing.body_b64 is not None:
-                        return Response(
-                            content=base64.b64decode(existing.body_b64),
-                            status_code=existing.status,
-                            headers=existing.headers or {},
-                            media_type=existing.media_type,
-                        )
+        # Skip specified paths
+        if any(skip in path for skip in self.skip_paths):
+            await self.app(scope, receive, send)
+            return
 
-                # Claim the key if not present
-                exp = now + self.ttl
-                created = self.store.set_initial(k, req_hash, exp)
-                if not created:
-                    # Someone else claimed; re-check for conflict or replay
-                    existing = self.store.get(k)
-                    if existing and existing.req_hash and existing.req_hash != req_hash:
-                        return JSONResponse(
-                            status_code=409,
-                            content={
-                                "type": "about:blank",
-                                "title": "Conflict",
-                                "detail": "Idempotency-Key re-used with different request payload.",
-                            },
-                        )
-                    if existing and existing.status is not None and existing.body_b64 is not None:
-                        return Response(
-                            content=base64.b64decode(existing.body_b64),
-                            status_code=existing.status,
-                            headers=existing.headers or {},
-                            media_type=existing.media_type,
-                        )
+        # Only apply to mutating methods
+        if method not in {"POST", "PATCH", "DELETE"}:
+            await self.app(scope, receive, send)
+            return
 
-                # Proceed to handler
-                resp = await call_next(request)
-                if 200 <= resp.status_code < 300:
-                    body_bytes = b"".join([section async for section in resp.body_iterator])
-                    headers: Dict[str, str] = dict(resp.headers)
-                    self.store.set_response(
-                        k,
-                        status=resp.status_code,
-                        body=body_bytes,
-                        headers=headers,
-                        media_type=resp.media_type,
-                    )
-                    return Response(
-                        content=body_bytes,
-                        status_code=resp.status_code,
-                        headers=headers,
-                        media_type=resp.media_type,
-                    )
-                return resp
-        return await call_next(request)
+        # Get idempotency key from headers
+        headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+        idkey = headers.get(self.header_name)
+
+        if not idkey:
+            # No idempotency key - pass through
+            await self.app(scope, receive, send)
+            return
+
+        # Buffer the request body
+        body_parts = []
+        while True:
+            message = await receive()
+            if message["type"] == "http.request":
+                body_parts.append(message.get("body", b"") or b"")
+                if not message.get("more_body", False):
+                    break
+            elif message["type"] == "http.disconnect":
+                break
+        body = b"".join(body_parts)
+
+        k = self._cache_key(method, path, idkey)
+        now = time.time()
+        req_hash = hashlib.sha256(body).hexdigest()
+
+        existing = self.store.get(k)
+        if existing and existing.exp > now:
+            # If payload mismatches, return conflict
+            if existing.req_hash and existing.req_hash != req_hash:
+                await self._send_json_response(
+                    send,
+                    409,
+                    {
+                        "type": "about:blank",
+                        "title": "Conflict",
+                        "detail": "Idempotency-Key re-used with different request payload.",
+                    },
+                )
+                return
+            # If response cached and payload matches, replay it
+            if existing.status is not None and existing.body_b64 is not None:
+                await self._send_cached_response(send, existing)
+                return
+
+        # Claim the key
+        exp = now + self.ttl
+        created = self.store.set_initial(k, req_hash, exp)
+        if not created:
+            existing = self.store.get(k)
+            if existing and existing.req_hash and existing.req_hash != req_hash:
+                await self._send_json_response(
+                    send,
+                    409,
+                    {
+                        "type": "about:blank",
+                        "title": "Conflict",
+                        "detail": "Idempotency-Key re-used with different request payload.",
+                    },
+                )
+                return
+            if existing and existing.status is not None and existing.body_b64 is not None:
+                await self._send_cached_response(send, existing)
+                return
+
+        # Create a replay receive that returns buffered body
+        # IMPORTANT: After replaying the body, we must forward to original receive()
+        # so that Starlette's listen_for_disconnect can properly detect client disconnects.
+        # This is required for streaming responses on ASGI spec < 2.4.
+        body_sent = False
+
+        async def replay_receive():
+            nonlocal body_sent
+            if not body_sent:
+                body_sent = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            # After body is sent, forward to original receive for disconnect detection
+            return await receive()
+
+        # Capture response for caching
+        response_started = False
+        response_status = 0
+        response_headers: list = []
+        response_body_parts = []
+
+        async def capture_send(message):
+            nonlocal response_started, response_status, response_headers
+            if message["type"] == "http.response.start":
+                response_started = True
+                response_status = message.get("status", 200)
+                response_headers = list(message.get("headers", []))
+            elif message["type"] == "http.response.body":
+                body_chunk = message.get("body", b"")
+                if body_chunk:
+                    response_body_parts.append(body_chunk)
+            await send(message)
+
+        await self.app(scope, replay_receive, capture_send)
+
+        # Cache successful responses
+        if 200 <= response_status < 300:
+            response_body = b"".join(response_body_parts)
+            headers_dict = {k.decode(): v.decode() for k, v in response_headers}
+            media_type = headers_dict.get("content-type", "application/octet-stream")
+            self.store.set_response(
+                k,
+                status=response_status,
+                body=response_body,
+                headers=headers_dict,
+                media_type=media_type,
+            )
+
+    async def _send_json_response(self, send, status: int, content: dict) -> None:
+        body = json.dumps(content).encode("utf-8")
+        await send(
+            {
+                "type": "http.response.start",
+                "status": status,
+                "headers": [(b"content-type", b"application/json")],
+            }
+        )
+        await send({"type": "http.response.body", "body": body, "more_body": False})
+
+    async def _send_cached_response(self, send, existing) -> None:
+        headers = [(k.encode(), v.encode()) for k, v in (existing.headers or {}).items()]
+        if existing.media_type:
+            headers.append((b"content-type", existing.media_type.encode()))
+        await send(
+            {
+                "type": "http.response.start",
+                "status": existing.status,
+                "headers": headers,
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": base64.b64decode(existing.body_b64),
+                "more_body": False,
+            }
+        )
 
 
 async def require_idempotency_key(
