@@ -46,29 +46,61 @@ class HandlerTimeoutMiddleware:
             await self.app(scope, receive, send)
             return
 
-        async def _call_next() -> None:
-            await self.app(scope, receive, send)
+        # Track if response has started streaming - if so, disable timeout
+        response_started = False
+        is_streaming = False
+        timeout_task = None
 
+        async def send_wrapper(message: dict) -> None:
+            nonlocal response_started, is_streaming, timeout_task
+
+            if message["type"] == "http.response.start":
+                response_started = True
+                # Check if it's a streaming response
+                headers = message.get("headers", [])
+                for name, value in headers:
+                    if name == b"content-type":
+                        if b"text/event-stream" in value or b"application/stream" in value:
+                            is_streaming = True
+                            # Cancel timeout for streaming responses
+                            if timeout_task and not timeout_task.done():
+                                timeout_task.cancel()
+                            print(
+                                "⏭️  [HandlerTimeout] Detected streaming response, disabling timeout"
+                            )
+                            break
+
+            await send(message)
+
+        async def _call_next() -> None:
+            await self.app(scope, receive, send_wrapper)
+
+        # For streaming responses, timeout only applies until response starts
+        # For regular responses, timeout applies to entire handler
         try:
-            await asyncio.wait_for(_call_next(), timeout=self.timeout_seconds)
+            timeout_task = asyncio.create_task(_call_next())
+            await asyncio.wait_for(asyncio.shield(timeout_task), timeout=self.timeout_seconds)
         except asyncio.TimeoutError:
-            # Build a minimal Request to extract headers and URL for trace info
-            request = Request(scope, receive=receive)
-            trace_id = None
-            for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
-                v = request.headers.get(h)
-                if v:
-                    trace_id = v
-                    break
-            resp = problem_response(
-                status=504,
-                title="Gateway Timeout",
-                detail="The request took too long to complete.",
-                code="GATEWAY_TIMEOUT",
-                instance=str(request.url),
-                trace_id=trace_id,
-            )
-            await resp(scope, receive, send)
+            # Only raise timeout if response hasn't started streaming
+            if not is_streaming:
+                # Build a minimal Request to extract headers and URL for trace info
+                request = Request(scope, receive=receive)
+                trace_id = None
+                for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
+                    v = request.headers.get(h)
+                    if v:
+                        trace_id = v
+                        break
+                resp = problem_response(
+                    status=504,
+                    title="Gateway Timeout",
+                    detail="The request took too long to complete.",
+                    code="GATEWAY_TIMEOUT",
+                    instance=str(request.url),
+                    trace_id=trace_id,
+                )
+                await resp(scope, receive, send)
+            # If streaming, let it continue (timeout was already cancelled)
 
 
 class BodyReadTimeoutMiddleware:
