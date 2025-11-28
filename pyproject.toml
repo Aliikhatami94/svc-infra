@@ -93,6 +93,7 @@ itsdangerous = "^2.2.0"
 pyotp = "^2.9.0"
 stripe = "^13.0.1"
 adyen = "^13.4.0"
+websockets = "^15.0.1"
 
 [tool.poetry.extras]
 # Postgres v3
