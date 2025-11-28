@@ -545,6 +545,6 @@ DB_PARAMS=pool_size=20&max_overflow=10
 
 ## Further Reading
 
-- [CLI Reference](../../src/svc_infra/docs/cli.md) - Complete CLI documentation
-- [Database Guide](../../src/svc_infra/docs/database.md) - Core svc-infra database docs
+- [CLI Reference](../../docs/cli.md) - Complete CLI documentation
+- [Database Guide](../../docs/database.md) - Core svc-infra database docs
 - [USAGE.md](../USAGE.md) - Full feature usage guide

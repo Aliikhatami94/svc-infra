@@ -680,5 +680,5 @@ python -m svc_infra.cli sql revision \
 ## Further Reading
 
 - [Database Guide](./DATABASE.md) - Complete database setup guide
-- [Core CLI Docs](../../src/svc_infra/docs/cli.md) - Core svc-infra CLI documentation
+- [Core CLI Docs](../../docs/cli.md) - Core svc-infra CLI documentation
 - [Alembic Docs](https://alembic.sqlalchemy.org/) - Official Alembic documentation
