@@ -100,7 +100,7 @@ def client() -> Generator[httpx.Client, None, None]:
 
 
 @pytest.fixture(autouse=True)
-def _reset_tenancy_between_tests(request, client: httpx.Client):
+def _reset_tenancy_between_tests(request):
     """Reset in-memory tenancy state before each tenancy-marked test.
 
     Applies to both in-process and external (BASE_URL) modes to prevent state leakage
@@ -109,6 +109,8 @@ def _reset_tenancy_between_tests(request, client: httpx.Client):
     # Only for tests marked 'tenancy'
     if request.node.get_closest_marker("tenancy") is None:
         return
+    # Lazily get client only when we actually need it (for tenancy tests)
+    client = request.getfixturevalue("client")
     try:
         r = client.post("/tenancy/_reset")
         assert r.status_code in (200, 204)

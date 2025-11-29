@@ -189,6 +189,50 @@ add_webhooks(app)  # Mounts /_webhooks routes and verification middleware
 
 **See**: [Webhooks Guide](webhooks.md)
 
+### WebSocket (`add_websocket_manager`)
+
+Add WebSocket connection management for real-time features.
+
+```python
+from fastapi import FastAPI, WebSocket
+from svc_infra.websocket import add_websocket_manager
+
+app = FastAPI()
+manager = add_websocket_manager(app)
+
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    await manager.connect(user_id, websocket)
+    try:
+        async for message in websocket.iter_json():
+            await manager.broadcast(message)
+    finally:
+        await manager.disconnect(user_id, websocket)
+```
+
+**For authenticated WebSocket endpoints**, use `ws_protected_router`:
+
+```python
+from svc_infra.api.fastapi.dual import ws_protected_router
+from svc_infra.api.fastapi.dx import WSIdentity
+
+router = ws_protected_router(prefix="/api")
+
+@router.websocket("/ws")
+async def secure_ws(websocket: WebSocket, user: WSIdentity):
+    # user.id, user.email, user.scopes from JWT
+    await manager.connect(user.id, websocket)
+    ...
+```
+
+**Environment variables**:
+- `WS_OPEN_TIMEOUT`: Connection timeout (default: 10s)
+- `WS_PING_INTERVAL`: Keepalive ping interval (default: 20s)
+- `WS_MAX_MESSAGE_SIZE`: Max message size (default: 1MB)
+- `WS_RECONNECT_ENABLED`: Enable auto-reconnection (default: true)
+
+**See**: [WebSocket Guide](websocket.md) for comprehensive documentation.
+
 ### Jobs (`easy_jobs`)
 
 Initialize job queue and scheduler.

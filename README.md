@@ -17,6 +17,7 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 | Database | SQL + Mongo wiring, Alembic helpers, inbox/outbox patterns | [Database](docs/database.md) |
 | Storage | File storage with S3, local, memory backends | [Storage](docs/storage.md) |
 | Documents | Generic document management with metadata | [Documents](docs/documents.md) |
+| WebSocket | Real-time communication, client & server | [WebSocket](docs/websocket.md) |
 | Tenancy | Multi-tenant boundaries and helpers | [Tenancy](docs/tenancy.md) |
 | Idempotency | Idempotent endpoints and middleware | [Idempotency](docs/idempotency.md) |
 | Rate Limiting | Middleware, dependency limiter, headers | [Rate limiting](docs/rate-limiting.md) |
