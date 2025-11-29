@@ -1,15 +1,12 @@
 """
 WebSocket infrastructure for svc-infra.
 
-Provides client and server-side WebSocket utilities:
-- WebSocketClient: Connect to external WebSocket services
-- ConnectionManager: Manage multiple server-side connections
-- Easy builders for quick setup
+Provides client and server-side WebSocket utilities.
 
 Quick Start (Client):
-    from svc_infra.websocket import easy_websocket_client
+    from svc_infra.websocket import websocket_client
 
-    async with easy_websocket_client("wss://api.example.com") as ws:
+    async with websocket_client("wss://api.example.com") as ws:
         await ws.send_json({"hello": "world"})
         async for message in ws:
             print(message)
@@ -31,8 +28,10 @@ Quick Start (Server):
             await manager.disconnect(user_id, websocket)
 """
 
-from .client import WebSocketClient, websocket_connect
-from .config import WebSocketConfig, get_default_config
+from .add import add_websocket_manager, get_ws_manager
+from .client import WebSocketClient
+from .config import WebSocketConfig
+from .easy import easy_websocket_client, websocket_client
 from .exceptions import (
     AuthenticationError,
     ConnectionClosedError,
@@ -40,15 +39,18 @@ from .exceptions import (
     MessageTooLargeError,
     WebSocketError,
 )
+from .manager import ConnectionManager
 from .models import ConnectionInfo, ConnectionState, WebSocketMessage
 
 __all__ = [
-    # Client
+    # Main API (simple)
+    "websocket_client",
+    "add_websocket_manager",
+    "get_ws_manager",
+    # Core classes (when you need more control)
     "WebSocketClient",
-    "websocket_connect",
-    # Config
+    "ConnectionManager",
     "WebSocketConfig",
-    "get_default_config",
     # Models
     "ConnectionState",
     "WebSocketMessage",
@@ -59,4 +61,6 @@ __all__ = [
     "ConnectionFailedError",
     "AuthenticationError",
     "MessageTooLargeError",
+    # Backward compat
+    "easy_websocket_client",
 ]
