@@ -5,11 +5,10 @@
 
 svc-infra packages the shared building blocks we use to ship production FastAPI services fast—HTTP APIs with secure auth, durable persistence, background execution, cache, observability, and webhook plumbing that all share the same batteries-included defaults.
 
-## Helper index
+## Documentation
 
 | Area | What it covers | Guide |
 | --- | --- | --- |
-| Getting Started | Overview and entry points | [This page](docs/getting-started.md) |
 | Environment | Feature switches and env vars | [Environment](docs/environment.md) |
 | API | FastAPI bootstrap, middleware, docs wiring | [API guide](docs/api.md) |
 | Auth | Sessions, OAuth/OIDC, MFA, SMTP delivery | [Auth](docs/auth.md) |
@@ -26,12 +25,13 @@ svc-infra packages the shared building blocks we use to ship production FastAPI 
 | Observability | Prometheus, Grafana, OpenTelemetry | [Observability](docs/observability.md) |
 | Ops | Probes, breakers, SLOs & dashboards | [Ops](docs/ops.md) |
 | Webhooks | Subscription store, signing, retry worker | [Webhooks](docs/webhooks.md) |
+| Admin | Admin endpoints and impersonation | [Admin](docs/admin.md) |
+| Billing | Billing primitives and Stripe integration | [Billing](docs/billing.md) |
 | CLI | Command groups for sql/mongo/obs/docs/dx/sdk/jobs | [CLI](docs/cli.md) |
 | Docs & SDKs | Publishing docs, generating SDKs | [Docs & SDKs](docs/docs-and-sdks.md) |
-| Acceptance | Acceptance harness and flows | [Acceptance](docs/acceptance.md), [Matrix](docs/acceptance-matrix.md) |
-| Contributing | Dev setup and quality gates | [Contributing](docs/contributing.md) |
-| Repo Review | Checklist for releasing/PRs | [Repo review](docs/repo-review.md) |
 | Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](docs/data-lifecycle.md) |
+| Timeouts | Request timeouts and resource limits | [Timeouts](docs/timeouts-and-resource-limits.md) |
+| Versioned Integrations | Managing third-party API versions | [Versioned Integrations](docs/versioned-integrations.md) |
 
 ## Quick Start with Template Example
 

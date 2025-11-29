@@ -976,7 +976,6 @@ GET /_ops/health
 
 ## See Also
 
-- [ADR-0012: Generic File Storage System](./adr/0012-generic-file-storage.md) - Design decisions
 - [API Integration Guide](./api.md) - FastAPI integration patterns
 - [Tenancy Guide](./tenancy.md) - Multi-tenant file isolation
 - [Security Guide](./security.md) - Security best practices

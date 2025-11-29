@@ -418,7 +418,6 @@ async def admin_summary():
 
 ## Further Reading
 
-- [ADR 0011: Admin scope and impersonation](./adr/0011-admin-scope-and-impersonation.md)
 - [Security & Auth Hardening](./security.md)
 - [Permissions & RBAC](./security.md#permissions-and-rbac)
 - [Audit Logging](./security.md#audit-logging)

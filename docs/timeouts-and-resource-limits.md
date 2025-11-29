@@ -34,8 +34,6 @@ The library exposes simple environment variables with sensible defaults. Use flo
   - Default: prod=20.0, nonprod=5.0
   - Purpose: Wait time for in-flight requests to drain on shutdown
 
-See ADR-0010 for design rationale: `docs/adr/0010-timeouts-and-resource-limits.md`.
-
 ## Request/handler timeouts (FastAPI)
 
 Two middlewares enforce timeouts inside your ASGI app:
