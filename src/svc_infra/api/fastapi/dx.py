@@ -59,19 +59,36 @@ from svc_infra.api.fastapi.auth.security import (
     RequireUser,
 )
 from svc_infra.api.fastapi.auth.settings import AuthSettings, get_auth_settings
-from svc_infra.api.fastapi.dual.protected import (
+
+# ----------------
+# WebSocket identity primitives (lightweight JWT, no DB required)
+# ----------------
+from svc_infra.api.fastapi.auth.ws_security import (
+    AllowWSIdentity,
+    OptionalWSIdentity,
+    RequireWSAnyScope,
+    RequireWSIdentity,
+    RequireWSScopes,
+    WSIdentity,
+    WSPrincipal,
+)
+from svc_infra.api.fastapi.dual.protected import (  # WebSocket routers (DualAPIRouter with JWT auth, no DB required)
     optional_identity_router,
     protected_router,
     roles_router,
     scopes_router,
     service_router,
     user_router,
+    ws_optional_router,
+    ws_protected_router,
+    ws_scopes_router,
+    ws_user_router,
 )
 
 # ----------------
 # Pre-wired routers (OpenAPI security auto-injected)
 # ----------------
-from svc_infra.api.fastapi.dual.public import public_router
+from svc_infra.api.fastapi.dual.public import public_router, ws_public_router
 
 # ----------------
 # App bootstrap
@@ -127,6 +144,20 @@ __all__ = [
     "service_router",
     "scopes_router",
     "roles_router",
+    # WebSocket identity
+    "WSPrincipal",
+    "WSIdentity",
+    "OptionalWSIdentity",
+    "RequireWSIdentity",
+    "AllowWSIdentity",
+    "RequireWSScopes",
+    "RequireWSAnyScope",
+    # WebSocket routers
+    "ws_public_router",
+    "ws_protected_router",
+    "ws_user_router",
+    "ws_scopes_router",
+    "ws_optional_router",
     # Feature routers
     "apikey_router",
     "mfa_router",

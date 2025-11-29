@@ -20,3 +20,28 @@ def public_router(**kwargs: Any) -> DualAPIRouter:
     apply_default_responses(r, DEFAULT_PUBLIC)
 
     return r
+
+
+def ws_public_router(**kwargs: Any) -> DualAPIRouter:
+    """
+    Public WebSocket router: no auth dependencies.
+
+    Use this for WebSocket endpoints that don't require authentication.
+    This is the WebSocket equivalent of `public_router()`.
+
+    Example:
+        router = ws_public_router(prefix="/api")
+
+        @router.websocket("/ws/public")
+        async def ws_endpoint(websocket: WebSocket):
+            await websocket.accept()
+            # No auth required - anyone can connect
+            async for msg in websocket.iter_json():
+                await websocket.send_json({"echo": msg})
+    """
+    r = DualAPIRouter(**kwargs)
+
+    # Keep OpenAPI consistent - no security requirement
+    apply_default_security(r, default_security=[])
+
+    return r

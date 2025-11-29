@@ -26,6 +26,19 @@ Quick Start (Server):
                 await manager.broadcast(msg)
         finally:
             await manager.disconnect(user_id, websocket)
+
+Quick Start (Auth):
+    Use the dual router system for WebSocket authentication:
+
+    from svc_infra.api.fastapi.dual import ws_protected_router
+    from svc_infra.api.fastapi.auth.ws_security import WSIdentity
+
+    router = ws_protected_router()
+
+    @router.websocket("/ws")
+    async def ws_endpoint(websocket: WebSocket, user: WSIdentity):
+        await manager.connect(user.id, websocket)
+        ...
 """
 
 from .add import add_websocket_manager, get_ws_manager
