@@ -61,24 +61,76 @@ def _gen_operation_id_factory():
     return _gen
 
 
+def _origin_to_regex(origin: str) -> str | None:
+    """Convert a wildcard origin pattern to a regex.
+
+    Supports patterns like:
+      - "https://*.vercel.app" -> matches any subdomain
+      - "https://nfrax-*.vercel.app" -> matches nfrax-xxx.vercel.app
+
+    Returns None if the origin is not a pattern (no wildcards).
+    """
+    import re
+
+    if "*" not in origin:
+        return None
+    # Escape special regex chars except *, then replace * with regex pattern
+    escaped = re.escape(origin).replace(r"\*", "[a-zA-Z0-9_-]+")
+    return f"^{escaped}$"
+
+
 def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None):
+    # Collect origins from parameter
     if isinstance(public_cors_origins, list):
-        origins = [o.strip() for o in public_cors_origins if o and o.strip()]
+        param_origins = [o.strip() for o in public_cors_origins if o and o.strip()]
     elif isinstance(public_cors_origins, str):
-        origins = [o.strip() for o in public_cors_origins.split(",") if o and o.strip()]
+        param_origins = [o.strip() for o in public_cors_origins.split(",") if o and o.strip()]
     else:
-        # Strict by default: no CORS unless explicitly configured via env or parameter.
-        fallback = os.getenv("CORS_ALLOW_ORIGINS", "")
-        origins = [o.strip() for o in fallback.split(",") if o and o.strip()]
+        param_origins = []
+
+    # Collect origins from environment variable
+    env_value = os.getenv("CORS_ALLOW_ORIGINS", "")
+    env_origins = [o.strip() for o in env_value.split(",") if o and o.strip()]
+
+    # Merge both sources, removing duplicates while preserving order
+    seen = set()
+    origins = []
+    for o in param_origins + env_origins:
+        if o not in seen:
+            seen.add(o)
+            origins.append(o)
 
     if not origins:
         return
 
     cors_kwargs = dict(allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+    # Check for "*" (allow all) first
     if "*" in origins:
         cors_kwargs["allow_origin_regex"] = ".*"
     else:
-        cors_kwargs["allow_origins"] = origins
+        # Separate exact origins from wildcard patterns
+        exact_origins = []
+        patterns = []
+        for o in origins:
+            regex = _origin_to_regex(o)
+            if regex:
+                patterns.append(regex)
+            else:
+                exact_origins.append(o)
+
+        # If we have patterns, combine into a single regex with exact origins
+        if patterns:
+            # Convert exact origins to regex patterns too
+            import re
+
+            for exact in exact_origins:
+                patterns.append(f"^{re.escape(exact)}$")
+            # Combine all patterns with OR
+            cors_kwargs["allow_origin_regex"] = "|".join(patterns)
+        else:
+            # No patterns, just use allow_origins
+            cors_kwargs["allow_origins"] = exact_origins
 
     app.add_middleware(CORSMiddleware, **cors_kwargs)
 
