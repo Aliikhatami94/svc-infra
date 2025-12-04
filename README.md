@@ -1,81 +1,274 @@
+<div align="center">
+
 # svc-infra
 
+### Production-ready FastAPI infrastructure in one import
+
 [![PyPI](https://img.shields.io/pypi/v/svc-infra.svg)](https://pypi.org/project/svc-infra/)
-[![Docs](https://img.shields.io/badge/docs-reference-blue)](.)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Downloads](https://static.pepy.tech/badge/svc-infra/month)](https://pepy.tech/project/svc-infra)
 
-svc-infra packages the shared building blocks we use to ship production FastAPI services fast—HTTP APIs with secure auth, durable persistence, background execution, cache, observability, and webhook plumbing that all share the same batteries-included defaults.
+**Stop rebuilding auth, billing, webhooks, and background jobs for every project.**
 
-## Documentation
+[Documentation](docs/) · [Examples](examples/) · [PyPI](https://pypi.org/project/svc-infra/)
 
-| Area | What it covers | Guide |
-| --- | --- | --- |
-| Environment | Feature switches and env vars | [Environment](docs/environment.md) |
-| API | FastAPI bootstrap, middleware, docs wiring | [API guide](docs/api.md) |
-| Auth | Sessions, OAuth/OIDC, MFA, SMTP delivery | [Auth](docs/auth.md) |
-| Security | Password policy, lockout, signed cookies, headers | [Security](docs/security.md) |
-| Database | SQL + Mongo wiring, Alembic helpers, inbox/outbox patterns | [Database](docs/database.md) |
-| Storage | File storage with S3, local, memory backends | [Storage](docs/storage.md) |
-| Documents | Generic document management with metadata | [Documents](docs/documents.md) |
-| WebSocket | Real-time communication, client & server | [WebSocket](docs/websocket.md) |
-| Tenancy | Multi-tenant boundaries and helpers | [Tenancy](docs/tenancy.md) |
-| Idempotency | Idempotent endpoints and middleware | [Idempotency](docs/idempotency.md) |
-| Rate Limiting | Middleware, dependency limiter, headers | [Rate limiting](docs/rate-limiting.md) |
-| Cache | cashews decorators, namespace management, TTL helpers | [Cache](docs/cache.md) |
-| Jobs | JobQueue, scheduler, CLI worker | [Jobs](docs/jobs.md) |
-| Observability | Prometheus, Grafana, OpenTelemetry | [Observability](docs/observability.md) |
-| Ops | Probes, breakers, SLOs & dashboards | [Ops](docs/ops.md) |
-| Webhooks | Subscription store, signing, retry worker | [Webhooks](docs/webhooks.md) |
-| Admin | Admin endpoints and impersonation | [Admin](docs/admin.md) |
-| Billing | Billing primitives and Stripe integration | [Billing](docs/billing.md) |
-| CLI | Command groups for sql/mongo/obs/docs/dx/sdk/jobs | [CLI](docs/cli.md) |
-| Docs & SDKs | Publishing docs, generating SDKs | [Docs & SDKs](docs/docs-and-sdks.md) |
-| Data Lifecycle | Fixtures, retention, erasure, backups | [Data lifecycle](docs/data-lifecycle.md) |
-| Timeouts | Request timeouts and resource limits | [Timeouts](docs/timeouts-and-resource-limits.md) |
-| Versioned Integrations | Managing third-party API versions | [Versioned Integrations](docs/versioned-integrations.md) |
+</div>
 
-## Quick Start with Template Example
+---
 
-See **ALL** svc-infra features working together in a complete example:
+## Why svc-infra?
 
-```bash
-# One-time setup (from repo root)
-make setup-template    # Scaffolds models, runs migrations
+Every FastAPI project needs the same things: authentication, database setup, background jobs, caching, webhooks, billing... You've written this code before. Multiple times.
 
-# Run the example server
-make run-template      # Starts at http://localhost:8001
+**svc-infra** packages battle-tested infrastructure used in production, so you can focus on your actual product:
+
+```python
+from svc_infra.api.fastapi.ease import easy_service_app
+
+app = easy_service_app(name="MyAPI", release="1.0.0")
+# ✅ Health checks, CORS, security headers, structured logging
+# ✅ Prometheus metrics, OpenTelemetry tracing
+# ✅ Request IDs, idempotency middleware
+# That's it. Ship it.
 ```
 
-See [`examples/README.md`](examples/README.md) for full documentation and manual setup options.
+## ⚡ Quick Install
 
-## Minimal FastAPI bootstrap
+```bash
+pip install svc-infra
+```
+
+## 🎯 What's Included
+
+| Feature | What You Get | One-liner |
+|---------|-------------|-----------|
+| **🔐 Auth** | JWT, sessions, OAuth/OIDC, MFA, API keys | `add_auth_users(app)` |
+| **💳 Billing** | Usage tracking, subscriptions, invoices, Stripe sync | `add_billing(app)` |
+| **📦 Database** | PostgreSQL + MongoDB, migrations, inbox/outbox | `add_sql_db(app)` |
+| **⚡ Jobs** | Background tasks, scheduling, retries, DLQ | `easy_jobs()` |
+| **🔗 Webhooks** | Subscriptions, HMAC signing, delivery retries | `add_webhooks(app)` |
+| **💾 Cache** | Redis/memory, decorators, namespacing | `init_cache()` |
+| **📊 Observability** | Prometheus, Grafana dashboards, OTEL | Built-in |
+| **📁 Storage** | S3, local, memory backends | `add_storage(app)` |
+| **🏢 Multi-tenancy** | Tenant isolation, scoped queries | Built-in |
+| **🚦 Rate Limiting** | Per-user, per-endpoint, headers | Built-in |
+
+## 🚀 30-Second Example
+
+Build a complete SaaS backend:
 
 ```python
 from fastapi import Depends
 from svc_infra.api.fastapi.ease import easy_service_app
 from svc_infra.api.fastapi.db.sql.add import add_sql_db
-from svc_infra.cache import init_cache
+from svc_infra.api.fastapi.auth import add_auth_users, current_active_user
 from svc_infra.jobs.easy import easy_jobs
 from svc_infra.webhooks.fastapi import require_signature
 
-app = easy_service_app(name="Billing", release="1.2.3")
-add_sql_db(app)              # reads SQL_URL / DB_* envs
-init_cache()                 # honors CACHE_PREFIX / CACHE_VERSION
-queue, scheduler = easy_jobs()  # switches via JOBS_DRIVER / REDIS_URL
+# Create app with batteries included
+app = easy_service_app(name="MySaaS", release="1.0.0")
 
-@app.post("/webhooks/billing")
-async def handle_webhook(payload = Depends(require_signature(lambda: ["current", "next"]))):
-    queue.enqueue("process-billing-webhook", payload)
-    return {"status": "queued"}
+# Add infrastructure
+add_sql_db(app)                    # PostgreSQL with migrations
+add_auth_users(app)                # Full auth system
+queue, scheduler = easy_jobs()     # Background jobs
+
+# Your actual business logic
+@app.post("/api/process")
+async def process_data(user=Depends(current_active_user)):
+    job = queue.enqueue("heavy_task", {"user_id": user.id})
+    return {"job_id": job.id, "status": "queued"}
+
+# Webhook endpoint with signature verification
+@app.post("/webhooks/stripe")
+async def stripe_webhook(payload=Depends(require_signature(lambda: ["whsec_..."]))):
+    queue.enqueue("process_payment", payload)
+    return {"received": True}
 ```
 
-## Environment switches
+**That's a production-ready API** with auth, database, background jobs, and webhook handling.
 
-- **API** – toggle logging/observability and docs exposure with `ENABLE_LOGGING`, `LOG_LEVEL`, `LOG_FORMAT`, `ENABLE_OBS`, `METRICS_PATH`, `OBS_SKIP_PATHS`, and `CORS_ALLOW_ORIGINS`. 【F:src/svc_infra/api/fastapi/ease.py†L67-L111】【F:src/svc_infra/api/fastapi/setup.py†L47-L88】
-- **Auth** – configure JWT secrets, SMTP, cookies, and policy using the `AUTH_…` settings family (e.g., `AUTH_JWT__SECRET`, `AUTH_SMTP_HOST`, `AUTH_SESSION_COOKIE_SECURE`). 【F:src/svc_infra/api/fastapi/auth/settings.py†L23-L91】
-- **Database** – set connection URLs or components via `SQL_URL`/`SQL_URL_FILE`, `DB_DIALECT`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, plus Mongo knobs like `MONGO_URL`, `MONGO_DB`, and `MONGO_URL_FILE`. 【F:src/svc_infra/api/fastapi/db/sql/add.py†L55-L114】【F:src/svc_infra/db/sql/utils.py†L85-L206】【F:src/svc_infra/db/nosql/mongo/settings.py†L9-L13】【F:src/svc_infra/db/nosql/utils.py†L56-L113】
-- **Storage** – choose backend with `STORAGE_BACKEND` (local, s3, memory) and configure with `STORAGE_S3_BUCKET`, `STORAGE_S3_REGION`, `STORAGE_BASE_PATH`, or auto-detect from `RAILWAY_VOLUME_MOUNT_PATH` / AWS credentials. 【F:src/svc_infra/storage/settings.py】【F:docs/storage.md】
-- **Jobs** – choose the queue backend with `JOBS_DRIVER` and provide Redis via `REDIS_URL`; interval schedules can be declared with `JOBS_SCHEDULE_JSON`. 【F:src/svc_infra/jobs/easy.py†L11-L27】【F:docs/jobs.md†L11-L48】
-- **Cache** – namespace keys and lifetimes through `CACHE_PREFIX`, `CACHE_VERSION`, and TTL overrides `CACHE_TTL_DEFAULT`, `CACHE_TTL_SHORT`, `CACHE_TTL_LONG`. 【F:src/svc_infra/cache/README.md†L20-L173】【F:src/svc_infra/cache/ttl.py†L26-L55】
-- **Observability** – turn metrics on/off or adjust scrape paths with `ENABLE_OBS`, `METRICS_PATH`, `OBS_SKIP_PATHS`, and Prometheus/Grafana flags like `SVC_INFRA_DISABLE_PROMETHEUS`, `SVC_INFRA_RATE_WINDOW`, `SVC_INFRA_DASHBOARD_REFRESH`, `SVC_INFRA_DASHBOARD_RANGE`. 【F:src/svc_infra/api/fastapi/ease.py†L67-L111】【F:src/svc_infra/obs/metrics/asgi.py†L49-L206】【F:src/svc_infra/obs/cloud_dash.py†L85-L108】
-- **Webhooks** – reuse the jobs envs (`JOBS_DRIVER`, `REDIS_URL`) for the delivery worker and queue configuration. 【F:docs/webhooks.md†L32-L53】
-- **Security** – enforce password policy, MFA, and rotation with auth prefixes such as `AUTH_PASSWORD_MIN_LENGTH`, `AUTH_PASSWORD_REQUIRE_SYMBOL`, `AUTH_JWT__SECRET`, and `AUTH_JWT__OLD_SECRETS`. 【F:docs/security.md†L24-L70】
+## 📚 Feature Highlights
+
+### 🔐 Authentication & Security
+
+Full auth system with zero boilerplate:
+
+```python
+from svc_infra.api.fastapi.auth import add_auth_users, current_active_user
+
+add_auth_users(app)  # Registers /auth/* routes automatically
+
+@app.get("/me")
+async def get_profile(user=Depends(current_active_user)):
+    return {"email": user.email, "mfa_enabled": user.mfa_enabled}
+```
+
+**Includes:** JWT tokens, session cookies, OAuth/OIDC (Google, GitHub, etc.), MFA/TOTP, password policies, account lockout, key rotation.
+
+### 💳 Usage-Based Billing
+
+Track usage and generate invoices:
+
+```python
+from svc_infra.billing import BillingService
+
+billing = BillingService(session=db, tenant_id="tenant_123")
+
+# Record API usage (idempotent)
+billing.record_usage(metric="api_calls", amount=1, idempotency_key="req_abc")
+
+# Generate monthly invoice
+invoice = billing.generate_monthly_invoice(
+    period_start=datetime(2025, 1, 1),
+    period_end=datetime(2025, 2, 1),
+)
+```
+
+**Includes:** Usage events, aggregation, plans & entitlements, subscriptions, invoices, Stripe sync hooks.
+
+### ⚡ Background Jobs
+
+Redis-backed job queue with retries:
+
+```python
+from svc_infra.jobs.easy import easy_jobs
+
+queue, scheduler = easy_jobs()  # Auto-detects Redis or uses memory
+
+# Enqueue work
+queue.enqueue("send_email", {"to": "user@example.com", "template": "welcome"})
+
+# Schedule recurring tasks
+scheduler.add("cleanup", interval_seconds=3600, target="myapp.tasks:cleanup")
+```
+
+```bash
+# Run the worker
+svc-infra jobs run
+```
+
+**Includes:** Visibility timeout, exponential backoff, dead letter queue, interval scheduler, CLI worker.
+
+### 🔗 Webhooks
+
+Send and receive webhooks with proper security:
+
+```python
+from svc_infra.webhooks import add_webhooks, WebhookService
+
+add_webhooks(app)  # Adds subscription management routes
+
+# Publish events
+webhook_service.publish("invoice.paid", {"invoice_id": "inv_123"})
+
+# Verify incoming webhooks
+@app.post("/webhooks/external")
+async def receive(payload=Depends(require_signature(lambda: ["secret1", "secret2"]))):
+    return {"ok": True}
+```
+
+**Includes:** Subscription store, HMAC-SHA256 signing, delivery retries, idempotent processing.
+
+### 📊 Observability
+
+Production monitoring out of the box:
+
+```python
+app = easy_service_app(name="MyAPI", release="1.0.0")
+# Prometheus metrics at /metrics
+# Health checks at /healthz, /readyz, /startupz
+# Request tracing with OpenTelemetry
+```
+
+```bash
+# Generate Grafana dashboards
+svc-infra obs dashboard --service myapi --output ./dashboards/
+```
+
+**Includes:** Prometheus metrics, Grafana dashboard generator, OTEL integration, SLO helpers.
+
+## ⚙️ Configuration
+
+Everything is configurable via environment variables:
+
+```bash
+# Database
+SQL_URL=postgresql://user:pass@localhost/mydb
+MONGO_URL=mongodb://localhost:27017
+
+# Auth
+AUTH_JWT__SECRET=your-secret-key
+AUTH_SMTP_HOST=smtp.sendgrid.net
+
+# Jobs
+JOBS_DRIVER=redis
+REDIS_URL=redis://localhost:6379
+
+# Storage
+STORAGE_BACKEND=s3
+STORAGE_S3_BUCKET=my-uploads
+
+# Observability
+ENABLE_OBS=true
+METRICS_PATH=/metrics
+```
+
+See the [Environment Reference](docs/environment.md) for all options.
+
+## 📖 Documentation
+
+| Module | Description | Guide |
+|--------|-------------|-------|
+| **API** | FastAPI bootstrap, middleware, versioning | [docs/api.md](docs/api.md) |
+| **Auth** | Sessions, OAuth/OIDC, MFA, API keys | [docs/auth.md](docs/auth.md) |
+| **Billing** | Usage tracking, subscriptions, invoices | [docs/billing.md](docs/billing.md) |
+| **Database** | SQL + MongoDB, migrations, patterns | [docs/database.md](docs/database.md) |
+| **Jobs** | Background tasks, scheduling | [docs/jobs.md](docs/jobs.md) |
+| **Webhooks** | Publishing, signing, verification | [docs/webhooks.md](docs/webhooks.md) |
+| **Cache** | Redis/memory caching, TTL helpers | [docs/cache.md](docs/cache.md) |
+| **Storage** | S3, local, memory file storage | [docs/storage.md](docs/storage.md) |
+| **Observability** | Metrics, tracing, dashboards | [docs/observability.md](docs/observability.md) |
+| **Security** | Password policy, headers, MFA | [docs/security.md](docs/security.md) |
+| **Tenancy** | Multi-tenant isolation | [docs/tenancy.md](docs/tenancy.md) |
+| **CLI** | Command-line tools | [docs/cli.md](docs/cli.md) |
+
+## 🏃 Running the Example
+
+See all features working together:
+
+```bash
+git clone https://github.com/nfraxio/svc-infra.git
+cd svc-infra
+
+# Setup and run
+make setup-template    # Creates DB, runs migrations
+make run-template      # Starts at http://localhost:8001
+```
+
+Visit http://localhost:8001/docs to explore the API.
+
+## 🤝 Related Packages
+
+svc-infra is part of the **nfrax** infrastructure suite:
+
+| Package | Purpose |
+|---------|---------|
+| **[svc-infra](https://github.com/nfraxio/svc-infra)** | Backend infrastructure (auth, billing, jobs, webhooks) |
+| **[ai-infra](https://github.com/nfraxio/ai-infra)** | AI/LLM infrastructure (agents, tools, RAG, MCP) |
+| **[fin-infra](https://github.com/nfraxio/fin-infra)** | Financial infrastructure (banking, portfolio, insights) |
+
+## 📄 License
+
+MIT License - use it for anything.
+
+---
+
+<div align="center">
+
+**Built with ❤️ by [nfraxio](https://github.com/nfraxio)**
+
+[⭐ Star us on GitHub](https://github.com/nfraxio/svc-infra) · [📦 View on PyPI](https://pypi.org/project/svc-infra/)
+
+</div>
