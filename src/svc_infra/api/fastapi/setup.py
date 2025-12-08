@@ -222,6 +222,7 @@ def _build_parent_app(
     root_server_url: str | None = None,
     root_include_api_key: bool = False,
     skip_paths: list[str] | None = None,
+    **fastapi_kwargs,  # Accept FastAPI kwargs
 ) -> FastAPI:
     # Root docs are now enabled in all environments to match root card visibility
     parent = FastAPI(
@@ -234,6 +235,7 @@ def _build_parent_app(
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        **fastapi_kwargs,  # Forward to FastAPI constructor
     )
 
     _setup_cors(parent, public_cors_origins)
@@ -309,6 +311,7 @@ def setup_service_api(
     root_public_base_url: str | None = None,
     root_include_api_key: bool | None = None,
     skip_paths: list[str] | None = None,
+    **fastapi_kwargs,  # Forward all other FastAPI kwargs (lifespan, etc.)
 ) -> FastAPI:
     # infer if not explicitly provided
     effective_root_include_api_key = (
@@ -325,6 +328,7 @@ def setup_service_api(
         root_server_url=root_server,
         root_include_api_key=effective_root_include_api_key,
         skip_paths=skip_paths,
+        **fastapi_kwargs,  # Forward to _build_parent_app
     )
 
     # Mount each version

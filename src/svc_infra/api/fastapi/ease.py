@@ -148,6 +148,7 @@ def easy_service_api(
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
     root_include_api_key: bool | None = None,
+    **fastapi_kwargs,  # Forward all other FastAPI kwargs
 ) -> FastAPI:
     service = ServiceInfo(name=name, release=release)
     specs = [
@@ -161,6 +162,7 @@ def easy_service_api(
         public_cors_origins=public_cors_origins,
         root_public_base_url=root_public_base_url,
         root_include_api_key=root_include_api_key,
+        **fastapi_kwargs,  # Forward to setup_service_api
     )
 
 
@@ -176,6 +178,7 @@ def easy_service_app(
     options: EasyAppOptions | None = None,
     enable_logging: bool | None = None,
     enable_observability: bool | None = None,
+    **fastapi_kwargs,  # Forward all other FastAPI kwargs (lifespan, etc.)
 ) -> FastAPI:
     """
     One-call bootstrap with env + options + flags:
@@ -226,6 +229,7 @@ def easy_service_app(
         public_cors_origins=public_cors_origins,
         root_public_base_url=root_public_base_url,
         root_include_api_key=root_include_api_key,
+        **fastapi_kwargs,  # Forward FastAPI kwargs (lifespan, etc.)
     )
 
     # 5) Observability
