@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable, Dict
@@ -21,8 +22,9 @@ class InMemoryScheduler:
     Not a full cron parser. Tracks next_run_at per task.
     """
 
-    def __init__(self):
+    def __init__(self, tick_interval: float = 60.0):
         self._tasks: Dict[str, ScheduledTask] = {}
+        self._tick_interval = tick_interval
 
     def add_task(self, name: str, interval_seconds: int, func: CronFunc) -> None:
         now = datetime.now(timezone.utc)
@@ -39,3 +41,13 @@ class InMemoryScheduler:
             if task.next_run_at <= now:
                 await task.func()
                 task.next_run_at = now + timedelta(seconds=task.interval_seconds)
+
+    async def run(self) -> None:
+        """Run the scheduler loop indefinitely.
+
+        Calls tick() at regular intervals to check and execute due tasks.
+        This method runs forever until cancelled.
+        """
+        while True:
+            await self.tick()
+            await asyncio.sleep(self._tick_interval)
