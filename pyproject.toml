@@ -74,7 +74,6 @@ aioboto3 = { version = "^13.0.0", optional = true }
 
 # Other infra deps
 mcp = "^1.13.0"
-ai-infra = "^0.1.63"
 # prometheus-client moved to extras only (removed from here)
 opentelemetry-sdk = "^1.36.0"
 opentelemetry-instrumentation-fastapi = "^0.57b0"
