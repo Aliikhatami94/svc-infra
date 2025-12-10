@@ -1,6 +1,25 @@
+# OS artifacts
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Editor backup files
+*~
+*.swp
+*.swo
+*.bak
+*.backup
+\#*\#
+.#*
+
+# IDE
 .idea/
+
+# Environment
 .env
 .env.local
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
