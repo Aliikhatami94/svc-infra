@@ -236,7 +236,7 @@ See the [Environment Reference](docs/environment.md) for all options.
 See all features working together:
 
 ```bash
-git clone https://github.com/nfraxio/svc-infra.git
+git clone https://github.com/nfraxlab/svc-infra.git
 cd svc-infra
 
 # Setup and run
@@ -252,9 +252,9 @@ svc-infra is part of the **nfrax** infrastructure suite:
 
 | Package | Purpose |
 |---------|---------|
-| **[svc-infra](https://github.com/nfraxio/svc-infra)** | Backend infrastructure (auth, billing, jobs, webhooks) |
-| **[ai-infra](https://github.com/nfraxio/ai-infra)** | AI/LLM infrastructure (agents, tools, RAG, MCP) |
-| **[fin-infra](https://github.com/nfraxio/fin-infra)** | Financial infrastructure (banking, portfolio, insights) |
+| **[svc-infra](https://github.com/nfraxlab/svc-infra)** | Backend infrastructure (auth, billing, jobs, webhooks) |
+| **[ai-infra](https://github.com/nfraxlab/ai-infra)** | AI/LLM infrastructure (agents, tools, RAG, MCP) |
+| **[fin-infra](https://github.com/nfraxlab/fin-infra)** | Financial infrastructure (banking, portfolio, insights) |
 
 ## 📄 License
 
@@ -264,8 +264,8 @@ MIT License - use it for anything.
 
 <div align="center">
 
-**Built with ❤️ by [nfraxio](https://github.com/nfraxio)**
+**Built with ❤️ by [nfraxlab](https://github.com/nfraxlab)**
 
-[⭐ Star us on GitHub](https://github.com/nfraxio/svc-infra) · [📦 View on PyPI](https://pypi.org/project/svc-infra/)
+[⭐ Star us on GitHub](https://github.com/nfraxlab/svc-infra) · [📦 View on PyPI](https://pypi.org/project/svc-infra/)
 
 </div>

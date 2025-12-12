@@ -411,7 +411,7 @@ class TestURLLoaderSync:
     def test_load_sync_works(self):
         """Test that load_sync() works in non-async context."""
         # This is an integration test that actually makes HTTP requests
-        loader = URLLoader("https://raw.githubusercontent.com/nfraxio/svc-infra/main/README.md")
+        loader = URLLoader("https://raw.githubusercontent.com/nfraxlab/svc-infra/main/README.md")
 
         try:
             contents = loader.load_sync()

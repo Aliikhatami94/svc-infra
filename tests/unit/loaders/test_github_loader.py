@@ -325,7 +325,7 @@ class TestGitHubLoaderSync:
         """Test that load_sync() works in non-async context."""
         # This is an integration test that actually calls GitHub
         # Skip if no network or rate limited
-        loader = GitHubLoader("nfraxio/svc-infra", path="docs", pattern="auth.md")
+        loader = GitHubLoader("nfraxlab/svc-infra", path="docs", pattern="auth.md")
 
         try:
             contents = loader.load_sync()

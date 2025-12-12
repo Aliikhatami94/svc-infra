@@ -25,7 +25,7 @@ class GitHubLoader(BaseLoader):
     Supports public repos and private repos (with token).
 
     Args:
-        repo: Repository in "owner/repo" format (e.g., "nfraxio/svc-infra")
+        repo: Repository in "owner/repo" format (e.g., "nfraxlab/svc-infra")
         path: Path within repo to load from (e.g., "docs", "examples/src").
             Empty string means repo root.
         branch: Branch name (default: "main")
@@ -41,14 +41,14 @@ class GitHubLoader(BaseLoader):
 
     Example:
         >>> # Load all markdown from docs/
-        >>> loader = GitHubLoader("nfraxio/svc-infra", path="docs")
+        >>> loader = GitHubLoader("nfraxlab/svc-infra", path="docs")
         >>> contents = await loader.load()
         >>> for c in contents:
         ...     print(f"Loaded: {c.source}")
         >>>
         >>> # Load Python files from examples
         >>> loader = GitHubLoader(
-        ...     "nfraxio/svc-infra",
+        ...     "nfraxlab/svc-infra",
         ...     path="examples/src",
         ...     pattern="*.py",
         ...     skip_patterns=["__pycache__", "test_*"],

@@ -33,9 +33,9 @@ class LoadedContent:
     Example:
         >>> content = LoadedContent(
         ...     content="# Authentication\\n\\nThis guide covers...",
-        ...     source="github://nfraxio/svc-infra/docs/auth.md",
+        ...     source="github://nfraxlab/svc-infra/docs/auth.md",
         ...     content_type="text/markdown",
-        ...     metadata={"repo": "nfraxio/svc-infra", "path": "docs/auth.md"},
+        ...     metadata={"repo": "nfraxlab/svc-infra", "path": "docs/auth.md"},
         ... )
         >>>
         >>> # Use with ai-infra Retriever

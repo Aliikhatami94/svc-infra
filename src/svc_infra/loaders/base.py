@@ -99,7 +99,7 @@ class BaseLoader(ABC):
 
         Example:
             >>> # In a script or notebook
-            >>> loader = GitHubLoader("nfraxio/svc-infra", path="docs")
+            >>> loader = GitHubLoader("nfraxlab/svc-infra", path="docs")
             >>> contents = loader.load_sync()
         """
         try:

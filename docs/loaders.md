@@ -30,7 +30,7 @@ pip install svc-infra
 from svc_infra.loaders import GitHubLoader, URLLoader, load_github, load_url
 
 # Load from GitHub
-loader = GitHubLoader("nfraxio/svc-infra", path="docs", pattern="*.md")
+loader = GitHubLoader("nfraxlab/svc-infra", path="docs", pattern="*.md")
 contents = await loader.load()
 
 # Load from URLs
@@ -38,7 +38,7 @@ loader = URLLoader("https://example.com/guide.md")
 contents = await loader.load()
 
 # Or use convenience functions
-contents = await load_github("nfraxio/svc-infra", path="docs")
+contents = await load_github("nfraxlab/svc-infra", path="docs")
 contents = await load_url("https://example.com/guide.md")
 ```
 
@@ -48,7 +48,7 @@ contents = await load_url("https://example.com/guide.md")
 from svc_infra.loaders import load_github_sync, load_url_sync
 
 # No async/await needed!
-contents = load_github_sync("nfraxio/svc-infra", path="docs")
+contents = load_github_sync("nfraxlab/svc-infra", path="docs")
 contents = load_url_sync("https://example.com/guide.md")
 ```
 
@@ -62,7 +62,7 @@ retriever = Retriever()
 
 # Load and embed documentation from multiple repos
 for pkg in ["svc-infra", "ai-infra", "fin-infra"]:
-    contents = await load_github(f"nfraxio/{pkg}", path="docs")
+    contents = await load_github(f"nfraxlab/{pkg}", path="docs")
     for c in contents:
         retriever.add_text(c.content, metadata=c.metadata)
 
@@ -104,12 +104,12 @@ Load files from GitHub repositories.
 from svc_infra.loaders import GitHubLoader
 
 # Load all markdown from docs/
-loader = GitHubLoader("nfraxio/svc-infra", path="docs")
+loader = GitHubLoader("nfraxlab/svc-infra", path="docs")
 contents = await loader.load()
 
 # Load Python files, excluding tests
 loader = GitHubLoader(
-    "nfraxio/svc-infra",
+    "nfraxlab/svc-infra",
     path="src",
     pattern="*.py",
     skip_patterns=["test_*", "*_test.py"],
@@ -118,7 +118,7 @@ contents = await loader.load()
 
 # Multiple patterns (separate with |)
 loader = GitHubLoader(
-    "nfraxio/svc-infra",
+    "nfraxlab/svc-infra",
     path="examples",
     pattern="*.py|*.md|*.yaml",
 )
@@ -133,7 +133,7 @@ contents = await loader.load()
 
 # Add custom metadata to all content
 loader = GitHubLoader(
-    "nfraxio/svc-infra",
+    "nfraxlab/svc-infra",
     path="docs",
     extra_metadata={"package": "svc-infra", "type": "documentation"},
 )
@@ -147,11 +147,11 @@ Each `LoadedContent` from GitHubLoader includes:
 ```python
 {
     "loader": "github",
-    "repo": "nfraxio/svc-infra",
+    "repo": "nfraxlab/svc-infra",
     "branch": "main",
     "path": "auth.md",           # Relative to specified path
     "full_path": "docs/auth.md", # Full path in repo
-    "source": "github://nfraxio/svc-infra/docs/auth.md",
+    "source": "github://nfraxlab/svc-infra/docs/auth.md",
     # Plus any extra_metadata you provided
 }
 ```
@@ -269,7 +269,7 @@ from ai_infra import Retriever
 from svc_infra.loaders import GitHubLoader
 
 retriever = Retriever()
-loader = GitHubLoader("nfraxio/svc-infra", path="docs")
+loader = GitHubLoader("nfraxlab/svc-infra", path="docs")
 
 for content in await loader.load():
     # Option 1: Direct use
@@ -291,7 +291,7 @@ from svc_infra.loaders import load_github, load_url
 
 # Load from GitHub
 contents = await load_github(
-    "nfraxio/svc-infra",
+    "nfraxlab/svc-infra",
     path="docs",
     pattern="*.md",
 )
@@ -310,7 +310,7 @@ contents = await load_url([
 from svc_infra.loaders import load_github_sync, load_url_sync
 
 # For scripts, notebooks, or non-async contexts
-contents = load_github_sync("nfraxio/svc-infra", path="docs")
+contents = load_github_sync("nfraxlab/svc-infra", path="docs")
 contents = load_url_sync("https://example.com/guide.md")
 ```
 
@@ -389,7 +389,7 @@ URLLoader defaults to 30-second timeout. Adjust with `timeout` parameter.
 ```python
 for pkg in ["svc-infra", "ai-infra", "fin-infra"]:
     contents = await load_github(
-        f"nfraxio/{pkg}",
+        f"nfraxlab/{pkg}",
         path="docs",
         extra_metadata={"package": pkg, "type": "docs"},
     )
@@ -427,7 +427,7 @@ for path in ["docs", "examples", "src/core"]:
 
 ```python
 # In Jupyter notebooks, use sync versions
-contents = load_github_sync("nfraxio/svc-infra", path="docs")
+contents = load_github_sync("nfraxlab/svc-infra", path="docs")
 ```
 
 ## API Summary

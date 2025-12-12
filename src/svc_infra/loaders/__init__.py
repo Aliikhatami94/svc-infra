@@ -9,7 +9,7 @@ Quick Start:
     >>> from svc_infra.loaders import GitHubLoader, URLLoader
     >>>
     >>> # Load from GitHub
-    >>> loader = GitHubLoader("nfraxio/svc-infra", path="docs")
+    >>> loader = GitHubLoader("nfraxlab/svc-infra", path="docs")
     >>> contents = await loader.load()
     >>>
     >>> # Load from URL
@@ -24,7 +24,7 @@ With ai-infra Retriever:
     >>> from svc_infra.loaders import GitHubLoader
     >>>
     >>> retriever = Retriever()
-    >>> loader = GitHubLoader("nfraxio/svc-infra", path="docs")
+    >>> loader = GitHubLoader("nfraxlab/svc-infra", path="docs")
     >>>
     >>> for content in await loader.load():
     ...     retriever.add_text(content.content, metadata=content.metadata)
@@ -33,7 +33,7 @@ Convenience Functions:
     >>> from svc_infra.loaders import load_github, load_url
     >>>
     >>> # One-liner loading
-    >>> contents = await load_github("nfraxio/svc-infra", path="docs")
+    >>> contents = await load_github("nfraxlab/svc-infra", path="docs")
     >>> contents = await load_url("https://example.com/guide.md")
 
 Available Loaders:
@@ -74,7 +74,7 @@ async def load_github(
         List of LoadedContent objects.
 
     Example:
-        >>> contents = await load_github("nfraxio/svc-infra", path="docs")
+        >>> contents = await load_github("nfraxlab/svc-infra", path="docs")
         >>> for c in contents:
         ...     print(f"{c.source}: {len(c.content)} chars")
     """
@@ -135,7 +135,7 @@ def load_github_sync(
 
     Example:
         >>> # In a script or notebook (no await needed)
-        >>> contents = load_github_sync("nfraxio/svc-infra", path="docs")
+        >>> contents = load_github_sync("nfraxlab/svc-infra", path="docs")
         >>> for c in contents:
         ...     print(f"{c.source}: {len(c.content)} chars")
     """
