@@ -4,9 +4,13 @@ import re
 from typing import Sequence
 
 # Environment variable names to look up for DB URL
+# Order matters: svc-infra canonical names first, then common PaaS names
 DEFAULT_DB_ENV_VARS: Sequence[str] = (
     "SQL_URL",
     "DB_URL",
+    "DATABASE_URL",  # Heroku, Railway (public)
+    "DATABASE_URL_PRIVATE",  # Railway (private networking)
+    "PRIVATE_SQL_URL",  # Legacy svc-infra naming
 )
 
 # Regex used to detect async drivers from URL drivername

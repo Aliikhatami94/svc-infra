@@ -124,18 +124,62 @@ def _compose_url_from_parts() -> Optional[str]:
 # ---------- Environment helpers ----------
 
 
+def _normalize_database_url(url: str) -> str:
+    """
+    Normalize database URL for SQLAlchemy compatibility.
+
+    Handles:
+      - postgres:// → postgresql:// (Heroku/Railway legacy format)
+      - Strips whitespace
+
+    Args:
+        url: Raw database URL string
+
+    Returns:
+        Normalized URL suitable for SQLAlchemy
+    """
+    url = url.strip()
+    # Heroku and Railway historically use 'postgres://' which SQLAlchemy doesn't accept
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    return url
+
+
 def get_database_url_from_env(
     required: bool = True,
     env_vars: Sequence[str] = DEFAULT_DB_ENV_VARS,
+    normalize: bool = True,
 ) -> Optional[str]:
     """
     Resolve the database connection string, with support for:
-      - Primary env vars (in order): DEFAULT_DB_ENV_VARS (e.g. SQL_URL, PRIVATE_SQL_URL, DB_URL).
+      - Primary env vars (in order): DEFAULT_DB_ENV_VARS
+        (SQL_URL, DB_URL, DATABASE_URL, DATABASE_URL_PRIVATE, PRIVATE_SQL_URL)
       - Secret file pointers: <NAME>_FILE (reads file contents).
       - Well-known locations: SQL_URL_FILE, /run/secrets/database_url.
       - Composed from parts: DB_* (host, port, name, user, password, params).
-    When a value is found, it is also written back into os.environ["SQL_URL"] for downstream code.
+
+    When a value is found, it is also written back into os.environ["SQL_URL"]
+    for downstream code.
+
+    Args:
+        required: If True, raise RuntimeError when no URL is found
+        env_vars: Sequence of environment variable names to check
+        normalize: If True, convert postgres:// to postgresql:// (default: True)
+
+    Returns:
+        Database URL string, or None if not found and not required
+
+    Raises:
+        RuntimeError: If required=True and no URL is found
     """
+
+    def _finalize(url: str) -> str:
+        """Normalize and cache the URL."""
+        if normalize:
+            url = _normalize_database_url(url)
+        os.environ["SQL_URL"] = url
+        return url
+
     # Load .env without clobbering existing process env
     load_dotenv(override=False)
 
@@ -150,10 +194,8 @@ def get_database_url_from_env(
             if os.path.isabs(s) and Path(s).exists():
                 file_val = _read_secret_from_file(s)
                 if file_val:
-                    os.environ["SQL_URL"] = file_val
-                    return file_val
-            os.environ["SQL_URL"] = s
-            return s
+                    return _finalize(file_val)
+            return _finalize(s)
 
         # Companion NAME_FILE secret path (e.g., SQL_URL_FILE)
         file_key = f"{key}_FILE"
@@ -161,32 +203,28 @@ def get_database_url_from_env(
         if file_path:
             file_val = _read_secret_from_file(file_path)
             if file_val:
-                os.environ["SQL_URL"] = file_val
-                return file_val
+                return _finalize(file_val)
 
     # 2) Conventional secret envs
     file_path = os.getenv("SQL_URL_FILE")
     if file_path:
         file_val = _read_secret_from_file(file_path)
         if file_val:
-            os.environ["SQL_URL"] = file_val
-            return file_val
+            return _finalize(file_val)
 
     # 3) Docker/K8s default secret mount
     file_val = _read_secret_from_file("/run/secrets/database_url")
     if file_val:
-        os.environ["SQL_URL"] = file_val
-        return file_val
+        return _finalize(file_val)
 
     # 4) Compose from parts (DB_DIALECT/DB_DRIVER/DB_HOST/.../DB_PARAMS)
     composed = _compose_url_from_parts()
     if composed:
-        os.environ["SQL_URL"] = composed
-        return composed
+        return _finalize(composed)
 
     if required:
         raise RuntimeError(
-            "Database URL not set. Set SQL_URL (or PRIVATE_SQL_URL / DB_URL), "
+            "Database URL not set. Set SQL_URL, DATABASE_URL, or DATABASE_URL_PRIVATE, "
             "or provide DB_* parts (DB_HOST, DB_NAME, etc.), or a *_FILE secret."
         )
     return None

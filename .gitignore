@@ -29,6 +29,9 @@ __pycache__/
 .vscode/
 .codex/
 
+# Agent instructions (local only, never commit)
+.github/copilot-instructions.md
+
 -PY
 __pypackages__/
 .pyre/

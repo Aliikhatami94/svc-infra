@@ -59,6 +59,10 @@ class JsonFormatter(logging.Formatter):
         if req_id is not None:
             payload["request_id"] = req_id
 
+        tenant_id = getattr(record, "tenant_id", None)
+        if tenant_id is not None:
+            payload["tenant_id"] = tenant_id
+
         # Optional HTTP context
         http_ctx = {
             k: v

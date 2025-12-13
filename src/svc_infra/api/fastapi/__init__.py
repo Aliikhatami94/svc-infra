@@ -5,6 +5,14 @@ from svc_infra.api.fastapi.dual import (
     dualize_user,
 )
 from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
+from svc_infra.health import (
+    add_dependency_health,
+    add_health_routes,
+    add_startup_probe,
+    check_database,
+    check_redis,
+    check_url,
+)
 
 from .cache.add import setup_caching
 from .ease import easy_service_api, easy_service_app
@@ -18,6 +26,13 @@ __all__ = [
     "dualize_protected",
     "ServiceInfo",
     "APIVersionSpec",
+    # Health
+    "add_startup_probe",
+    "add_health_routes",
+    "add_dependency_health",
+    "check_database",
+    "check_redis",
+    "check_url",
     # Ease
     "setup_service_api",
     "easy_service_api",

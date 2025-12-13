@@ -62,8 +62,30 @@ class HandlerTimeoutMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # TODO: Implement actual timeout logic (currently passes through)
-        await self.app(scope, receive, send)
+        # Track if response has started (headers sent)
+        response_started = False
+
+        async def send_wrapper(message: dict) -> None:
+            nonlocal response_started
+            if message.get("type") == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await asyncio.wait_for(
+                self.app(scope, receive, send_wrapper),
+                timeout=self.timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            # Only send 504 if response hasn't started yet
+            if not response_started:
+                response = problem_response(
+                    status=504,
+                    title="Gateway Timeout",
+                    detail=f"Handler did not complete within {self.timeout_seconds}s",
+                )
+                await response(scope, receive, send)
+            # If response already started, we can't change it - just let it fail
 
 
 class BodyReadTimeoutMiddleware:

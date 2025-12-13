@@ -6,8 +6,10 @@ from svc_infra.cli.cmds import (
     _HELP,
     jobs_app,
     register_alembic,
+    register_db_ops,
     register_docs,
     register_dx,
+    register_health,
     register_mongo,
     register_mongo_scaffold,
     register_obs,
@@ -19,6 +21,11 @@ from svc_infra.cli.foundation.typer_bootstrap import pre_cli
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help=_HELP)
 pre_cli(app)
+
+# --- db ops group ---
+db_app = typer.Typer(no_args_is_help=True, add_completion=False, help="Database operations")
+register_db_ops(db_app)
+app.add_typer(db_app, name="db")
 
 # --- sql group ---
 sql_app = typer.Typer(no_args_is_help=True, add_completion=False, help="SQL commands")
@@ -32,6 +39,11 @@ mongo_app = typer.Typer(no_args_is_help=True, add_completion=False, help="MongoD
 register_mongo(mongo_app)
 register_mongo_scaffold(mongo_app)
 app.add_typer(mongo_app, name="mongo")
+
+# --- health group ---
+health_app = typer.Typer(no_args_is_help=True, add_completion=False, help="Health checks")
+register_health(health_app)
+app.add_typer(health_app, name="health")
 
 # -- obs group ---
 obs_app = typer.Typer(no_args_is_help=True, add_completion=False, help="Observability commands")

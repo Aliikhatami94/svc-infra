@@ -13,8 +13,9 @@ Design notes:
    fail verification (because their prev_hash links break transitively).
 """
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Protocol, Sequence, Tuple
 
 try:  # SQLAlchemy may not be present in minimal test context
     from sqlalchemy import select
@@ -24,6 +25,77 @@ except Exception:  # pragma: no cover
     select = None  # type: ignore
 
 from svc_infra.security.models import AuditLog, compute_audit_hash
+
+
+@dataclass(frozen=True)
+class AuditEvent:
+    ts: datetime
+    actor_id: Any
+    tenant_id: str | None
+    event_type: str
+    resource_ref: str | None
+    metadata: dict
+
+
+class AuditLogStore(Protocol):
+    """Minimal interface for storing audit events.
+
+    This is intentionally small so applications can swap in a SQL-backed store.
+    """
+
+    def append(
+        self,
+        *,
+        actor_id: Any = None,
+        tenant_id: str | None = None,
+        event_type: str,
+        resource_ref: str | None = None,
+        metadata: dict | None = None,
+        ts: datetime | None = None,
+    ) -> AuditEvent:
+        pass
+
+    def list(
+        self,
+        *,
+        tenant_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[AuditEvent]:
+        pass
+
+
+class InMemoryAuditLogStore:
+    """In-memory audit event store (useful for tests and prototypes)."""
+
+    def __init__(self):
+        self._events: list[AuditEvent] = []
+
+    def append(
+        self,
+        *,
+        actor_id: Any = None,
+        tenant_id: str | None = None,
+        event_type: str,
+        resource_ref: str | None = None,
+        metadata: dict | None = None,
+        ts: datetime | None = None,
+    ) -> AuditEvent:
+        event = AuditEvent(
+            ts=ts or datetime.now(timezone.utc),
+            actor_id=actor_id,
+            tenant_id=tenant_id,
+            event_type=event_type,
+            resource_ref=resource_ref,
+            metadata=dict(metadata or {}),
+        )
+        self._events.append(event)
+        return event
+
+    def list(self, *, tenant_id: str | None = None, limit: int | None = None) -> list[AuditEvent]:
+        out = [e for e in self._events if tenant_id is None or e.tenant_id == tenant_id]
+        if limit is not None:
+            return out[-int(limit) :]
+        return out
 
 
 async def append_audit_event(
@@ -127,4 +199,10 @@ def verify_audit_chain(events: Sequence[AuditLog]) -> Tuple[bool, List[int]]:
     return ok, sorted(set(broken))
 
 
-__all__ = ["append_audit_event", "verify_audit_chain"]
+__all__ = [
+    "append_audit_event",
+    "verify_audit_chain",
+    "AuditEvent",
+    "AuditLogStore",
+    "InMemoryAuditLogStore",
+]
