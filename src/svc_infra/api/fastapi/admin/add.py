@@ -13,7 +13,7 @@ from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from ....app.env import get_current_environment
+from ....app.env import get_current_environment, require_secret
 from ....security.permissions import RequirePermission
 from ..auth.security import Identity, Principal, _current_principal
 from ..auth.state import get_auth_state
@@ -88,8 +88,10 @@ def add_admin(
         return
 
     env = get_current_environment()
-    _secret = (
-        secret or os.getenv("ADMIN_IMPERSONATION_SECRET") or os.getenv("APP_SECRET") or "dev-secret"
+    _secret = require_secret(
+        secret or os.getenv("ADMIN_IMPERSONATION_SECRET") or os.getenv("APP_SECRET"),
+        "ADMIN_IMPERSONATION_SECRET or APP_SECRET",
+        dev_default="dev-only-admin-impersonation-secret-not-for-production",
     )
     _ttl = int(os.getenv("ADMIN_IMPERSONATION_TTL", str(ttl_seconds)))
     _cookie = os.getenv("ADMIN_IMPERSONATION_COOKIE", cookie_name)

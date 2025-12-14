@@ -1,18 +1,22 @@
 from datetime import datetime, timezone
 
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
+from svc_infra.app.env import require_secret
 
 
 def get_mfa_pre_jwt_writer():
     st = get_auth_settings()
     jwt_block = getattr(st, "jwt", None)
 
-    # Force to plain string
-    secret = (
-        jwt_block.secret.get_secret_value()
-        if jwt_block and getattr(jwt_block, "secret", None)
-        else "svc-dev-secret-change-me"
-    )
+    # Force to plain string - use require_secret to ensure it's set in production
+    if jwt_block and getattr(jwt_block, "secret", None):
+        secret = jwt_block.secret.get_secret_value()
+    else:
+        secret = require_secret(
+            None,
+            "JWT_SECRET (via auth settings jwt.secret for MFA)",
+            dev_default="dev-only-mfa-jwt-secret-not-for-production",
+        )
     secret = str(secret)
 
     lifetime = int(getattr(st, "mfa_pre_token_lifetime_seconds", 300))

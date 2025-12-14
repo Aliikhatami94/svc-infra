@@ -1,4 +1,4 @@
-from .env import pick
+from .env import MissingSecretError, pick, require_secret
 from .logging import setup_logging
 from .logging.formats import LoggingConfig, LogLevelOptions
 
@@ -7,4 +7,6 @@ __all__ = [
     "LoggingConfig",
     "LogLevelOptions",
     "pick",
+    "require_secret",
+    "MissingSecretError",
 ]

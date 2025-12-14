@@ -11,7 +11,7 @@ from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.api.fastapi.dual.dualize import dualize_public, dualize_user
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
-from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
+from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV, require_secret
 from svc_infra.security.jwt_rotation import RotatingJWTStrategy
 
 from ...auth.security import auth_login_path
@@ -91,7 +91,11 @@ def get_fastapi_users(
         if jwt_block and getattr(jwt_block, "secret", None):
             secret = jwt_block.secret.get_secret_value()
         else:
-            secret = "svc-dev-secret-change-me"
+            secret = require_secret(
+                None,
+                "JWT_SECRET (via auth settings jwt.secret)",
+                dev_default="dev-only-jwt-secret-not-for-production",
+            )
         lifetime = getattr(jwt_block, "lifetime_seconds", None) if jwt_block else None
         if not isinstance(lifetime, int) or lifetime <= 0:
             lifetime = 3600

@@ -6,6 +6,7 @@ from typing import Dict, List
 from uuid import uuid4
 
 from svc_infra.db.outbox import OutboxStore
+from svc_infra.webhooks.encryption import encrypt_secret
 
 
 @dataclass
@@ -53,13 +54,15 @@ class WebhookService:
         last_id = 0
         for sub in self._subs.get_for_topic(topic):
             event = dict(base_event)
+            # Encrypt secret before storing in outbox for security
+            encrypted_secret = encrypt_secret(sub.secret)
             msg_payload = {
                 "event": event,
                 "subscription": {
                     "id": sub.id,
                     "topic": sub.topic,
                     "url": sub.url,
-                    "secret": sub.secret,
+                    "secret": encrypted_secret,
                 },
             }
             msg = self._outbox.enqueue(topic, msg_payload)

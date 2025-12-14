@@ -8,6 +8,7 @@ from svc_infra.jobs.builtins.outbox_processor import make_outbox_tick
 from svc_infra.jobs.builtins.webhook_delivery import make_webhook_handler
 from svc_infra.jobs.queue import InMemoryJobQueue
 from svc_infra.jobs.worker import process_one
+from svc_infra.webhooks.encryption import decrypt_secret, is_encrypted
 from svc_infra.webhooks.service import InMemoryWebhookSubscriptions, WebhookService
 
 pytestmark = pytest.mark.webhooks
@@ -43,10 +44,15 @@ def test_publish_enqueues_subscription_identity():
     assert len(messages) == 2
     subscriptions = [m.payload["subscription"] for m in messages]
     urls = {s["url"] for s in subscriptions}
-    secrets = {s["secret"] for s in subscriptions}
+    encrypted_secrets = [s["secret"] for s in subscriptions]
     ids = {s["id"] for s in subscriptions}
     assert urls == {"https://example.test/a", "https://example.test/b"}
-    assert secrets == {"secret-a", "secret-b"}
+    # Secrets should be encrypted in the outbox
+    for encrypted in encrypted_secrets:
+        assert is_encrypted(encrypted), f"Secret should be encrypted: {encrypted}"
+    # Decrypted secrets should match originals
+    decrypted_secrets = {decrypt_secret(s) for s in encrypted_secrets}
+    assert decrypted_secrets == {"secret-a", "secret-b"}
     assert len(ids) == 2
     for msg in messages:
         event = msg.payload["event"]

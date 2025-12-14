@@ -166,3 +166,69 @@ def prepare_env() -> Path:
     env_file = find_env_file(start=root)
     load_env_if_present(env_file, override=False)
     return root
+
+
+class MissingSecretError(RuntimeError):
+    """Raised when a required secret is not configured in production/staging."""
+
+    pass
+
+
+def require_secret(
+    value: str | None,
+    name: str,
+    *,
+    dev_default: str | None = None,
+    environments: tuple[str, ...] = ("prod", "production", "staging", "test"),
+) -> str:
+    """Require a secret to be set in production environments.
+
+    In development/local environments, falls back to dev_default if provided.
+    In production environments, raises MissingSecretError if not set.
+
+    Args:
+        value: The secret value (may be None or empty)
+        name: Name of the secret for error messages (e.g., "SESSION_SECRET")
+        dev_default: Default value to use in development (NEVER in production)
+        environments: Environments where the secret is required
+
+    Returns:
+        The secret value
+
+    Raises:
+        MissingSecretError: If secret is not set in production environments
+
+    Example:
+        >>> secret = require_secret(
+        ...     os.getenv("SESSION_SECRET"),
+        ...     "SESSION_SECRET",
+        ...     dev_default="dev-only-secret",
+        ... )
+    """
+    if value:
+        return value
+
+    current_env = get_current_environment()
+
+    # Check if we're in a production-like environment
+    raw_env = os.getenv("APP_ENV") or os.getenv("RAILWAY_ENVIRONMENT_NAME") or ""
+    is_production_like = (
+        current_env == PROD_ENV
+        or current_env == TEST_ENV  # staging/preview
+        or raw_env.lower() in environments
+    )
+
+    if is_production_like:
+        raise MissingSecretError(
+            f"SECURITY ERROR: {name} must be set in production/staging environments. "
+            f"Current environment: {current_env} (raw: {raw_env!r})"
+        )
+
+    # In development, use the dev default if provided
+    if dev_default is not None:
+        return dev_default
+
+    raise MissingSecretError(
+        f"{name} is not set and no dev_default was provided. "
+        "Either set the environment variable or provide a dev_default."
+    )

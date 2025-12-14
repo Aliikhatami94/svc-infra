@@ -8,9 +8,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+from svc_infra.app.env import require_secret
 from svc_infra.security.headers import SECURE_DEFAULTS, SecurityHeadersMiddleware
 
-DEFAULT_SESSION_SECRET = "svc-dev-secret-change-me"
+DEFAULT_SESSION_SECRET = "dev-only-session-secret-not-for-production"
 
 
 def _parse_bool(value: str | None) -> bool | None:
@@ -129,7 +130,12 @@ def _configure_session_middleware(
     if not install or not _should_add_session_middleware(app):
         return
 
-    secret = secret_key or env.get("SESSION_SECRET") or DEFAULT_SESSION_SECRET
+    # Use require_secret to ensure secrets are set in production
+    secret = require_secret(
+        secret_key or env.get("SESSION_SECRET"),
+        "SESSION_SECRET",
+        dev_default=DEFAULT_SESSION_SECRET,
+    )
     https_env = _parse_bool(env.get("SESSION_COOKIE_SECURE"))
     effective_https_only = (
         https_only if https_only is not None else (https_env if https_env is not None else False)

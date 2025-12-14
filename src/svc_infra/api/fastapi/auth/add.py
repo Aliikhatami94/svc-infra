@@ -14,7 +14,7 @@ from svc_infra.api.fastapi.auth.routers.oauth_router import oauth_router_with_ba
 from svc_infra.api.fastapi.auth.routers.session_router import build_session_router
 from svc_infra.api.fastapi.db.sql.users import get_fastapi_users
 from svc_infra.api.fastapi.paths.prefix import AUTH_PREFIX, USER_PREFIX
-from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
+from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV, require_secret
 from svc_infra.db.sql.apikey import bind_apikey_model
 
 from .policy import AuthPolicy, DefaultAuthPolicy
@@ -274,11 +274,14 @@ def add_auth_users(
 
     if not any(m.cls.__name__ == "SessionMiddleware" for m in app.user_middleware):
         jwt_block = getattr(settings_obj, "jwt", None)
-        secret = (
-            jwt_block.secret.get_secret_value()
-            if jwt_block and getattr(jwt_block, "secret", None)
-            else "svc-dev-secret-change-me"
-        )
+        if jwt_block and getattr(jwt_block, "secret", None):
+            secret = jwt_block.secret.get_secret_value()
+        else:
+            secret = require_secret(
+                None,
+                "JWT_SECRET (via auth settings jwt.secret for SessionMiddleware)",
+                dev_default="dev-only-session-jwt-secret-not-for-production",
+            )
         same_site_lit = cast(
             Literal["lax", "strict", "none"],
             str(getattr(settings_obj, "session_cookie_samesite", "lax")).lower(),

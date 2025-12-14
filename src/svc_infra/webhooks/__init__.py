@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .encryption import decrypt_secret, encrypt_secret, is_encrypted
+
 if TYPE_CHECKING:  # pragma: no cover - for type checkers only
     from .add import add_webhooks
 
-__all__ = ["add_webhooks"]
+__all__ = ["add_webhooks", "encrypt_secret", "decrypt_secret", "is_encrypted"]
 
 
 def __getattr__(name: str):

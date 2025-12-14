@@ -6,6 +6,7 @@ from svc_infra.db.inbox import InboxStore
 from svc_infra.db.outbox import OutboxStore
 from svc_infra.http import get_default_timeout_seconds, new_async_httpx_client
 from svc_infra.jobs.queue import Job
+from svc_infra.webhooks.encryption import decrypt_secret
 from svc_infra.webhooks.signing import sign
 
 
@@ -42,7 +43,9 @@ def make_webhook_handler(
         if event is not None and subscription is not None:
             delivery_payload = event
             url = subscription.get("url") or get_webhook_url_for_topic(topic)
-            secret = subscription.get("secret") or get_secret_for_topic(topic)
+            # Decrypt secret (handles both encrypted and plaintext for backwards compat)
+            raw_secret = subscription.get("secret") or get_secret_for_topic(topic)
+            secret = decrypt_secret(raw_secret)
             subscription_id = subscription.get("id")
         else:
             delivery_payload = payload

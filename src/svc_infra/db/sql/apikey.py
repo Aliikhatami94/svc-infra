@@ -11,14 +11,23 @@ from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, String, Uniqu
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
+from svc_infra.app.env import require_secret
 from svc_infra.db.sql.base import ModelBase
 from svc_infra.db.sql.types import GUID
 
-_APIKEY_HMAC_SECRET = os.getenv("APIKEY_HASH_SECRET") or "change-me-low-entropy-dev"
+
+def _get_apikey_secret() -> str:
+    """Get APIKEY_HASH_SECRET, requiring it in production."""
+    return require_secret(
+        os.getenv("APIKEY_HASH_SECRET"),
+        "APIKEY_HASH_SECRET",
+        dev_default="dev-only-apikey-hmac-secret-not-for-production",
+    )
 
 
 def _hmac_sha256(s: str) -> str:
-    return hmac.new(_APIKEY_HMAC_SECRET.encode(), s.encode(), hashlib.sha256).hexdigest()
+    secret = _get_apikey_secret()
+    return hmac.new(secret.encode(), s.encode(), hashlib.sha256).hexdigest()
 
 
 def _now() -> datetime:

@@ -79,16 +79,10 @@ class SimpleRateLimitMiddleware:
                     tenant_id = await _resolve_tenant_id(request)
             except Exception:
                 tenant_id = None
-            # Fallback header behavior
-            if not tenant_id:
-                if _resolve_tenant_id is None:
-                    tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get(
-                        "X-Tenant-ID"
-                    )
-                elif self._allow_untrusted_tenant_header:
-                    tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get(
-                        "X-Tenant-ID"
-                    )
+            # Fallback header behavior - ONLY if explicitly allowed
+            # Never trust untrusted headers by default to prevent rate limit evasion
+            if not tenant_id and self._allow_untrusted_tenant_header:
+                tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get("X-Tenant-ID")
 
         key = key_fn(request)
         if self.scope_by_tenant and tenant_id:

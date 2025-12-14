@@ -7,6 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, class_mapper
 
 
+def _escape_ilike(q: str) -> str:
+    """Escape special characters for ILIKE pattern matching.
+
+    Prevents SQL injection via wildcard characters that could match
+    unintended data (e.g., % matches any string, _ matches any char).
+    """
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class SqlRepository:
     """
     Very small async repository around a mapped SQLAlchemy model.
@@ -148,7 +157,7 @@ class SqlRepository:
         order_by: Optional[Sequence[Any]] = None,
         where: Optional[Sequence[Any]] = None,
     ) -> Sequence[Any]:
-        ilike = f"%{q}%"
+        ilike = f"%{_escape_ilike(q)}%"
         conditions = []
         for f in fields:
             col = getattr(self.model, f, None)
@@ -176,7 +185,7 @@ class SqlRepository:
         fields: Sequence[str],
         where: Optional[Sequence[Any]] = None,
     ) -> int:
-        ilike = f"%{q}%"
+        ilike = f"%{_escape_ilike(q)}%"
         conditions = []
         for f in fields:
             col = getattr(self.model, f, None)

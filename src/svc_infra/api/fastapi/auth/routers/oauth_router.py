@@ -28,6 +28,7 @@ from svc_infra.api.fastapi.paths.auth import (
     OAUTH_LOGIN_PATH,
     OAUTH_REFRESH_PATH,
 )
+from svc_infra.app.env import require_secret
 from svc_infra.security.models import RefreshToken
 from svc_infra.security.session import issue_session_and_refresh, rotate_session_refresh
 
@@ -263,11 +264,14 @@ async def _find_or_create_user(session, user_model, email: str, full_name: str |
         is_verified=True,
     )
 
-    # Set hashed password for OAuth users
+    # Set hashed password for OAuth users - use cryptographically random password
+    # OAuth users authenticate via provider, not password, so this is never used
+    # but must be unpredictable to prevent password-based login attacks
+    random_password = secrets.token_urlsafe(32)
     if hasattr(user, "hashed_password"):
-        user.hashed_password = PasswordHelper().hash("!oauth!")
+        user.hashed_password = PasswordHelper().hash(random_password)
     elif hasattr(user, "password_hash"):
-        user.password_hash = PasswordHelper().hash("!oauth!")
+        user.password_hash = PasswordHelper().hash(random_password)
 
     if full_name and hasattr(user, "full_name"):
         setattr(user, "full_name", full_name)
@@ -445,11 +449,14 @@ async def _process_user_authentication(
 async def _validate_and_decode_jwt_token(raw_token: str) -> str:
     """Validate and decode JWT token to extract user ID."""
     st = get_auth_settings()
-    secret = (
-        st.jwt.secret.get_secret_value()
-        if getattr(st, "jwt", None) and getattr(st.jwt, "secret", None)
-        else "dev-change-me"
-    )
+    if getattr(st, "jwt", None) and getattr(st.jwt, "secret", None):
+        secret = st.jwt.secret.get_secret_value()
+    else:
+        secret = require_secret(
+            None,
+            "JWT_SECRET (via auth settings jwt.secret for token validation)",
+            dev_default="dev-only-jwt-validation-secret-not-for-production",
+        )
 
     try:
         payload = jwt.decode(
