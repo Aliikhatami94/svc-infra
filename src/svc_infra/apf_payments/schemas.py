@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, Field, conint, constr
+from pydantic import BaseModel, Field, StringConstraints
 
-Currency = constr(pattern=r"^[A-Z]{3}$")
-AmountMinor = conint(ge=0)  # minor units (cents)
+# Type aliases for payment fields using Annotated with proper type hints
+Currency = Annotated[str, StringConstraints(pattern=r"^[A-Z]{3}$")]
+AmountMinor = Annotated[int, Field(ge=0)]  # minor units (cents)
 
 
 class CustomerUpsertIn(BaseModel):
@@ -187,7 +188,7 @@ class UsageRecordIn(BaseModel):
     # If provider doesn't use subscription_item, allow provider_price_id as fallback.
     subscription_item: Optional[str] = None
     provider_price_id: Optional[str] = None
-    quantity: conint(ge=0)
+    quantity: Annotated[int, Field(ge=0)]
     timestamp: Optional[int] = None  # Unix seconds; provider defaults to "now"
     action: Optional[Literal["increment", "set"]] = "increment"
 

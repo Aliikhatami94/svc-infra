@@ -52,7 +52,7 @@ def add_observability(
                 # Install middleware manually to pass route_resolver
                 def _resolver(req):
                     # Base template
-                    from svc_infra.obs.metrics.asgi import _route_template  # type: ignore
+                    from svc_infra.obs.metrics.asgi import _route_template
 
                     base = _route_template(req)
                     method = getattr(req, "method", "GET")

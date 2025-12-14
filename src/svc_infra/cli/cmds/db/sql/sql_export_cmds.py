@@ -57,13 +57,13 @@ def export_tenant(
         assert AsyncEngine is not None  # for type checkers
 
         async def _fetch() -> list[dict[str, Any]]:
-            async with engine.connect() as conn:  # type: ignore[call-arg]
+            async with engine.connect() as conn:
                 result = await conn.execute(stmt, params)
                 return [dict(row) for row in result.mappings()]
 
         rows = asyncio.run(_fetch())
     else:
-        with engine.connect() as conn:  # type: ignore[attr-defined]
+        with engine.connect() as conn:
             result = conn.execute(stmt, params)
             rows = [dict(row) for row in result.mappings()]
 

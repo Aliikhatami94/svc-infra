@@ -35,7 +35,7 @@ async def run_erasure(
     for s in plan.steps:
         res = s.run(session, principal_id)
         if hasattr(res, "__await__"):
-            res = await res  # type: ignore[misc]
+            res = await res
         total += int(res or 0)
     if on_audit:
         on_audit("erasure.completed", {"principal_id": principal_id, "affected": total})

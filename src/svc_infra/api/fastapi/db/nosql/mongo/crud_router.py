@@ -56,7 +56,7 @@ def make_crud_router_plus_mongo(
     # LIST
     @router.get(
         "",
-        response_model=cast(Any, Page[read_schema]),
+        response_model=cast(Any, Page[read_schema]),  # type: ignore[valid-type]
         description=f"List items in {prefix} collection",
     )
     async def list_items(
@@ -74,14 +74,14 @@ def make_crud_router_plus_mongo(
         else:
             items = await service.list(db, limit=lp.limit, offset=lp.offset, sort=sort)
             total = await service.count(db)
-        return Page[read_schema].from_items(
+        return Page[read_schema].from_items(  # type: ignore[valid-type]
             total=total, items=items, limit=lp.limit, offset=lp.offset
         )
 
     # GET by id
     @router.get(
         "/{item_id}",
-        response_model=cast(Any, read_schema),
+        response_model=cast(Any, read_schema),  # type: ignore[valid-type]
         description=f"Get item from {prefix} collection",
     )
     async def get_item(db: DBDep, item_id: Any):
@@ -93,21 +93,21 @@ def make_crud_router_plus_mongo(
     # CREATE
     @router.post(
         "",
-        response_model=cast(Any, read_schema),
+        response_model=cast(Any, read_schema),  # type: ignore[valid-type]
         status_code=201,
         description=f"Create item in {prefix} collection",
     )
-    async def create_item(db: DBDep, payload: create_schema = Body(...)):
+    async def create_item(db: DBDep, payload: create_schema = Body(...)):  # type: ignore[valid-type]
         data = payload.model_dump(exclude_unset=True)
         return await service.create(db, data)
 
     # UPDATE
     @router.patch(
         "/{item_id}",
-        response_model=cast(Any, read_schema),
+        response_model=cast(Any, read_schema),  # type: ignore[valid-type]
         description=f"Update item in {prefix} collection",
     )
-    async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):
+    async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):  # type: ignore[valid-type]
         data = payload.model_dump(exclude_unset=True)
         row = await service.update(db, item_id, data)
         if not row:

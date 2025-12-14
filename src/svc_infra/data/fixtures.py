@@ -19,8 +19,8 @@ async def run_fixtures(
             return
     for fn in loaders:
         res = fn()
-        if inspect.isawaitable(res):  # type: ignore[arg-type]
-            await res  # type: ignore[misc]
+        if inspect.isawaitable(res):
+            await res
     if run_once_file:
         sentinel.parent.mkdir(parents=True, exist_ok=True)
         Path(run_once_file).write_text("ok")

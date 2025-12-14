@@ -10,7 +10,7 @@ import typer
 
 # --- NEW: load .env automatically (best-effort) ---
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv
 except Exception:  # pragma: no cover
     load_dotenv = None
 

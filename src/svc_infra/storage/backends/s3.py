@@ -11,9 +11,9 @@ try:
     import aioboto3
     from botocore.exceptions import ClientError, NoCredentialsError
 except ImportError:
-    aioboto3 = None  # type: ignore
-    ClientError = Exception  # type: ignore
-    NoCredentialsError = Exception  # type: ignore
+    aioboto3 = None
+    ClientError = Exception
+    NoCredentialsError = Exception
 
 from ..base import FileNotFoundError, InvalidKeyError, PermissionDeniedError, StorageError
 

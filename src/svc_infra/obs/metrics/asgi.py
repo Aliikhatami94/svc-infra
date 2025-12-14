@@ -34,7 +34,7 @@ def _register_default_collectors_once() -> None:
     try:
         # These imports are no-ops if already registered by the client,
         # but GCCollector typically needs explicit instantiation.
-        from prometheus_client import GCCollector  # type: ignore
+        from prometheus_client import GCCollector
 
         GCCollector()  # registers GC metrics
         _default_collectors_ready = True

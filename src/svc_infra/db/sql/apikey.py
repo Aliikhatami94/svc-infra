@@ -52,7 +52,7 @@ def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type
     Call this once during app boot (e.g., inside add_auth_users when enable_api_keys=True).
     """
 
-    class ApiKey(ModelBase):  # type: ignore[misc, valid-type]
+    class ApiKey(ModelBase):
         __tablename__ = table_name
 
         id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)

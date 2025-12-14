@@ -4,7 +4,7 @@ import logging
 import os
 import time
 import warnings
-from typing import Optional, Protocol, Tuple
+from typing import Callable, Optional, Protocol, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class RedisRateLimitStore:
         *,
         limit: int = 120,
         prefix: str = "ratelimit",
-        clock: Optional[callable] = None,
+        clock: Optional[Callable[[], float]] = None,
     ):
         self.redis = redis_client
         self.limit = limit

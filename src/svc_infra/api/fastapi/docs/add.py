@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -134,7 +134,7 @@ a { color: #62aef7; }
 def add_sdk_generation_stub(
     app: FastAPI,
     *,
-    on_generate: Optional[callable] = None,
+    on_generate: Optional[Callable[[], None]] = None,
     openapi_path: str = "/openapi.json",
 ) -> None:
     """Hook to add an SDK generation stub.

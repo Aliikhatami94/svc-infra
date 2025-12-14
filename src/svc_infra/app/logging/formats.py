@@ -35,7 +35,7 @@ class LoggingConfig(BaseModel):
 class JsonFormatter(logging.Formatter):
     """Structured JSON formatter for prod and CI logs."""
 
-    def format(self, record: logging.LogRecord) -> str:  # type: ignore[override]
+    def format(self, record: logging.LogRecord) -> str:
         import json
         import os as _os
         from traceback import format_exception

@@ -31,16 +31,16 @@ async def purge_policy(session: SqlSession, policy: RetentionPolicy) -> int:
     where = list(policy.extra_where or [])
     created_col = getattr(m, "created_at", None)
     if created_col is not None and hasattr(created_col, "__le__"):
-        where.append(created_col <= cutoff)  # type: ignore[operator]
+        where.append(created_col <= cutoff)
 
     # Soft-delete path when available and requested
     if not policy.hard_delete and policy.soft_delete_field and hasattr(m, policy.soft_delete_field):
-        stmt = m.update().where(*where).values({policy.soft_delete_field: cutoff})  # type: ignore[attr-defined]
+        stmt = m.update().where(*where).values({policy.soft_delete_field: cutoff})
         res = await session.execute(stmt)
         return getattr(res, "rowcount", 0)
 
     # Hard delete fallback
-    stmt = m.delete().where(*where)  # type: ignore[attr-defined]
+    stmt = m.delete().where(*where)
     res = await session.execute(stmt)
     return getattr(res, "rowcount", 0)
 

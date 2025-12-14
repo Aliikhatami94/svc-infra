@@ -27,7 +27,7 @@ def set_tenant_resolver(
 
 async def _maybe_await(x):
     if callable(getattr(x, "__await__", None)):
-        return await x  # type: ignore[misc]
+        return await x
     return x
 
 
@@ -47,7 +47,7 @@ async def resolve_tenant_id(
     # read header value if not provided directly (supports direct calls without DI)
     if tenant_header is None:
         try:
-            tenant_header = request.headers.get("X-Tenant-Id")  # type: ignore[assignment]
+            tenant_header = request.headers.get("X-Tenant-Id")
         except Exception:
             tenant_header = None
 

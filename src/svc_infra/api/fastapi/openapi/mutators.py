@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Iterable, Iterator, Tuple
+from typing import Callable, Dict, Iterable, Iterator, Tuple
 
 from ..auth.security import auth_login_path
 from .models import APIVersionSpec, ServiceInfo, VersionInfo
@@ -51,7 +51,7 @@ def pagination_components_mutator(
     *,
     default_limit: int = 50,
     max_limit: int = 200,
-) -> callable:
+) -> Callable[[dict], dict]:
     """
     Adds reusable pagination/filtering parameters & paginated envelope schemas.
     - Cursor: cursor/limit
@@ -196,7 +196,7 @@ def auto_attach_pagination_params_mutator(
     attach_filters: bool = True,
     apply_when: str = "array_200",
     flag_disable: str = "x_no_auto_pagination",
-) -> callable:
+) -> Callable[[dict], dict]:
     """
     Attaches reusable pagination/filter parameters to GET "listy" operations.
 
@@ -1144,7 +1144,7 @@ def ensure_problem_examples_mutator():
 
     try:
         # Internal helper with sensible defaults
-        from .conventions import _problem_example  # type: ignore
+        from .conventions import _problem_example
     except Exception:  # pragma: no cover - fallback
 
         def _problem_example(**kw):  # type: ignore

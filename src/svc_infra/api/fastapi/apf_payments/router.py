@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Literal, Optional, cast
+from typing import Callable, Literal, Optional, cast
 
 from fastapi import Body, Depends, Header, HTTPException, Request, Response, status
 from starlette.responses import JSONResponse
@@ -71,7 +71,7 @@ def _tx_kind(kind: str) -> Literal["payment", "refund", "fee", "payout", "captur
 
 
 # --- tenant resolution ---
-_tenant_resolver: None | (callable) = None
+_tenant_resolver: Callable | None = None
 
 
 def set_payments_tenant_resolver(fn):
@@ -94,9 +94,9 @@ async def resolve_payments_tenant_id(
         val = _tenant_resolver(request, identity, tenant_header)
         # Support async or sync resolver
         if inspect.isawaitable(val):
-            val = await val  # type: ignore[assignment]
+            val = await val
         if val:
-            return val  # type: ignore[return-value]
+            return val
         # if None, continue default flow
 
     # 2) Principal (user)

@@ -17,7 +17,7 @@ def _resolve_target(path: str) -> Callable[[], Awaitable[None]]:
     mod = importlib.import_module(mod_name)
     fn = getattr(mod, func_name)
     if asyncio.iscoroutinefunction(fn):
-        return fn  # type: ignore[return-value]
+        return fn
 
     # wrap sync into async
     async def _wrapped():

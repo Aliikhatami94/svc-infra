@@ -128,7 +128,7 @@ async def append_audit_event(
                 .order_by(AuditLog.id.desc())
                 .limit(1)
             )
-            result = await db.execute(stmt)  # type: ignore[attr-defined]
+            result = await db.execute(stmt)
             prev = result.scalars().first()
             if prev:
                 prev_hash = prev.hash
@@ -157,12 +157,12 @@ async def append_audit_event(
     )
     if hasattr(db, "add"):
         try:
-            db.add(row)  # type: ignore[attr-defined]
+            db.add(row)
         except Exception:  # pragma: no cover - minimal shim safety
             pass
         if hasattr(db, "flush"):
             try:
-                await db.flush()  # type: ignore[attr-defined]
+                await db.flush()
             except Exception:  # pragma: no cover
                 pass
     return row

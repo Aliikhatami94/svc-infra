@@ -155,21 +155,23 @@ def _build_filtered_schema(
 
 def _ensure_original_openapi_saved(app: FastAPI) -> None:
     if not hasattr(app.state, "_scoped_original_openapi"):
-        app.state._scoped_original_openapi = app.openapi  # type: ignore[attr-defined]
+        app.state._scoped_original_openapi = app.openapi
 
 
 def _get_full_schema_from_original(app: FastAPI) -> Dict:
     _ensure_original_openapi_saved(app)
-    return copy.deepcopy(app.state._scoped_original_openapi())  # type: ignore[attr-defined]
+    return copy.deepcopy(app.state._scoped_original_openapi())
 
 
 def _install_root_filter(app: FastAPI, exclude_prefixes: List[str]) -> None:
     _ensure_original_openapi_saved(app)
-    app.state._scoped_root_exclusions = sorted(set(exclude_prefixes))  # type: ignore[attr-defined]
+    app.state._scoped_root_exclusions = sorted(set(exclude_prefixes))
 
     def root_filtered_openapi():
         full_schema = _get_full_schema_from_original(app)
-        return _build_filtered_schema(full_schema, exclude_prefixes=app.state._scoped_root_exclusions)  # type: ignore[attr-defined]
+        return _build_filtered_schema(
+            full_schema, exclude_prefixes=app.state._scoped_root_exclusions
+        )
 
     app.openapi = root_filtered_openapi
 

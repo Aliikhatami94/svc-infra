@@ -78,7 +78,7 @@ class NoSqlRepository:
         if not parts:
             return {}
         if len(parts) == 1:
-            return parts[0]  # type: ignore[return-value]
+            return parts[0]
         return {"$and": parts}
 
     def _normalize_id_value(self, val: Any) -> Any:

@@ -51,7 +51,7 @@ def instrument_requests():
             _http_client_total.labels(host, method_u, code).inc()
             _http_client_duration.labels(host, method_u).observe(elapsed)
 
-    requests.sessions.Session.request = _wrapped  # type: ignore[attr-defined]
+    requests.sessions.Session.request = _wrapped
 
 
 def instrument_httpx():
@@ -93,5 +93,5 @@ def instrument_httpx():
             _http_client_total.labels(host, method, code).inc()
             _http_client_duration.labels(host, method).observe(time.perf_counter() - start)
 
-    httpx.Client.send = _wrap_sync_send(_orig_sync)  # type: ignore[assignment]
-    httpx.AsyncClient.send = _wrapped_async  # type: ignore[assignment]
+    httpx.Client.send = _wrap_sync_send(_orig_sync)
+    httpx.AsyncClient.send = _wrapped_async

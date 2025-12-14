@@ -51,7 +51,7 @@ async def verify_chain_for_tenant(
             if tenant_id is not None:
                 stmt = stmt.where(AuditLog.tenant_id == tenant_id)
             stmt = stmt.order_by(AuditLog.id.asc())
-            result = await db.execute(stmt)  # type: ignore[attr-defined]
+            result = await db.execute(stmt)
             events = list(result.scalars().all())
         except Exception:  # pragma: no cover
             events = []

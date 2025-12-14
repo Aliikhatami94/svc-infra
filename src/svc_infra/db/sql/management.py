@@ -15,7 +15,7 @@ def _sa_columns(model: type[object]) -> list[Column]:
 def _py_type(col: Column) -> type:
     # Prefer SQLAlchemy-provided python_type when available
     if getattr(col.type, "python_type", None):
-        return col.type.python_type  # type: ignore[no-any-return]
+        return col.type.python_type
 
     from datetime import date, datetime
     from typing import Any as _Any
@@ -25,7 +25,7 @@ def _py_type(col: Column) -> type:
 
     try:
         from sqlalchemy.dialects.postgresql import JSONB
-        from sqlalchemy.dialects.postgresql import UUID as PG_UUID  # type: ignore
+        from sqlalchemy.dialects.postgresql import UUID as PG_UUID
     except Exception:  # pragma: no cover
         PG_UUID = None  # type: ignore
         JSONB = None  # type: ignore

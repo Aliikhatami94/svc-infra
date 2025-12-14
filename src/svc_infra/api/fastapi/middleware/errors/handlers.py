@@ -136,7 +136,7 @@ def register_error_handlers(app):
         try:
             if getattr(exc, "headers", None):
                 # FastAPI/Starlette exceptions store headers as a dict[str, str]
-                hdrs = dict(getattr(exc, "headers"))  # type: ignore[arg-type]
+                hdrs = dict(getattr(exc, "headers"))
         except Exception:
             hdrs = None
         return problem_response(
@@ -166,7 +166,7 @@ def register_error_handlers(app):
         hdrs: dict[str, str] | None = None
         try:
             if getattr(exc, "headers", None):
-                hdrs = dict(getattr(exc, "headers"))  # type: ignore[arg-type]
+                hdrs = dict(getattr(exc, "headers"))
         except Exception:
             hdrs = None
         return problem_response(

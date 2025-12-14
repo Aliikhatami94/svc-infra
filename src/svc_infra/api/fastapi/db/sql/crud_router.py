@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Optional, Sequence, Type, TypeVar
+from typing import Annotated, Any, Callable, Optional, Sequence, Type, TypeVar
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
@@ -73,14 +73,14 @@ def make_crud_router_plus_sql(
     # -------- LIST --------
     @router.get(
         "",
-        response_model=Page[read_schema],
+        response_model=Page[read_schema],  # type: ignore[valid-type]
         description=f"List items of type {model.__name__}",
     )
     async def list_items(
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
         sp: Annotated[SearchParams, Depends(dep_search)],
-        session: SqlSessionDep,  # type: ignore[name-defined]
+        session: SqlSessionDep,
     ):
         order_spec = op.order_by or default_ordering
         order_fields = _parse_ordering_to_fields(order_spec)
@@ -104,10 +104,10 @@ def make_crud_router_plus_sql(
     # -------- GET by id --------
     @router.get(
         "/{item_id}",
-        response_model=read_schema,
+        response_model=read_schema,  # type: ignore[valid-type]
         description=f"Get item of type {model.__name__}",
     )
-    async def get_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
+    async def get_item(item_id: Any, session: SqlSessionDep):
         row = await service.get(session, _coerce_id(item_id))
         if not row:
             raise HTTPException(404, "Not found")
@@ -116,13 +116,13 @@ def make_crud_router_plus_sql(
     # -------- CREATE --------
     @router.post(
         "",
-        response_model=read_schema,
+        response_model=read_schema,  # type: ignore[valid-type]
         status_code=201,
         description=f"Create item of type {model.__name__}",
     )
     async def create_item(
-        session: SqlSessionDep,  # type: ignore[name-defined]
-        payload: create_schema = Body(...),
+        session: SqlSessionDep,
+        payload: create_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
             data = payload.model_dump(exclude_unset=True)
@@ -135,13 +135,13 @@ def make_crud_router_plus_sql(
     # -------- UPDATE --------
     @router.patch(
         "/{item_id}",
-        response_model=read_schema,
+        response_model=read_schema,  # type: ignore[valid-type]
         description=f"Update item of type {model.__name__}",
     )
     async def update_item(
         item_id: Any,
-        session: SqlSessionDep,  # type: ignore[name-defined]
-        payload: update_schema = Body(...),
+        session: SqlSessionDep,
+        payload: update_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
             data = payload.model_dump(exclude_unset=True)
@@ -158,7 +158,7 @@ def make_crud_router_plus_sql(
     @router.delete(
         "/{item_id}", status_code=204, description=f"Delete item of type {model.__name__}"
     )
-    async def delete_item(item_id: Any, session: SqlSessionDep):  # type: ignore[name-defined]
+    async def delete_item(item_id: Any, session: SqlSessionDep):
         ok = await service.delete(session, _coerce_id(item_id))
         if not ok:
             raise HTTPException(404, "Not found")
@@ -170,7 +170,7 @@ def make_crud_router_plus_sql(
 def make_tenant_crud_router_plus_sql(
     *,
     model: type[Any],
-    service_factory: callable,  # factory that returns a SqlService (will be wrapped)
+    service_factory: Callable[[], Any],  # factory that returns a SqlService (will be wrapped)
     read_schema: Type[ReadModel],
     create_schema: Type[CreateModel],
     update_schema: Type[UpdateModel],
@@ -196,7 +196,7 @@ def make_tenant_crud_router_plus_sql(
         _base_instance = service_factory() if callable(service_factory) else service_factory  # type: ignore[misc]
     except TypeError:
         # If the callable requires args, assume it's already an instance
-        _base_instance = service_factory  # type: ignore[assignment]
+        _base_instance = service_factory
 
     def _coerce_id(v: Any) -> Any:
         """Best-effort coercion of path ids: cast digit-only strings to int.
@@ -222,17 +222,17 @@ def make_tenant_crud_router_plus_sql(
         return fields
 
     # create per-request service with tenant scoping
-    async def _svc(session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
+    async def _svc(session: SqlSessionDep, tenant_id: TenantId):
         repo_or_service = getattr(_base_instance, "repo", _base_instance)
-        svc: Any = TenantSqlService(repo_or_service, tenant_id=tenant_id, tenant_field=tenant_field)  # type: ignore[arg-type]
-        return svc  # type: ignore[return-value]
+        svc: Any = TenantSqlService(repo_or_service, tenant_id=tenant_id, tenant_field=tenant_field)
+        return svc
 
-    @router.get("", response_model=Page[read_schema])
+    @router.get("", response_model=Page[read_schema])  # type: ignore[valid-type]
     async def list_items(
         lp: Annotated[LimitOffsetParams, Depends(dep_limit_offset)],
         op: Annotated[OrderParams, Depends(dep_order)],
         sp: Annotated[SearchParams, Depends(dep_search)],
-        session: SqlSessionDep,  # type: ignore[name-defined]
+        session: SqlSessionDep,
         tenant_id: TenantId,
     ):
         svc = await _svc(session, tenant_id)
@@ -254,19 +254,19 @@ def make_tenant_crud_router_plus_sql(
             total = await svc.count(session)
         return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
-    @router.get("/{item_id}", response_model=read_schema)
-    async def get_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
+    @router.get("/{item_id}", response_model=read_schema)  # type: ignore[valid-type]
+    async def get_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):
         svc = await _svc(session, tenant_id)
         obj = await svc.get(session, item_id)
         if not obj:
             raise HTTPException(404, "not_found")
         return obj
 
-    @router.post("", response_model=read_schema, status_code=201)
+    @router.post("", response_model=read_schema, status_code=201)  # type: ignore[valid-type]
     async def create_item(
-        session: SqlSessionDep,  # type: ignore[name-defined]
+        session: SqlSessionDep,
         tenant_id: TenantId,
-        payload: create_schema = Body(...),
+        payload: create_schema = Body(...),  # type: ignore[valid-type]
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
@@ -277,12 +277,12 @@ def make_tenant_crud_router_plus_sql(
             raise HTTPException(422, "invalid_payload")
         return await svc.create(session, data)
 
-    @router.patch("/{item_id}", response_model=read_schema)
+    @router.patch("/{item_id}", response_model=read_schema)  # type: ignore[valid-type]
     async def update_item(
         item_id: Any,
-        session: SqlSessionDep,  # type: ignore[name-defined]
+        session: SqlSessionDep,
         tenant_id: TenantId,
-        payload: update_schema = Body(...),
+        payload: update_schema = Body(...),  # type: ignore[valid-type]
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
@@ -297,7 +297,7 @@ def make_tenant_crud_router_plus_sql(
         return updated
 
     @router.delete("/{item_id}", status_code=204)
-    async def delete_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):  # type: ignore[name-defined]
+    async def delete_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):
         svc = await _svc(session, tenant_id)
         ok = await svc.delete(session, _coerce_id(item_id))
         if not ok:

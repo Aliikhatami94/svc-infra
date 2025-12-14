@@ -27,7 +27,7 @@ def dualize_into(
         prefix="",  # prevent double-prefixing on include_router
         tags=list(src.tags or []),
         dependencies=list(src.dependencies or []),
-        default_response_class=src.default_response_class,  # type: ignore[arg-type]
+        default_response_class=src.default_response_class,
         responses=dict(src.responses or {}),
         callbacks=list(src.callbacks or []),
         routes=[],  # start empty

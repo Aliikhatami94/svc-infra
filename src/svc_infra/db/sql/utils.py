@@ -22,12 +22,12 @@ else:
 
 try:
     # Runtime import (may be missing if async extras aren’t installed)
-    from sqlalchemy.ext.asyncio import create_async_engine as _create_async_engine  # type: ignore
+    from sqlalchemy.ext.asyncio import create_async_engine as _create_async_engine
 except Exception:  # pragma: no cover - optional dep
     _create_async_engine = None  # type: ignore
 
 try:
-    from sqlalchemy import create_engine as _create_engine  # type: ignore
+    from sqlalchemy import create_engine as _create_engine
 except Exception:  # pragma: no cover - optional env
     _create_engine = None  # type: ignore
 
@@ -843,15 +843,15 @@ def ensure_database_exists(url: URL | str) -> None:
         if is_async_url(u):
 
             async def _ping_and_dispose():
-                async with eng.begin() as conn:  # type: ignore[call-arg]
+                async with eng.begin() as conn:
                     await conn.execute(text("SELECT 1"))
-                await eng.dispose()  # type: ignore[attr-defined]
+                await eng.dispose()
 
             asyncio.run(_ping_and_dispose())
         else:
-            with eng.begin() as conn:  # type: ignore[call-arg]
+            with eng.begin() as conn:
                 conn.execute(text("SELECT 1"))
-            eng.dispose()  # type: ignore[attr-defined]
+            eng.dispose()
     except OperationalError as exc:  # pragma: no cover (depends on env)
         raise RuntimeError(f"Failed to connect to database: {exc}") from exc
 

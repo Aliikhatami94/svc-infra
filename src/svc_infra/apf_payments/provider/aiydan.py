@@ -43,9 +43,9 @@ from svc_infra.apf_payments.settings import get_payments_settings
 from .base import ProviderAdapter
 
 try:  # pragma: no cover - optional dependency
-    import aiydan  # type: ignore
+    import aiydan
 except Exception:  # pragma: no cover - handled at runtime
-    aiydan = None  # type: ignore
+    aiydan = None
 
 
 async def _maybe_await(result: Any) -> Any:
@@ -315,11 +315,11 @@ def _balance_snapshot_to_out(data: dict[str, Any]) -> BalanceSnapshotOut:
 
 def _ensure_sequence(result: Any) -> Sequence[dict[str, Any]]:
     if isinstance(result, Sequence):
-        return result  # type: ignore[arg-type]
+        return result
     if isinstance(result, dict):
         items = result.get("items")
         if isinstance(items, Sequence):
-            return items  # type: ignore[arg-type]
+            return items
     raise RuntimeError("Expected sequence payload from Aiydan client")
 
 
@@ -327,14 +327,14 @@ def _ensure_list_response(result: Any) -> Tuple[Sequence[dict[str, Any]], Option
     if isinstance(result, tuple) and len(result) == 2:
         items, cursor = result
         if isinstance(items, Sequence) or items is None:
-            return (items or []), cursor  # type: ignore[arg-type]
+            return (items or []), cursor
     if isinstance(result, dict):
         items = result.get("items")
         cursor = result.get("next_cursor") or result.get("cursor")
         if isinstance(items, Sequence):
             return items, cursor
     if isinstance(result, Sequence):
-        return result, None  # type: ignore[arg-type]
+        return result, None
     raise RuntimeError("Expected iterable response from Aiydan client")
 
 

@@ -29,7 +29,7 @@ class FieldSpec:
 
 def _opt(t: type[Any]) -> tuple[type[Any], object]:
     # convenience: Optional[t] with default None
-    return (t | None, None)  # type: ignore[operator]
+    return (t | None, None)
 
 
 def make_crud_schemas_from_specs(
@@ -60,9 +60,9 @@ def make_crud_schemas_from_specs(
         if not s.exclude_from_update:
             ann_update[s.name] = _opt(s.typ)
 
-    Read = create_model(read_name or "Read", **ann_read)  # type: ignore[arg-type]
-    Create = create_model(create_name or "Create", **ann_create)  # type: ignore[arg-type]
-    Update = create_model(update_name or "Update", **ann_update)  # type: ignore[arg-type]
+    Read = create_model(read_name or "Read", **ann_read)
+    Create = create_model(create_name or "Create", **ann_create)
+    Update = create_model(update_name or "Update", **ann_update)
 
     cfg = ConfigDict(from_attributes=True)
     if json_encoders:

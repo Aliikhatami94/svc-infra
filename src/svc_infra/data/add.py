@@ -47,7 +47,7 @@ def add_data_lifecycle(
         if on_load_fixtures:
             res = on_load_fixtures()
             if inspect.isawaitable(res):
-                await res  # type: ignore[misc]
+                await res
 
     app.add_event_handler("startup", _run_lifecycle)
 

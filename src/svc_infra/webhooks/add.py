@@ -47,7 +47,7 @@ T = TypeVar("T")
 
 class _Factory(Protocol[T]):
     def __call__(self) -> T:
-        ...
+        pass
 
 
 class RedisOutboxStore(OutboxStore):
@@ -119,7 +119,9 @@ class RedisOutboxStore(OutboxStore):
             payload = json.loads(payload_raw.decode())
             created_raw = msg.get(b"created_at") or ""
             created_at = (
-                datetime.fromisoformat(created_raw.decode()) if created_raw else datetime.now(timezone.utc)
+                datetime.fromisoformat(created_raw.decode())
+                if created_raw
+                else datetime.now(timezone.utc)
             )
             return OutboxMessage(
                 id=msg_id,
@@ -172,13 +174,15 @@ def _resolve_value(value: T | _Factory[T] | None, default_factory: _Factory[T]) 
     if value is None:
         return default_factory()
     if _is_factory(value):
-        return value()  # type: ignore[return-value]
+        return value()
     return value  # type: ignore[return-value]
 
 
 def _build_redis_client(env: Mapping[str, str]) -> "Redis" | None:
     if Redis is None:
-        logger.warning("Redis backend requested but redis-py is not installed; falling back to in-memory stores")
+        logger.warning(
+            "Redis backend requested but redis-py is not installed; falling back to in-memory stores"
+        )
         return None
     url = env.get("REDIS_URL", "redis://localhost:6379/0")
     return Redis.from_url(url)
@@ -212,7 +216,9 @@ def _default_subscriptions() -> InMemoryWebhookSubscriptions:
     return InMemoryWebhookSubscriptions()
 
 
-def _subscription_lookup(subs: InMemoryWebhookSubscriptions) -> tuple[Callable[[str], str], Callable[[str], str]]:
+def _subscription_lookup(
+    subs: InMemoryWebhookSubscriptions,
+) -> tuple[Callable[[str], str], Callable[[str], str]]:
     def _get_url(topic: str) -> str:
         items = subs.get_for_topic(topic)
         if not items:
@@ -234,13 +240,15 @@ def add_webhooks(
     *,
     outbox: OutboxStore | _Factory[OutboxStore] | None = ...,
     inbox: InboxStore | _Factory[InboxStore] | None = ...,
-    subscriptions: InMemoryWebhookSubscriptions | _Factory[InMemoryWebhookSubscriptions] | None = ...,
+    subscriptions: (
+        InMemoryWebhookSubscriptions | _Factory[InMemoryWebhookSubscriptions] | None
+    ) = ...,
     queue: JobQueue | None = ...,
     scheduler: InMemoryScheduler | None = ...,
     schedule_tick: bool = ...,
     env: Mapping[str, str] = ...,
 ) -> None:
-    ...
+    pass
 
 
 def add_webhooks(
@@ -248,7 +256,9 @@ def add_webhooks(
     *,
     outbox: OutboxStore | _Factory[OutboxStore] | None = None,
     inbox: InboxStore | _Factory[InboxStore] | None = None,
-    subscriptions: InMemoryWebhookSubscriptions | _Factory[InMemoryWebhookSubscriptions] | None = None,
+    subscriptions: (
+        InMemoryWebhookSubscriptions | _Factory[InMemoryWebhookSubscriptions] | None
+    ) = None,
     queue: JobQueue | None = None,
     scheduler: InMemoryScheduler | None = None,
     schedule_tick: bool = True,
@@ -319,4 +329,3 @@ def add_webhooks(
 
 
 __all__ = ["add_webhooks"]
-

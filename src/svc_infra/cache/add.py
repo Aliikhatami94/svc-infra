@@ -127,8 +127,8 @@ def add_cache(
         try:
             on_event = getattr(app, "on_event", None)
             if callable(on_event):
-                on_event("startup")(_startup)  # type: ignore[misc]
-                on_event("shutdown")(_shutdown)  # type: ignore[misc]
+                on_event("startup")(_startup)
+                on_event("shutdown")(_shutdown)
                 register_ok = True
         except Exception:
             register_ok = False
