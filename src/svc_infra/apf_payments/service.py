@@ -19,6 +19,7 @@ from .models import (
     PaySetupIntent,
     PaySubscription,
 )
+from .provider.base import ProviderAdapter
 from .provider.registry import get_provider_registry
 from .schemas import (
     BalanceSnapshotOut,
@@ -88,7 +89,7 @@ class PaymentsService:
 
     # --- internal helpers -----------------------------------------------------
 
-    def _get_adapter(self):
+    def _get_adapter(self) -> ProviderAdapter:
         if self._adapter is not None:
             return self._adapter
         reg = get_provider_registry()

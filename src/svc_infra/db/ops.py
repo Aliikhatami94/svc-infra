@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, cast
 
 from .sql.utils import get_database_url_from_env
 
@@ -184,7 +184,7 @@ def run_sync_sql(
                 cur.execute(sql)
 
             if fetch:
-                return cur.fetchall()
+                return cast(list[tuple[Any, ...]], cur.fetchall())
 
             conn.commit()
             return None

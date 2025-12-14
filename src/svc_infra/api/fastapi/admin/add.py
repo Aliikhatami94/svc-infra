@@ -9,7 +9,7 @@ import os
 import time
 from hashlib import sha256
 from types import SimpleNamespace
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
@@ -49,7 +49,7 @@ def _verify(token: str, *, secret: str) -> dict:
         payload = json.loads(body)
         if int(payload.get("exp", 0)) < int(time.time()):
             raise ValueError("expired")
-        return payload
+        return cast(dict[Any, Any], payload)
     except Exception as e:
         raise ValueError("invalid_token") from e
 
@@ -60,7 +60,7 @@ def admin_router(*, dependencies: Optional[list[Any]] = None, **kwargs) -> APIRo
     Use permission guards inside endpoints for fine-grained control.
     """
 
-    return roles_router("admin", **kwargs)
+    return cast(APIRouter, roles_router("admin", **kwargs))
 
 
 def add_admin(

@@ -20,7 +20,7 @@ Quick Start:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 from fastapi import HTTPException, Request, Response
 
@@ -49,7 +49,9 @@ def get_documents_manager(app: "FastAPI") -> "DocumentManager":
     """
     if not hasattr(app.state, "documents"):
         raise RuntimeError("Documents not configured. Call add_documents(app) first.")
-    return app.state.documents
+    from .ease import DocumentManager
+
+    return cast(DocumentManager, app.state.documents)
 
 
 def add_documents(

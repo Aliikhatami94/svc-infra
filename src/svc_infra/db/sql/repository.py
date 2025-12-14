@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable, Optional, Sequence, Set
+from typing import Any, Iterable, Optional, Sequence, Set, cast
 
 from sqlalchemy import Select, String, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,8 +46,8 @@ class SqlRepository:
     def _model_columns(self) -> set[str]:
         return {c.key for c in class_mapper(self.model).columns}
 
-    def _id_column(self) -> InstrumentedAttribute:
-        return getattr(self.model, self.id_attr)
+    def _id_column(self) -> InstrumentedAttribute[Any]:
+        return cast(InstrumentedAttribute[Any], getattr(self.model, self.id_attr))
 
     def _base_select(self) -> Select:
         stmt = select(self.model)

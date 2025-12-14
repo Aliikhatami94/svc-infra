@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 
-def _load_json(path: str | Path) -> dict:
+def _load_json(path: str | Path) -> dict[Any, Any]:
     import json
 
     p = Path(path)
-    return json.loads(p.read_text())
+    return cast(dict[Any, Any], json.loads(p.read_text()))
 
 
 def check_openapi_problem_schema(

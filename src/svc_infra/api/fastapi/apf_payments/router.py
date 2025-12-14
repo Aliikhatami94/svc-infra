@@ -96,16 +96,16 @@ async def resolve_payments_tenant_id(
         if inspect.isawaitable(val):
             val = await val
         if val:
-            return val
+            return cast(str, val)
         # if None, continue default flow
 
     # 2) Principal (user)
     if identity and getattr(identity.user or object(), "tenant_id", None):
-        return getattr(identity.user, "tenant_id")
+        return cast(str, getattr(identity.user, "tenant_id"))
 
     # 3) Principal (api key)
     if identity and getattr(identity.api_key or object(), "tenant_id", None):
-        return getattr(identity.api_key, "tenant_id")
+        return cast(str, getattr(identity.api_key, "tenant_id"))
 
     # 4) Explicit header argument (tests pass this)
     if tenant_header:
@@ -114,7 +114,7 @@ async def resolve_payments_tenant_id(
     # 5) Request state
     state_tid = getattr(getattr(request, "state", object()), "tenant_id", None)
     if state_tid:
-        return state_tid
+        return cast(str, state_tid)
 
     raise HTTPException(status_code=400, detail="tenant_context_missing")
 

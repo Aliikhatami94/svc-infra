@@ -10,7 +10,7 @@ import json
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 from urllib.parse import urlencode
 
 import aiofiles
@@ -323,7 +323,7 @@ class LocalBackend:
         try:
             async with aiofiles.open(meta_path, "r") as f:
                 content = await f.read()
-                return json.loads(content)
+                return cast(dict[Any, Any], json.loads(content))
         except (OSError, json.JSONDecodeError) as e:
             raise StorageError(f"Failed to read metadata for {key}: {e}")
 

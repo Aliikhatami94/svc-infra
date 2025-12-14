@@ -468,7 +468,7 @@ async def _validate_and_decode_jwt_token(raw_token: str) -> str:
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(401, "invalid_token")
-        return user_id
+        return cast(str, user_id)
     except Exception:
         raise HTTPException(401, "invalid_token")
 

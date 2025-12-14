@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional, cast
 
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
@@ -97,9 +97,9 @@ def _init_metrics() -> None:
 def _route_template(req: Request) -> str:
     route = getattr(req, "scope", {}).get("route")
     if route and hasattr(route, "path_format"):
-        return route.path_format
+        return cast(str, route.path_format)
     if route and hasattr(route, "path"):
-        return route.path
+        return cast(str, route.path)
     return req.url.path or "/*unmatched*"
 
 

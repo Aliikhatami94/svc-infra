@@ -4,7 +4,7 @@ import base64
 import contextvars
 import json
 import logging
-from typing import Any, Callable, Generic, Iterable, List, Optional, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, List, Optional, Sequence, TypeVar, cast
 
 from fastapi import Query, Request
 from pydantic import BaseModel, Field
@@ -47,13 +47,13 @@ def _encode_cursor(payload: dict) -> str:
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
-def decode_cursor(token: Optional[str]) -> dict:
+def decode_cursor(token: Optional[str]) -> dict[Any, Any]:
     """Public: decode an incoming cursor token for debugging/ops."""
     if not token:
         return {}
     s = token + "=" * (-len(token) % 4)
     raw = base64.urlsafe_b64decode(s.encode("ascii")).decode("utf-8")
-    return json.loads(raw)
+    return cast(dict[Any, Any], json.loads(raw))
 
 
 # ---------- Context ----------

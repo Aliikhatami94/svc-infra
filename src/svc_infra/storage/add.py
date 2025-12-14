@@ -6,7 +6,7 @@ Provides helpers to integrate storage backends with FastAPI applications.
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, cast
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -198,7 +198,7 @@ def get_storage(request: Request) -> StorageBackend:
             "Storage not initialized. " "Call add_storage(app) during application setup."
         )
 
-    return request.app.state.storage
+    return cast(StorageBackend, request.app.state.storage)
 
 
 async def health_check_storage(request: Request) -> dict:

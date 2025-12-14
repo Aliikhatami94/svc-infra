@@ -5,7 +5,7 @@ Works with AWS S3, DigitalOcean Spaces, Wasabi, Backblaze B2, Minio, and
 any S3-compatible object storage service.
 """
 
-from typing import Optional
+from typing import Optional, cast
 
 try:
     import aioboto3
@@ -160,7 +160,7 @@ class S3Backend:
             async with session.client("s3", **self._session_config, **self._client_config) as s3:
                 response = await s3.get_object(Bucket=self.bucket, Key=key)
                 async with response["Body"] as stream:
-                    return await stream.read()
+                    return cast(bytes, await stream.read())
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -259,7 +259,7 @@ class S3Backend:
                     Params=params,
                     ExpiresIn=expires_in,
                 )
-                return url
+                return cast(str, url)
 
         except ClientError as e:
             raise StorageError(f"Failed to generate presigned URL: {e}")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, cast
 
 from bson import ObjectId
 
@@ -117,7 +117,7 @@ class NoSqlRepository:
 
     async def count(self, db, *, filter: Optional[Dict[str, Any]] = None) -> int:
         filt = self._merge_and(self._alive_filter(), filter)
-        return await db[self.collection_name].count_documents(filt or {})
+        return cast(int, await db[self.collection_name].count_documents(filt or {}))
 
     async def get(self, db, id_value: Any) -> Dict | None:
         id_value = self._normalize_id_value(id_value)
@@ -155,10 +155,10 @@ class NoSqlRepository:
             res = await db[self.collection_name].update_one(
                 {self.id_field: id_value}, {"$set": set_ops}
             )
-            return res.modified_count > 0
+            return cast(int, res.modified_count) > 0
 
         res = await db[self.collection_name].delete_one({self.id_field: id_value})
-        return res.deleted_count > 0
+        return cast(int, res.deleted_count) > 0
 
     async def search(
         self,
@@ -184,7 +184,7 @@ class NoSqlRepository:
         regex = {"$regex": q, "$options": "i"}
         or_filter = {"$or": [{f: regex} for f in fields]} if fields else {}
         filt = self._merge_and(self._alive_filter(), or_filter)
-        return await db[self.collection_name].count_documents(filt or {})
+        return cast(int, await db[self.collection_name].count_documents(filt or {}))
 
     async def exists(self, db, *, where: Iterable[Dict[str, Any]]) -> bool:
         filt = self._merge_and(self._alive_filter(), *list(where))

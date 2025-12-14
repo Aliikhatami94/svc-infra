@@ -29,7 +29,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .manager import ConnectionManager
 
@@ -118,7 +118,7 @@ def get_ws_manager(app_or_request: FastAPI | Request) -> ConnectionManager:
         raise RuntimeError(
             "WebSocket manager not found. " "Did you forget to call add_websocket_manager(app)?"
         )
-    return manager
+    return cast(ConnectionManager, manager)
 
 
 def get_ws_manager_dependency(request: Request) -> ConnectionManager:

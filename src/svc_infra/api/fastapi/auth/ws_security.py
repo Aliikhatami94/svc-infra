@@ -22,7 +22,7 @@ For router-level dependencies (protects all endpoints):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 import jwt
 from fastapi import Depends, WebSocket, WebSocketException, status
@@ -125,7 +125,7 @@ def _decode_jwt(token: str) -> dict:
                 algorithms=["HS256"],
                 options={"require": ["sub", "exp"]},
             )
-            return payload
+            return cast(dict[Any, Any], payload)
         except jwt.ExpiredSignatureError:
             raise WebSocketException(
                 code=status.WS_1008_POLICY_VIOLATION,

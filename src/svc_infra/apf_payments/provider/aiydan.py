@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import date, datetime, timezone
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence, Tuple, cast
 
 from svc_infra.apf_payments.schemas import (
     BalanceAmount,
@@ -62,15 +62,16 @@ def _coerce_id(data: dict[str, Any], *candidates: str) -> str:
     raise RuntimeError(f"Aiydan payload missing id fields: {candidates}")
 
 
-def _ensure_utc_isoformat(value: Any) -> Optional[str]:
+def _ensure_utc_isoformat(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
         return value
     if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc).isoformat()
+        dt: datetime = value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat()
     if isinstance(value, date):
         return datetime(value.year, value.month, value.day, tzinfo=timezone.utc).isoformat()
     try:
@@ -79,7 +80,7 @@ def _ensure_utc_isoformat(value: Any) -> Optional[str]:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc).isoformat()
     except Exception:
-        return str(value)
+        return cast(str, str(value))  # Cast needed since value is Any
 
 
 def _customer_to_out(data: dict[str, Any]) -> CustomerOut:

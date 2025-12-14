@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any, cast
 
 from ai_infra.llm.tools.custom.cli import cli_cmd_help, cli_subcmd_help
 from ai_infra.mcp.server.tools import mcp_from_functions
@@ -11,13 +12,13 @@ from svc_infra.cli.foundation.runner import run_from_root
 CLI_PROG = "svc-infra"
 
 
-async def svc_infra_cmd_help() -> dict:
+async def svc_infra_cmd_help() -> dict[Any, Any]:
     """
     Get help text for svc-infra CLI.
     - Prepares project env without chdir (so we can 'cd' in the command itself).
     - Tries poetry → console script → python -m svc_infra.cli_shim.
     """
-    return await cli_cmd_help(CLI_PROG)
+    return cast(dict[Any, Any], await cli_cmd_help(CLI_PROG))
 
 
 # No dedicated 'docs list' function — users can use 'docs --help' to discover topics.
@@ -89,14 +90,14 @@ class Subcommand(str, Enum):
     sdk_postman = "sdk postman"
 
 
-async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict:
+async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict[Any, Any]:
     """
     Get help text for a specific subcommand of svc-infra CLI.
     (Enum keeps a tight schema; function signature remains simple.)
     """
     tokens = subcommand.value.split()
     if len(tokens) == 1:
-        return await cli_subcmd_help(CLI_PROG, subcommand)
+        return cast(dict[Any, Any], await cli_subcmd_help(CLI_PROG, subcommand))
 
     root = prepare_env()
     text = await run_from_root(root, CLI_PROG, [*tokens, "--help"])
