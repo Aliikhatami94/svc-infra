@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 
 import pytest
@@ -8,7 +9,20 @@ pytestmark = pytest.mark.acceptance
 
 
 BASE_TOPIC = "accept.topic"
-RECEIVER_URL = "http://testserver/_accept/webhooks/receiver"
+
+
+# When running in Docker (BASE_URL set), the API container can reach itself via localhost.
+# When running in-process, we use "testserver" which is handled by ASGITransport.
+def _get_receiver_url() -> str:
+    base_url = os.getenv("BASE_URL")
+    if base_url:
+        # Running in Docker - the API container delivers to itself via localhost
+        # BASE_URL is typically "http://api:8000", but the API delivers to itself
+        return "http://localhost:8000/_accept/webhooks/receiver"
+    return "http://testserver/_accept/webhooks/receiver"
+
+
+RECEIVER_URL = _get_receiver_url()
 
 
 def _subscribe(client, *, secret: str):

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-import hashlib
 import os
+
+# Set required secrets for acceptance tests BEFORE any imports that might trigger require_secret.
+# In test environments, require_secret() requires these to be set.
+os.environ.setdefault("ADMIN_IMPERSONATION_SECRET", "acceptance-test-only-secret")
+os.environ.setdefault("APP_SECRET", "acceptance-test-only-app-secret")
+
+import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -1716,6 +1722,7 @@ async def _accept_webhook_delivery(job: Job) -> None:
     if not outbox_id or not topic:
         return
     # The built-in handler signs payload and posts over HTTP; we emulate but allow ASGITransport
+    from svc_infra.webhooks.encryption import decrypt_secret
     from svc_infra.webhooks.signing import sign
 
     subscription = payload.get("subscription") if isinstance(payload, dict) else None
@@ -1723,7 +1730,9 @@ async def _accept_webhook_delivery(job: Job) -> None:
     if event is not None and subscription is not None:
         delivery_payload = event
         url = subscription.get("url")
-        secret = subscription.get("secret")
+        # Decrypt secret (handles both encrypted and plaintext for backwards compat)
+        raw_secret = subscription.get("secret")
+        secret = decrypt_secret(raw_secret)
         subscription_id = subscription.get("id")
     else:
         # Fallback to router-level lookup via app.state

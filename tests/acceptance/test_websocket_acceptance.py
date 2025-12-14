@@ -316,9 +316,9 @@ def test_a23_03_broadcast_to_all():
         except Exception as e:
             errors.append(str(e))
 
-    # Start two clients
-    t1 = threading.Thread(target=user_client, args=("user1", True))
-    t2 = threading.Thread(target=user_client, args=("user2", False))
+    # Start two clients (daemon=True to avoid blocking process exit)
+    t1 = threading.Thread(target=user_client, args=("user1", True), daemon=True)
+    t2 = threading.Thread(target=user_client, args=("user2", False), daemon=True)
 
     t2.start()
     time.sleep(0.05)  # Let user2 connect first
@@ -387,10 +387,10 @@ def test_a23_05_room_isolation():
         except Exception:
             pass
 
-    # User in room1 sends message
-    t1 = threading.Thread(target=room_client, args=("room1", "user1", True))
+    # User in room1 sends message (daemon=True to avoid blocking process exit)
+    t1 = threading.Thread(target=room_client, args=("room1", "user1", True), daemon=True)
     # User in room2 should NOT receive message from room1
-    t2 = threading.Thread(target=room_client, args=("room2", "user2", False))
+    t2 = threading.Thread(target=room_client, args=("room2", "user2", False), daemon=True)
 
     t1.start()
     t2.start()

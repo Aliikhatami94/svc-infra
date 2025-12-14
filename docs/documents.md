@@ -447,7 +447,7 @@ class OCRResult(BaseModel):
 ```python
 # fin-infra/src/fin_infra/documents/ocr.py
 from svc_infra.documents import download_document
-from ai_infra.llm import CoreLLM
+from ai_infra.llm import LLM
 
 async def extract_text(document_id: str) -> OCRResult:
     """Extract text from financial documents."""

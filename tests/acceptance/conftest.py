@@ -16,10 +16,12 @@ if str(SRC) not in sys.path:
 
 
 class _SyncASGIClient:
-    def __init__(self, app) -> None:
-        self._loop = asyncio.new_event_loop()
+    def __init__(self, app, loop: asyncio.AbstractEventLoop | None = None) -> None:
+        self._loop = loop or asyncio.new_event_loop()
+        self._owns_loop = loop is None  # Track if we created the loop
+        self._transport = httpx.ASGITransport(app=app)
         self._client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app),
+            transport=self._transport,
             base_url="http://testserver",
             timeout=10.0,
         )
@@ -54,8 +56,14 @@ class _SyncASGIClient:
 
     def close(self) -> None:
         self._run(self._client.aclose())
-        self._loop.close()
-        asyncio.set_event_loop(None)
+        # Also close the transport to release any resources
+        if hasattr(self._transport, "aclose"):
+            self._run(self._transport.aclose())
+        # Don't close the loop here - let the fixture manage the loop lifecycle
+
+
+# Module-level cache for shared app lifecycle between client and _acceptance_app_ready fixtures
+_shared_app_state: dict = {}
 
 
 @pytest.fixture(scope="session")
@@ -88,14 +96,35 @@ def client() -> Generator[httpx.Client, None, None]:
     try:
         asyncio.set_event_loop(loop)
         loop.run_until_complete(acceptance_app.router.startup())
-        client = _SyncASGIClient(acceptance_app)
+        # Mark the app as started for _acceptance_app_ready fixture
+        _shared_app_state["started"] = True
+        _shared_app_state["loop"] = loop
+        client = _SyncASGIClient(acceptance_app, loop=loop)  # Pass the loop
         try:
             yield client
         finally:
             client.close()
             loop.run_until_complete(acceptance_app.router.shutdown())
+            _shared_app_state["started"] = False
+            # Cancel any remaining tasks to prevent hanging
+            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+            for task in pending:
+                task.cancel()
+            if pending:
+                # Use wait_for with timeout to prevent infinite hang
+                try:
+                    loop.run_until_complete(
+                        asyncio.wait_for(
+                            asyncio.gather(*pending, return_exceptions=True), timeout=2.0
+                        )
+                    )
+                except asyncio.TimeoutError:
+                    pass  # Tasks didn't complete in time, force close
+            # Stop the loop to clear any lingering callbacks
+            loop.stop()
     finally:
-        loop.close()
+        if not loop.is_closed():
+            loop.close()
         asyncio.set_event_loop(prev_loop)
 
 
@@ -125,9 +154,21 @@ def _acceptance_app_ready():
 
     This is used by a subset of acceptance tests that still rely on
     Starlette's TestClient directly rather than the shared httpx client.
+
+    NOTE: This fixture shares the app lifecycle with the `client` fixture
+    to avoid double startup/shutdown issues.
     """
+    # Skip if using external BASE_URL
+    if os.getenv("BASE_URL"):
+        pytest.skip("_acceptance_app_ready not available when using BASE_URL")
+        return
 
     from .app import app as acceptance_app  # lazy import
+
+    # Check if app is already started by the client fixture
+    if _shared_app_state.get("started"):
+        yield acceptance_app
+        return
 
     try:
         prev_loop = asyncio.get_running_loop()
@@ -138,8 +179,26 @@ def _acceptance_app_ready():
     try:
         asyncio.set_event_loop(loop)
         loop.run_until_complete(acceptance_app.router.startup())
+        _shared_app_state["started"] = True
+        _shared_app_state["loop"] = loop
         yield acceptance_app
         loop.run_until_complete(acceptance_app.router.shutdown())
+        _shared_app_state["started"] = False
+        # Cancel any remaining tasks to prevent hanging
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        for task in pending:
+            task.cancel()
+        if pending:
+            # Use wait_for with timeout to prevent infinite hang
+            try:
+                loop.run_until_complete(
+                    asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True), timeout=2.0)
+                )
+            except asyncio.TimeoutError:
+                pass  # Tasks didn't complete in time, force close
+        # Stop the loop to clear any lingering callbacks
+        loop.stop()
     finally:
-        loop.close()
+        if not loop.is_closed():
+            loop.close()
         asyncio.set_event_loop(prev_loop)

@@ -1,5 +1,8 @@
 from . import api, app
 
+# Base exception
+from .exceptions import SvcInfraError
+
 # Content Loaders
 from .loaders import (
     BaseLoader,
@@ -16,6 +19,8 @@ __all__ = [
     # Modules
     "app",
     "api",
+    # Base exception
+    "SvcInfraError",
     # Loaders
     "BaseLoader",
     "GitHubLoader",
