@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import inspect
+import threading
 from typing import Any, Awaitable, Callable, Dict, Iterable, Set
 
 from fastapi import Depends, HTTPException
 
 from svc_infra.api.fastapi.auth.security import Identity
+
+# Thread-safe permission registry
+_PERMISSION_LOCK = threading.Lock()
 
 # Central role -> permissions mapping. Projects can extend at startup.
 PERMISSION_REGISTRY: Dict[str, Set[str]] = {
@@ -23,10 +27,26 @@ PERMISSION_REGISTRY: Dict[str, Set[str]] = {
 }
 
 
+def register_role(role: str, permissions: Set[str]) -> None:
+    """Thread-safe registration of a role and its permissions."""
+    with _PERMISSION_LOCK:
+        PERMISSION_REGISTRY[role] = permissions
+
+
+def extend_role(role: str, permissions: Set[str]) -> None:
+    """Thread-safe extension of an existing role's permissions."""
+    with _PERMISSION_LOCK:
+        if role in PERMISSION_REGISTRY:
+            PERMISSION_REGISTRY[role] |= permissions
+        else:
+            PERMISSION_REGISTRY[role] = permissions
+
+
 def get_permissions_for_roles(roles: Iterable[str]) -> Set[str]:
     perms: Set[str] = set()
-    for r in roles:
-        perms |= PERMISSION_REGISTRY.get(r, set())
+    with _PERMISSION_LOCK:
+        for r in roles:
+            perms |= PERMISSION_REGISTRY.get(r, set())
     return perms
 
 
@@ -138,6 +158,8 @@ def RequireABAC(
 
 __all__ = [
     "PERMISSION_REGISTRY",
+    "register_role",
+    "extend_role",
     "get_permissions_for_roles",
     "principal_permissions",
     "has_permission",

@@ -1,7 +1,31 @@
 from __future__ import annotations
 
+import logging
+import os
 import time
+import warnings
 from typing import Optional, Protocol, Tuple
+
+logger = logging.getLogger(__name__)
+
+_INMEMORY_WARNED = False
+
+
+def _check_inmemory_production_warning(class_name: str) -> None:
+    """Warn if in-memory store is used in production."""
+    global _INMEMORY_WARNED
+    if _INMEMORY_WARNED:
+        return
+    env = os.getenv("ENV", "development").lower()
+    if env in ("production", "staging", "prod"):
+        _INMEMORY_WARNED = True
+        msg = (
+            f"{class_name} is being used in {env} environment. "
+            "This is NOT suitable for production - data will be lost on restart. "
+            "Use RedisRateLimitStore instead."
+        )
+        warnings.warn(msg, RuntimeWarning, stacklevel=3)
+        logger.critical(msg)
 
 
 class RateLimitStore(Protocol):
@@ -15,6 +39,7 @@ class RateLimitStore(Protocol):
 
 class InMemoryRateLimitStore:
     def __init__(self, limit: int = 120):
+        _check_inmemory_production_warning("InMemoryRateLimitStore")
         self.limit = limit
         # Track per-key rolling windows: key -> (count, window_start_epoch)
         self._state: dict[str, tuple[int, float]] = {}

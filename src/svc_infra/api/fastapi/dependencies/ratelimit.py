@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Callable, Optional
 
@@ -7,12 +8,14 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore, RateLimitStore
+from svc_infra.obs.metrics import emit_rate_limited
+
+logger = logging.getLogger(__name__)
 
 try:
     from svc_infra.api.fastapi.tenancy.context import resolve_tenant_id as _resolve_tenant_id
 except Exception:  # pragma: no cover - minimal builds
     _resolve_tenant_id = None  # type: ignore
-from svc_infra.obs.metrics import emit_rate_limited
 
 
 class RateLimiter:
@@ -60,8 +63,8 @@ class RateLimiter:
             retry = max(0, reset - int(time.time()))
             try:
                 emit_rate_limited(str(key), eff_limit, retry)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to emit rate limit metric: %s", e)
             raise HTTPException(
                 status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry)}
             )
@@ -107,8 +110,8 @@ def rate_limiter(
             retry = max(0, reset - int(time.time()))
             try:
                 emit_rate_limited(str(key), eff_limit, retry)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to emit rate limit metric: %s", e)
             raise HTTPException(
                 status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry)}
             )

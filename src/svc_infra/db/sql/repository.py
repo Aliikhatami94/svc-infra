@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Iterable, Optional, Sequence, Set
 
 from sqlalchemy import Select, String, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, class_mapper
+
+logger = logging.getLogger(__name__)
 
 
 def _escape_ilike(q: str) -> str:
@@ -164,8 +167,9 @@ class SqlRepository:
             if col is not None:
                 try:
                     conditions.append(col.cast(String).ilike(ilike))
-                except Exception:
+                except Exception as e:
                     # skip columns that cannot be used in ilike even with cast
+                    logger.debug("Column %s cannot be cast for ILIKE search: %s", f, e)
                     continue
         stmt = self._base_select()
         if where:
@@ -192,7 +196,8 @@ class SqlRepository:
             if col is not None:
                 try:
                     conditions.append(col.cast(String).ilike(ilike))
-                except Exception:
+                except Exception as e:
+                    logger.debug("Column %s cannot be cast for ILIKE search: %s", f, e)
                     continue
         stmt = self._base_select()
         if where:

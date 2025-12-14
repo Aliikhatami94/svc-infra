@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from dataclasses import dataclass
 from typing import Dict, Optional
 
 from svc_infra.http import new_httpx_client
+
+logger = logging.getLogger(__name__)
 
 
 def sha1_hex(data: str) -> str:
@@ -71,8 +74,9 @@ class HIBPClient:
         prefix, suffix = full[:5], full[5:]
         try:
             body = self.range_query(prefix)
-        except Exception:
+        except Exception as e:
             # Fail-open: if HIBP unavailable, do not block users.
+            logger.warning("HIBP password check failed (fail-open): %s", e)
             return False
 
         for line in body.splitlines():

@@ -30,15 +30,24 @@ def sign_cookie(
     *,
     key: str,
     expires_in: Optional[int] = None,
+    path: Optional[str] = None,
+    domain: Optional[str] = None,
 ) -> str:
-    """Produce a compact signed cookie value with optional expiry.
+    """Produce a compact signed cookie value with optional expiry and scope binding.
 
     Format: base64url(json).base64url(hmac)
     If expires_in is provided, 'exp' epoch seconds is injected into payload prior to signing.
+    If path or domain is provided, they are included in the signed payload to prevent
+    cookie replay attacks across different paths/domains.
     """
     body = dict(payload)
     if expires_in is not None:
         body.setdefault("exp", _now() + int(expires_in))
+    # Include scope in signature to prevent replay across paths/domains
+    if path is not None:
+        body.setdefault("_path", path)
+    if domain is not None:
+        body.setdefault("_domain", domain)
     data = json.dumps(body, separators=(",", ":"), sort_keys=True).encode()
     sig = _sign(data, key.encode())
     return f"{_b64e(data)}.{sig}"
@@ -49,11 +58,15 @@ def verify_cookie(
     *,
     key: str,
     old_keys: Optional[List[str]] = None,
+    expected_path: Optional[str] = None,
+    expected_domain: Optional[str] = None,
 ) -> Tuple[bool, Optional[Dict[str, Any]]]:
     """Verify a signed cookie against the primary key or any old key.
 
     Returns (ok, payload). If ok is False, payload will be None.
     Rejects if exp is present and in the past.
+    If expected_path or expected_domain is provided, verifies the cookie was signed
+    for that scope (prevents replay attacks across paths/domains).
     """
     if not value or "." not in value:
         return False, None
@@ -72,6 +85,13 @@ def verify_cookie(
         # Expire when current time reaches or exceeds exp
         if "exp" in payload and _now() >= int(payload["exp"]):
             return False, None
+        # Verify scope binding if expected
+        if expected_path is not None:
+            if payload.get("_path") != expected_path:
+                return False, None
+        if expected_domain is not None:
+            if payload.get("_domain") != expected_domain:
+                return False, None
         return True, payload
     except Exception:
         return False, None

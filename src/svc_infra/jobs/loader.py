@@ -3,10 +3,13 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+import logging
 import os
 from typing import Awaitable, Callable
 
 from .scheduler import InMemoryScheduler
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_target(path: str) -> Callable[[], Awaitable[None]]:
@@ -40,6 +43,6 @@ def schedule_from_env(scheduler: InMemoryScheduler, env_var: str = "JOBS_SCHEDUL
             target = t["target"]
             fn = _resolve_target(target)
             scheduler.add_task(name, interval, fn)
-        except Exception:
-            # ignore bad entries
+        except Exception as e:
+            logger.warning("Failed to load scheduled job entry %s: %s", t, e)
             continue

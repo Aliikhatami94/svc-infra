@@ -1,8 +1,32 @@
 from __future__ import annotations
 
+import logging
+import os
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Protocol
+
+logger = logging.getLogger(__name__)
+
+_INMEMORY_WARNED = False
+
+
+def _check_inmemory_production_warning(class_name: str) -> None:
+    """Warn if in-memory store is used in production."""
+    global _INMEMORY_WARNED
+    if _INMEMORY_WARNED:
+        return
+    env = os.getenv("ENV", "development").lower()
+    if env in ("production", "staging", "prod"):
+        _INMEMORY_WARNED = True
+        msg = (
+            f"{class_name} is being used in {env} environment. "
+            "This is NOT suitable for production - data will be lost on restart. "
+            "Use RedisJobQueue instead."
+        )
+        warnings.warn(msg, RuntimeWarning, stacklevel=3)
+        logger.critical(msg)
 
 
 @dataclass
@@ -38,6 +62,7 @@ class InMemoryJobQueue:
     """
 
     def __init__(self):
+        _check_inmemory_production_warning("InMemoryJobQueue")
         self._seq = 0
         self._jobs: list[Job] = []
 

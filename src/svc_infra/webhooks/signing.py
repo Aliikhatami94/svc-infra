@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 from typing import Dict, Iterable
+
+logger = logging.getLogger(__name__)
 
 
 def canonical_body(payload: Dict) -> bytes:
@@ -19,7 +22,8 @@ def verify(secret: str, payload: Dict, signature: str) -> bool:
     expected = sign(secret, payload)
     try:
         return hmac.compare_digest(expected, signature)
-    except Exception:
+    except Exception as e:
+        logger.warning("Webhook signature verification failed: %s", e)
         return False
 
 

@@ -6,11 +6,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence
 
 try:
-    from sqlalchemy import select
+    from sqlalchemy import or_, select
     from sqlalchemy.ext.asyncio import AsyncSession
 except Exception:  # pragma: no cover - optional import for type hints
     AsyncSession = Any  # type: ignore[misc]
     select = None  # type: ignore
+    or_ = None  # type: ignore
 
 from svc_infra.security.models import FailedAuthAttempt
 
@@ -77,10 +78,15 @@ async def get_lockout_status(
         FailedAuthAttempt.ts >= window_start,
         FailedAuthAttempt.success == False,  # noqa: E712
     )
+    # Use OR logic: lock out if EITHER user_id OR ip_hash has too many failures
+    # This prevents attackers from rotating IPs to bypass lockout
+    filters = []
     if user_id:
-        q = q.where(FailedAuthAttempt.user_id == user_id)
+        filters.append(FailedAuthAttempt.user_id == user_id)
     if ip_hash:
-        q = q.where(FailedAuthAttempt.ip_hash == ip_hash)
+        filters.append(FailedAuthAttempt.ip_hash == ip_hash)
+    if filters:
+        q = q.where(or_(*filters))
 
     rows: Sequence[FailedAuthAttempt] = (await session.execute(q)).scalars().all()
     fail_count = len(rows)

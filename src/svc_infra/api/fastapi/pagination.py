@@ -3,10 +3,13 @@ from __future__ import annotations
 import base64
 import contextvars
 import json
+import logging
 from typing import Any, Callable, Generic, Iterable, List, Optional, Sequence, TypeVar
 
 from fastapi import Query, Request
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -159,8 +162,8 @@ def text_filter(items: Iterable[T], q: Optional[str], *getters: Callable[[T], st
                 if ql in (g(it) or "").lower():
                     out.append(it)
                     break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("text_filter getter failed for item: %s", e)
     return out
 
 

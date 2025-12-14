@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Dict, Optional
@@ -8,6 +9,23 @@ from typing import Dict, Optional
 from redis import Redis
 
 from .queue import Job, JobQueue
+
+logger = logging.getLogger(__name__)
+
+# Lua script for atomic reserve: pop from ready, push to processing, set visibility timeout
+# Returns job_id if successful, nil if queue is empty
+_RESERVE_LUA = """
+local ready_key = KEYS[1]
+local processing_key = KEYS[2]
+local processing_vt_key = KEYS[3]
+local visible_at = ARGV[1]
+
+local job_id = redis.call('RPOPLPUSH', ready_key, processing_key)
+if job_id then
+    redis.call('ZADD', processing_vt_key, visible_at, job_id)
+end
+return job_id
+"""
 
 
 class RedisJobQueue(JobQueue):
@@ -27,6 +45,13 @@ class RedisJobQueue(JobQueue):
         self._r = client
         self._p = prefix
         self._vt = visibility_timeout
+        # Try to register Lua script for atomic reserve
+        # Falls back to non-atomic if Lua scripting isn't available (e.g., fakeredis in tests)
+        self._reserve_script = None
+        try:
+            self._reserve_script = client.register_script(_RESERVE_LUA)
+        except Exception as e:
+            logger.debug("Lua scripting not available, using non-atomic reserve: %s", e)
 
     # Key helpers
     def _k(self, name: str) -> str:
@@ -88,7 +113,32 @@ class RedisJobQueue(JobQueue):
         self._move_due_delayed_to_ready()
         # move timed-out processing jobs back to ready before reserving
         self._requeue_timed_out_processing()
-        jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
+
+        # Calculate visibility timeout BEFORE reserve to prevent race condition
+        visible_at = int(datetime.now(timezone.utc).timestamp()) + int(self._vt)
+
+        # Try atomic reserve using Lua script if available
+        # This prevents race condition where two workers could reserve the same job
+        if self._reserve_script is not None:
+            try:
+                jid = self._reserve_script(
+                    keys=[self._k("ready"), self._k("processing"), self._k("processing_vt")],
+                    args=[visible_at],
+                )
+            except Exception as e:
+                # Fall back to non-atomic if Lua fails at runtime
+                logger.warning("Lua script failed, using non-atomic reserve: %s", e)
+                jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
+                if jid:
+                    job_id_tmp = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
+                    self._r.zadd(self._k("processing_vt"), {job_id_tmp: visible_at})
+        else:
+            # Non-atomic fallback (for fakeredis in tests, or older Redis versions)
+            jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
+            if jid:
+                job_id_tmp = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
+                self._r.zadd(self._k("processing_vt"), {job_id_tmp: visible_at})
+
         if not jid:
             return None
         job_id = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
@@ -97,6 +147,7 @@ class RedisJobQueue(JobQueue):
         if not data:
             # corrupted entry; ack and skip
             self._r.lrem(self._k("processing"), 1, job_id)
+            self._r.zrem(self._k("processing_vt"), job_id)
             return None
 
         # Decode fields
@@ -128,14 +179,11 @@ class RedisJobQueue(JobQueue):
         # If exceeded max_attempts → DLQ and skip
         if attempts > max_attempts:
             self._r.lrem(self._k("processing"), 1, job_id)
+            self._r.zrem(self._k("processing_vt"), job_id)
             self._r.lpush(self._k("dlq"), job_id)
             return None
-        # Update attempts and visibility timeout
-        visible_at = int(datetime.now(timezone.utc).timestamp()) + int(self._vt)
-        pipe = self._r.pipeline()
-        pipe.hset(key, mapping={"attempts": attempts, "visible_at": visible_at})
-        pipe.zadd(self._k("processing_vt"), {job_id: visible_at})
-        pipe.execute()
+        # Update attempts count in job hash (visibility timeout already set atomically in Lua script)
+        self._r.hset(key, mapping={"attempts": attempts, "visible_at": visible_at})
         return Job(
             id=job_id,
             name=name,
