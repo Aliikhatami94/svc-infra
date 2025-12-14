@@ -31,6 +31,24 @@ handler = make_webhook_handler(
 # X-Event-Id, X-Topic, X-Attempt, X-Signature (HMAC-SHA256), X-Signature-Alg, X-Signature-Version, X-Payload-Version
 ```
 
+- Encrypt secrets at rest:
+
+```python
+from svc_infra.webhooks.encryption import encrypt_secret, decrypt_secret, is_encrypted
+
+# Store encrypted in database
+encrypted = encrypt_secret("my-webhook-secret")  # Returns "enc:v1:..."
+
+# Check if already encrypted
+if not is_encrypted(secret):
+    secret = encrypt_secret(secret)
+
+# Decrypt when needed for signature verification
+plain = decrypt_secret(encrypted)
+```
+
+**Security**: Always encrypt webhook secrets before storing in database. The `encrypt_secret()` function uses Fernet (AES-128-CBC + HMAC-SHA256) and prefixes encrypted values with `enc:v1:` for easy detection.
+
 - Verification (FastAPI):
 
 ```python

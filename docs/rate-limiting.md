@@ -34,6 +34,7 @@ When exceeded, responses are 429 with `Retry-After` and the same headers.
 Advanced options:
 - `scope_by_tenant=True` to automatically include tenant id in the key if tenancy is configured.
 - `limit_resolver=request -> int | None` to override the limit dynamically per request (e.g., per-plan quotas).
+- `allow_untrusted_tenant_header=False` (default) — **Security**: When `True`, allows the `X-Tenant-Id` header to be trusted for unauthenticated requests. **This is disabled by default** to prevent attackers from spoofing tenant IDs to evade per-tenant rate limits. Only enable if you have a trusted proxy that sets this header.
 
 ## Per-route dependency
 

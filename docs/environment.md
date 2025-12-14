@@ -109,6 +109,25 @@ Pydantic loads these with the `AUTH_` prefix and `__` as the nested delimiter.
 
 The primitives under `svc_infra.security` rely on configuration objects passed from application code; they do not read environment variables directly beyond the shared `AuthSettings` listed above.
 
+### require_secret()
+
+Use `require_secret()` to safely load secrets with environment-aware defaults:
+
+```python
+from svc_infra.app.env import require_secret, MissingSecretError
+import os
+
+# In production: raises MissingSecretError if not set
+# In development: uses dev_default if provided
+secret = require_secret(
+    os.getenv("SESSION_SECRET"),
+    "SESSION_SECRET",
+    dev_default="dev-only-secret",  # NEVER used in production
+)
+```
+
+**Critical**: Never use hardcoded fallbacks like `os.getenv("SECRET") or "default"` — this silently uses insecure defaults in production. Always use `require_secret()` which fails loudly.
+
 ## Webhook helpers
 
 Current webhook helpers (`fastapi.require_signature`, `InMemoryWebhookSubscriptions`, `WebhookService`) rely on dependency injection for secrets and stores and do not read environment variables directly.
