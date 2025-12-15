@@ -83,9 +83,9 @@ def make_document_crud_schemas(
         )
 
     # Backstop encoders in case any exotic types slip through
-    encoders = {ObjectId: str, PyObjectId: str}
+    encoders: dict[type, type] = {ObjectId: str, PyObjectId: str}
     if json_encoders:
-        encoders.update(json_encoders)
+        encoders.update(json_encoders)  # type: ignore[arg-type]  # json_encoders has compatible types
 
     return make_crud_schemas_from_specs(
         specs=specs,

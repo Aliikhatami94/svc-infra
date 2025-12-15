@@ -120,7 +120,7 @@ def cache_read(
 
     def _decorator(func: Callable[..., Awaitable[Any]]):
         # Try different cashews cache decorator signatures for compatibility
-        cache_kwargs = {"tags": tags_func}
+        cache_kwargs: dict[str, Any] = {"tags": tags_func}
         if early_ttl is not None:
             cache_kwargs["early_ttl"] = early_ttl
         if refresh is not None:
@@ -132,7 +132,7 @@ def cache_read(
         # Attempt 1: With prefix parameter (preferred)
         if namespace:
             try:
-                wrapped = _cache.cache(ttl_val, template, prefix=namespace, **cache_kwargs)(func)
+                wrapped = _cache.cache(ttl_val, template, prefix=namespace, **cache_kwargs)(func)  # type: ignore[arg-type]  # cashews cache() API
             except TypeError as e:
                 error_msgs.append(f"prefix parameter: {e}")
 
@@ -144,7 +144,7 @@ def cache_read(
                     if namespace and not template.startswith(f"{namespace}:")
                     else template
                 )
-                wrapped = _cache.cache(ttl_val, key_with_namespace, **cache_kwargs)(func)
+                wrapped = _cache.cache(ttl_val, key_with_namespace, **cache_kwargs)(func)  # type: ignore[arg-type]  # cashews cache() API
             except TypeError as e:
                 error_msgs.append(f"embedded namespace: {e}")
 

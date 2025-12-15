@@ -42,7 +42,7 @@ def add_data_lifecycle(
                 initial_message="initial schema",
                 followup_message="autogen",
                 discover_packages=discover_packages,
-                with_payments=with_payments,
+                with_payments=with_payments if with_payments is not None else False,
             )
         if on_load_fixtures:
             res = on_load_fixtures()

@@ -85,7 +85,7 @@ class PaymentsService:
         self.session = session
         self.tenant_id = tenant_id
         self._provider_name = (provider_name or _default_provider_name()).lower()
-        self._adapter = None  # resolved on first use
+        self._adapter: ProviderAdapter | None = None  # resolved on first use
 
     # --- internal helpers -----------------------------------------------------
 

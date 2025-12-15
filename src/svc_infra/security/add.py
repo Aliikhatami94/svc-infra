@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from typing import Iterable
+from typing import Iterable, Literal, cast
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -88,7 +88,7 @@ def _configure_cors(
         if origin_regex:
             cors_kwargs["allow_origin_regex"] = origin_regex
 
-    app.add_middleware(CORSMiddleware, **cors_kwargs)
+    app.add_middleware(CORSMiddleware, **cors_kwargs)  # type: ignore[arg-type]  # CORSMiddleware accepts these kwargs
 
 
 def _configure_security_headers(
@@ -141,7 +141,13 @@ def _configure_session_middleware(
         https_only if https_only is not None else (https_env if https_env is not None else False)
     )
     same_site_env = env.get("SESSION_COOKIE_SAMESITE")
-    same_site_value = same_site_env.strip() if same_site_env else same_site
+    same_site_raw = same_site_env.strip() if same_site_env else same_site
+    # Validate and narrow to expected Literal type
+    same_site_value: Literal["lax", "strict", "none"] = (
+        "lax"
+        if same_site_raw not in ("lax", "strict", "none")
+        else cast(Literal["lax", "strict", "none"], same_site_raw)
+    )
 
     max_age_env = env.get("SESSION_COOKIE_MAX_AGE_SECONDS")
     try:

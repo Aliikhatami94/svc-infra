@@ -59,4 +59,9 @@ def get_sender() -> Sender:
     if not configured:
         return ConsoleSender()
 
+    # At this point, all values must be set
+    assert host is not None
+    assert user is not None
+    assert pw is not None
+    assert frm is not None
     return SMTPSender(host, st.smtp_port, user, pw, frm)

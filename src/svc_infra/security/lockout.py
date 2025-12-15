@@ -9,7 +9,7 @@ try:
     from sqlalchemy import or_, select
     from sqlalchemy.ext.asyncio import AsyncSession
 except Exception:  # pragma: no cover - optional import for type hints
-    AsyncSession = Any  # type: ignore[misc]
+    AsyncSession = Any  # type: ignore[misc,assignment]
     select = None  # type: ignore
     or_ = None  # type: ignore
 

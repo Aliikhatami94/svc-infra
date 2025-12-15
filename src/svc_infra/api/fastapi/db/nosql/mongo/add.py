@@ -24,7 +24,8 @@ from .health import make_mongo_health_router
 def add_mongo_db_with_url(app: FastAPI, url: str, db_name: str) -> None:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
-        await init_mongo(MongoSettings(url=url, db_name=db_name))
+        # MongoSettings expects url as AnyUrl, which can be constructed from str via Pydantic
+        await init_mongo(MongoSettings(url=url, db_name=db_name))  # type: ignore[arg-type]  # Pydantic coerces str to AnyUrl
         try:
             expected = get_mongo_dbname_from_env(required=False)
             db = await acquire_db()

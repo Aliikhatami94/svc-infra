@@ -135,12 +135,12 @@ def setup_oauth_authentication(
     if not providers:
         return
 
+    redirect_url = post_login_redirect or getattr(settings_obj, "post_login_redirect", None) or "/"
     oauth_router_instance = oauth_router_with_backend(
         user_model=user_model,
         auth_backend=auth_backend,
         providers=providers,
-        post_login_redirect=post_login_redirect
-        or getattr(settings_obj, "post_login_redirect", "/"),
+        post_login_redirect=redirect_url,
         provider_account_model=provider_account_model,
         auth_policy=auth_policy,
     )

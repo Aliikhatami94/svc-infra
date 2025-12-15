@@ -4,7 +4,7 @@ from string import Template as _T
 from typing import Any, Dict
 
 
-def render_template(tmpl_dir: str, name: str, subs: dict[str, Any] = None) -> str:
+def render_template(tmpl_dir: str, name: str, subs: dict[str, Any] | None = None) -> str:
     txt = pkg.files(tmpl_dir).joinpath(name).read_text(encoding="utf-8")
     return _T(txt).safe_substitute(subs)
 

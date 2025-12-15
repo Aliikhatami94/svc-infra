@@ -140,7 +140,7 @@ def revision(
         cfg,
         message=message,
         autogenerate=autogenerate,
-        head=head,
+        head=head or "head",
         branch_label=branch_label,
         version_path=version_path,
         sql=sql,
@@ -319,7 +319,7 @@ def setup_and_migrate(
     """
     resolved_url = database_url or get_database_url_from_env(required=True)
     root = prepare_env()
-    if create_db_if_missing:
+    if create_db_if_missing and resolved_url:
         ensure_database_exists(resolved_url)
 
     mig_dir = init_alembic(

@@ -113,7 +113,7 @@ class DualAPIRouter(APIRouter):
         if envelope:
             response_model = Paginated[model]  # type: ignore[valid-type]
         else:
-            response_model = list[model]  # type: ignore[valid-type]
+            response_model = list[model]  # type: ignore[valid-type,assignment]
 
         injector = make_pagination_injector(
             envelope=envelope,

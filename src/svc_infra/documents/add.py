@@ -138,7 +138,7 @@ def add_documents(
         user_id = form.get("user_id")
         file = form.get("file")
 
-        if not user_id:
+        if not user_id or not isinstance(user_id, str):
             raise HTTPException(status_code=422, detail="user_id is required")
         if not file or not hasattr(file, "read"):
             raise HTTPException(status_code=422, detail="file is required")

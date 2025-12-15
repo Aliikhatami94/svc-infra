@@ -161,9 +161,9 @@ class RedisJobQueue(JobQueue):
                 return default
             return val.decode() if isinstance(val, (bytes, bytearray)) else str(val)
 
-        attempts = int(_get("attempts", "0")) + 1
-        max_attempts = int(_get("max_attempts", "5"))
-        backoff_seconds = int(_get("backoff_seconds", "60"))
+        attempts = int(_get("attempts", "0") or "0") + 1
+        max_attempts = int(_get("max_attempts", "5") or "5")
+        backoff_seconds = int(_get("backoff_seconds", "60") or "60")
         name = _get("name", "") or ""
         payload_json = _get("payload", "{}") or "{}"
         try:
@@ -217,9 +217,9 @@ class RedisJobQueue(JobQueue):
                 return default
             return val.decode() if isinstance(val, (bytes, bytearray)) else str(val)
 
-        attempts = int(_get("attempts", "0"))
-        max_attempts = int(_get("max_attempts", "5"))
-        backoff_seconds = int(_get("backoff_seconds", "60"))
+        attempts = int(_get("attempts", "0") or "0")
+        max_attempts = int(_get("max_attempts", "5") or "5")
+        backoff_seconds = int(_get("backoff_seconds", "60") or "60")
         now_ts = int(datetime.now(timezone.utc).timestamp())
         # DLQ if at or beyond max_attempts
         if attempts >= max_attempts:

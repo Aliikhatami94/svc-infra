@@ -122,7 +122,7 @@ async def resolve_payments_tenant_id(
 # --- deps ---
 async def get_service(
     session: SqlSessionDep,
-    request: Request = ...,  # FastAPI will inject; tests may omit
+    request: Request = ...,  # type: ignore[assignment]  # FastAPI will inject; tests may omit
     identity: OptionalIdentity = None,
     tenant_id: str | None = None,
 ) -> PaymentsService:

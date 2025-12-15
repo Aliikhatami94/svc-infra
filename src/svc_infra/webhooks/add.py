@@ -79,7 +79,9 @@ class RedisOutboxStore(OutboxStore):
 
     # Protocol methods --------------------------------------------------
     def enqueue(self, topic: str, payload: dict[str, Any]) -> OutboxMessage:
-        msg_id = int(self._client.incr(self._seq_key))
+        incr_result = self._client.incr(self._seq_key)
+        # Redis incr always returns int synchronously for sync client
+        msg_id = int(incr_result) if isinstance(incr_result, (int, str)) else 0  # type: ignore[arg-type]
         created_at = datetime.now(timezone.utc)
         record = {
             "id": msg_id,

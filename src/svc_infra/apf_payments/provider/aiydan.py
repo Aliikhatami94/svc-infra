@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import date, datetime, timezone
-from typing import Any, Optional, Sequence, Tuple, cast
+from typing import Any, Literal, Optional, Sequence, Tuple, cast
 
 from svc_infra.apf_payments.schemas import (
     BalanceAmount,
@@ -269,6 +269,10 @@ def _payout_to_out(data: dict[str, Any]) -> PayoutOut:
 
 
 def _usage_record_to_out(data: dict[str, Any]) -> UsageRecordOut:
+    action_raw = data.get("action")
+    action: Literal["increment", "set"] | None = None
+    if action_raw in ("increment", "set"):
+        action = cast(Literal["increment", "set"], action_raw)
     return UsageRecordOut(
         id=str(data.get("id")),
         quantity=int(data.get("quantity", 0) or 0),
@@ -279,7 +283,7 @@ def _usage_record_to_out(data: dict[str, Any]) -> UsageRecordOut:
         provider_price_id=(
             str(data.get("provider_price_id")) if data.get("provider_price_id") else None
         ),
-        action=(str(data.get("action")) if data.get("action") else None),
+        action=action,
     )
 
 

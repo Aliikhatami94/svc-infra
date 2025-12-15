@@ -541,7 +541,7 @@ def attach_standard_responses_mutator(
 
 
 def drop_unused_components_mutator(
-    drop_responses: list[str] = None, drop_schemas: list[str] = None
+    drop_responses: list[str] | None = None, drop_schemas: list[str] | None = None
 ):
     drop_responses = drop_responses or []
     drop_schemas = drop_schemas or []
@@ -1251,7 +1251,7 @@ def scrub_invalid_object_examples_mutator():
             sch = mt_obj.get("schema")
             ex = mt_obj.get("example")
             if "example" in mt_obj and _invalid_object_example(
-                sch if isinstance(sch, dict) else {}, ex
+                sch if isinstance(sch, dict) else {}, ex if isinstance(ex, dict) else {}
             ):
                 mt_obj.pop("example", None)
 

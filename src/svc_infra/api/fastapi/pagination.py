@@ -130,7 +130,7 @@ class PaginationContext(Generic[T]):
         return _encode_cursor({"after": last_key})
 
 
-_pagination_ctx: contextvars.ContextVar[PaginationContext] = contextvars.ContextVar(
+_pagination_ctx: contextvars.ContextVar[PaginationContext | None] = contextvars.ContextVar(
     "pagination_ctx", default=None
 )
 

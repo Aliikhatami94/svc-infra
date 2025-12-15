@@ -99,7 +99,7 @@ class AsyncBillingService:
             q = q.where(UsageAggregate.period_start >= date_from)
         if date_to is not None:
             q = q.where(UsageAggregate.period_start < date_to)
-        rows: list[UsageAggregate] = (await self.session.execute(q)).scalars().all()
+        rows = list((await self.session.execute(q)).scalars().all())
         return rows
 
     async def generate_monthly_invoice(

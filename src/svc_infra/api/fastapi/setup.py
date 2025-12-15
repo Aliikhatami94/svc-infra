@@ -40,8 +40,9 @@ def _gen_operation_id_factory():
 
     def _gen(route: APIRoute) -> str:
         base = route.name or getattr(route.endpoint, "__name__", "op")
-        base = _normalize(base)
-        tag = _normalize(route.tags[0]) if route.tags else ""
+        base = _normalize(str(base))  # Convert Enum to str if needed
+        tag_raw = route.tags[0] if route.tags else ""
+        tag = _normalize(str(tag_raw)) if tag_raw else ""
         method = next(iter(route.methods or ["GET"])).lower()
 
         candidate = base
@@ -132,7 +133,7 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
             # No patterns, just use allow_origins
             cors_kwargs["allow_origins"] = exact_origins
 
-    app.add_middleware(CORSMiddleware, **cors_kwargs)
+    app.add_middleware(CORSMiddleware, **cors_kwargs)  # type: ignore[arg-type]  # CORSMiddleware accepts these kwargs
 
 
 def _setup_middlewares(app: FastAPI, skip_paths: list[str] | None = None):
@@ -180,7 +181,7 @@ def _build_child_app(
         contact=_dump_or_none(service.contact),
         license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
-        description=service.description,
+        description=service.description or "",
         generate_unique_id_function=_gen_operation_id_factory(),
     )
 
@@ -231,7 +232,7 @@ def _build_parent_app(
         contact=_dump_or_none(service.contact),
         license_info=_dump_or_none(service.license),
         terms_of_service=service.terms_of_service,
-        description=service.description,
+        description=service.description or "",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",

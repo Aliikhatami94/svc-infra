@@ -237,7 +237,7 @@ class StripeAdapter(ProviderAdapter):
     async def list_customers(
         self, *, provider: str | None, user_id: str | None, limit: int, cursor: str | None
     ) -> tuple[list[CustomerOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if cursor:
             params["starting_after"] = cursor
         # Stripe has no direct filter for our custom user_id; many teams store mapping in DB.
@@ -366,7 +366,7 @@ class StripeAdapter(ProviderAdapter):
     async def list_products(
         self, *, active: bool | None, limit: int, cursor: str | None
     ) -> tuple[list[ProductOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if active is not None:
             params["active"] = bool(active)
         if cursor:
@@ -415,7 +415,7 @@ class StripeAdapter(ProviderAdapter):
         limit: int,
         cursor: str | None,
     ) -> tuple[list[PriceOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if provider_product_id:
             params["product"] = provider_product_id
         if active is not None:
@@ -493,7 +493,7 @@ class StripeAdapter(ProviderAdapter):
         limit: int,
         cursor: str | None,
     ) -> tuple[list[SubscriptionOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if customer_provider_id:
             params["customer"] = customer_provider_id
         if status:
@@ -555,7 +555,7 @@ class StripeAdapter(ProviderAdapter):
         limit: int,
         cursor: str | None,
     ) -> tuple[list[InvoiceOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if customer_provider_id:
             params["customer"] = customer_provider_id
         if status:
@@ -583,7 +583,7 @@ class StripeAdapter(ProviderAdapter):
     async def list_invoice_line_items(
         self, provider_invoice_id: str, *, limit: int, cursor: str | None
     ) -> tuple[list[InvoiceLineItemOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if cursor:
             params["starting_after"] = cursor
         res = await _acall(stripe.Invoice.list_lines, provider_invoice_id, **params)
@@ -663,7 +663,7 @@ class StripeAdapter(ProviderAdapter):
         limit: int,
         cursor: str | None,
     ) -> tuple[list[IntentOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if customer_provider_id:
             params["customer"] = customer_provider_id
         if status:
@@ -720,7 +720,7 @@ class StripeAdapter(ProviderAdapter):
     async def list_disputes(
         self, *, status: str | None, limit: int, cursor: str | None
     ) -> tuple[list[DisputeOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if status:
             params["status"] = status
         if cursor:
@@ -761,7 +761,7 @@ class StripeAdapter(ProviderAdapter):
     async def list_payouts(
         self, *, limit: int, cursor: str | None
     ) -> tuple[list[PayoutOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if cursor:
             params["starting_after"] = cursor
         res = await _acall(stripe.Payout.list, **params)
@@ -777,7 +777,7 @@ class StripeAdapter(ProviderAdapter):
     async def list_refunds(
         self, *, provider_payment_intent_id: str | None, limit: int, cursor: str | None
     ) -> tuple[list[RefundOut], str | None]:
-        params = {"limit": int(limit)}
+        params: dict[str, Any] = {"limit": int(limit)}
         if provider_payment_intent_id:
             params["payment_intent"] = provider_payment_intent_id
         if cursor:
@@ -829,7 +829,7 @@ class StripeAdapter(ProviderAdapter):
             sub_item = items.data[0].id if items.data else None
         if not sub_item:
             return [], None
-        params = {"limit": int(f.limit or 50)}
+        params: dict[str, Any] = {"limit": int(f.limit or 50)}
         if f.cursor:
             params["starting_after"] = f.cursor
         res = await _acall(stripe.SubscriptionItem.list_usage_record_summaries, sub_item, **params)

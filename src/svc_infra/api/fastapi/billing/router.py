@@ -49,7 +49,7 @@ async def list_aggregates(
     metric: str,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
-    svc: Annotated[AsyncBillingService, Depends(get_service)] = None,
+    svc: Annotated[AsyncBillingService, Depends(get_service)] = None,  # type: ignore[assignment]
 ):
     rows = await svc.list_daily_aggregates(metric=metric, date_from=date_from, date_to=date_to)
     items = [

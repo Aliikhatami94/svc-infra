@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable, Optional
+from typing import TYPE_CHECKING, Iterable, Optional, cast
 
 from fastapi import FastAPI
 
 from svc_infra.apf_payments.provider.registry import get_provider_registry
 from svc_infra.api.fastapi.apf_payments.router import build_payments_routers
+
+if TYPE_CHECKING:
+    from svc_infra.apf_payments.provider.base import ProviderAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,7 @@ def _maybe_register_default_providers(
             pass
     if adapters:
         for a in adapters:
-            reg.register(a)  # must implement ProviderAdapter protocol (name, create_intent, etc.)
+            reg.register(cast("ProviderAdapter", a))  # must implement ProviderAdapter protocol
 
 
 def add_payments(

@@ -3,9 +3,12 @@ from __future__ import annotations
 import logging
 import os
 from logging.config import dictConfig
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence, cast
 
 from svc_infra.app.env import CURRENT_ENVIRONMENT
+
+if TYPE_CHECKING:
+    from .formats import LogFormatOptions, LogLevelOptions
 
 from .filter import filter_logs_for_paths
 from .formats import (
@@ -27,7 +30,11 @@ def setup_logging(
 ) -> None:
     """Configure logging + optional access-log path filtering."""
     if fmt is not None or level is not None:
-        LoggingConfig(fmt=fmt, level=level)  # pydantic validation
+        # Cast to expected Literal types after validation
+        LoggingConfig(
+            fmt=cast("LogFormatOptions | None", fmt),
+            level=cast("LogLevelOptions | None", level),
+        )  # pydantic validation
 
     if level is None:
         level = _read_level()

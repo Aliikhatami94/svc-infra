@@ -41,7 +41,7 @@ async def invalidate_tags(*tags: str) -> int:
 
     # Strategy 2: Legacy cashews invalidate with positional args
     try:
-        result = await _cache.invalidate(*tags)
+        result = await _cache.invalidate(*tags)  # type: ignore[arg-type]  # cashews API accepts *tags
         return int(result) if isinstance(result, int) else len(tags)
     except (TypeError, AttributeError):
         pass

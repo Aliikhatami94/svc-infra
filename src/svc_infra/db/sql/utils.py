@@ -863,7 +863,10 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
         return
 
     # Gather local revision ids from versions/
-    script_location = Path(cfg.get_main_option("script_location"))
+    script_location_str = cfg.get_main_option("script_location")
+    if not script_location_str:
+        return
+    script_location = Path(script_location_str)
     versions_dir = script_location / "versions"
     local_ids: Set[str] = set()
     if versions_dir.exists():

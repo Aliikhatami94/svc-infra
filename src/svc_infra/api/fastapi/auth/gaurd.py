@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend
 from fastapi_users.password import PasswordHelper
+from starlette.datastructures import FormData
 
 from svc_infra.api.fastapi.auth._cookies import compute_cookie_params
 from svc_infra.api.fastapi.auth.policy import AuthPolicy, DefaultAuthPolicy
@@ -31,6 +33,7 @@ async def login_client_gaurd(request: Request):
 
     # only enforce on the login endpoint (form-encoded)
     if request.method.upper() == "POST" and request.url.path.endswith("/login"):
+        form: FormData | dict[str, Any]
         try:
             form = await request.form()
         except Exception:

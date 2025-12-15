@@ -635,6 +635,8 @@ def _create_oauth_router(
             raise HTTPException(400, "unverified_email")
         if not email:
             raise HTTPException(400, "No email from provider")
+        if not provider_user_id:
+            raise HTTPException(400, "No user ID from provider")
 
         # Process user authentication
         user = await _process_user_authentication(

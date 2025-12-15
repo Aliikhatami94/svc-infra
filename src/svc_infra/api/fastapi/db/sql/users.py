@@ -102,7 +102,7 @@ def get_fastapi_users(
         old = []
         if jwt_block and getattr(jwt_block, "old_secrets", None):
             old = [s.get_secret_value() for s in jwt_block.old_secrets or []]
-        audience = "fastapi-users:auth"
+        audience = ["fastapi-users:auth"]
         if old:
             return RotatingJWTStrategy(
                 secret=secret,

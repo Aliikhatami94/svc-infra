@@ -73,7 +73,7 @@ class HandlerTimeoutMiddleware:
 
         try:
             await asyncio.wait_for(
-                self.app(scope, receive, send_wrapper),
+                self.app(scope, receive, send_wrapper),  # type: ignore[arg-type]  # ASGI send signature
                 timeout=self.timeout_seconds,
             )
         except asyncio.TimeoutError:

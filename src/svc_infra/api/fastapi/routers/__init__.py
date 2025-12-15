@@ -4,7 +4,7 @@ import importlib
 import logging
 import pkgutil
 from types import ModuleType
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
@@ -99,7 +99,7 @@ def _is_router_excluded_by_environment(
         )
         return False
 
-    normalized_excluded_envs = set()
+    normalized_excluded_envs: set[Environment | str] = set()
     for e in router_excluded_envs:
         try:
             normalized_excluded_envs.add(Environment(e) if not isinstance(e, Environment) else e)
@@ -126,7 +126,7 @@ def _is_router_included_by_environment(
             f"ROUTER_ENVIRONMENTS in {module_name} must be a set/list/tuple, got {type(router_envs)}"
         )
         return True
-    normalized = set()
+    normalized: set[Environment | str] = set()
     for e in router_envs:
         try:
             normalized.add(Environment(e) if not isinstance(e, Environment) else e)
@@ -163,7 +163,7 @@ def _build_include_kwargs(module: ModuleType, prefix: str, force_include: bool) 
     router_tag = getattr(module, "ROUTER_TAG", None)
     include_in_schema = getattr(module, "INCLUDE_ROUTER_IN_SCHEMA", True)
 
-    include_kwargs = {"prefix": prefix}
+    include_kwargs: dict[str, Any] = {"prefix": prefix}
     if router_prefix:
         include_kwargs["prefix"] = prefix.rstrip("/") + router_prefix
     if router_tag:

@@ -26,6 +26,7 @@ def check_version_or_409(get_current_version: Callable[[], Any], provided: str) 
     - provided: header value; attempts to coerce to int if current is int
     """
     current = get_current_version()
+    p: int | str
     if isinstance(current, int):
         try:
             p = int(provided)

@@ -21,9 +21,13 @@ class RotatingJWTStrategy(JWTStrategy):
         old_secrets: Optional[Iterable[str]] = None,
         token_audience: Optional[Union[str, List[str]]] = None,
     ):
-        super().__init__(
-            secret=secret, lifetime_seconds=lifetime_seconds, token_audience=token_audience
-        )
+        # Normalize token_audience to list as required by parent JWTStrategy
+        aud_list: list[str] = (
+            [token_audience]
+            if isinstance(token_audience, str)
+            else list(token_audience) if token_audience else []
+        ) or ["fastapi-users:auth"]
+        super().__init__(secret=secret, lifetime_seconds=lifetime_seconds, token_audience=aud_list)
         self._verify_secrets: List[str] = [secret] + list(old_secrets or [])
 
     async def read_token(self, token: str, audience: Optional[str] = None):  # type: ignore[override]

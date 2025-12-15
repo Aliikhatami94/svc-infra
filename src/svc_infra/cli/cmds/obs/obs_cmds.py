@@ -12,7 +12,7 @@ import typer
 try:
     from dotenv import load_dotenv
 except Exception:  # pragma: no cover
-    load_dotenv = None
+    load_dotenv = None  # type: ignore[assignment]
 
 from svc_infra.obs.cloud_dash import push_dashboards_from_pkg
 from svc_infra.utils import render_template, write

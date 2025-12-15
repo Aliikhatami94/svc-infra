@@ -179,9 +179,9 @@ def add_admin(
             dep_provider = existing or _current_principal
 
         async def _override_current_principal(
+            request: Request,
+            session: SqlSessionDep,
             base: Principal = Depends(dep_provider),
-            request: Request = None,
-            session: SqlSessionDep = None,
         ) -> Principal:
             token = request.cookies.get(_cookie) if request else None
             if not token:
