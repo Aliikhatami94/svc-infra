@@ -26,7 +26,16 @@ def _build_refresh_app(policy: SimpleNamespace, mocker):
     class DummyUserModel:
         pass
 
+    # Create mock auth backend with properly typed get_strategy
     auth_backend = Mock()
+
+    # get_strategy is used as a FastAPI dependency, so it needs a proper signature
+    # (not *args, **kwargs which FastAPI interprets as query params)
+    def _get_strategy():
+        return Mock()
+
+    auth_backend.get_strategy = _get_strategy
+
     router = oauth_router_with_backend(
         user_model=DummyUserModel,
         auth_backend=auth_backend,

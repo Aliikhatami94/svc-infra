@@ -126,7 +126,7 @@ def mfa_router(
 
         # RELOAD from DB to avoid stale state
         user = (
-            await session.execute(select(user_model).where(user_model.id == user.id))
+            await session.execute(select(user_model).where(user_model.id == user.id))  # type: ignore[attr-defined]
         ).scalar_one()
 
         if not getattr(user, "mfa_secret", None):

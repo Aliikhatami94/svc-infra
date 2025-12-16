@@ -22,11 +22,15 @@ def _find_auth_mapper() -> Optional[Tuple[str, TypeEngine, str]]:
                 table = mapper.local_table or getattr(cls, "__table__", None)
                 if table is None:
                     continue
-                pk_cols = list(table.primary_key.columns)
+                table_name = getattr(table, "name", None)
+                if not isinstance(table_name, str) or not table_name:
+                    continue
+                # SQLAlchemy's primary_key is iterable; don't rely on .columns typing.
+                pk_cols = list(table.primary_key)
                 if len(pk_cols) != 1:
                     continue  # require single-column PK
                 pk_col = pk_cols[0]
-                return (table.name, pk_col.type, pk_col.name)
+                return (table_name, pk_col.type, pk_col.name)
     except Exception:
         pass
     return None

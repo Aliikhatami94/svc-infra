@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 RMI ?= all
 
-.PHONY: help accept compose_up wait seed down pytest_accept unit unitv clean clean-pycache setup-template run-template test
+.PHONY: help accept compose_up wait seed down pytest_accept unit unitv test lint type typecheck format format-check check ci clean clean-pycache setup-template run-template
 
 help: ## Show available commands
 	@echo "Available commands:"
@@ -15,6 +15,15 @@ help: ## Show available commands
 	@echo "  unitv             Run unit tests (verbose)"
 	@echo "  accept            Run full acceptance tests (with auto-clean)"
 	@echo "  test              Run all tests (unit + acceptance)"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  format            Format code with ruff"
+	@echo "  format-check      Check formatting (ruff format --check)"
+	@echo "  lint              Lint code with ruff"
+	@echo "  type              Type check with mypy"
+	@echo "  typecheck         Alias for 'type'"
+	@echo "  check             Run lint + type checks"
+	@echo "  ci                Run checks + unit tests"
 	@echo ""
 	@echo "Docker Compose (for acceptance):"
 	@echo "  compose_up        Start test stack"
@@ -124,6 +133,55 @@ unitv:
 			python -m pytest -vv tests/unit; \
 		fi; \
 	fi
+
+# --- Code Quality ---
+format:
+	@echo "[format] Formatting with ruff"
+	@if command -v poetry >/dev/null 2>&1; then \
+		poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+		poetry run ruff format .; \
+	else \
+		echo "[format] Poetry not found; falling back to system ruff"; \
+		ruff format .; \
+	fi
+
+format-check:
+	@echo "[format] Checking formatting (ruff format --check)"
+	@if command -v poetry >/dev/null 2>&1; then \
+		poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+		poetry run ruff format --check .; \
+	else \
+		echo "[format] Poetry not found; falling back to system ruff"; \
+		ruff format --check .; \
+	fi
+
+lint:
+	@echo "[lint] Running ruff check"
+	@if command -v poetry >/dev/null 2>&1; then \
+		poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+		poetry run ruff check .; \
+	else \
+		echo "[lint] Poetry not found; falling back to system ruff"; \
+		ruff check .; \
+	fi
+
+type:
+	@echo "[type] Running mypy"
+	@if command -v poetry >/dev/null 2>&1; then \
+		poetry install --no-interaction --only main,dev >/dev/null 2>&1 || true; \
+		poetry run mypy src; \
+	else \
+		echo "[type] Poetry not found; falling back to system mypy"; \
+		mypy src; \
+	fi
+
+typecheck: type
+
+check: lint type
+	@echo "[check] All checks passed"
+
+ci: check unit
+	@echo "[ci] Checks + unit passed"
 
 # --- Cleanup helpers ---
 clean:

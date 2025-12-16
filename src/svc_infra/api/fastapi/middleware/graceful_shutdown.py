@@ -35,7 +35,14 @@ class InflightTrackerMiddleware:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
-        state = scope.get("app").state
+        app = scope.get("app")
+        if app is None:
+            await self.app(scope, receive, send)
+            return
+        state = getattr(app, "state", None)
+        if state is None:
+            await self.app(scope, receive, send)
+            return
         state._inflight_requests = getattr(state, "_inflight_requests", 0) + 1
         try:
             await self.app(scope, receive, send)

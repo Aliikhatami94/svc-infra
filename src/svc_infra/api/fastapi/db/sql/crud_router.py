@@ -125,7 +125,7 @@ def make_crud_router_plus_sql(
         payload: create_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)
+            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -144,7 +144,7 @@ def make_crud_router_plus_sql(
         payload: update_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)
+            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -270,7 +270,7 @@ def make_tenant_crud_router_plus_sql(
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)
+            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -286,7 +286,7 @@ def make_tenant_crud_router_plus_sql(
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)
+            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
         elif isinstance(payload, dict):
             data = payload
         else:

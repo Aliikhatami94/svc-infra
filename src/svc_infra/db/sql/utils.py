@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Set, Union
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Set, Union, cast
 
 from alembic.config import Config
 from dotenv import load_dotenv
@@ -537,7 +537,7 @@ async def _pg_create_database_async(url: URL) -> None:
             )
             if not exists:
                 quoted = _pg_quote_ident(target_db)
-                await conn.execution_options(isolation_level="AUTOCOMMIT").execute(
+                await conn.execution_options(isolation_level="AUTOCOMMIT").execute(  # type: ignore[attr-defined]
                     text(f'CREATE DATABASE "{quoted}"')
                 )
     except DBAPIError as e:
@@ -841,17 +841,19 @@ def ensure_database_exists(url: URL | str) -> None:
     try:
         eng = build_engine(u)
         if is_async_url(u):
+            async_eng = cast(AsyncEngineType, eng)
 
             async def _ping_and_dispose():
-                async with eng.begin() as conn:
+                async with async_eng.begin() as conn:
                     await conn.execute(text("SELECT 1"))
-                await eng.dispose()
+                await async_eng.dispose()
 
             asyncio.run(_ping_and_dispose())
         else:
-            with eng.begin() as conn:
+            sync_eng = cast(SyncEngine, eng)
+            with sync_eng.begin() as conn:
                 conn.execute(text("SELECT 1"))
-            eng.dispose()
+            sync_eng.dispose()
     except OperationalError as exc:  # pragma: no cover (depends on env)
         raise RuntimeError(f"Failed to connect to database: {exc}") from exc
 
@@ -886,7 +888,7 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
     if is_async_url(url_obj):
 
         async def _run() -> None:
-            eng = build_engine(url_obj)  # AsyncEngine
+            eng = cast(AsyncEngineType, build_engine(url_obj))
             try:
                 async with eng.begin() as conn:
                     # Do sync-y inspector / SQL via run_sync
@@ -909,7 +911,7 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
 
         asyncio.run(_run())
     else:
-        eng = build_engine(url_obj)  # sync Engine
+        eng = cast(SyncEngine, build_engine(url_obj))
         try:
             with eng.begin() as c:
                 insp = inspect(c)

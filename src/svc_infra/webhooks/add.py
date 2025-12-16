@@ -20,7 +20,7 @@ import logging
 import os
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
-from typing import Any, Protocol, TypeVar, overload
+from typing import Any, Protocol, TypeVar, cast, overload
 
 from fastapi import FastAPI
 
@@ -99,16 +99,17 @@ class RedisOutboxStore(OutboxStore):
         self, *, topics: list[str] | tuple[str, ...] | set[str] | None = None
     ) -> OutboxMessage | None:
         allowed = set(topics) if topics else None
-        ids = self._client.lrange(self._queue_key, 0, -1)
+        ids = cast(list[Any], self._client.lrange(self._queue_key, 0, -1))
         for raw_id in ids:
-            msg_id = int(raw_id)
-            msg = self._client.hgetall(self._msg_key(msg_id))
+            raw_id_str = raw_id.decode() if isinstance(raw_id, (bytes, bytearray)) else str(raw_id)
+            msg_id = int(raw_id_str)
+            msg = cast(dict[Any, Any], self._client.hgetall(self._msg_key(msg_id)))
             if not msg:
                 continue
             topic = msg.get(b"topic")
             if topic is None:
                 continue
-            topic_str = topic.decode()
+            topic_str = topic.decode() if isinstance(topic, (bytes, bytearray)) else str(topic)
             if allowed is not None and topic_str not in allowed:
                 continue
             attempts = int(msg.get(b"attempts", 0))
@@ -118,10 +119,19 @@ class RedisOutboxStore(OutboxStore):
             if attempts > 0:
                 continue
             payload_raw = msg.get(b"payload") or b"{}"
-            payload = json.loads(payload_raw.decode())
-            created_raw = msg.get(b"created_at") or ""
+            payload_txt = (
+                payload_raw.decode()
+                if isinstance(payload_raw, (bytes, bytearray))
+                else str(payload_raw)
+            )
+            payload = json.loads(payload_txt)
+            created_raw = msg.get(b"created_at") or b""
             created_at = (
-                datetime.fromisoformat(created_raw.decode())
+                datetime.fromisoformat(
+                    created_raw.decode()
+                    if isinstance(created_raw, (bytes, bytearray))
+                    else str(created_raw)
+                )
                 if created_raw
                 else datetime.now(timezone.utc)
             )

@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi_users import FastAPIUsers
-from fastapi_users.authentication import AuthenticationBackend
+from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.password import PasswordHelper
 from starlette.datastructures import FormData
 
@@ -39,8 +39,10 @@ async def login_client_gaurd(request: Request):
         except Exception:
             form = {}
 
-        client_id = (form.get("client_id") or "").strip()
-        client_secret = (form.get("client_secret") or "").strip()
+        client_id_raw = form.get("client_id")
+        client_secret_raw = form.get("client_secret")
+        client_id = client_id_raw.strip() if isinstance(client_id_raw, str) else ""
+        client_secret = client_secret_raw.strip() if isinstance(client_secret_raw, str) else ""
         if not client_id or not client_secret:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="client_credentials_required"
@@ -81,9 +83,9 @@ def auth_session_router(
         scope: str = Form(""),
         client_id: str | None = Form(None),
         client_secret: str | None = Form(None),
+        strategy: Strategy[Any, Any] = Depends(auth_backend.get_strategy),
         user_manager=Depends(fapi.get_user_manager),
     ):
-        strategy = auth_backend.get_strategy()
         email = username.strip().lower()
         # Compute IP hash for lockout correlation
         client_ip = getattr(request.client, "host", None)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import httpx
@@ -16,7 +17,7 @@ def _py(cmd: list[str], env: dict[str, str] | None = None) -> subprocess.Complet
     if env:
         merged.update(env)
     return subprocess.run(
-        ["python", "-m", "svc_infra.cli", *cmd],
+        [sys.executable, "-m", "svc_infra.cli", *cmd],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         env=merged,

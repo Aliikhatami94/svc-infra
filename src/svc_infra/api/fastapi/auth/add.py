@@ -272,7 +272,7 @@ def add_auth_users(
     policy = auth_policy or DefaultAuthPolicy(settings_obj)
     include_in_docs = CURRENT_ENVIRONMENT in (LOCAL_ENV, DEV_ENV)
 
-    if not any(m.cls.__name__ == "SessionMiddleware" for m in app.user_middleware):
+    if not any(m.cls.__name__ == "SessionMiddleware" for m in app.user_middleware):  # type: ignore[attr-defined]
         jwt_block = getattr(settings_obj, "jwt", None)
         if jwt_block and getattr(jwt_block, "secret", None):
             secret = jwt_block.secret.get_secret_value()

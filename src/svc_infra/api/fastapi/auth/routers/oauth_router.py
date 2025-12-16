@@ -10,9 +10,9 @@ from urllib.parse import urlencode, urlparse
 import jwt
 from authlib.integrations.base_client.errors import OAuthError
 from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from fastapi_users.authentication import AuthenticationBackend
+from fastapi_users.authentication import AuthenticationBackend, Strategy
 from fastapi_users.password import PasswordHelper
 from sqlalchemy import select
 from starlette import status
@@ -46,9 +46,12 @@ def _validate_redirect(url: str, allow_hosts: list[str], *, require_https: bool)
     p = urlparse(url)
     if not p.netloc:
         return
-    host_port = p.hostname.lower() + (f":{p.port}" if p.port else "")
+    if not p.hostname:
+        raise HTTPException(400, "redirect_not_allowed")
+    hostname = p.hostname
+    host_port = hostname.lower() + (f":{p.port}" if p.port else "")
     allowed = {h.lower() for h in allow_hosts}
-    if host_port not in allowed and p.hostname.lower() not in allowed:
+    if host_port not in allowed and hostname.lower() not in allowed:
         raise HTTPException(400, "redirect_not_allowed")
     if require_https and p.scheme != "https":
         raise HTTPException(400, "https_required")
@@ -449,8 +452,10 @@ async def _process_user_authentication(
 async def _validate_and_decode_jwt_token(raw_token: str) -> str:
     """Validate and decode JWT token to extract user ID."""
     st = get_auth_settings()
-    if getattr(st, "jwt", None) and getattr(st.jwt, "secret", None):
-        secret = st.jwt.secret.get_secret_value()
+    jwt_settings = getattr(st, "jwt", None)
+    jwt_secret = getattr(jwt_settings, "secret", None) if jwt_settings is not None else None
+    if jwt_secret:
+        secret = jwt_secret.get_secret_value()
     else:
         secret = require_secret(
             None,
@@ -475,14 +480,13 @@ async def _validate_and_decode_jwt_token(raw_token: str) -> str:
 
 async def _set_cookie_on_response(
     resp: Response,
-    auth_backend: AuthenticationBackend,
+    strategy: Strategy[Any, Any],
     user: Any,
     *,
     refresh_raw: str,
 ) -> None:
     """Set authentication (JWT) and refresh cookies on response."""
     st = get_auth_settings()
-    strategy = auth_backend.get_strategy()
     jwt_token = await strategy.write_token(user)
 
     same_site_lit = cast(Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower())
@@ -606,7 +610,12 @@ def _create_oauth_router(
         responses={302: {"description": "Redirect to app (or MFA redirect)."}},
         description="OAuth callback endpoint.",
     )
-    async def oauth_callback(request: Request, provider: str, session: SqlSessionDep):
+    async def oauth_callback(
+        request: Request,
+        provider: str,
+        session: SqlSessionDep,
+        strategy: Strategy[Any, Any] = Depends(auth_backend.get_strategy),
+    ):
         """Handle OAuth callback and complete authentication."""
         # Handle provider-side errors up front
         if err := request.query_params.get("error"):
@@ -678,7 +687,6 @@ def _create_oauth_router(
         )
 
         # Generate JWT token for the response
-        strategy = auth_backend.get_strategy()
         jwt_token = await strategy.write_token(user)
 
         # If redirecting to a different origin, append token as URL fragment for frontend to extract
@@ -695,7 +703,7 @@ def _create_oauth_router(
 
         # Create response with auth + refresh cookies (for same-origin requests)
         resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
-        await _set_cookie_on_response(resp, auth_backend, user, refresh_raw=raw_refresh)
+        await _set_cookie_on_response(resp, strategy, user, refresh_raw=raw_refresh)
 
         # Clean up session state
         _clean_oauth_session_state(request, provider)
@@ -715,7 +723,11 @@ def _create_oauth_router(
         responses={204: {"description": "Cookie refreshed"}},
         description="Refresh authentication token.",
     )
-    async def refresh(request: Request, session: SqlSessionDep):
+    async def refresh(
+        request: Request,
+        session: SqlSessionDep,
+        strategy: Strategy[Any, Any] = Depends(auth_backend.get_strategy),
+    ):
         """Refresh authentication token."""
         st = get_auth_settings()
 
@@ -766,7 +778,7 @@ def _create_oauth_router(
 
         # Write response (204) with new cookies
         resp = Response(status_code=status.HTTP_204_NO_CONTENT)
-        await _set_cookie_on_response(resp, auth_backend, user, refresh_raw=new_raw)
+        await _set_cookie_on_response(resp, strategy, user, refresh_raw=new_raw)
         # Policy hook: trigger after successful rotation; suppress hook errors
         if hasattr(policy, "on_token_refresh"):
             try:

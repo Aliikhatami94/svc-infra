@@ -50,9 +50,9 @@ class JsonFormatter(logging.Formatter):
 
         # Add these two lines:
         if getattr(record, "trace_id", None):
-            payload["trace_id"] = record.trace_id
+            payload["trace_id"] = record.trace_id  # type: ignore[attr-defined]
         if getattr(record, "span_id", None):
-            payload["span_id"] = record.span_id
+            payload["span_id"] = record.span_id  # type: ignore[attr-defined]
 
         # Optional correlation id
         req_id = getattr(record, "request_id", None)

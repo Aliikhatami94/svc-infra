@@ -62,7 +62,7 @@ def apikey_router():
         if owner_id != caller_id and not getattr(p.user, "is_superuser", False):
             raise HTTPException(403, "forbidden")
 
-        plaintext, prefix, hashed = ApiKey.make_secret()
+        plaintext, prefix, hashed = ApiKey.make_secret()  # type: ignore[attr-defined]
         expires = (
             (datetime.now(timezone.utc) + timedelta(hours=payload.ttl_hours))
             if payload.ttl_hours
@@ -100,7 +100,7 @@ def apikey_router():
     async def list_keys(sess: SqlSessionDep, p: Identity):
         q = select(ApiKey)
         if not getattr(p.user, "is_superuser", False):
-            q = q.where(ApiKey.user_id == p.user.id)
+            q = q.where(ApiKey.user_id == p.user.id)  # type: ignore[attr-defined]
         rows = (await sess.execute(q)).scalars().all()
         return [
             ApiKeyOut(

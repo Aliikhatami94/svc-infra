@@ -19,9 +19,9 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
             size = None
         if size is not None and size > self.max_bytes:
             try:
-                emit_suspect_payload(
-                    getattr(request, "url", None).path if hasattr(request, "url") else None, size
-                )
+                url = getattr(request, "url", None)
+                path = url.path if url is not None else None
+                emit_suspect_payload(path, size)
             except Exception:
                 pass
             return JSONResponse(

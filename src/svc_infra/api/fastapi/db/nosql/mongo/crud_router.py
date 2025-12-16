@@ -98,7 +98,7 @@ def make_crud_router_plus_mongo(
         description=f"Create item in {prefix} collection",
     )
     async def create_item(db: DBDep, payload: create_schema = Body(...)):  # type: ignore[valid-type]
-        data = payload.model_dump(exclude_unset=True)
+        data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
         return await service.create(db, data)
 
     # UPDATE
@@ -108,7 +108,7 @@ def make_crud_router_plus_mongo(
         description=f"Update item in {prefix} collection",
     )
     async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):  # type: ignore[valid-type]
-        data = payload.model_dump(exclude_unset=True)
+        data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
         row = await service.update(db, item_id, data)
         if not row:
             raise HTTPException(404, "Not found")

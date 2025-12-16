@@ -5,10 +5,11 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import typer
 from sqlalchemy import text
+from sqlalchemy.engine import Engine
 
 from svc_infra.db.sql.utils import build_engine
 
@@ -56,14 +57,17 @@ def export_tenant(
     if is_async_engine:
         assert AsyncEngine is not None  # for type checkers
 
+        async_engine = cast(AsyncEngine, engine)
+
         async def _fetch() -> list[dict[str, Any]]:
-            async with engine.connect() as conn:
+            async with async_engine.connect() as conn:
                 result = await conn.execute(stmt, params)
                 return [dict(row) for row in result.mappings()]
 
         rows = asyncio.run(_fetch())
     else:
-        with engine.connect() as conn:
+        sync_engine = cast(Engine, engine)
+        with sync_engine.connect() as conn:
             result = conn.execute(stmt, params)
             rows = [dict(row) for row in result.mappings()]
 

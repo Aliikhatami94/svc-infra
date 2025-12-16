@@ -147,7 +147,7 @@ async def shutdown_cache() -> None:
         logger.warning(f"Error during cache shutdown (ignored): {e}")
 
 
-def instance():
+def get_cache():
     """
     Get the underlying cashews cache instance.
 

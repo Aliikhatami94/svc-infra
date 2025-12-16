@@ -46,8 +46,8 @@ def bind_sqlalchemy_pool_metrics(
         # Update gauges on engine_connect as a cheap heartbeat
         pool = sync_engine.pool
         try:
-            _pool_in_use.labels(label).set(pool.checkedout())
-            _pool_available.labels(label).set(pool.size() - pool.checkedout())
+            _pool_in_use.labels(label).set(pool.checkedout())  # type: ignore[attr-defined]
+            _pool_available.labels(label).set(pool.size() - pool.checkedout())  # type: ignore[attr-defined]
         except Exception:
             pass
 
@@ -56,8 +56,8 @@ def bind_sqlalchemy_pool_metrics(
         _pool_checked_out_total.labels(label).inc()
         try:
             pool = sync_engine.pool
-            _pool_in_use.labels(label).set(pool.checkedout())
-            _pool_available.labels(label).set(pool.size() - pool.checkedout())
+            _pool_in_use.labels(label).set(pool.checkedout())  # type: ignore[attr-defined]
+            _pool_available.labels(label).set(pool.size() - pool.checkedout())  # type: ignore[attr-defined]
         except Exception:
             pass
 
@@ -66,7 +66,7 @@ def bind_sqlalchemy_pool_metrics(
         _pool_checked_in_total.labels(label).inc()
         try:
             pool = sync_engine.pool
-            _pool_in_use.labels(label).set(pool.checkedout())
-            _pool_available.labels(label).set(pool.size() - pool.checkedout())
+            _pool_in_use.labels(label).set(pool.checkedout())  # type: ignore[attr-defined]
+            _pool_available.labels(label).set(pool.size() - pool.checkedout())  # type: ignore[attr-defined]
         except Exception:
             pass

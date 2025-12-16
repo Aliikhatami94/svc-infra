@@ -110,7 +110,10 @@ def _with_dark_mode(resp: HTMLResponse) -> HTMLResponse:
     block and toggling a `.dark` class on the body element.
     """
     try:
-        body = resp.body.decode("utf-8", errors="ignore")
+        raw_body = resp.body
+        if isinstance(raw_body, memoryview):
+            raw_body = raw_body.tobytes()
+        body = raw_body.decode("utf-8", errors="ignore")
     except Exception:  # pragma: no cover - very unlikely
         return resp
 

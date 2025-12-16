@@ -18,7 +18,10 @@ from svc_infra.db.sql.base import ModelBase
 from svc_infra.db.sql.types import GUID
 
 if TYPE_CHECKING:
-    from svc_infra.security.models import User
+    from typing import Any
+
+    # User model is application-specific; this is a forward reference for type hints
+    User = Any  # type: ignore[misc]
 
 
 class ProviderAccount(ModelBase):

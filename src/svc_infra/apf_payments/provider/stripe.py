@@ -577,7 +577,7 @@ class StripeAdapter(ProviderAdapter):
         params = {"customer": customer_provider_id}
         if subscription_id:
             params["subscription"] = subscription_id
-        inv = await _acall(stripe.Invoice.upcoming, **params)
+        inv = await _acall(stripe.Invoice.upcoming, **params)  # type: ignore[attr-defined]
         return _inv_to_out(inv)
 
     async def list_invoice_line_items(
@@ -738,7 +738,7 @@ class StripeAdapter(ProviderAdapter):
         d = await _acall(stripe.Dispute.modify, provider_dispute_id, evidence=evidence)
         # Some disputes require explicit submit call:
         try:
-            d = await _acall(stripe.Dispute.submit, provider_dispute_id)
+            d = await _acall(stripe.Dispute.submit, provider_dispute_id)  # type: ignore[attr-defined]
         except Exception:
             pass
         return _dispute_to_out(d)
@@ -810,7 +810,7 @@ class StripeAdapter(ProviderAdapter):
         }
         if data.timestamp:
             body["timestamp"] = int(data.timestamp)
-        rec = await _acall(stripe.UsageRecord.create, **body)
+        rec = await _acall(stripe.UsageRecord.create, **body)  # type: ignore[attr-defined]
         return UsageRecordOut(
             id=rec.id,
             quantity=int(rec.quantity),
@@ -832,7 +832,11 @@ class StripeAdapter(ProviderAdapter):
         params: dict[str, Any] = {"limit": int(f.limit or 50)}
         if f.cursor:
             params["starting_after"] = f.cursor
-        res = await _acall(stripe.SubscriptionItem.list_usage_record_summaries, sub_item, **params)
+        res = await _acall(
+            stripe.SubscriptionItem.list_usage_record_summaries,  # type: ignore[attr-defined]
+            sub_item,
+            **params,
+        )
         items: list[UsageRecordOut] = []
         for s in res.data:
             # No record id in summaries—synthesize a stable id from period start.

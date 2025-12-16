@@ -4,7 +4,7 @@ import json
 import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from redis import Redis
 
@@ -83,7 +83,7 @@ class RedisJobQueue(JobQueue):
 
     def _move_due_delayed_to_ready(self) -> None:
         now_ts = int(datetime.now(timezone.utc).timestamp())
-        ids = self._r.zrangebyscore(self._k("delayed"), "-inf", now_ts)
+        ids = cast(list[Any], self._r.zrangebyscore(self._k("delayed"), "-inf", now_ts))
         if not ids:
             return
         pipe = self._r.pipeline()
@@ -95,7 +95,7 @@ class RedisJobQueue(JobQueue):
 
     def _requeue_timed_out_processing(self) -> None:
         now_ts = int(datetime.now(timezone.utc).timestamp())
-        ids = self._r.zrangebyscore(self._k("processing_vt"), "-inf", now_ts)
+        ids = cast(list[Any], self._r.zrangebyscore(self._k("processing_vt"), "-inf", now_ts))
         if not ids:
             return
         pipe = self._r.pipeline()
@@ -143,7 +143,7 @@ class RedisJobQueue(JobQueue):
             return None
         job_id = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
         key = self._job_key(job_id)
-        data = self._r.hgetall(key)
+        data = cast(dict[Any, Any], self._r.hgetall(key))
         if not data:
             # corrupted entry; ack and skip
             self._r.lrem(self._k("processing"), 1, job_id)
@@ -201,7 +201,7 @@ class RedisJobQueue(JobQueue):
 
     def fail(self, job_id: str, *, error: str | None = None) -> None:
         key = self._job_key(job_id)
-        data = self._r.hgetall(key)
+        data = cast(dict[Any, Any], self._r.hgetall(key))
         if not data:
             # nothing to do
             self._r.lrem(self._k("processing"), 1, job_id)

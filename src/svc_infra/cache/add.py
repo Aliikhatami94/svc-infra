@@ -18,7 +18,7 @@ import os
 from typing import Any, Callable, Optional
 
 from svc_infra.cache.backend import DEFAULT_READINESS_TIMEOUT
-from svc_infra.cache.backend import instance as _instance
+from svc_infra.cache.backend import get_cache as _get_cache
 from svc_infra.cache.backend import setup_cache as _setup_cache
 from svc_infra.cache.backend import shutdown_cache as _shutdown_cache
 from svc_infra.cache.backend import wait_ready as _wait_ready
@@ -101,7 +101,7 @@ def add_cache(
         # Expose cache instance for convenience
         if expose_state and hasattr(app, "state"):
             try:
-                setattr(app.state, state_key, _instance())
+                setattr(app.state, state_key, _get_cache())
             except Exception:
                 logger.debug("Unable to expose cache instance on app.state", exc_info=True)
 
@@ -138,7 +138,7 @@ def add_cache(
         try:
             setattr(app.state, "_svc_cache_wired", True)
             if expose_state and not hasattr(app.state, state_key):
-                setattr(app.state, state_key, _instance())
+                setattr(app.state, state_key, _get_cache())
         except Exception:
             pass
 

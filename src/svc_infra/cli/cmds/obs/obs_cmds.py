@@ -171,7 +171,7 @@ def scaffold(target: str = typer.Option(..., help="compose|railway|k8s|fly")):
     out.mkdir(parents=True, exist_ok=True)
 
     base = files("svc_infra.obs.templates.sidecars").joinpath(target)
-    for p in base.rglob("*"):
+    for p in base.rglob("*"):  # type: ignore[attr-defined]
         if p.is_file():
             rel = p.relative_to(base)
             dst = out / rel

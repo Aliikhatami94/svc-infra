@@ -7,6 +7,9 @@ and resource-based cache management.
 
 from .add import add_cache
 
+# Cache instance access for object-oriented usage
+from .backend import get_cache
+
 # Core decorators - main public API
 from .decorators import cached  # alias for cache_read
 from .decorators import mutates  # alias for cache_write
@@ -36,4 +39,6 @@ __all__ = [
     "entity",
     # Easy integration helper
     "add_cache",
+    # Cache instance access
+    "get_cache",
 ]

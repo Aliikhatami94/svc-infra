@@ -189,7 +189,8 @@ def _build_child_app(
 
     # ---- OpenAPI pipeline (DRY!) ----
     include_api_key = bool(spec.include_api_key) if spec.include_api_key is not None else False
-    mount_path = f"/{spec.tag.strip('/')}"
+    tag_str = str(spec.tag).strip("/")
+    mount_path = f"/{tag_str}"
     server_url = (
         mount_path
         if not spec.public_base_url
@@ -335,8 +336,9 @@ def setup_service_api(
     # Mount each version
     for spec in versions:
         child = _build_child_app(service, spec, skip_paths=skip_paths)
-        mount_path = f"/{spec.tag.strip('/')}"
-        parent.mount(mount_path, child, name=spec.tag.strip("/"))
+        tag_str = str(spec.tag).strip("/")
+        mount_path = f"/{tag_str}"
+        parent.mount(mount_path, child, name=tag_str)
 
     @parent.get("/", include_in_schema=False, response_class=HTMLResponse)
     def index():
@@ -353,7 +355,7 @@ def setup_service_api(
 
         # Version cards
         for spec in versions:
-            tag = spec.tag.strip("/")
+            tag = str(spec.tag).strip("/")
             cards.append(
                 CardSpec(
                     tag=tag,

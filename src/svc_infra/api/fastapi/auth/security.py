@@ -51,7 +51,7 @@ async def resolve_api_key(
     apikey = None
     if prefix:
         apikey = (
-            (await session.execute(select(ApiKey).where(ApiKey.key_prefix == prefix)))
+            (await session.execute(select(ApiKey).where(ApiKey.key_prefix == prefix)))  # type: ignore[attr-defined]
             .scalars()
             .first()
         )

@@ -140,7 +140,11 @@ def add_documents(
 
         if not user_id or not isinstance(user_id, str):
             raise HTTPException(status_code=422, detail="user_id is required")
-        if not file or not hasattr(file, "read"):
+
+        # NOTE: request.form() yields Starlette's UploadFile, not FastAPI's wrapper.
+        from starlette.datastructures import UploadFile as StarletteUploadFile
+
+        if not file or not isinstance(file, StarletteUploadFile):
             raise HTTPException(status_code=422, detail="file is required")
 
         # Read file content
