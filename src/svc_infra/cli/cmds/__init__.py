@@ -1,4 +1,25 @@
-from svc_infra.cli.cmds.db.nosql.mongo.mongo_cmds import register as register_mongo
+from __future__ import annotations
+
+from typing import Any
+
+import typer
+
+try:
+    from svc_infra.cli.cmds.db.nosql.mongo.mongo_cmds import register as register_mongo
+except ModuleNotFoundError as exc:
+    _mongo_import_error = exc
+
+    def register_mongo(app: typer.Typer) -> None:  # type: ignore[no-redef]
+        def _unavailable() -> Any:
+            raise ModuleNotFoundError(
+                "MongoDB CLI commands require optional dependencies. Install pymongo and motor "
+                "to enable `svc-infra mongo ...` commands."
+            ) from _mongo_import_error
+
+        # Provide a single helpful command instead of failing CLI import.
+        app.command("unavailable")(_unavailable)
+
+
 from svc_infra.cli.cmds.db.nosql.mongo.mongo_scaffold_cmds import (
     register as register_mongo_scaffold,
 )

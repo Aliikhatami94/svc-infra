@@ -1,9 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, Sequence, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Optional,
+    Sequence,
+    TYPE_CHECKING,
+    Type,
+    Union,
+)
 
-from pymongo import IndexModel
+if TYPE_CHECKING:
+    from pymongo import IndexModel
+else:
+    try:
+        from pymongo import IndexModel
+    except ModuleNotFoundError:
+        # Minimal runtime stub so importing svc_infra works without optional Mongo deps.
+        class IndexModel:  # type: ignore[no-redef]
+            pass
 
 
 def _snake(name: str) -> str:
