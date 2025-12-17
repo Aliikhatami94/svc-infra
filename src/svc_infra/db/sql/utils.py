@@ -17,19 +17,19 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine as SyncEngine
     from sqlalchemy.ext.asyncio import AsyncEngine as AsyncEngineType
 else:
-    SyncEngine = Any  # type: ignore
-    AsyncEngineType = Any  # type: ignore
+    SyncEngine = Any  # type: ignore[assignment]
+    AsyncEngineType = Any  # type: ignore[assignment]
 
 try:
     # Runtime import (may be missing if async extras aren’t installed)
     from sqlalchemy.ext.asyncio import create_async_engine as _create_async_engine
 except Exception:  # pragma: no cover - optional dep
-    _create_async_engine = None  # type: ignore
+    _create_async_engine = None  # type: ignore[assignment]
 
 try:
     from sqlalchemy import create_engine as _create_engine
 except Exception:  # pragma: no cover - optional env
-    _create_engine = None  # type: ignore
+    _create_engine = None  # type: ignore[assignment]
 
 
 def prepare_process_env(

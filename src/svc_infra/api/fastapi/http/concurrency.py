@@ -10,5 +10,6 @@ def require_if_match(request: Request, current_etag: str):
         )
     if current_etag not in [t.strip() for t in val.split(",")]:
         raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED, detail="ETag precondition failed."
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="ETag precondition failed.",
         )

@@ -154,7 +154,8 @@ def test_setup_service_api_infers_root_include_api_key(mocker):
 
     mocker.patch("svc_infra.api.fastapi.setup.register_all_routers", side_effect=fake_register)
     mocker.patch(
-        "svc_infra.api.fastapi.setup.render_index_html", side_effect=fake_render_index_html
+        "svc_infra.api.fastapi.setup.render_index_html",
+        side_effect=fake_render_index_html,
     )
     mocker.patch("svc_infra.api.fastapi.setup.apply_mutators")
     mocker.patch("svc_infra.api.fastapi.setup.setup_mutators", side_effect=fake_setup_mutators)

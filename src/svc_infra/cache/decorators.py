@@ -256,7 +256,10 @@ def cache_write(
                 if recache:
                     try:
                         await execute_recache(
-                            recache, *args, max_concurrency=recache_max_concurrency, **kwargs
+                            recache,
+                            *args,
+                            max_concurrency=recache_max_concurrency,
+                            **kwargs,
                         )
                     except Exception as e:
                         logger.error(f"Cache recaching failed: {e}")

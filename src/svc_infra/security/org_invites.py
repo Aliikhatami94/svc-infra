@@ -9,8 +9,8 @@ try:
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession
 except Exception:  # pragma: no cover
-    AsyncSession = object  # type: ignore
-    select = None  # type: ignore
+    AsyncSession = object  # type: ignore[misc,assignment]
+    select = None  # type: ignore[assignment]
 
 from .models import OrganizationInvitation, OrganizationMembership
 

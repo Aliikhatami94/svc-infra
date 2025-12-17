@@ -44,7 +44,9 @@ class ProviderAccount(ModelBase):
     user: Mapped["User"] = relationship(back_populates="provider_accounts")
 
     created_at = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
     updated_at = mapped_column(
         DateTime(timezone=True),

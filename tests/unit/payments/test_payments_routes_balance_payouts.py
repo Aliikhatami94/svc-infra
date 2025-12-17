@@ -9,7 +9,10 @@ async def test_get_balance(client, fake_adapter, mocker):
             mocker.Mock(currency="USD", amount=5000),
             mocker.Mock(currency="EUR", amount=3000),
         ],
-        pending=[mocker.Mock(currency="USD", amount=1000), mocker.Mock(currency="GBP", amount=500)],
+        pending=[
+            mocker.Mock(currency="USD", amount=1000),
+            mocker.Mock(currency="GBP", amount=500),
+        ],
     )
 
     res = await client.get("/payments/balance")

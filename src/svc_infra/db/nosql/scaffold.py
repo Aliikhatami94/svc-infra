@@ -103,7 +103,9 @@ def scaffold_schemas_core(
     dest = normalize_dir(dest_dir)
     ent = pascal(entity_name)
     txt = render_template(
-        tmpl_dir="svc_infra.db.nosql.mongo.templates", name="schemas.py.tmpl", subs={"Entity": ent}
+        tmpl_dir="svc_infra.db.nosql.mongo.templates",
+        name="schemas.py.tmpl",
+        subs={"Entity": ent},
     )
     filename = schemas_filename or f"{snake(entity_name)}.py"
     res = write(dest / filename, txt, overwrite)

@@ -46,7 +46,13 @@ class _Repo(SqlRepository):
 
     async def search(self, session, *, q, fields, limit, offset, order_by=None, where=None):
         return await self._search(
-            session, q=q, fields=fields, limit=limit, offset=offset, order_by=order_by, where=where
+            session,
+            q=q,
+            fields=fields,
+            limit=limit,
+            offset=offset,
+            order_by=order_by,
+            where=where,
         )
 
     async def count_filtered(self, session, *, q, fields, where=None):

@@ -84,7 +84,9 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
         oauth_router_module, "_extract_user_info_from_provider", fake_extract_user_info
     )
     monkeypatch.setattr(
-        oauth_router_module, "_process_user_authentication", fake_process_user_authentication
+        oauth_router_module,
+        "_process_user_authentication",
+        fake_process_user_authentication,
     )
     monkeypatch.setattr(
         oauth_router_module, "_determine_final_redirect_url", fake_determine_redirect

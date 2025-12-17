@@ -65,7 +65,14 @@ class TestDbWait:
             mock_check.return_value = AsyncMock(return_value=mock_result)
             result = runner.invoke(
                 cli_app,
-                ["db", "wait", "--url", "postgresql://localhost/test", "--timeout", "1"],
+                [
+                    "db",
+                    "wait",
+                    "--url",
+                    "postgresql://localhost/test",
+                    "--timeout",
+                    "1",
+                ],
             )
 
         assert result.exit_code == 0

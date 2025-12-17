@@ -22,7 +22,9 @@ class UsageEvent(ModelBase):
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
     __table_args__ = (
@@ -41,7 +43,9 @@ class UsageAggregate(ModelBase):
     granularity: Mapped[str] = mapped_column(String(8), nullable=False)  # hour|day|month
     total: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
     __table_args__ = (
@@ -57,7 +61,9 @@ class Plan(ModelBase):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -70,7 +76,9 @@ class PlanEntitlement(ModelBase):
     limit_per_window: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     window: Mapped[str] = mapped_column(String(8), nullable=False)  # day|month
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -83,7 +91,9 @@ class Subscription(ModelBase):
     effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -97,7 +107,9 @@ class Price(ModelBase):
     metric: Mapped[Optional[str]] = mapped_column(String(64))  # null for fixed recurring
     recurring_interval: Mapped[Optional[str]] = mapped_column(String(8))  # month|year
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -113,7 +125,9 @@ class Invoice(ModelBase):
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     provider_invoice_id: Mapped[Optional[str]] = mapped_column(String(128), index=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -127,5 +141,7 @@ class InvoiceLine(ModelBase):
     quantity: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )

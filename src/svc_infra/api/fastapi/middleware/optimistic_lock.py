@@ -6,7 +6,7 @@ from fastapi import Header, HTTPException
 
 
 async def require_if_match(
-    version: Annotated[Optional[str], Header(alias="If-Match")] = None
+    version: Annotated[Optional[str], Header(alias="If-Match")] = None,
 ) -> str:
     """Require If-Match header for optimistic locking on mutating operations.
 

@@ -115,7 +115,8 @@ def client() -> Generator[httpx.Client, None, None]:
                 try:
                     loop.run_until_complete(
                         asyncio.wait_for(
-                            asyncio.gather(*pending, return_exceptions=True), timeout=2.0
+                            asyncio.gather(*pending, return_exceptions=True),
+                            timeout=2.0,
                         )
                     )
                 except asyncio.TimeoutError:

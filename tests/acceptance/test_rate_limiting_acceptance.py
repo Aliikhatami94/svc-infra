@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
 
 @pytest.mark.acceptance
 class TestRateLimitingAcceptance:
     def test_dependency_rate_limit_429_and_retry_after(self, client):
-        # Hit /rl/dep 4 times; limit is 3 per minute using a fixed key
-        headers = {"X-RL-Key": "rl-accept-test-1"}
+        # Hit /rl/dep 4 times; limit is 3 per minute using a unique key per run
+        unique_key = f"rl-accept-test-{uuid.uuid4().hex[:8]}"
+        headers = {"X-RL-Key": unique_key}
         r1 = client.get("/rl/dep", headers=headers)
         r2 = client.get("/rl/dep", headers=headers)
         r3 = client.get("/rl/dep", headers=headers)

@@ -210,7 +210,11 @@ class TestGitHubLoaderLoad:
             content_response.status_code = 200
             content_response.raise_for_status = MagicMock()
 
-            mock_client.get.side_effect = [tree_response, content_response, content_response]
+            mock_client.get.side_effect = [
+                tree_response,
+                content_response,
+                content_response,
+            ]
 
             contents = await loader.load()
 
@@ -236,7 +240,11 @@ class TestGitHubLoaderLoad:
             content_response.status_code = 200
             content_response.raise_for_status = MagicMock()
 
-            mock_client.get.side_effect = [tree_response, content_response, content_response]
+            mock_client.get.side_effect = [
+                tree_response,
+                content_response,
+                content_response,
+            ]
 
             contents = await loader.load()
 
@@ -303,7 +311,11 @@ class TestGitHubLoaderLoad:
             content_response.status_code = 200
             content_response.raise_for_status = MagicMock()
 
-            mock_client.get.side_effect = [tree_response, content_response, content_response]
+            mock_client.get.side_effect = [
+                tree_response,
+                content_response,
+                content_response,
+            ]
 
             contents = await loader.load()
 

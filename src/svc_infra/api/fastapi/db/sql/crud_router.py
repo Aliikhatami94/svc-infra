@@ -93,7 +93,12 @@ def make_crud_router_plus_sql(
                 if f.strip()
             ]
             items = await service.search(
-                session, q=sp.q, fields=fields, limit=lp.limit, offset=lp.offset, order_by=order_by
+                session,
+                q=sp.q,
+                fields=fields,
+                limit=lp.limit,
+                offset=lp.offset,
+                order_by=order_by,
             )
             total = await service.count_filtered(session, q=sp.q, fields=fields)
         else:
@@ -156,7 +161,9 @@ def make_crud_router_plus_sql(
 
     # -------- DELETE --------
     @router.delete(
-        "/{item_id}", status_code=204, description=f"Delete item of type {model.__name__}"
+        "/{item_id}",
+        status_code=204,
+        description=f"Delete item of type {model.__name__}",
     )
     async def delete_item(item_id: Any, session: SqlSessionDep):
         ok = await service.delete(session, _coerce_id(item_id))
@@ -246,7 +253,12 @@ def make_tenant_crud_router_plus_sql(
                 if f.strip()
             ]
             items = await svc.search(
-                session, q=sp.q, fields=fields, limit=lp.limit, offset=lp.offset, order_by=order_by
+                session,
+                q=sp.q,
+                fields=fields,
+                limit=lp.limit,
+                offset=lp.offset,
+                order_by=order_by,
             )
             total = await svc.count_filtered(session, q=sp.q, fields=fields)
         else:

@@ -25,7 +25,8 @@ def test_add_observability_registers_metrics(mocker):
     engine_two = Mock(name="engine_two")
 
     mocker.patch(
-        "svc_infra.obs.add.ObservabilitySettings", return_value=create_settings(enabled=True)
+        "svc_infra.obs.add.ObservabilitySettings",
+        return_value=create_settings(enabled=True),
     )
     add_prometheus = mocker.patch("svc_infra.obs.metrics.asgi.add_prometheus")
     bind_pool_metrics = mocker.patch(
@@ -57,7 +58,8 @@ def test_add_observability_skips_when_disabled(mocker):
     app = FastAPI()
 
     mocker.patch(
-        "svc_infra.obs.add.ObservabilitySettings", return_value=create_settings(enabled=False)
+        "svc_infra.obs.add.ObservabilitySettings",
+        return_value=create_settings(enabled=False),
     )
     add_prometheus = mocker.patch("svc_infra.obs.metrics.asgi.add_prometheus")
     bind_pool_metrics = mocker.patch(
@@ -75,7 +77,8 @@ def test_add_observability_with_route_classifier_uses_resolver(mocker):
 
     # Ensure metrics enabled
     mocker.patch(
-        "svc_infra.obs.add.ObservabilitySettings", return_value=create_settings(enabled=True)
+        "svc_infra.obs.add.ObservabilitySettings",
+        return_value=create_settings(enabled=True),
     )
 
     # Patch the internal route template to return a stable base

@@ -39,7 +39,13 @@ def test_a1001_cli_migrations_and_seed(tmp_path: Path):
 
     # End-to-end setup and migrate should succeed
     out1 = _py(
-        ["sql", "setup-and-migrate", "--overwrite-scaffold", "--create-followup-revision"], env=env
+        [
+            "sql",
+            "setup-and-migrate",
+            "--overwrite-scaffold",
+            "--create-followup-revision",
+        ],
+        env=env,
     )
     assert "setup_and_migrate" in out1.stdout
 
@@ -49,7 +55,8 @@ def test_a1001_cli_migrations_and_seed(tmp_path: Path):
     lines = env_py_content.splitlines()
     # Insert import after line 2 (after "from __future__ import annotations")
     lines.insert(
-        2, f'import sys; sys.path.insert(0, "{tmp_path}"); import models  # Import User model'
+        2,
+        f'import sys; sys.path.insert(0, "{tmp_path}"); import models  # Import User model',
     )
     env_py_path.write_text("\n".join(lines))
 
@@ -107,7 +114,15 @@ def test_a1003_sdk_cli_dry_run(tmp_path: Path, client: httpx.Client):
 
     # TS SDK dry-run prints command
     out_ts = _py(
-        ["sdk", "ts", str(schema_path), "--outdir", str(tmp_path / "sdk-ts"), "--dry-run", "true"],
+        [
+            "sdk",
+            "ts",
+            str(schema_path),
+            "--outdir",
+            str(tmp_path / "sdk-ts"),
+            "--dry-run",
+            "true",
+        ],
         env=env,
     )
     assert "openapi-typescript-codegen" in out_ts.stdout

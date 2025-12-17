@@ -112,10 +112,16 @@ def add_admin(
     user_getter = impersonation_user_getter
 
     @r.post(
-        "/impersonate/start", status_code=204, dependencies=[RequirePermission("admin.impersonate")]
+        "/impersonate/start",
+        status_code=204,
+        dependencies=[RequirePermission("admin.impersonate")],
     )
     async def start_impersonation(
-        body: dict, request: Request, response: Response, session: SqlSessionDep, identity: Identity
+        body: dict,
+        request: Request,
+        response: Response,
+        session: SqlSessionDep,
+        identity: Identity,
     ):
         target_id = (body or {}).get("user_id")
         reason = (body or {}).get("reason", "")

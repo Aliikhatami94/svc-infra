@@ -108,7 +108,8 @@ def _read_level() -> str:
     from svc_infra.app.env import pick
 
     return cast(
-        str, pick(prod="INFO", nonprod="DEBUG", dev="DEBUG", test="DEBUG", local="DEBUG")
+        str,
+        pick(prod="INFO", nonprod="DEBUG", dev="DEBUG", test="DEBUG", local="DEBUG"),
     ).upper()
 
 

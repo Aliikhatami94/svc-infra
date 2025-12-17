@@ -4,7 +4,6 @@ from typing import Any, Protocol
 
 
 class AuthPolicy(Protocol):
-
     async def should_require_mfa(self, user: Any) -> bool:
         pass
 

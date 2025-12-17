@@ -85,7 +85,8 @@ def test_a502_secret_rotation_accepts_old_and_new(client):
     old_secret = "old"
     new_secret = "new"
     client.post(
-        "/_accept/webhooks/config", json={"secrets": [old_secret, new_secret], "fail_first": 0}
+        "/_accept/webhooks/config",
+        json={"secrets": [old_secret, new_secret], "fail_first": 0},
     )
     _subscribe(client, secret=old_secret)
 

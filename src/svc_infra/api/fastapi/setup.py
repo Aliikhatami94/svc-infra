@@ -207,11 +207,17 @@ def _build_child_app(
 
     if spec.routers_package:
         register_all_routers(
-            child, base_package=spec.routers_package, prefix="", environment=CURRENT_ENVIRONMENT
+            child,
+            base_package=spec.routers_package,
+            prefix="",
+            environment=CURRENT_ENVIRONMENT,
         )
 
     logger.info(
-        "[%s] initialized version %s [env: %s]", service.name, spec.tag, CURRENT_ENVIRONMENT
+        "[%s] initialized version %s [env: %s]",
+        service.name,
+        spec.tag,
+        CURRENT_ENVIRONMENT,
     )
     return child
 

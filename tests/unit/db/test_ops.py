@@ -119,7 +119,10 @@ class TestWaitForDatabase:
         """Should return False when timeout is reached."""
         from svc_infra.db.ops import wait_for_database
 
-        with patch("svc_infra.db.ops._get_connection", side_effect=Exception("Connection refused")):
+        with patch(
+            "svc_infra.db.ops._get_connection",
+            side_effect=Exception("Connection refused"),
+        ):
             result = wait_for_database(
                 url="postgresql://test/db",
                 timeout=0.5,
@@ -200,7 +203,9 @@ class TestRunSyncSql:
 
         with patch("svc_infra.db.ops._get_connection", return_value=mock_conn):
             run_sync_sql(
-                "SELECT * FROM users WHERE id = %s", params=(42,), url="postgresql://test/db"
+                "SELECT * FROM users WHERE id = %s",
+                params=(42,),
+                url="postgresql://test/db",
             )
 
         # Second call should be with params

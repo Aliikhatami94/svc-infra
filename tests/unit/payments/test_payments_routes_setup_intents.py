@@ -16,7 +16,9 @@ async def test_create_setup_intent(client, fake_adapter, mocker):
     )
 
     res = await client.post(
-        "/payments/setup_intents", json={"payment_method_types": ["card"]}, headers=IDEMP
+        "/payments/setup_intents",
+        json={"payment_method_types": ["card"]},
+        headers=IDEMP,
     )
 
     assert res.status_code == 201
@@ -89,7 +91,9 @@ async def test_setup_intent_with_3ds_action(client, fake_adapter, mocker):
     )
 
     res = await client.post(
-        "/payments/setup_intents", json={"payment_method_types": ["card"]}, headers=IDEMP
+        "/payments/setup_intents",
+        json={"payment_method_types": ["card"]},
+        headers=IDEMP,
     )
 
     assert res.status_code == 201

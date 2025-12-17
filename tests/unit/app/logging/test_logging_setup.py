@@ -183,7 +183,10 @@ def test_drop_paths_argument_overrides_env(monkeypatch):
     monkeypatch.setenv("LOG_DROP_PATHS", "/metrics,/health")
     # drop_paths argument should take precedence
     setup_logging(
-        level=LogLevelOptions.INFO, fmt="plain", filter_envs=["local"], drop_paths=["/only"]
+        level=LogLevelOptions.INFO,
+        fmt="plain",
+        filter_envs=["local"],
+        drop_paths=["/only"],
     )
 
     acc = logging.getLogger("uvicorn.access")

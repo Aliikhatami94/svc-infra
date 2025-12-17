@@ -487,7 +487,10 @@ def ensure_global_tags_mutator(default_desc: str = "Operations related to {tag}.
         # add missing tags; do NOT override existing descriptions
         for name in sorted(used):
             if name not in existing_map:
-                existing_map[name] = {"name": name, "description": default_desc.format(tag=name)}
+                existing_map[name] = {
+                    "name": name,
+                    "description": default_desc.format(tag=name),
+                }
             else:
                 if not existing_map[name].get("description"):
                     existing_map[name]["description"] = default_desc.format(tag=name)
@@ -640,7 +643,9 @@ def ensure_media_type_schemas_mutator():
 
 
 # ---------- 3) Request body descriptions ----------
-def ensure_request_body_descriptions_mutator(default_template="Request body for {method} {path}."):
+def ensure_request_body_descriptions_mutator(
+    default_template="Request body for {method} {path}.",
+):
     def m(schema: dict) -> dict:
         schema = dict(schema)
         for path, method, op in _iter_ops(schema):
@@ -1380,17 +1385,20 @@ def hardening_components_mutator():
             },
         )
         headers.setdefault(
-            "XRateLimitLimit", {"schema": {"type": "integer"}, "description": "Tokens in window."}
+            "XRateLimitLimit",
+            {"schema": {"type": "integer"}, "description": "Tokens in window."},
         )
         headers.setdefault(
             "XRateLimitRemaining",
             {"schema": {"type": "integer"}, "description": "Remaining tokens."},
         )
         headers.setdefault(
-            "XRateLimitReset", {"schema": {"type": "integer"}, "description": "Unix reset time."}
+            "XRateLimitReset",
+            {"schema": {"type": "integer"}, "description": "Unix reset time."},
         )
         headers.setdefault(
-            "XRequestId", {"schema": {"type": "string"}, "description": "Correlation id."}
+            "XRequestId",
+            {"schema": {"type": "string"}, "description": "Correlation id."},
         )
         headers.setdefault(
             "Deprecation",
@@ -1401,7 +1409,10 @@ def hardening_components_mutator():
         )
         headers.setdefault(
             "Sunset",
-            {"schema": {"type": "string"}, "description": "HTTP-date for deprecation sunset."},
+            {
+                "schema": {"type": "string"},
+                "description": "HTTP-date for deprecation sunset.",
+            },
         )
         return schema
 
@@ -1473,14 +1484,16 @@ def attach_header_params_mutator():
                     hdrs.setdefault("Last-Modified", {"$ref": "#/components/headers/LastModified"})
                     hdrs.setdefault("X-Request-Id", {"$ref": "#/components/headers/XRequestId"})
                     hdrs.setdefault(
-                        "X-RateLimit-Limit", {"$ref": "#/components/headers/XRateLimitLimit"}
+                        "X-RateLimit-Limit",
+                        {"$ref": "#/components/headers/XRateLimitLimit"},
                     )
                     hdrs.setdefault(
                         "X-RateLimit-Remaining",
                         {"$ref": "#/components/headers/XRateLimitRemaining"},
                     )
                     hdrs.setdefault(
-                        "X-RateLimit-Reset", {"$ref": "#/components/headers/XRateLimitReset"}
+                        "X-RateLimit-Reset",
+                        {"$ref": "#/components/headers/XRateLimitReset"},
                     )
                 if code == "429":
                     resp.setdefault("headers", {})["Retry-After"] = {

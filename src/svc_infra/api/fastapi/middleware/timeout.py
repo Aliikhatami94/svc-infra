@@ -162,7 +162,11 @@ class BodyReadTimeoutMiddleware:
             nonlocal body_sent
             if not body_sent:
                 body_sent = True
-                return {"type": "http.request", "body": bytes(buffered), "more_body": False}
+                return {
+                    "type": "http.request",
+                    "body": bytes(buffered),
+                    "more_body": False,
+                }
             # After body is sent, forward to original receive for disconnect detection
             return dict(await receive())
 

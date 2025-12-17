@@ -75,7 +75,9 @@ async def test_cache_read_falls_back_when_prefix_not_supported(mocker):
 async def test_cache_write_invalidates_tags_and_executes_recache(mocker):
     mocker.patch("svc_infra.cache.decorators.resolve_tags", return_value=["user:123"])
     invalidate = mocker.patch(
-        "svc_infra.cache.decorators.invalidate_tags", new_callable=AsyncMock, return_value=1
+        "svc_infra.cache.decorators.invalidate_tags",
+        new_callable=AsyncMock,
+        return_value=1,
     )
     execute = mocker.patch("svc_infra.cache.decorators.execute_recache", new_callable=AsyncMock)
 

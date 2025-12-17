@@ -52,7 +52,10 @@ class DummyClient:
         return self._intents.get(provider_intent_id)
 
     async def get_balance_snapshot(self):
-        return {"available": {"USD": 1000}, "pending": [{"currency": "eur", "amount": 500}]}
+        return {
+            "available": {"USD": 1000},
+            "pending": [{"currency": "eur", "amount": 500}],
+        }
 
     async def create_usage_record(self, payload):
         return {
@@ -183,7 +186,8 @@ async def test_tenant_persistence_and_ledger(mocker):
     await fake_session.flush()
     capture_entry = await fake_session.scalar(
         select(LedgerEntry).where(
-            LedgerEntry.provider_ref == intent_out.provider_intent_id, LedgerEntry.kind == "capture"
+            LedgerEntry.provider_ref == intent_out.provider_intent_id,
+            LedgerEntry.kind == "capture",
         )
     )
     assert capture_entry is not None
@@ -194,7 +198,8 @@ async def test_tenant_persistence_and_ledger(mocker):
     await fake_session.flush()
     refund_entry = await fake_session.scalar(
         select(LedgerEntry).where(
-            LedgerEntry.provider_ref == intent_out.provider_intent_id, LedgerEntry.kind == "refund"
+            LedgerEntry.provider_ref == intent_out.provider_intent_id,
+            LedgerEntry.kind == "refund",
         )
     )
     assert refund_entry is not None

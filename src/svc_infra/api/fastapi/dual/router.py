@@ -37,7 +37,11 @@ class DualAPIRouter(APIRouter):
             if is_rootish:
                 # primary root
                 self.add_api_route(
-                    "", func, methods=methods, include_in_schema=show_in_schema, **kwargs
+                    "",
+                    func,
+                    methods=methods,
+                    include_in_schema=show_in_schema,
+                    **kwargs,
                 )
                 # only add the "/" twin for *safe* methods
                 if set(m.upper() for m in methods) <= safe_methods:
@@ -48,7 +52,11 @@ class DualAPIRouter(APIRouter):
 
             # non-root unchanged
             self.add_api_route(
-                primary, func, methods=methods, include_in_schema=show_in_schema, **kwargs
+                primary,
+                func,
+                methods=methods,
+                include_in_schema=show_in_schema,
+                **kwargs,
             )
             if alt != primary:
                 self.add_api_route(alt, func, methods=methods, include_in_schema=False, **kwargs)

@@ -22,7 +22,10 @@ async def test_create_intent_maps_fields(monkeypatch, mocker):
 
     out = await adapter.create_intent(
         mocker.Mock(
-            amount=1234, currency="USD", capture_method="automatic", payment_method_types=[]
+            amount=1234,
+            currency="USD",
+            capture_method="automatic",
+            payment_method_types=[],
         ),
         user_id=None,
     )

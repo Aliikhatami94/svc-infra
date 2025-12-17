@@ -10,7 +10,8 @@ class UsageIn(BaseModel):
     metric: str = Field(..., min_length=1, max_length=64)
     amount: Annotated[int, Field(ge=0, description="Non-negative amount for the metric")]
     at: Optional[datetime] = Field(
-        default=None, description="Event timestamp (UTC). Defaults to server time if omitted."
+        default=None,
+        description="Event timestamp (UTC). Defaults to server time if omitted.",
     )
     idempotency_key: str = Field(..., min_length=1, max_length=128)
     metadata: dict = Field(default_factory=dict)

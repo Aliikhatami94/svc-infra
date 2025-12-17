@@ -16,7 +16,9 @@ def build_session_router() -> APIRouter:
     router = APIRouter(prefix="/sessions", tags=["sessions"])
 
     @router.get(
-        "/me", response_model=list[dict], dependencies=[RequirePermission("security.session.list")]
+        "/me",
+        response_model=list[dict],
+        dependencies=[RequirePermission("security.session.list")],
     )
     async def list_my_sessions(identity: Identity, session: SqlSessionDep) -> List[dict]:
         stmt = select(AuthSession).where(AuthSession.user_id == identity.user.id)

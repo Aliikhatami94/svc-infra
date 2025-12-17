@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 try:  # optional import; auth may not be used by all consumers
     from svc_infra.api.fastapi.auth.security import OptionalIdentity
 except Exception:  # pragma: no cover - fallback for minimal builds
-    OptionalIdentity = None  # type: ignore
+    OptionalIdentity = None  # type: ignore[misc,assignment]
 
 
 _tenant_resolver: Optional[Callable[..., Any]] = None

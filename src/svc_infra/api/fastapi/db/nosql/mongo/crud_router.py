@@ -71,7 +71,12 @@ def make_crud_router_plus_mongo(
         sort = _parse_sort(op.order_by or default_ordering, allowed_order_fields)
         if sp.q and search_fields:
             items = await service.search(
-                db, q=sp.q, fields=search_fields, limit=lp.limit, offset=lp.offset, sort=sort
+                db,
+                q=sp.q,
+                fields=search_fields,
+                limit=lp.limit,
+                offset=lp.offset,
+                sort=sort,
             )
             total = await service.count_filtered(db, q=sp.q, fields=search_fields)
         else:

@@ -12,7 +12,7 @@ class FastApiException(Exception):
         detail: Optional[str] = None,
         status_code: int = 400,
         *,
-        code: str | None = None
+        code: str | None = None,
     ):
         self.title = title
         self.detail = detail

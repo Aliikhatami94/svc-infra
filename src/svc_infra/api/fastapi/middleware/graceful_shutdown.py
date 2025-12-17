@@ -62,7 +62,9 @@ async def _wait_for_drain(app: FastAPI, grace: float) -> None:
     inflight = int(getattr(app.state, "_inflight_requests", 0))
     if inflight > 0:
         logger.warning(
-            "Graceful shutdown timeout: %s in-flight request(s) after %.2fs", inflight, waited
+            "Graceful shutdown timeout: %s in-flight request(s) after %.2fs",
+            inflight,
+            waited,
         )
 
 

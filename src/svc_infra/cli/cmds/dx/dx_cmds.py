@@ -72,7 +72,15 @@ def cmd_ci(
     if openapi:
         steps.append([sys.executable, "-m", "svc_infra.cli", "dx", "openapi", openapi])
     steps.append(
-        [sys.executable, "-m", "svc_infra.cli", "dx", "migrations", "--project-root", project_root]
+        [
+            sys.executable,
+            "-m",
+            "svc_infra.cli",
+            "dx",
+            "migrations",
+            "--project-root",
+            project_root,
+        ]
     )
     steps.append(["pytest", "-q", "-W", "error"])  # mirrors CI
 

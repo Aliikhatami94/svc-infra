@@ -41,7 +41,10 @@ def test_middleware_scopes_by_tenant_and_dynamic_limit():
     assert c.get("/ping", headers={"X-Tenant-Id": "B"}).status_code == 200
     assert c.get("/ping", headers={"X-Tenant-Id": "B"}).status_code == 200
     r = c.get("/ping", headers={"X-Tenant-Id": "B"})
-    assert r.status_code in {200, 429}  # last one may be 200 or 429 based on window timing
+    assert r.status_code in {
+        200,
+        429,
+    }  # last one may be 200 or 429 based on window timing
 
 
 def test_dependency_scopes_by_tenant_and_dynamic_limit():

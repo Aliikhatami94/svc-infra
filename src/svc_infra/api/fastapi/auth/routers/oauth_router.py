@@ -443,7 +443,13 @@ async def _process_user_authentication(
 
     # Ensure provider link exists
     await _update_provider_account(
-        session, provider_account_model, user, provider, provider_user_id, token, raw_claims
+        session,
+        provider_account_model,
+        user,
+        provider,
+        provider_user_id,
+        token,
+        raw_claims,
     )
 
     return user
@@ -636,9 +642,13 @@ def _create_oauth_router(
 
         # Extract user information from provider
         cfg = providers.get(provider, {})
-        email, full_name, provider_user_id, email_verified, raw_claims = (
-            await _extract_user_info_from_provider(request, client, token, provider, cfg, nonce)
-        )
+        (
+            email,
+            full_name,
+            provider_user_id,
+            email_verified,
+            raw_claims,
+        ) = await _extract_user_info_from_provider(request, client, token, provider, cfg, nonce)
 
         if email_verified is False:
             raise HTTPException(400, "unverified_email")

@@ -92,7 +92,9 @@ class TestIdempotencyMiddleware:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.post(
-                "/test", json={"data": "test"}, headers={"Idempotency-Key": "test-key-123"}
+                "/test",
+                json={"data": "test"},
+                headers={"Idempotency-Key": "test-key-123"},
             )
 
             # Verify request is processed normally
@@ -133,12 +135,16 @@ class TestIdempotencyMiddleware:
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             # First request
             response1 = await client.post(
-                "/test", json={"data": "test"}, headers={"Idempotency-Key": "duplicate-key-123"}
+                "/test",
+                json={"data": "test"},
+                headers={"Idempotency-Key": "duplicate-key-123"},
             )
 
             # Second request with same idempotency key
             response2 = await client.post(
-                "/test", json={"data": "test"}, headers={"Idempotency-Key": "duplicate-key-123"}
+                "/test",
+                json={"data": "test"},
+                headers={"Idempotency-Key": "duplicate-key-123"},
             )
 
             # Both should return the same response

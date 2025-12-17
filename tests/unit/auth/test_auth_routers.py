@@ -73,7 +73,8 @@ def _setup_account_app(session, principal) -> FastAPI:
 def _setup_apikey_app(session, principal, mocker) -> FastAPI:
     app = FastAPI()
     mocker.patch(
-        "svc_infra.api.fastapi.auth.routers.apikey_router.get_apikey_model", return_value=FakeApiKey
+        "svc_infra.api.fastapi.auth.routers.apikey_router.get_apikey_model",
+        return_value=FakeApiKey,
     )
 
     class _SelectStub:

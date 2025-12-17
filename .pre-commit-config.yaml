@@ -56,6 +56,23 @@ repos:
         args: ["--select=E,F", "--exclude=.venv,venv,build,dist,node_modules,.git"]
         # additional_dependencies: [flake8-bugbear]
 
+  # --- Type checking ---
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        args: ["--config-file=mypy.ini"]
+        additional_dependencies:
+          - pydantic>=2.0
+          - fastapi>=0.109.0
+          - httpx>=0.27.0
+          - types-redis
+          - types-PyYAML
+          - types-python-dateutil
+        exclude: ^tests/
+        pass_filenames: false
+        entry: mypy src/
+
   # --- Tests (opt-in/manual only) ---
   - repo: local
     hooks:

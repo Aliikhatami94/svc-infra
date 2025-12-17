@@ -15,7 +15,9 @@ class TestTenancyAcceptance:
 
         # Switch to another tenant via X-Accept-Tenant header and create there
         r2 = client.post(
-            "/tenancy/widgets", json={"name": "beta"}, headers={"X-Accept-Tenant": "t-2"}
+            "/tenancy/widgets",
+            json={"name": "beta"},
+            headers={"X-Accept-Tenant": "t-2"},
         )
         assert r2.status_code == 201
         body2 = r2.json()

@@ -168,7 +168,8 @@ class WebSocketClient:
         if not self._connection:
             raise WebSocketError("Not connected")
         try:
-            return await self._connection.recv()
+            result = await self._connection.recv()
+            return str(result) if isinstance(result, str) else bytes(result)
         except ConnectionClosedOK:
             raise ConnectionClosedError(1000, "Normal closure")
         except ConnectionClosed as e:

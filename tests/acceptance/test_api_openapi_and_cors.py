@@ -19,7 +19,10 @@ def test_openapi_present(client: httpx.Client):
     "origin,allowed",
     [
         ("https://example.com", True),
-        ("http://not-allowed.local", True),  # acceptance app sets public_cors_origins=["*"]
+        (
+            "http://not-allowed.local",
+            True,
+        ),  # acceptance app sets public_cors_origins=["*"]
     ],
 )
 def test_cors_preflight_options(client: httpx.Client, origin: str, allowed: bool):

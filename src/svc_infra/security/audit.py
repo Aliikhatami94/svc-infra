@@ -21,8 +21,8 @@ try:  # SQLAlchemy may not be present in minimal test context
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession
 except Exception:  # pragma: no cover
-    AsyncSession = Any  # type: ignore
-    select = None  # type: ignore
+    AsyncSession = Any  # type: ignore[misc,assignment]
+    select = None  # type: ignore[assignment]
 
 from svc_infra.security.models import AuditLog, compute_audit_hash
 

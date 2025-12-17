@@ -29,7 +29,9 @@ class PayCustomer(ModelBase):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
     __table_args__ = (
@@ -57,7 +59,9 @@ class PayIntent(ModelBase):
     status: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     client_secret: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
     confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     captured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -82,7 +86,9 @@ class PayEvent(ModelBase):
     )
     type: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     received_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
     payload_json: Mapped[dict] = mapped_column(JSON, nullable=False)  # compact JSON string
 
@@ -142,7 +148,9 @@ class PayPaymentMethod(ModelBase):
     exp_year: Mapped[Optional[int]] = mapped_column(Numeric(4, 0))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
     __table_args__ = (
@@ -170,7 +178,9 @@ class PayProduct(ModelBase):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -192,7 +202,9 @@ class PayPrice(ModelBase):
     trial_days: Mapped[Optional[int]] = mapped_column(Numeric(5, 0))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -217,7 +229,9 @@ class PaySubscription(ModelBase):
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     current_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
     __table_args__ = (
@@ -252,7 +266,9 @@ class PayInvoice(ModelBase):
     hosted_invoice_url: Mapped[Optional[str]] = mapped_column(String(255))
     pdf_url: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
     __table_args__ = (
@@ -283,7 +299,9 @@ class PaySetupIntent(ModelBase):
     )  # requires_action|succeeded|canceled|processing
     client_secret: Mapped[Optional[str]] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
     __table_args__ = (
@@ -312,7 +330,9 @@ class PayDispute(ModelBase):
     )  # needs_response|under_review|won|lost|warning_closed
     evidence_due_by: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )
 
 
@@ -335,5 +355,7 @@ class PayPayout(ModelBase):
     arrival_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     type: Mapped[Optional[str]] = mapped_column(String(32))  # bank_account|card|...
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+        DateTime(timezone=True),
+        server_default=text("CURRENT_TIMESTAMP"),
+        nullable=False,
     )

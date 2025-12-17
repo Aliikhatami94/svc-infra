@@ -26,7 +26,11 @@ async def test_audit_chain_verification_and_tamper_detection():
 
     # Build a chain of three events
     e1 = await append_audit_event(
-        db, actor_id=actor_id, tenant_id=tenant_id, event_type="login", metadata={"ip": "1.1.1.1"}
+        db,
+        actor_id=actor_id,
+        tenant_id=tenant_id,
+        event_type="login",
+        metadata={"ip": "1.1.1.1"},
     )
     e2 = await append_audit_event(
         db,
@@ -37,7 +41,12 @@ async def test_audit_chain_verification_and_tamper_detection():
         prev_event=e1,
     )
     e3 = await append_audit_event(
-        db, actor_id=actor_id, tenant_id=tenant_id, event_type="logout", metadata={}, prev_event=e2
+        db,
+        actor_id=actor_id,
+        tenant_id=tenant_id,
+        event_type="logout",
+        metadata={},
+        prev_event=e2,
     )
 
     ok_chain, broken = verify_audit_chain([e1, e2, e3])

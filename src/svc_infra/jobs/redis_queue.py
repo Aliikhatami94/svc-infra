@@ -71,7 +71,8 @@ class RedisJobQueue(JobQueue):
         # available_at stored as ISO format
         data["available_at"] = job.available_at.isoformat()
         self._r.hset(
-            self._job_key(job_id), mapping={k: str(v) for k, v in data.items() if v is not None}
+            self._job_key(job_id),
+            mapping={k: str(v) for k, v in data.items() if v is not None},
         )
         if delay_seconds and delay_seconds > 0:
             at = int(now.timestamp()) + int(delay_seconds)
@@ -122,7 +123,11 @@ class RedisJobQueue(JobQueue):
         if self._reserve_script is not None:
             try:
                 jid = self._reserve_script(
-                    keys=[self._k("ready"), self._k("processing"), self._k("processing_vt")],
+                    keys=[
+                        self._k("ready"),
+                        self._k("processing"),
+                        self._k("processing_vt"),
+                    ],
                     args=[visible_at],
                 )
             except Exception as e:
@@ -229,7 +234,7 @@ class RedisJobQueue(JobQueue):
             return
         delay = backoff_seconds * max(1, attempts)
         available_at_ts = now_ts + delay
-        mapping = {
+        mapping: dict[str, str] = {
             "last_error": error or "",
             "available_at": datetime.fromtimestamp(available_at_ts, tz=timezone.utc).isoformat(),
         }

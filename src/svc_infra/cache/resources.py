@@ -157,7 +157,8 @@ class Resource:
                     logger.error(f"Resource recache failed: {e}")
 
             await asyncio.gather(
-                *[_run_single_resource_recache(spec) for spec in specs], return_exceptions=True
+                *[_run_single_resource_recache(spec) for spec in specs],
+                return_exceptions=True,
             )
 
         def _decorator(mutator: Callable):

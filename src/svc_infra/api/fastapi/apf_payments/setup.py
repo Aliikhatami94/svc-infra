@@ -56,7 +56,8 @@ def add_payments(
 
     for r in build_payments_routers(prefix=prefix):
         app.include_router(
-            r, include_in_schema=True if include_in_docs is None else bool(include_in_docs)
+            r,
+            include_in_schema=True if include_in_docs is None else bool(include_in_docs),
         )
 
     # Store the startup function to be called by lifespan if needed

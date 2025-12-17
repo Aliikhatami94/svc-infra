@@ -45,7 +45,8 @@ async def login_client_gaurd(request: Request):
         client_secret = client_secret_raw.strip() if isinstance(client_secret_raw, str) else ""
         if not client_id or not client_secret:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="client_credentials_required"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="client_credentials_required",
             )
 
         # validate against configured clients
@@ -57,7 +58,8 @@ async def login_client_gaurd(request: Request):
 
         if not ok:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_client_credentials"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid_client_credentials",
             )
 
 
@@ -124,7 +126,10 @@ def auth_session_router(
         if not hashed:
             try:
                 await record_attempt(
-                    session, user_id=getattr(user, "id", None), ip_hash=ip_hash, success=False
+                    session,
+                    user_id=getattr(user, "id", None),
+                    ip_hash=ip_hash,
+                    success=False,
                 )
             except Exception:
                 pass
@@ -151,7 +156,10 @@ def auth_session_router(
         if not ok:
             try:
                 await record_attempt(
-                    session, user_id=getattr(user, "id", None), ip_hash=ip_hash, success=False
+                    session,
+                    user_id=getattr(user, "id", None),
+                    ip_hash=ip_hash,
+                    success=False,
                 )
             except Exception:
                 pass
@@ -192,7 +200,10 @@ def auth_session_router(
         # Record successful attempt (for audit)
         try:
             await record_attempt(
-                session, user_id=getattr(user, "id", None), ip_hash=ip_hash, success=True
+                session,
+                user_id=getattr(user, "id", None),
+                ip_hash=ip_hash,
+                success=True,
             )
         except Exception:
             pass

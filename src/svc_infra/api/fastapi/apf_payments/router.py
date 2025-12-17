@@ -225,7 +225,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Payment Intents", "Refunds"],
     )
     async def refund_intent(
-        provider_intent_id: str, data: RefundIn, svc: PaymentsService = Depends(get_service)
+        provider_intent_id: str,
+        data: RefundIn,
+        svc: PaymentsService = Depends(get_service),
     ):
         out = await svc.refund(provider_intent_id, data)
         await svc.session.flush()
@@ -745,7 +747,10 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
 
     # ===== Balance & Payouts =====
     @prot.get(
-        "/balance", name="payments_get_balance", response_model=BalanceSnapshotOut, tags=["Balance"]
+        "/balance",
+        name="payments_get_balance",
+        response_model=BalanceSnapshotOut,
+        tags=["Balance"],
     )
     async def get_balance(svc: PaymentsService = Depends(get_service)):
         return await svc.get_balance_snapshot()

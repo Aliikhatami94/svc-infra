@@ -81,7 +81,11 @@ def create_ws_test_app() -> FastAPI:
                 if data.get("type") == "message":
                     await manager.broadcast_to_room(
                         room_name,
-                        {"user": user_id, "room": room_name, "message": data.get("text", "")},
+                        {
+                            "user": user_id,
+                            "room": room_name,
+                            "message": data.get("text", ""),
+                        },
                     )
         except WebSocketDisconnect:
             await manager.leave_room(user_id, room_name)

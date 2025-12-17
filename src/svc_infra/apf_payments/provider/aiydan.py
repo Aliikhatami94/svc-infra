@@ -331,7 +331,9 @@ def _ensure_sequence(result: Any) -> Sequence[dict[str, Any]]:
     raise RuntimeError("Expected sequence payload from Aiydan client")
 
 
-def _ensure_list_response(result: Any) -> Tuple[Sequence[dict[str, Any]], Optional[str]]:
+def _ensure_list_response(
+    result: Any,
+) -> Tuple[Sequence[dict[str, Any]], Optional[str]]:
     if isinstance(result, tuple) and len(result) == 2:
         items, cursor = result
         if isinstance(items, Sequence) or items is None:
@@ -785,7 +787,12 @@ class AiydanAdapter(ProviderAdapter):
         return _intent_to_out(result)
 
     async def list_customers(
-        self, *, provider: str | None, user_id: str | None, limit: int, cursor: str | None
+        self,
+        *,
+        provider: str | None,
+        user_id: str | None,
+        limit: int,
+        cursor: str | None,
     ) -> tuple[list[CustomerOut], str | None]:
         result = await _maybe_await(
             self._client.list_customers(

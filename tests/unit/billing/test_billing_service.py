@@ -56,7 +56,8 @@ def test_record_and_aggregate_and_invoice(sync_session: Session):
 
     # Aggregate
     bs.aggregate_daily(
-        metric="tokens", day_start=now.replace(hour=0, minute=0, second=0, microsecond=0)
+        metric="tokens",
+        day_start=now.replace(hour=0, minute=0, second=0, microsecond=0),
     )
 
     # Generate invoice for month

@@ -285,13 +285,19 @@ class FakeAdapter(ProviderAdapter):
     async def ensure_customer(self, data: CustomerUpsertIn) -> CustomerOut:  # type: ignore[override]
         cid = data.email or data.name or "cus_accept"
         out = CustomerOut(
-            id=cid, provider=self.name, provider_customer_id=cid, email=data.email, name=data.name
+            id=cid,
+            provider=self.name,
+            provider_customer_id=cid,
+            email=data.email,
+            name=data.name,
         )
         self._customers[cid] = out
         self._methods.setdefault(cid, [])
         return out
 
-    async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:  # type: ignore[override]
+    async def attach_payment_method(
+        self, data: PaymentMethodAttachIn
+    ) -> PaymentMethodOut:  # type: ignore[override]
         mid = f"pm_{len(self._methods.get(data.customer_provider_id, [])) + 1}"
         out = PaymentMethodOut(
             id=mid,
@@ -312,10 +318,14 @@ class FakeAdapter(ProviderAdapter):
         lst.append(out)
         return out
 
-    async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:  # type: ignore[override]
+    async def list_payment_methods(
+        self, provider_customer_id: str
+    ) -> list[PaymentMethodOut]:  # type: ignore[override]
         return list(self._methods.get(provider_customer_id, []))
 
-    async def create_intent(self, data: IntentCreateIn, *, user_id: str | None) -> IntentOut:  # type: ignore[override]
+    async def create_intent(
+        self, data: IntentCreateIn, *, user_id: str | None
+    ) -> IntentOut:  # type: ignore[override]
         iid = f"pi_{len(self._intents) + 1}"
         out = IntentOut(
             id=iid,
@@ -604,7 +614,11 @@ async def create_widget(payload: dict, tenant_id: _TenantId):  # type: ignore[na
 
     wid = str(app.state.ten_widget_next_id)
     app.state.ten_widget_next_id += 1
-    item = {"id": wid, "name": str(payload.get("name", f"w-{wid}")), "tenant_id": tenant_id}
+    item = {
+        "id": wid,
+        "name": str(payload.get("name", f"w-{wid}")),
+        "tenant_id": tenant_id,
+    }
     items.append(item)
     app.state.ten_widget_index[wid] = tenant_id
     return item
@@ -837,7 +851,11 @@ async def _load_owned(owner_id: str):
 @_sec.get(
     "/owned/{owner_id}",
     dependencies=[
-        RequireABAC(permission="user.read", predicate=owns_resource(), resource_getter=_load_owned)
+        RequireABAC(
+            permission="user.read",
+            predicate=owns_resource(),
+            resource_getter=_load_owned,
+        )
     ],
 )
 async def owned_resource(owner_id: str):
@@ -971,7 +989,11 @@ async def _accept_me(request: Request):
         user = None
     if not user:
         raise HTTPException(401, "invalid_token")
-    return {"id": str(user.id), "email": user.email, "is_verified": bool(user.is_verified)}
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "is_verified": bool(user.is_verified),
+    }
 
 
 # ---------------- Acceptance MFA (A1-07 step 1) -----------------
@@ -1333,7 +1355,11 @@ async def rl_dep_echo(request: Request):
         # Mirror dependency RL behavior: 429 with Retry-After header
         resp = JSONResponse(
             status_code=429,
-            content={"error": "rate_limited", "limit": _DEP_LIMIT, "retry_after": retry},
+            content={
+                "error": "rate_limited",
+                "limit": _DEP_LIMIT,
+                "retry_after": retry,
+            },
         )
         resp.headers["Retry-After"] = str(retry)
         return resp

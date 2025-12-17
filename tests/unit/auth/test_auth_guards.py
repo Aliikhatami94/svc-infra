@@ -478,7 +478,10 @@ class TestGuardCombinations:
         async def test_endpoint(
             user_principal=require_user_guard, scoped_principal=require_scopes_guard
         ):
-            return {"user_id": user_principal.user.id, "scopes": scoped_principal.scopes}
+            return {
+                "user_id": user_principal.user.id,
+                "scopes": scoped_principal.scopes,
+            }
 
         # Mock the underlying _current_principal dependency
         app.dependency_overrides[_current_principal] = lambda: principal
@@ -513,9 +516,13 @@ class TestGuardCombinations:
 
         @app.get("/test")
         async def test_endpoint(
-            service_principal=require_service_guard, scoped_principal=require_any_scope_guard
+            service_principal=require_service_guard,
+            scoped_principal=require_any_scope_guard,
         ):
-            return {"api_key_id": service_principal.api_key.id, "scopes": scoped_principal.scopes}
+            return {
+                "api_key_id": service_principal.api_key.id,
+                "scopes": scoped_principal.scopes,
+            }
 
         # Mock the underlying _current_principal dependency
         app.dependency_overrides[_current_principal] = lambda: principal

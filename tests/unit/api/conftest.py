@@ -73,7 +73,11 @@ def mock_router():
 def sample_api_request_data():
     """Provide sample API request data for testing."""
     return {
-        "user": {"email": "test@example.com", "name": "Test User", "password": "test_password"},
+        "user": {
+            "email": "test@example.com",
+            "name": "Test User",
+            "password": "test_password",
+        },
         "product": {
             "name": "Test Product",
             "description": "A test product",

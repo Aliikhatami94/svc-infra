@@ -77,18 +77,22 @@ class SqlRepository:
         stmt = stmt.limit(limit).offset(offset)
         if order_by:
             stmt = stmt.order_by(*order_by)
-        rows = (await session.execute(stmt)).scalars().all()
-        return rows
+        result = (await session.execute(stmt)).scalars().all()
+        return list(result)
 
     async def count(self, session: AsyncSession, *, where: Optional[Sequence[Any]] = None) -> int:
         base = self._base_select()
         if where:
             base = base.where(and_(*where))
         stmt = select(func.count()).select_from(base.subquery())
-        return (await session.execute(stmt)).scalar_one()
+        return int((await session.execute(stmt)).scalar_one())
 
     async def get(
-        self, session: AsyncSession, id_value: Any, *, where: Optional[Sequence[Any]] = None
+        self,
+        session: AsyncSession,
+        id_value: Any,
+        *,
+        where: Optional[Sequence[Any]] = None,
     ) -> Any | None:
         # honors soft-delete if configured
         stmt = self._base_select().where(self._id_column() == id_value)
@@ -125,7 +129,11 @@ class SqlRepository:
         return obj
 
     async def delete(
-        self, session: AsyncSession, id_value: Any, *, where: Optional[Sequence[Any]] = None
+        self,
+        session: AsyncSession,
+        id_value: Any,
+        *,
+        where: Optional[Sequence[Any]] = None,
     ) -> bool:
         # Fast path: when no extra filters provided, use session.get for simplicity (matches tests)
         if not where:

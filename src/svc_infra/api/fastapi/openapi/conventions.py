@@ -16,7 +16,11 @@ PROBLEM_SCHEMA: Dict[str, Any] = {
             "description": "URI identifying the error type",
         },
         "title": {"type": "string", "description": "Short, human-readable summary"},
-        "status": {"type": "integer", "format": "int32", "description": "HTTP status code"},
+        "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code",
+        },
         "detail": {"type": "string", "description": "Human-readable explanation"},
         "instance": {
             "type": "string",
@@ -36,7 +40,10 @@ PROBLEM_SCHEMA: Dict[str, Any] = {
                 },
             },
         },
-        "trace_id": {"type": "string", "description": "Correlation/trace id (if available)"},
+        "trace_id": {
+            "type": "string",
+            "description": "Correlation/trace id (if available)",
+        },
     },
     "required": ["title", "status"],
 }

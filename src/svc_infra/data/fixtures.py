@@ -6,7 +6,9 @@ from typing import Awaitable, Callable, Iterable, Optional
 
 
 async def run_fixtures(
-    loaders: Iterable[Callable[[], None | Awaitable[None]]], *, run_once_file: Optional[str] = None
+    loaders: Iterable[Callable[[], None | Awaitable[None]]],
+    *,
+    run_once_file: Optional[str] = None,
 ) -> None:
     """Run a sequence of fixture loaders (sync or async).
 

@@ -37,7 +37,7 @@ from .service import InMemoryWebhookSubscriptions
 try:  # Optional dependency – only required when redis backends are selected.
     from redis import Redis
 except Exception:  # pragma: no cover - redis is optional in most test runs.
-    Redis = None  # type: ignore
+    Redis = None  # type: ignore[misc,assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +86,12 @@ class RedisOutboxStore(OutboxStore):
         except (TypeError, ValueError):
             msg_id = 0
         created_at = datetime.now(timezone.utc)
-        record = {
-            "id": msg_id,
+        record: dict[str, str] = {
+            "id": str(msg_id),
             "topic": topic,
             "payload": json.dumps(payload),
             "created_at": created_at.isoformat(),
-            "attempts": 0,
+            "attempts": "0",
             "processed_at": "",
         }
         self._client.hset(self._msg_key(msg_id), mapping=record)

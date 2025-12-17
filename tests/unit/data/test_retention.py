@@ -80,7 +80,11 @@ async def test_run_retention_soft_delete():
 async def test_run_retention_hard_delete():
     sess = FakeSession()
     pol = RetentionPolicy(
-        name="demo", model=FakeModel, older_than_days=30, soft_delete_field=None, hard_delete=True
+        name="demo",
+        model=FakeModel,
+        older_than_days=30,
+        soft_delete_field=None,
+        hard_delete=True,
     )
     total = await run_retention_purge(sess, [pol])
     assert total == 3

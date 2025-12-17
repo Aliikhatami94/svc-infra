@@ -26,7 +26,12 @@ class Principal:
     """Unified identity: user via JWT/cookie or service via API key."""
 
     def __init__(
-        self, *, user=None, scopes: list[str] | None = None, via: str = "jwt", api_key=None
+        self,
+        *,
+        user=None,
+        scopes: list[str] | None = None,
+        via: str = "jwt",
+        api_key=None,
     ):
         self.user = user
         self.scopes = scopes or []

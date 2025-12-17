@@ -66,7 +66,9 @@ def normalize_index(idx: Union[IndexModel, Alias]) -> IndexModel:
     return IndexModel(keys, **kwargs)
 
 
-def normalize_indexes(indexes: Optional[Iterable[Union[IndexModel, Alias]]]) -> List[IndexModel]:
+def normalize_indexes(
+    indexes: Optional[Iterable[Union[IndexModel, Alias]]],
+) -> List[IndexModel]:
     if not indexes:
         return []
     return [normalize_index(i) for i in indexes]

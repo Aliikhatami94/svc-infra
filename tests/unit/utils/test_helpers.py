@@ -73,7 +73,9 @@ def assert_json_response(response_data: Dict[str, Any], expected_status: int = 2
 
 
 def assert_error_response(
-    response_data: Dict[str, Any], expected_status: int, error_code: Optional[str] = None
+    response_data: Dict[str, Any],
+    expected_status: int,
+    error_code: Optional[str] = None,
 ) -> None:
     """Assert that a response is an error response."""
     assert "detail" in response_data

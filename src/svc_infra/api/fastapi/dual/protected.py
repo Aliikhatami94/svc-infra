@@ -88,7 +88,8 @@ def scopes_router(*scopes: str, **kwargs: Any) -> DualAPIRouter:
 # ROLE-GATED (example using roles attribute or resolver passed by caller)
 def roles_router(*roles: str, role_resolver=None, **kwargs):
     r = DualAPIRouter(
-        dependencies=[RequireUser(), RequireRoles(*roles, resolver=role_resolver)], **kwargs
+        dependencies=[RequireUser(), RequireRoles(*roles, resolver=role_resolver)],
+        **kwargs,
     )
     apply_default_security(
         r, default_security=[{"OAuth2PasswordBearer": []}, {"SessionCookie": []}]

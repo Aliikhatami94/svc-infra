@@ -12,7 +12,7 @@ try:
     # Optional import: tenancy may not be enabled in all apps
     from svc_infra.api.fastapi.tenancy.context import resolve_tenant_id as _resolve_tenant_id
 except Exception:  # pragma: no cover - fallback for minimal builds
-    _resolve_tenant_id = None  # type: ignore
+    _resolve_tenant_id = None  # type: ignore[assignment]
 
 
 class SimpleRateLimitMiddleware:

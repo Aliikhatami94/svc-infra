@@ -26,7 +26,9 @@ def get_service(tenant_id: TenantId, session: SqlSessionDep) -> AsyncBillingServ
     dependencies=[Depends(require_idempotency_key)],
 )
 async def record_usage(
-    data: UsageIn, svc: Annotated[AsyncBillingService, Depends(get_service)], response: Response
+    data: UsageIn,
+    svc: Annotated[AsyncBillingService, Depends(get_service)],
+    response: Response,
 ):
     at = data.at or datetime.now(tz=timezone.utc)
     evt_id = await svc.record_usage(

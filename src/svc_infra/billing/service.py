@@ -20,7 +20,13 @@ class BillingService:
     provider_sync: Optional[ProviderSyncHook] = None
 
     def record_usage(
-        self, *, metric: str, amount: int, at: datetime, idempotency_key: str, metadata: dict | None
+        self,
+        *,
+        metric: str,
+        amount: int,
+        at: datetime,
+        idempotency_key: str,
+        metadata: dict | None,
     ) -> str:
         # Ensure UTC
         if at.tzinfo is None:

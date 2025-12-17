@@ -52,7 +52,9 @@ def test_check_migrations_up_to_date_tolerates_absence(tmp_path: Path):
     check_migrations_up_to_date(project_root=tmp_path)
 
 
-def test_check_migrations_up_to_date_requires_versions_when_alembic_present(tmp_path: Path):
+def test_check_migrations_up_to_date_requires_versions_when_alembic_present(
+    tmp_path: Path,
+):
     (tmp_path / "alembic.ini").write_text("[alembic]")
     (tmp_path / "migrations").mkdir()
     with pytest.raises(ValueError):

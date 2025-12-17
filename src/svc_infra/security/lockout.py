@@ -10,8 +10,8 @@ try:
     from sqlalchemy.ext.asyncio import AsyncSession
 except Exception:  # pragma: no cover - optional import for type hints
     AsyncSession = Any  # type: ignore[misc,assignment]
-    select = None  # type: ignore
-    or_ = None  # type: ignore
+    select = None  # type: ignore[assignment]
+    or_ = None  # type: ignore[assignment]
 
 from svc_infra.security.models import FailedAuthAttempt
 

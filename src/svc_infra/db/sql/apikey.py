@@ -83,7 +83,9 @@ def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type
         meta: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
 
         created_at = mapped_column(
-            DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
+            DateTime(timezone=True),
+            server_default=text("CURRENT_TIMESTAMP"),
+            nullable=False,
         )
         updated_at = mapped_column(
             DateTime(timezone=True),

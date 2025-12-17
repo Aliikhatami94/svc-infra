@@ -17,7 +17,11 @@ def test_add_webhooks_mounts_router_and_reuses_dependencies():
     client = TestClient(app)
     resp = client.post(
         "/_webhooks/subscriptions",
-        json={"topic": "invoice.created", "url": "https://example.test", "secret": "sekrit"},
+        json={
+            "topic": "invoice.created",
+            "url": "https://example.test",
+            "secret": "sekrit",
+        },
     )
     assert resp.status_code == 200
 

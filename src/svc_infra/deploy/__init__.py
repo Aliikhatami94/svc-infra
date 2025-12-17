@@ -73,7 +73,11 @@ class Platform(StrEnum):
 # Order matters: more specific platforms checked first
 PLATFORM_SIGNATURES: dict[Platform, tuple[str, ...]] = {
     # Developer PaaS (most specific first)
-    Platform.RAILWAY: ("RAILWAY_ENVIRONMENT", "RAILWAY_PROJECT_ID", "RAILWAY_SERVICE_ID"),
+    Platform.RAILWAY: (
+        "RAILWAY_ENVIRONMENT",
+        "RAILWAY_PROJECT_ID",
+        "RAILWAY_SERVICE_ID",
+    ),
     Platform.RENDER: ("RENDER", "RENDER_SERVICE_ID", "RENDER_INSTANCE_ID"),
     Platform.FLY: ("FLY_APP_NAME", "FLY_REGION", "FLY_ALLOC_ID"),
     Platform.HEROKU: ("DYNO", "HEROKU_APP_NAME", "HEROKU_SLUG_COMMIT"),
@@ -86,7 +90,10 @@ PLATFORM_SIGNATURES: dict[Platform, tuple[str, ...]] = {
     Platform.APP_ENGINE: ("GAE_APPLICATION", "GAE_SERVICE", "GAE_VERSION"),
     Platform.GCE: ("GCE_METADATA_HOST",),
     # Azure
-    Platform.AZURE_CONTAINER_APPS: ("CONTAINER_APP_NAME", "CONTAINER_APP_ENV_DNS_SUFFIX"),
+    Platform.AZURE_CONTAINER_APPS: (
+        "CONTAINER_APP_NAME",
+        "CONTAINER_APP_ENV_DNS_SUFFIX",
+    ),
     Platform.AZURE_FUNCTIONS: ("FUNCTIONS_WORKER_RUNTIME", "AzureWebJobsStorage"),
     Platform.AZURE_APP_SERVICE: ("WEBSITE_SITE_NAME", "WEBSITE_INSTANCE_ID"),
     # Generic container/orchestration (check last)
@@ -163,7 +170,11 @@ def get_platform() -> Platform:
 AWS_PLATFORMS = frozenset({Platform.AWS_ECS, Platform.AWS_LAMBDA, Platform.AWS_BEANSTALK})
 GCP_PLATFORMS = frozenset({Platform.CLOUD_RUN, Platform.APP_ENGINE, Platform.GCE})
 AZURE_PLATFORMS = frozenset(
-    {Platform.AZURE_CONTAINER_APPS, Platform.AZURE_FUNCTIONS, Platform.AZURE_APP_SERVICE}
+    {
+        Platform.AZURE_CONTAINER_APPS,
+        Platform.AZURE_FUNCTIONS,
+        Platform.AZURE_APP_SERVICE,
+    }
 )
 PAAS_PLATFORMS = frozenset({Platform.RAILWAY, Platform.RENDER, Platform.FLY, Platform.HEROKU})
 
@@ -190,7 +201,11 @@ def is_paas() -> bool:
 
 def is_serverless() -> bool:
     """Check if running in serverless environment (Lambda, Cloud Run, Functions)."""
-    return get_platform() in {Platform.AWS_LAMBDA, Platform.CLOUD_RUN, Platform.AZURE_FUNCTIONS}
+    return get_platform() in {
+        Platform.AWS_LAMBDA,
+        Platform.CLOUD_RUN,
+        Platform.AZURE_FUNCTIONS,
+    }
 
 
 def is_containerized() -> bool:

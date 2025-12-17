@@ -110,7 +110,9 @@ class TestResourceCacheRead:
         res = resource("user", "user_id")
 
         @res.cache_read(
-            suffix="profile", ttl=300, tags_template=("user:{user_id}", "profile:{user_id}")
+            suffix="profile",
+            ttl=300,
+            tags_template=("user:{user_id}", "profile:{user_id}"),
         )
         async def get_user_profile(*, user_id: int):
             return {"id": user_id, "name": "Database User"}

@@ -29,7 +29,8 @@ def _gen_recovery_codes(n: int, length: int) -> list[str]:
 def _gen_numeric_code(n: int = 6) -> str:
     import random
 
-    return "".join(str(random.randrange(10)) for _ in range(n))
+    code = "".join(str(random.randrange(10)) for _ in range(n))
+    return code
 
 
 def _hash(s: str) -> str:

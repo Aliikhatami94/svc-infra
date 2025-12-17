@@ -7,7 +7,7 @@ from typing import Optional
 try:
     from sqlalchemy.ext.asyncio import AsyncSession
 except Exception:  # pragma: no cover
-    AsyncSession = object  # type: ignore
+    AsyncSession = object  # type: ignore[misc,assignment]
 
 from svc_infra.security.models import (
     AuthSession,

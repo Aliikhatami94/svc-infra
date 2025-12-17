@@ -20,7 +20,11 @@ async def test_create_customer(client, fake_adapter, mocker):
 
     res = await client.post(
         "/payments/customers",
-        json={"user_id": "user_123", "email": "test@example.com", "name": "Test Customer"},
+        json={
+            "user_id": "user_123",
+            "email": "test@example.com",
+            "name": "Test Customer",
+        },
         headers=IDEMP,
     )
 

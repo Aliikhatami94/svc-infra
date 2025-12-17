@@ -165,7 +165,9 @@ async def test_cancel_subscription(client, fake_adapter, mocker):
     )
 
     res = await client.post(
-        "/payments/subscriptions/sub_123/cancel", json={"at_period_end": True}, headers=IDEMP
+        "/payments/subscriptions/sub_123/cancel",
+        json={"at_period_end": True},
+        headers=IDEMP,
     )
 
     assert res.status_code == 200

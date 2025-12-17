@@ -44,7 +44,7 @@ from .base import ProviderAdapter
 try:
     import stripe
 except Exception:  # pragma: no cover
-    stripe = None  # type: ignore
+    stripe = None  # type: ignore[assignment]
 
 
 async def _acall(fn, /, *args, **kwargs):
@@ -235,7 +235,12 @@ class StripeAdapter(ProviderAdapter):
         )
 
     async def list_customers(
-        self, *, provider: str | None, user_id: str | None, limit: int, cursor: str | None
+        self,
+        *,
+        provider: str | None,
+        user_id: str | None,
+        limit: int,
+        cursor: str | None,
     ) -> tuple[list[CustomerOut], str | None]:
         params: dict[str, Any] = {"limit": int(limit)}
         if cursor:
@@ -271,13 +276,21 @@ class StripeAdapter(ProviderAdapter):
                 invoice_settings={"default_payment_method": pm.id},
             )
             is_default = (
-                getattr(getattr(cust, "invoice_settings", None), "default_payment_method", None)
+                getattr(
+                    getattr(cust, "invoice_settings", None),
+                    "default_payment_method",
+                    None,
+                )
                 == pm.id
             )
         else:
             cust = await _acall(stripe.Customer.retrieve, data.customer_provider_id)
             is_default = (
-                getattr(getattr(cust, "invoice_settings", None), "default_payment_method", None)
+                getattr(
+                    getattr(cust, "invoice_settings", None),
+                    "default_payment_method",
+                    None,
+                )
                 == pm.id
             )
         return _pm_to_out(pm, is_default=is_default)
@@ -542,7 +555,8 @@ class StripeAdapter(ProviderAdapter):
         else:
             kwargs["unit_amount"] = int(data.unit_amount)
         await _acall(
-            stripe.InvoiceItem.create, **{k: v for k, v in kwargs.items() if v is not None}
+            stripe.InvoiceItem.create,
+            **{k: v for k, v in kwargs.items() if v is not None},
         )
         inv = await _acall(stripe.Invoice.retrieve, provider_invoice_id)
         return _inv_to_out(inv)
@@ -617,7 +631,8 @@ class StripeAdapter(ProviderAdapter):
         if data.payment_method_types:
             kwargs["payment_method_types"] = data.payment_method_types
         pi = await _acall(
-            stripe.PaymentIntent.create, **{k: v for k, v in kwargs.items() if v is not None}
+            stripe.PaymentIntent.create,
+            **{k: v for k, v in kwargs.items() if v is not None},
         )
         return _pi_to_out(pi)
 
@@ -678,7 +693,8 @@ class StripeAdapter(ProviderAdapter):
     # ---- Setup Intents (off-session readiness) ----
     async def create_setup_intent(self, data: SetupIntentCreateIn) -> SetupIntentOut:
         si = await _acall(
-            stripe.SetupIntent.create, payment_method_types=data.payment_method_types or ["card"]
+            stripe.SetupIntent.create,
+            payment_method_types=data.payment_method_types or ["card"],
         )
         return SetupIntentOut(
             id=si.id,

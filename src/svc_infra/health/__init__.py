@@ -300,7 +300,10 @@ class HealthRegistry:
             else:
                 # Check all critical checks
                 agg_result = await self.check_all()
-                all_healthy = agg_result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
+                all_healthy = agg_result.status in (
+                    HealthStatus.HEALTHY,
+                    HealthStatus.DEGRADED,
+                )
 
             if all_healthy:
                 return True
@@ -711,7 +714,10 @@ def add_health_routes(
         result = await registry.check_all()
 
         # For startup, only critical checks matter
-        critical_healthy = result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
+        critical_healthy = result.status in (
+            HealthStatus.HEALTHY,
+            HealthStatus.DEGRADED,
+        )
 
         if critical_healthy:
             return JSONResponse({"status": "ok"}, status_code=200)

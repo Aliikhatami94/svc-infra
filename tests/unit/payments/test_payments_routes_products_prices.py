@@ -19,7 +19,9 @@ async def test_create_product(client, fake_adapter, mocker):
     fake_adapter.create_product.return_value = mock_product
 
     res = await client.post(
-        "/payments/products", json={"name": "Test Product", "active": True}, headers=IDEMP
+        "/payments/products",
+        json={"name": "Test Product", "active": True},
+        headers=IDEMP,
     )
 
     assert res.status_code == 201

@@ -135,7 +135,14 @@ def up():
         ):
             _emit_local_agent(root, metrics_url)
             _run(
-                ["docker", "compose", "-f", str(root / "docker-compose.cloud.yml"), "up", "-d"],
+                [
+                    "docker",
+                    "compose",
+                    "-f",
+                    str(root / "docker-compose.cloud.yml"),
+                    "up",
+                    "-d",
+                ],
                 env=os.environ.copy(),
             )
             typer.echo("[cloud] local Grafana Agent started (pushing metrics to Cloud)")
@@ -150,7 +157,10 @@ def up():
     env["GRAFANA_PORT"] = str(local_graf)
     env["PROM_PORT"] = str(local_prom)
     _emit_local_stack(root, metrics_url)
-    _run(["docker", "compose", "-f", str(root / "docker-compose.yml"), "up", "-d"], env=env)
+    _run(
+        ["docker", "compose", "-f", str(root / "docker-compose.yml"), "up", "-d"],
+        env=env,
+    )
     typer.echo(f"Local Grafana → http://localhost:{local_graf}  (admin/admin)")
     typer.echo(f"Local Prometheus → http://localhost:{local_prom}")
 
@@ -159,11 +169,13 @@ def down():
     root = Path(".obs")
     if (root / "docker-compose.yml").exists():
         subprocess.run(
-            ["docker", "compose", "-f", str(root / "docker-compose.yml"), "down"], check=False
+            ["docker", "compose", "-f", str(root / "docker-compose.yml"), "down"],
+            check=False,
         )
     if (root / "docker-compose.cloud.yml").exists():
         subprocess.run(
-            ["docker", "compose", "-f", str(root / "docker-compose.cloud.yml"), "down"], check=False
+            ["docker", "compose", "-f", str(root / "docker-compose.cloud.yml"), "down"],
+            check=False,
         )
     typer.echo("Stopped local obs services.")
 

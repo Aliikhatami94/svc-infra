@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 try:  # optional SQLAlchemy import for environments without SA
     from sqlalchemy import select
 except Exception:  # pragma: no cover
-    select = None  # type: ignore
+    select = None  # type: ignore[assignment]
 
 from .audit import append_audit_event, verify_audit_chain
 from .models import AuditLog

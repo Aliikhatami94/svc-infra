@@ -492,7 +492,8 @@ class PaymentsService:
 
     async def capture_intent(self, provider_intent_id: str, data: CaptureIn) -> IntentOut:
         out = await self._get_adapter().capture_intent(
-            provider_intent_id, amount=int(data.amount) if data.amount is not None else None
+            provider_intent_id,
+            amount=int(data.amount) if data.amount is not None else None,
         )
         pi = await self.session.scalar(
             select(PayIntent).where(PayIntent.provider_intent_id == provider_intent_id)
@@ -731,7 +732,10 @@ class PaymentsService:
         adapter = self._get_adapter()
         try:
             return await adapter.list_customers(
-                provider=f.provider, user_id=f.user_id, limit=f.limit or 50, cursor=f.cursor
+                provider=f.provider,
+                user_id=f.user_id,
+                limit=f.limit or 50,
+                cursor=f.cursor,
             )
         except NotImplementedError:
             # Fallback to local DB listing
@@ -814,7 +818,10 @@ class PaymentsService:
         cursor: str | None,
     ) -> tuple[list[PriceOut], str | None]:
         return await self._get_adapter().list_prices(
-            provider_product_id=provider_product_id, active=active, limit=limit, cursor=cursor
+            provider_product_id=provider_product_id,
+            active=active,
+            limit=limit,
+            cursor=cursor,
         )
 
     async def update_price(self, provider_price_id: str, data: PriceUpdateIn) -> PriceOut:
@@ -839,7 +846,10 @@ class PaymentsService:
         cursor: str | None,
     ) -> tuple[list[SubscriptionOut], str | None]:
         return await self._get_adapter().list_subscriptions(
-            customer_provider_id=customer_provider_id, status=status, limit=limit, cursor=cursor
+            customer_provider_id=customer_provider_id,
+            status=status,
+            limit=limit,
+            cursor=cursor,
         )
 
     # ---- Payment Methods (get/update) ----
@@ -869,7 +879,9 @@ class PaymentsService:
         self, *, provider_payment_intent_id: str | None, limit: int, cursor: str | None
     ) -> tuple[list[RefundOut], str | None]:
         return await self._get_adapter().list_refunds(
-            provider_payment_intent_id=provider_payment_intent_id, limit=limit, cursor=cursor
+            provider_payment_intent_id=provider_payment_intent_id,
+            limit=limit,
+            cursor=cursor,
         )
 
     async def get_refund(self, provider_refund_id: str) -> RefundOut:

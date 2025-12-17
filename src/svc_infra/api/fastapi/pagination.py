@@ -115,7 +115,11 @@ class PaginationContext(Generic[T]):
         return 0
 
     def wrap(
-        self, items: list[T], *, next_cursor: Optional[str] = None, total: Optional[int] = None
+        self,
+        items: list[T],
+        *,
+        next_cursor: Optional[str] = None,
+        total: Optional[int] = None,
     ):
         if self.envelope:
             return Paginated[T](items=items, next_cursor=next_cursor, total=total)

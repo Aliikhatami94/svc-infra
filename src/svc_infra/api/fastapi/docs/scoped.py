@@ -186,7 +186,9 @@ def _ensure_root_excludes_registered_scopes(app: FastAPI) -> None:
         _install_root_filter(app, scopes)
 
 
-def _normalize_envs(envs: Optional[Iterable[Environment | str]]) -> Optional[set[Environment]]:
+def _normalize_envs(
+    envs: Optional[Iterable[Environment | str]],
+) -> Optional[set[Environment]]:
     if envs is None:
         return None
     out: set[Environment] = set()

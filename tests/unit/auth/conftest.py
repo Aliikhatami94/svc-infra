@@ -92,5 +92,6 @@ def _auth_env(monkeypatch):
         verification_token_secret = "verify-secret"
 
     monkeypatch.setattr(
-        "svc_infra.api.fastapi.auth.settings.get_auth_settings", lambda: MockAuthSettings()
+        "svc_infra.api.fastapi.auth.settings.get_auth_settings",
+        lambda: MockAuthSettings(),
     )

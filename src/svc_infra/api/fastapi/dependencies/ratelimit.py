@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 try:
     from svc_infra.api.fastapi.tenancy.context import resolve_tenant_id as _resolve_tenant_id
 except Exception:  # pragma: no cover - minimal builds
-    _resolve_tenant_id = None  # type: ignore
+    _resolve_tenant_id = None  # type: ignore[assignment]
 
 
 class RateLimiter:
@@ -66,7 +66,9 @@ class RateLimiter:
             except Exception as e:
                 logger.warning("Failed to emit rate limit metric: %s", e)
             raise HTTPException(
-                status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry)}
+                status_code=429,
+                detail="Rate limit exceeded",
+                headers={"Retry-After": str(retry)},
             )
 
 
@@ -113,7 +115,9 @@ def rate_limiter(
             except Exception as e:
                 logger.warning("Failed to emit rate limit metric: %s", e)
             raise HTTPException(
-                status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry)}
+                status_code=429,
+                detail="Rate limit exceeded",
+                headers={"Retry-After": str(retry)},
             )
 
     return dep

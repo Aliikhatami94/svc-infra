@@ -22,7 +22,10 @@ def verify_backups(
     """
     if last_success is None:
         return BackupHealthReport(
-            ok=False, last_success=None, retention_days=retention_days, message="no_backup_seen"
+            ok=False,
+            last_success=None,
+            retention_days=retention_days,
+            message="no_backup_seen",
         )
     now = datetime.now(timezone.utc)
     age_days = (now - last_success).total_seconds() / 86400.0

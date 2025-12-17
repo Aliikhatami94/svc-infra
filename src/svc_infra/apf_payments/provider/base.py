@@ -186,7 +186,12 @@ class ProviderAdapter(Protocol):
 
     # --- Customers ---
     async def list_customers(
-        self, *, provider: str | None, user_id: str | None, limit: int, cursor: str | None
+        self,
+        *,
+        provider: str | None,
+        user_id: str | None,
+        limit: int,
+        cursor: str | None,
     ) -> tuple[list[CustomerOut], str | None]:
         """Optional: if not implemented, the service will list from local DB."""
         pass

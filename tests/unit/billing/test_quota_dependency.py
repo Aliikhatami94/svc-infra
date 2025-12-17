@@ -35,7 +35,10 @@ async def test_quota_dependency_allows_without_subscription(mocker):
     app.dependency_overrides[get_session] = _mock_session
     app.dependency_overrides[require_tenant_id] = _tenant
 
-    @app.get("/feature", dependencies=[Depends(require_quota("tokens", window="day", soft=False))])
+    @app.get(
+        "/feature",
+        dependencies=[Depends(require_quota("tokens", window="day", soft=False))],
+    )
     async def feature():
         return {"ok": True}
 

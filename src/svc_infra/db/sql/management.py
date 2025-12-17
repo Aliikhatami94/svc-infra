@@ -27,8 +27,8 @@ def _py_type(col: Column) -> type:
         from sqlalchemy.dialects.postgresql import JSONB
         from sqlalchemy.dialects.postgresql import UUID as PG_UUID
     except Exception:  # pragma: no cover
-        PG_UUID = None  # type: ignore
-        JSONB = None  # type: ignore
+        PG_UUID = None  # type: ignore[misc,assignment]
+        JSONB = None  # type: ignore[misc,assignment]
 
     t = col.type
     if PG_UUID is not None and isinstance(t, PG_UUID):
@@ -47,7 +47,7 @@ def _py_type(col: Column) -> type:
         return dict
     if JSONB is not None and isinstance(t, JSONB):
         return dict
-    return _Any
+    return object  # fallback type for unknown column types
 
 
 def _exclude_from_create(col: Column) -> bool:

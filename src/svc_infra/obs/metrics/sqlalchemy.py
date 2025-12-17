@@ -7,7 +7,7 @@ from sqlalchemy.engine import Engine
 try:
     from sqlalchemy.ext.asyncio import AsyncEngine
 except Exception:  # optional
-    AsyncEngine = None  # type: ignore
+    AsyncEngine = None  # type: ignore[misc,assignment]
 
 from .base import counter, gauge
 

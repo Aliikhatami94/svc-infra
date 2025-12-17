@@ -17,13 +17,19 @@ class _Model:
     def __init__(self):
         self._rows: list[_Row] = []
 
-    id = type("Col", (), {"asc": lambda self: ("id", "asc"), "desc": lambda self: ("id", "desc")})()
+    id = type(
+        "Col",
+        (),
+        {"asc": lambda self: ("id", "asc"), "desc": lambda self: ("id", "desc")},
+    )()
     deleted_at = type("Col", (), {"is_": lambda self, v: ("deleted_at_is", v)})()
     is_active = type("Col", (), {"is_": lambda self, v: ("is_active_is", v)})()
 
     # mimic SQLAlchemy class_mapper columns
     @property
-    def __mapper__(self):  # pragma: no cover - not actually used by our class_mapper stub
+    def __mapper__(
+        self,
+    ):  # pragma: no cover - not actually used by our class_mapper stub
         return None
 
 

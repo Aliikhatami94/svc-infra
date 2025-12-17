@@ -15,6 +15,9 @@ class RouteDebugMiddleware(BaseHTTPMiddleware):
         route = request.scope.get("route")
         ep = getattr(route, "endpoint", None) if route else None
         log.info(
-            "MATCHED %s %s -> %s", request.method, request.url.path, getattr(ep, "__name__", ep)
+            "MATCHED %s %s -> %s",
+            request.method,
+            request.url.path,
+            getattr(ep, "__name__", ep),
         )
         return response
