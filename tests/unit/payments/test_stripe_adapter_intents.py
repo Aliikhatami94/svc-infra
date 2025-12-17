@@ -7,6 +7,9 @@ async def test_create_intent_maps_fields(monkeypatch, mocker):
     from svc_infra.apf_payments.provider.stripe import StripeAdapter
     from svc_infra.apf_payments.provider.stripe import stripe as stripe_sdk
 
+    if stripe_sdk is None:
+        pytest.skip("stripe SDK not installed (optional dependency)")
+
     adapter = StripeAdapter()
 
     pi = mocker.Mock(
