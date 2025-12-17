@@ -35,14 +35,13 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=500"]
 
-  # --- Ruff: Formatting + Linting (matches CI) ---
+  # --- Ruff: Formatting + Linting (matches CI exactly) ---
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.4
     hooks:
-      # Run the formatter (replaces black + isort)
+      # Run the formatter (no custom args - uses ruff defaults like CI)
       - id: ruff-format
-        args: ["--line-length", "100"]
-      # Run the linter (replaces flake8)
+      # Run the linter
       - id: ruff
         args: ["--fix", "--exit-non-zero-on-fix"]
 

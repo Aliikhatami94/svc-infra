@@ -16,8 +16,12 @@ from svc_infra.db.sql.apikey import get_apikey_model
 
 # ---------- OpenAPI security schemes (appear in docs) ----------
 auth_login_path = USER_PREFIX + LOGIN_PATH
-oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl=auth_login_path, auto_error=False)
-cookie_auth_optional = APIKeyCookie(name=get_auth_settings().auth_cookie_name, auto_error=False)
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=auth_login_path, auto_error=False
+)
+cookie_auth_optional = APIKeyCookie(
+    name=get_auth_settings().auth_cookie_name, auto_error=False
+)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
@@ -78,7 +82,9 @@ async def resolve_api_key(
 
     apikey.mark_used()
     await session.flush()
-    return Principal(user=apikey.user, scopes=apikey.scopes, via="api_key", api_key=apikey)
+    return Principal(
+        user=apikey.user, scopes=apikey.scopes, via="api_key", api_key=apikey
+    )
 
 
 async def resolve_bearer_or_cookie_principal(
@@ -86,7 +92,11 @@ async def resolve_bearer_or_cookie_principal(
 ) -> Optional[Principal]:
     st = get_auth_settings()
     raw_auth = (request.headers.get("authorization") or "").strip()
-    token = raw_auth.split(" ", 1)[1].strip() if raw_auth.lower().startswith("bearer ") else ""
+    token = (
+        raw_auth.split(" ", 1)[1].strip()
+        if raw_auth.lower().startswith("bearer ")
+        else ""
+    )
     if not token:
         token = (request.cookies.get(st.auth_cookie_name) or "").strip()
     if not token:
@@ -163,7 +173,9 @@ AllowIdentity = Depends(_optional_principal)  # same, but optional
 # ---------- DX: small guard factories ----------
 def RequireRoles(*roles: str, resolver: Callable[[Any], list[str]] | None = None):
     async def _guard(p: Identity):
-        have = set((resolver(p.user) if resolver else getattr(p.user, "roles", []) or []))
+        have = set(
+            (resolver(p.user) if resolver else getattr(p.user, "roles", []) or [])
+        )
         if not set(roles).issubset(have):
             raise HTTPException(403, "forbidden")
         return p
