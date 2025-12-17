@@ -28,7 +28,7 @@ class TestOutboxInbox:
 
     def test_outbox_topic_filter(self):
         ob = InMemoryOutboxStore()
-        m1 = ob.enqueue("orders", {"id": 1})
+        ob.enqueue("orders", {"id": 1})
         ob.enqueue("billing", {"id": 99})
 
         nxt = ob.fetch_next(topics=["billing"])

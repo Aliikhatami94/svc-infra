@@ -4,16 +4,11 @@ SQL database test fixtures and configuration.
 
 from __future__ import annotations
 
-from datetime import datetime
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import Column, DateTime, Integer, String, create_engine, func
-from sqlalchemy.ext.declarative import declarative_base
-
-# Test database models
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import Column, DateTime, Integer, String, func
+from sqlalchemy.orm import declarative_base
 
 from tests.unit.utils.test_helpers import MockDatabaseSession
 

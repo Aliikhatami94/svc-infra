@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated, Any, Callable, Optional
+from typing import Annotated, Any, Callable, Optional, cast
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2PasswordBearer
@@ -89,7 +89,7 @@ async def resolve_bearer_or_cookie_principal(
     from fastapi_users.manager import BaseUserManager, UUIDIDMixin
     from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
-    user_db = SQLAlchemyUserDatabase(session, UserModel)
+    user_db: Any = SQLAlchemyUserDatabase(session, UserModel)
 
     class _ShimManager(UUIDIDMixin, BaseUserManager[Any, Any]):
         reset_password_token_secret = "unused"
@@ -107,7 +107,7 @@ async def resolve_bearer_or_cookie_principal(
     if not user:
         return None
 
-    db_user = await session.get(UserModel, user.id)
+    db_user = await cast(Any, session).get(UserModel, user.id)
     if not db_user:
         return None
     if not getattr(db_user, "is_active", True):

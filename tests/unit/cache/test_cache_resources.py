@@ -4,10 +4,7 @@ Tests for cache resources functionality.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, Mock, patch
-
-import pytest
+from typing import Any, Dict
 
 from svc_infra.cache.resources import Resource, resource
 

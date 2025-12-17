@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import typer
 from typer.testing import CliRunner
 
 from svc_infra.cli import app as cli_app

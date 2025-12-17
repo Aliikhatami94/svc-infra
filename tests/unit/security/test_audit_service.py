@@ -33,7 +33,7 @@ async def test_audit_service_append_and_verify():
         db, actor_id=actor, tenant_id=tenant, event_type="update", metadata={"x": 2}, prev_event=e1
     )
     # Link third event explicitly to keep a single continuous chain in this fake DB context
-    e3 = await append_event(
+    await append_event(
         db, actor_id=actor, tenant_id=tenant, event_type="delete", metadata={}, prev_event=e2
     )
 

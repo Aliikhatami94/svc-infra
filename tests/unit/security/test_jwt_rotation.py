@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import dataclasses
-from typing import Any
-
 import pytest
 from fastapi_users.authentication.strategy.jwt import JWTStrategy
 

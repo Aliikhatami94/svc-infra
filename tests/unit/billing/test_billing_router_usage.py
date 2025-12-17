@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 
 IDEMP = {"Idempotency-Key": "idem-usage-1"}

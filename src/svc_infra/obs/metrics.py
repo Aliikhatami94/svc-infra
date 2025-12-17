@@ -1,10 +1,11 @@
-from __future__ import annotations
+"""Lightweight metrics hooks for abuse heuristics.
 
+Intentionally minimal to avoid pulling full metrics stacks; these are no-ops by
+default but can be swapped in tests or wired to a metrics backend by overriding the
+functions.
 """
-Lightweight metrics hooks for abuse heuristics. Intentionally minimal to avoid pulling
-full metrics stacks; these are no-ops by default but can be swapped in tests or wired
-to a metrics backend by overriding the functions.
-"""
+
+from __future__ import annotations
 
 from typing import Callable, Optional
 

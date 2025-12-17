@@ -1,20 +1,15 @@
 """Unit tests for easy_storage builder function."""
 
+import importlib.util
 import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-try:
-    import aioboto3
-
-    AIOBOTO3_AVAILABLE = True
-except ImportError:
-    AIOBOTO3_AVAILABLE = False
-
 from svc_infra.storage.backends import LocalBackend, MemoryBackend, S3Backend
 from svc_infra.storage.easy import easy_storage
-from svc_infra.storage.settings import StorageSettings
+
+AIOBOTO3_AVAILABLE = importlib.util.find_spec("aioboto3") is not None
 
 
 @pytest.mark.storage
@@ -111,6 +106,7 @@ class TestEasyStorage:
         with caplog.at_level(logging.INFO):
             backend = easy_storage()
 
+        assert isinstance(backend, S3Backend)
         assert "Wasabi" in caplog.text
 
     @pytest.mark.skipif(not AIOBOTO3_AVAILABLE, reason="aioboto3 not installed")
@@ -123,6 +119,7 @@ class TestEasyStorage:
         with caplog.at_level(logging.INFO):
             backend = easy_storage()
 
+        assert isinstance(backend, S3Backend)
         assert "Backblaze B2" in caplog.text
 
     @pytest.mark.skipif(not AIOBOTO3_AVAILABLE, reason="aioboto3 not installed")
@@ -135,6 +132,7 @@ class TestEasyStorage:
         with caplog.at_level(logging.INFO):
             backend = easy_storage()
 
+        assert isinstance(backend, S3Backend)
         assert "Minio" in caplog.text or "localhost" in caplog.text
 
     def test_fallback_to_memory(self, monkeypatch, caplog):

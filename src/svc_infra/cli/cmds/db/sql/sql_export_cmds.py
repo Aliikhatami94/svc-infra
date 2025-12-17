@@ -14,9 +14,9 @@ from sqlalchemy.engine import Engine
 from svc_infra.db.sql.utils import build_engine
 
 try:  # SQLAlchemy async extras are optional
-    from sqlalchemy.ext.asyncio import AsyncEngine
+    import sqlalchemy.ext.asyncio as sa_async
 except Exception:  # pragma: no cover - fallback when async extras unavailable
-    AsyncEngine = None  # type: ignore[assignment]
+    sa_async = None  # type: ignore[assignment]
 
 
 def export_tenant(
@@ -52,12 +52,10 @@ def export_tenant(
 
     stmt = text(query)
 
-    is_async_engine = AsyncEngine is not None and isinstance(engine, AsyncEngine)
+    is_async_engine = sa_async is not None and isinstance(engine, sa_async.AsyncEngine)
 
     if is_async_engine:
-        assert AsyncEngine is not None  # for type checkers
-
-        async_engine = cast(AsyncEngine, engine)
+        async_engine = cast(Any, engine)
 
         async def _fetch() -> list[dict[str, Any]]:
             async with async_engine.connect() as conn:

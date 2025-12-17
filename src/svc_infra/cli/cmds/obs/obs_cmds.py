@@ -4,18 +4,22 @@ import os
 import socket
 import subprocess
 from pathlib import Path
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 import typer
 
-# --- NEW: load .env automatically (best-effort) ---
-try:
-    from dotenv import load_dotenv
-except Exception:  # pragma: no cover
-    load_dotenv = None  # type: ignore[assignment]
-
 from svc_infra.obs.cloud_dash import push_dashboards_from_pkg
 from svc_infra.utils import render_template, write
+
+# --- NEW: load .env automatically (best-effort) ---
+load_dotenv: Callable[..., Any] | None
+try:
+    from dotenv import load_dotenv as _real_load_dotenv
+except Exception:  # pragma: no cover
+    load_dotenv = None
+else:
+    load_dotenv = _real_load_dotenv
 
 
 def _run(cmd: list[str], *, env: dict | None = None):
@@ -102,7 +106,7 @@ def up():
       - Else → Local mode (Grafana + Prometheus).
     """
     # NEW: load .env once, best-effort, without crashing if package missing
-    if load_dotenv:
+    if load_dotenv is not None:
         try:
             load_dotenv(dotenv_path=Path(".env"), override=False)
         except Exception:

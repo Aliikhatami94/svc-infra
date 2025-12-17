@@ -1,6 +1,3 @@
-import asyncio
-from contextlib import asynccontextmanager
-
 import pytest
 
 from svc_infra.db.inbox import InMemoryInboxStore
@@ -45,8 +42,6 @@ async def test_webhook_delivery_success(monkeypatch):
 
     # patch httpx.AsyncClient.post
     import httpx
-
-    orig_client = httpx.AsyncClient
 
     class DummyClient:
         def __init__(self, *a, **k):

@@ -12,7 +12,6 @@ from svc_infra.apf_payments.schemas import (
     CaptureIn,
     IntentCreateIn,
     RefundIn,
-    SetupIntentCreateIn,
     UsageRecordIn,
 )
 from svc_infra.apf_payments.service import PaymentsService
@@ -66,9 +65,6 @@ class DummyClient:
 class FakeSession:
     def __init__(self):
         self._rows = []
-
-    async def add(self, obj):  # service may call sync add; accept both
-        self._rows.append(obj)
 
     def add(self, obj):  # sync path used in service
         # auto id assignment if missing

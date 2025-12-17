@@ -4,11 +4,9 @@ Common test utilities and helpers for svc-infra tests.
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, Optional
 from unittest.mock import Mock
 
-import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -145,7 +143,6 @@ class MockDatabaseSession:
 def setup_auth_mocks(app: FastAPI, mocker, user=None, api_key=None, principal=None):
     """Set up authentication mocks for testing."""
     from svc_infra.api.fastapi.auth.security import (
-        Principal,
         _current_principal,
         _optional_principal,
         resolve_api_key,

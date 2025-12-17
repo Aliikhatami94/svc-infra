@@ -1,5 +1,7 @@
 """Unit tests for S3Backend."""
 
+import importlib.util
+
 import pytest
 import pytest_asyncio
 
@@ -13,20 +15,10 @@ except ImportError:
     mock_aws = None
     ClientError = Exception
 
-try:
-    import aioboto3
-
-    AIOBOTO3_AVAILABLE = True
-except ImportError:
-    AIOBOTO3_AVAILABLE = False
-
 from svc_infra.storage.backends.s3 import S3Backend
-from svc_infra.storage.base import (
-    FileNotFoundError,
-    InvalidKeyError,
-    PermissionDeniedError,
-    StorageError,
-)
+from svc_infra.storage.base import FileNotFoundError, InvalidKeyError
+
+AIOBOTO3_AVAILABLE = importlib.util.find_spec("aioboto3") is not None
 
 
 @pytest.mark.storage

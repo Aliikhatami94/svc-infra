@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import types
 import uuid
-
-import pytest
-from fastapi import HTTPException
 
 from svc_infra.api.fastapi.auth.security import Principal
 from svc_infra.security.permissions import (

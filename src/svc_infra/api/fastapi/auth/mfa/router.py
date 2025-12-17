@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any, cast
 
 import pyotp
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
@@ -79,7 +80,7 @@ def mfa_router(
             raise HTTPException(401, "Invalid token")
 
         # IMPORTANT: rehydrate into *your* session
-        db_user = await session.get(user_model, user.id)
+        db_user = await cast(Any, session).get(user_model, user.id)
         if not db_user:
             raise HTTPException(401, "Invalid token")
 
@@ -198,7 +199,7 @@ def mfa_router(
             raise HTTPException(401, "Invalid pre-auth token")
 
         # 2) load user
-        user = await session.get(user_model, uid)
+        user = await cast(Any, session).get(user_model, uid)
         if not user:
             raise HTTPException(401, "Invalid pre-auth token")
 
@@ -271,7 +272,7 @@ def mfa_router(
             raise HTTPException(401, "Invalid pre-auth token")
 
         # 1b) Load user to get their email
-        user = await session.get(user_model, uid)
+        user = await cast(Any, session).get(user_model, uid)
         if not user or not getattr(user, "email", None):
             # (optionally also check user.mfa_enabled here)
             raise HTTPException(401, "Invalid pre-auth token")
@@ -326,7 +327,7 @@ def mfa_router(
         # Email OTP is always offered in your flow at verify-time
         methods.append("email")
 
-        def _mask(email: str) -> str:
+        def _mask(email: str) -> str | None:
             if not email or "@" not in email:
                 return None
             name, domain = email.split("@", 1)

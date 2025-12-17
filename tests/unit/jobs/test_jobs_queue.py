@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
 
 import pytest
 
@@ -17,7 +16,7 @@ async def test_enqueue_and_process_success():
     queue, _sched = easy_jobs()
 
     # Enqueue a job
-    j = queue.enqueue("say-hello", {"name": "alice"})
+    queue.enqueue("say-hello", {"name": "alice"})
 
     # Process
     processed = await process_one(queue, handler=lambda job: asyncio.sleep(0))
@@ -31,7 +30,7 @@ async def test_enqueue_and_process_success():
 @pytest.mark.asyncio
 async def test_fail_and_backoff_requeues_job():
     q = InMemoryJobQueue()
-    j = q.enqueue("task", {})
+    q.enqueue("task", {})
 
     # First attempt fails: next available should be in the future
     async def boom(job):

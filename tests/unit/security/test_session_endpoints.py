@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
 
 from svc_infra.api.fastapi.auth.routers.session_router import build_session_router
-from svc_infra.security.models import AuthSession, RefreshToken
+from svc_infra.security.models import AuthSession
 from svc_infra.security.session import issue_session_and_refresh
 
 

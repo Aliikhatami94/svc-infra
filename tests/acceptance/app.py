@@ -22,17 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
 from httpx import ASGITransport
-from sqlalchemy import (
-    Column,
-    DateTime,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    create_engine,
-    select,
-    text,
-)
+from sqlalchemy import Column, DateTime, MetaData, String, Table, create_engine, select, text
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from svc_infra.apf_payments import settings as payments_settings
@@ -56,7 +46,6 @@ from svc_infra.api.fastapi.auth.security import (
 )
 from svc_infra.api.fastapi.billing.setup import add_billing as _add_billing
 from svc_infra.api.fastapi.db.sql.session import get_session
-from svc_infra.api.fastapi.dependencies.ratelimit import rate_limiter
 from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
 from svc_infra.api.fastapi.middleware.errors.handlers import problem_response as _problem_response
 from svc_infra.api.fastapi.middleware.errors.handlers import (
@@ -65,7 +54,6 @@ from svc_infra.api.fastapi.middleware.errors.handlers import (
 from svc_infra.api.fastapi.middleware.ratelimit import (
     SimpleRateLimitMiddleware as _SimpleRateLimitMiddleware,
 )
-from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
 from svc_infra.api.fastapi.middleware.timeout import (
     BodyReadTimeoutMiddleware as _BodyReadTimeoutMiddleware,
 )
@@ -366,7 +354,7 @@ add_payments(app, prefix="/payments", register_default_providers=False, adapters
 _add_billing(app)
 
 # Mount storage backend for acceptance tests (A22-01 to A22-05)
-from svc_infra.storage import add_storage as _add_storage
+from svc_infra.storage import add_storage as _add_storage  # noqa: E402
 
 # Use memory backend for deterministic acceptance tests
 _storage_backend = _add_storage(app, backend=None)  # Will auto-detect or use memory
@@ -474,7 +462,7 @@ async def _storage_backend_info(request: Request):
 app.include_router(_storage_router)
 
 # Mount documents module for acceptance tests (A23-01 to A23-05)
-from svc_infra.documents import add_documents
+from svc_infra.documents import add_documents  # noqa: E402
 
 # Add documents with auto-detected storage backend
 _documents_manager = add_documents(app, storage_backend=_storage_backend)

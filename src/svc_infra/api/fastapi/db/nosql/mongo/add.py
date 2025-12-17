@@ -100,8 +100,6 @@ def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> Non
             )
 
         router = make_crud_router_plus_mongo(
-            collection=resource.resolved_collection(),
-            repo=repo,
             service=svc,
             read_schema=Read,
             create_schema=Create,

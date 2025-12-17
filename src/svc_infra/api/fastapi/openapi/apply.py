@@ -17,7 +17,7 @@ def apply_default_security(router: APIRouter, *, default_security: list[dict] | 
             kwargs["openapi_extra"] = ox
         return original_add(path, endpoint, **kwargs)
 
-    router.add_api_route = _wrapped_add_api_route
+    setattr(router, "add_api_route", _wrapped_add_api_route)
 
 
 def apply_default_responses(router: APIRouter, defaults: dict[int, dict]) -> None:
@@ -38,4 +38,4 @@ def apply_default_responses(router: APIRouter, defaults: dict[int, dict]) -> Non
         kwargs["responses"] = responses
         return original_add(path, endpoint, **kwargs)
 
-    router.add_api_route = _wrapped_add_api_route
+    setattr(router, "add_api_route", _wrapped_add_api_route)

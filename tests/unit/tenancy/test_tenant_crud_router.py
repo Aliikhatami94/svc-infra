@@ -6,13 +6,12 @@ import pytest
 
 # Skip tests if FastAPI is not installed (optional dependency)
 fastapi = pytest.importorskip("fastapi", reason="FastAPI not installed")
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
-from svc_infra.api.fastapi.db.sql.crud_router import make_tenant_crud_router_plus_sql
-from svc_infra.api.fastapi.db.sql.session import get_session
-from svc_infra.api.fastapi.tenancy.context import TenantId
+from svc_infra.api.fastapi.db.sql.crud_router import make_tenant_crud_router_plus_sql  # noqa: E402
+from svc_infra.api.fastapi.db.sql.session import get_session  # noqa: E402
 
 
 class _TenantCol:

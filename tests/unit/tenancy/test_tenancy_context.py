@@ -7,8 +7,6 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from svc_infra.api.fastapi.tenancy.context import (
-    OptionalTenantId,
-    TenantId,
     require_tenant_id,
     resolve_tenant_id,
     set_tenant_resolver,

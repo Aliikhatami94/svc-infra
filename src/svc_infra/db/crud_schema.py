@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, cast
 
 from pydantic import BaseModel, ConfigDict, create_model
 
@@ -27,7 +27,7 @@ class FieldSpec:
     exclude_from_update: bool = False
 
 
-def _opt(t: type[Any]) -> tuple[type[Any], object]:
+def _opt(t: type[Any]) -> tuple[Any, Any]:
     # convenience: Optional[t] with default None
     return (t | None, None)
 
@@ -40,9 +40,9 @@ def make_crud_schemas_from_specs(
     update_name: Optional[str],
     json_encoders: Optional[dict[type[Any], Any]] = None,
 ) -> tuple[type[BaseModel], type[BaseModel], type[BaseModel]]:
-    ann_read: dict[str, tuple[type, object]] = {}
-    ann_create: dict[str, tuple[type, object]] = {}
-    ann_update: dict[str, tuple[type, object]] = {}
+    ann_read: dict[str, tuple[Any, Any]] = {}
+    ann_create: dict[str, tuple[Any, Any]] = {}
+    ann_update: dict[str, tuple[Any, Any]] = {}
 
     for s in specs:
         # READ: include unless excluded; all fields Optional
@@ -60,9 +60,9 @@ def make_crud_schemas_from_specs(
         if not s.exclude_from_update:
             ann_update[s.name] = _opt(s.typ)
 
-    Read = create_model(read_name or "Read", **ann_read)
-    Create = create_model(create_name or "Create", **ann_create)
-    Update = create_model(update_name or "Update", **ann_update)
+    Read = create_model(read_name or "Read", **cast(dict[str, Any], ann_read))
+    Create = create_model(create_name or "Create", **cast(dict[str, Any], ann_create))
+    Update = create_model(update_name or "Update", **cast(dict[str, Any], ann_update))
 
     cfg = ConfigDict(from_attributes=True)
     if json_encoders:

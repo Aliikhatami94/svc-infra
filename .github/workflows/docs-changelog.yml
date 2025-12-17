@@ -1,0 +1,144 @@
+name: Update Docs Changelog
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  update-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for accurate dates
+
+      - name: Update Changelog
+        run: |
+          set -e
+
+          CHANGELOG_FILE="docs-changelog.json"
+          TODAY=$(date -u +"%Y-%m-%d")
+
+          # Check if this is first run (no changelog exists) or manual trigger
+          FULL_REBUILD=false
+          if [ ! -f "$CHANGELOG_FILE" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FULL_REBUILD=true
+            echo "Full rebuild mode - scanning all docs with Git history"
+            rm -f "$CHANGELOG_FILE"
+            echo '{"files": {}, "history": []}' > "$CHANGELOG_FILE"
+            ALL_FILES=$(find docs -name "*.md" -type f 2>/dev/null || echo "")
+          else
+            echo "Incremental mode - processing changed files only"
+            ALL_FILES=$(git diff --name-only HEAD~1 HEAD -- 'docs/*.md' 'docs/**/*.md' 2>/dev/null || echo "")
+          fi
+
+          if [ -z "$ALL_FILES" ]; then
+            echo "No markdown files to process"
+            exit 0
+          fi
+
+          for file in $ALL_FILES; do
+            # Skip if file was deleted
+            if [ ! -f "$file" ]; then
+              continue
+            fi
+
+            REL_PATH="${file#docs/}"
+
+            # Extract title from first heading
+            TITLE=$(head -20 "$file" | grep -m1 '^# ' | sed 's/^# *//' || echo "$REL_PATH")
+            if [ -z "$TITLE" ]; then
+              TITLE="$REL_PATH"
+            fi
+
+            if [ "$FULL_REBUILD" = true ]; then
+              # Use Git history for accurate dates
+              CREATED=$(git log --follow --format=%aI --reverse -- "$file" 2>/dev/null | head -1 | cut -d'T' -f1)
+              LAST_UPDATED=$(git log --format=%aI -1 -- "$file" 2>/dev/null | cut -d'T' -f1)
+              UPDATE_COUNT=$(git log --follow --oneline -- "$file" 2>/dev/null | wc -l | tr -d ' ')
+
+              # Fallback to today if no Git history
+              [ -z "$CREATED" ] && CREATED="$TODAY"
+              [ -z "$LAST_UPDATED" ] && LAST_UPDATED="$TODAY"
+              [ -z "$UPDATE_COUNT" ] || [ "$UPDATE_COUNT" -eq 0 ] && UPDATE_COUNT=1
+
+              # Add to files map
+              jq --arg path "$REL_PATH" \
+                 --arg created "$CREATED" \
+                 --arg updated "$LAST_UPDATED" \
+                 --argjson count "$UPDATE_COUNT" \
+                 --arg title "$TITLE" \
+                 '.files[$path] = {"created": $created, "lastUpdated": $updated, "updateCount": $count, "title": $title}' \
+                 "$CHANGELOG_FILE" > tmp.json && mv tmp.json "$CHANGELOG_FILE"
+
+              # Calculate days since creation/update for history
+              EPOCH_NOW=$(date +%s)
+              EPOCH_CREATED=$(date -d "$CREATED" +%s 2>/dev/null || echo "$EPOCH_NOW")
+              EPOCH_UPDATED=$(date -d "$LAST_UPDATED" +%s 2>/dev/null || echo "$EPOCH_NOW")
+              DAYS_SINCE_CREATION=$(( (EPOCH_NOW - EPOCH_CREATED) / 86400 ))
+              DAYS_SINCE_UPDATE=$(( (EPOCH_NOW - EPOCH_UPDATED) / 86400 ))
+
+              # Add to history if recent
+              if [ "$DAYS_SINCE_CREATION" -le 14 ]; then
+                jq --arg path "$REL_PATH" --arg date "$CREATED" --arg type "new" --arg title "$TITLE" \
+                   '.history = [{"date": $date, "file": $path, "type": $type, "title": $title}] + .history' \
+                   "$CHANGELOG_FILE" > tmp.json && mv tmp.json "$CHANGELOG_FILE"
+                echo "  [new] $REL_PATH (created $CREATED)"
+              elif [ "$DAYS_SINCE_UPDATE" -le 7 ] && [ "$LAST_UPDATED" != "$CREATED" ]; then
+                jq --arg path "$REL_PATH" --arg date "$LAST_UPDATED" --arg type "updated" --arg title "$TITLE" \
+                   '.history = [{"date": $date, "file": $path, "type": $type, "title": $title}] + .history' \
+                   "$CHANGELOG_FILE" > tmp.json && mv tmp.json "$CHANGELOG_FILE"
+                echo "  [updated] $REL_PATH (last changed $LAST_UPDATED)"
+              else
+                echo "  [tracked] $REL_PATH"
+              fi
+            else
+              # Incremental update - use today's date
+              EXISTS=$(jq -r --arg path "$REL_PATH" '.files[$path] // empty' "$CHANGELOG_FILE")
+
+              if [ -z "$EXISTS" ]; then
+                TYPE="new"
+                jq --arg path "$REL_PATH" --arg date "$TODAY" --arg title "$TITLE" \
+                   '.files[$path] = {"created": $date, "lastUpdated": $date, "updateCount": 1, "title": $title}' \
+                   "$CHANGELOG_FILE" > tmp.json && mv tmp.json "$CHANGELOG_FILE"
+              else
+                TYPE="updated"
+                jq --arg path "$REL_PATH" --arg date "$TODAY" --arg title "$TITLE" \
+                   '.files[$path].lastUpdated = $date | .files[$path].updateCount += 1 | .files[$path].title = $title' \
+                   "$CHANGELOG_FILE" > tmp.json && mv tmp.json "$CHANGELOG_FILE"
+              fi
+
+              # Add to history
+              jq --arg path "$REL_PATH" --arg date "$TODAY" --arg type "$TYPE" --arg title "$TITLE" \
+                 '.history = [{"date": $date, "file": $path, "type": $type, "title": $title}] + .history' \
+                 "$CHANGELOG_FILE" > tmp.json && mv tmp.json "$CHANGELOG_FILE"
+
+              echo "  [$TYPE] $REL_PATH"
+            fi
+          done
+
+          # Keep history to last 500 entries
+          jq '.history = .history[:500]' "$CHANGELOG_FILE" > tmp.json && mv tmp.json "$CHANGELOG_FILE"
+
+          echo "Changelog updated successfully"
+
+      - name: Commit Changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet docs-changelog.json 2>/dev/null; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git add docs-changelog.json
+          git commit -m "docs: update changelog [skip ci]"
+          git push

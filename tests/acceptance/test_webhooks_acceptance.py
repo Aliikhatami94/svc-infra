@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import time
 
 import pytest
 
@@ -56,7 +55,7 @@ def test_a501_signature_and_delivery_with_retry(client):
 
     # Fire a test event
     event = {"hello": "world", "version": 1}
-    outbox_id = _test_fire(client, event)
+    _test_fire(client, event)
 
     # First tick schedules the outbox job, then processing should fail (receiver 500)
     client.post("/scheduler/tick")
@@ -91,7 +90,7 @@ def test_a502_secret_rotation_accepts_old_and_new(client):
     _subscribe(client, secret=old_secret)
 
     # Fire with payload; even though subscription holds old secret, verify_any accepts either
-    outbox_id = _test_fire(client, {"x": 1})
+    _test_fire(client, {"x": 1})
     client.post("/scheduler/tick")
     assert _process_one(client) is True
 
@@ -99,7 +98,7 @@ def test_a502_secret_rotation_accepts_old_and_new(client):
     assert len(deliveries) == 1
     # Now rotate subscription to new secret and send again
     _subscribe(client, secret=new_secret)
-    outbox_id = _test_fire(client, {"x": 2})
+    _test_fire(client, {"x": 2})
     client.post("/scheduler/tick")
     assert _process_one(client) is True
     deliveries = client.get("/_accept/webhooks/deliveries").json()["deliveries"]

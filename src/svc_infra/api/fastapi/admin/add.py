@@ -104,7 +104,7 @@ def add_admin(
         except Exception:
             # Fallback: simple shim if auth state not configured
             return SimpleNamespace(id=user_id)
-        obj = await session.get(UserModel, user_id)
+        obj = await cast(Any, session).get(UserModel, user_id)
         if not obj:
             raise HTTPException(404, "user_not_found")
         return obj

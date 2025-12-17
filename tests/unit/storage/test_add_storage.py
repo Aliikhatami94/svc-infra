@@ -1,7 +1,6 @@
 """Unit tests for FastAPI storage integration."""
 
-from typing import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI, Request

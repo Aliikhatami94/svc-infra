@@ -1,0 +1,180 @@
+{
+  "files": {
+    "admin.md": {
+      "created": "2025-11-27",
+      "lastUpdated": "2025-11-29",
+      "updateCount": 4,
+      "title": "Admin Scope & Operations"
+    },
+    "api.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-11-29",
+      "updateCount": 7,
+      "title": "FastAPI helper guide"
+    },
+    "auth.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Auth settings"
+    },
+    "billing.md": {
+      "created": "2025-11-27",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 2,
+      "title": "Billing Primitives"
+    },
+    "cache.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 4,
+      "title": "Cache guide"
+    },
+    "cli.md": {
+      "created": "2025-10-18",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 4,
+      "title": "CLI Quick Reference"
+    },
+    "data-lifecycle.md": {
+      "created": "2025-10-16",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Data Lifecycle"
+    },
+    "database.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Database guide"
+    },
+    "docs-and-sdks.md": {
+      "created": "2025-10-16",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Docs & SDKs"
+    },
+    "documents.md": {
+      "created": "2025-11-27",
+      "lastUpdated": "2025-12-14",
+      "updateCount": 3,
+      "title": "Generic Document Management"
+    },
+    "environment.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-12-13",
+      "updateCount": 4,
+      "title": "Environment Reference"
+    },
+    "idempotency.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Idempotency & Concurrency Controls"
+    },
+    "jobs.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 4,
+      "title": "Background Jobs & Scheduling"
+    },
+    "loaders.md": {
+      "created": "2025-12-09",
+      "lastUpdated": "2025-12-12",
+      "updateCount": 2,
+      "title": "Content Loaders"
+    },
+    "observability.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Observability guide"
+    },
+    "ops.md": {
+      "created": "2025-10-16",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 4,
+      "title": "SLOs & Ops"
+    },
+    "rate-limiting.md": {
+      "created": "2025-10-14",
+      "lastUpdated": "2025-12-13",
+      "updateCount": 8,
+      "title": "Rate Limiting & Abuse Protection"
+    },
+    "security.md": {
+      "created": "2025-10-14",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 7,
+      "title": "Security: Configuration & Examples"
+    },
+    "storage.md": {
+      "created": "2025-11-27",
+      "lastUpdated": "2025-11-29",
+      "updateCount": 4,
+      "title": "Storage System"
+    },
+    "tenancy.md": {
+      "created": "2025-10-16",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Tenancy model and integration"
+    },
+    "timeouts-and-resource-limits.md": {
+      "created": "2025-11-27",
+      "lastUpdated": "2025-11-29",
+      "updateCount": 4,
+      "title": "Timeouts & Resource Limits"
+    },
+    "versioned-integrations.md": {
+      "created": "2025-11-27",
+      "lastUpdated": "2025-11-27",
+      "updateCount": 3,
+      "title": "Using add_* Functions Under Versioned Routing"
+    },
+    "webhooks.md": {
+      "created": "2025-10-15",
+      "lastUpdated": "2025-12-13",
+      "updateCount": 6,
+      "title": "Webhooks Framework"
+    },
+    "websocket.md": {
+      "created": "2025-11-29",
+      "lastUpdated": "2025-11-29",
+      "updateCount": 1,
+      "title": "WebSocket Infrastructure"
+    }
+  },
+  "history": [
+    {
+      "date": "2025-12-13",
+      "file": "webhooks.md",
+      "type": "updated",
+      "title": "Webhooks Framework"
+    },
+    {
+      "date": "2025-12-13",
+      "file": "rate-limiting.md",
+      "type": "updated",
+      "title": "Rate Limiting & Abuse Protection"
+    },
+    {
+      "date": "2025-12-09",
+      "file": "loaders.md",
+      "type": "new",
+      "title": "Content Loaders"
+    },
+    {
+      "date": "2025-12-13",
+      "file": "environment.md",
+      "type": "updated",
+      "title": "Environment Reference"
+    },
+    {
+      "date": "2025-12-14",
+      "file": "documents.md",
+      "type": "updated",
+      "title": "Generic Document Management"
+    }
+  ]
+}

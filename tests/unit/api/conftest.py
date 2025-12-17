@@ -4,20 +4,14 @@ API test fixtures and configuration.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from tests.unit.utils.test_helpers import (
-    create_mock_api_key,
-    create_mock_principal,
-    create_mock_user,
-    setup_auth_mocks,
-    setup_database_mocks,
-)
+from tests.unit.utils.test_helpers import setup_auth_mocks, setup_database_mocks
 
 
 @pytest_asyncio.fixture
@@ -33,10 +27,10 @@ async def api_app(mocker) -> FastAPI:
     register_error_handlers(app)
 
     # Set up database mocks
-    mock_session = setup_database_mocks(app)
+    setup_database_mocks(app)
 
     # Set up auth mocks
-    user, api_key, principal = setup_auth_mocks(app, mocker)
+    setup_auth_mocks(app, mocker)
 
     return app
 

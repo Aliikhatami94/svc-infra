@@ -5,11 +5,10 @@ NoSQL database test fixtures and configuration.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-import pytest_asyncio
 
 from tests.unit.utils.test_helpers import MockDatabaseSession
 

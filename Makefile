@@ -23,7 +23,7 @@ help: ## Show available commands
 	@echo "  type              Type check with mypy"
 	@echo "  typecheck         Alias for 'type'"
 	@echo "  check             Run lint + type checks"
-	@echo "  ci                Run checks + unit tests"
+	@echo "  ci                Run checks + tests"
 	@echo ""
 	@echo "Docker Compose (for acceptance):"
 	@echo "  compose_up        Start test stack"
@@ -83,6 +83,14 @@ accept:
 	@echo "[accept] Running full acceptance (with auto-clean)"
 	@status=0; \
 	$(MAKE) compose_up || status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		if [ "${CI:-}" = "true" ] || [ "${CI:-}" = "1" ]; then \
+			echo "[accept] docker compose failed (CI=true): failing acceptance"; \
+		else \
+			echo "[accept] docker compose failed; skipping acceptance (set CI=true to enforce)"; \
+			status=0; \
+		fi; \
+	fi; \
 	if [ $$status -eq 0 ]; then \
 		$(MAKE) wait || status=$$?; \
 	fi; \
@@ -180,8 +188,8 @@ typecheck: type
 check: lint type
 	@echo "[check] All checks passed"
 
-ci: check unit
-	@echo "[ci] Checks + unit passed"
+ci: check test
+	@echo "[ci] All checks + tests passed"
 
 # --- Cleanup helpers ---
 clean:
@@ -230,3 +238,9 @@ test:
 		echo "[test] Tests failed"; \
 	fi; \
 	exit $$status
+
+# --- Docs Changelog ---
+.PHONY: docs-changelog
+
+docs-changelog: ## Generate/update docs/CHANGELOG.json for What's New page
+	@./scripts/docs-changelog.sh

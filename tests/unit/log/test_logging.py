@@ -9,8 +9,6 @@ import os
 import sys
 from unittest.mock import patch
 
-import pytest
-
 
 class TestFlush:
     """Tests for flush() function."""

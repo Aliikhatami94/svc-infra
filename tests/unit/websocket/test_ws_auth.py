@@ -5,13 +5,10 @@ and the various auth dependencies.
 """
 
 import time
-
-import pytest
-
-pytestmark = pytest.mark.websocket
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import jwt
+import pytest
 
 from svc_infra.api.fastapi.auth.ws_security import (
     RequireWSAnyScope,
@@ -23,6 +20,8 @@ from svc_infra.api.fastapi.auth.ws_security import (
     _ws_optional_principal,
     resolve_ws_bearer_principal,
 )
+
+pytestmark = pytest.mark.websocket
 
 
 class TestWSPrincipal:
@@ -300,7 +299,6 @@ class TestRequireWSScopes:
     @pytest.mark.asyncio
     async def test_allows_with_required_scopes(self):
         """Allows when all required scopes present."""
-        from fastapi import Depends
 
         principal = WSPrincipal(id="user-123", scopes=["read", "write", "admin"])
 

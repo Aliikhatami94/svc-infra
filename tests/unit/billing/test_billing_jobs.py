@@ -10,7 +10,6 @@ from svc_infra.billing.jobs import (
 )
 from svc_infra.db.outbox import InMemoryOutboxStore
 from svc_infra.jobs.queue import InMemoryJobQueue
-from svc_infra.jobs.worker import process_one
 from svc_infra.webhooks.service import InMemoryWebhookSubscriptions, WebhookService
 
 pytestmark = pytest.mark.billing

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     # User model is application-specific; this is a forward reference for type hints
-    User = Any  # type: ignore[misc]
+    User = Any
 
 
 class ProviderAccount(ModelBase):

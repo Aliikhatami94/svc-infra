@@ -91,9 +91,7 @@ class NoSqlRepository:
         return val
 
     @staticmethod
-    def _public_doc(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        if not doc:
-            return doc
+    def _public_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
         d = dict(doc)
         if "_id" in d and "id" not in d:
             _id = d.pop("_id", None)
@@ -108,7 +106,7 @@ class NoSqlRepository:
         offset: int,
         sort: Optional[List[Tuple[str, int]]] = None,
         filter: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict]:
+    ) -> List[Dict[str, Any]]:
         filt = self._merge_and(self._alive_filter(), filter)
         cursor = db[self.collection_name].find(filt).skip(offset).limit(limit)
         if sort:
@@ -123,6 +121,8 @@ class NoSqlRepository:
         id_value = self._normalize_id_value(id_value)
         filt = self._merge_and(self._alive_filter(), {self.id_field: id_value})
         doc = await db[self.collection_name].find_one(filt)
+        if doc is None:
+            return None
         return self._public_doc(doc)
 
     async def create(self, db, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -169,7 +169,7 @@ class NoSqlRepository:
         limit: int,
         offset: int,
         sort: Optional[List[Tuple[str, int]]] = None,
-    ) -> List[Dict]:
+    ) -> List[Dict[str, Any]]:
         regex = {"$regex": q, "$options": "i"}
         or_filter = [{"$or": [{f: regex} for f in fields]}] if fields else []
         filt = (

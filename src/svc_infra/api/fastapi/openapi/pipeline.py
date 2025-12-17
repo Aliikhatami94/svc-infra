@@ -23,4 +23,4 @@ def apply_mutators(app: FastAPI, *mutators):
         app.openapi_schema = schema
         return schema
 
-    app.openapi = patched
+    setattr(app, "openapi", patched)

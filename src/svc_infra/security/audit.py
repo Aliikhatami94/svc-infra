@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Audit log append & chain verification utilities.
 
 Provides helpers to append a new AuditLog entry maintaining a hash-chain
@@ -12,6 +10,8 @@ Design notes:
  - If a middle event is altered, that event and all subsequent events will
    fail verification (because their prev_hash links break transitively).
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone

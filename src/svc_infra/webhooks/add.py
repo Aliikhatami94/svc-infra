@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """FastAPI integration helpers for the webhooks router.
 
 The :func:`add_webhooks` helper wires the public router into an app and makes
@@ -15,12 +13,14 @@ standard outbox tick task and webhook delivery job handler so the caller only
 needs to start their existing worker loop.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
-from typing import Any, Protocol, TypeVar, cast, overload
+from typing import Any, Protocol, TypeGuard, TypeVar, cast
 
 from fastapi import FastAPI
 
@@ -42,11 +42,11 @@ except Exception:  # pragma: no cover - redis is optional in most test runs.
 logger = logging.getLogger(__name__)
 
 
-T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 
-class _Factory(Protocol[T]):
-    def __call__(self) -> T:
+class _Factory(Protocol[T_co]):
+    def __call__(self) -> T_co:
         pass
 
 
@@ -79,9 +79,12 @@ class RedisOutboxStore(OutboxStore):
 
     # Protocol methods --------------------------------------------------
     def enqueue(self, topic: str, payload: dict[str, Any]) -> OutboxMessage:
-        incr_result = self._client.incr(self._seq_key)
-        # Redis incr always returns int synchronously for sync client
-        msg_id = int(incr_result) if isinstance(incr_result, (int, str)) else 0  # type: ignore[arg-type]
+        incr_result = cast(Any, self._client.incr(self._seq_key))
+        # Redis incr always returns an int for the sync client. Be defensive for mocks.
+        try:
+            msg_id = int(incr_result)
+        except (TypeError, ValueError):
+            msg_id = 0
         created_at = datetime.now(timezone.utc)
         record = {
             "id": msg_id,
@@ -95,9 +98,7 @@ class RedisOutboxStore(OutboxStore):
         self._client.rpush(self._queue_key, msg_id)
         return OutboxMessage(id=msg_id, topic=topic, payload=payload, created_at=created_at)
 
-    def fetch_next(
-        self, *, topics: list[str] | tuple[str, ...] | set[str] | None = None
-    ) -> OutboxMessage | None:
+    def fetch_next(self, topics: Iterable[str] | None = None) -> OutboxMessage | None:
         allowed = set(topics) if topics else None
         ids = cast(list[Any], self._client.lrange(self._queue_key, 0, -1))
         for raw_id in ids:
@@ -178,16 +179,16 @@ class RedisInboxStore(InboxStore):
         return bool(self._client.exists(self._key(key)))
 
 
-def _is_factory(obj: Any) -> bool:
+def _is_factory(obj: Any) -> TypeGuard[Callable[[], Any]]:
     return callable(obj) and not isinstance(obj, (str, bytes, bytearray))
 
 
-def _resolve_value(value: T | _Factory[T] | None, default_factory: _Factory[T]) -> T:
+def _resolve_value(value: T_co | _Factory[T_co] | None, default_factory: _Factory[T_co]) -> T_co:
     if value is None:
         return default_factory()
     if _is_factory(value):
-        return value()
-    return value  # type: ignore[return-value]
+        return cast(T_co, value())
+    return cast(T_co, value)
 
 
 def _build_redis_client(env: Mapping[str, str]) -> "Redis" | None:
@@ -244,23 +245,6 @@ def _subscription_lookup(
         return items[0].secret
 
     return _get_url, _get_secret
-
-
-@overload
-def add_webhooks(
-    app: FastAPI,
-    *,
-    outbox: OutboxStore | _Factory[OutboxStore] | None = ...,
-    inbox: InboxStore | _Factory[InboxStore] | None = ...,
-    subscriptions: (
-        InMemoryWebhookSubscriptions | _Factory[InMemoryWebhookSubscriptions] | None
-    ) = ...,
-    queue: JobQueue | None = ...,
-    scheduler: InMemoryScheduler | None = ...,
-    schedule_tick: bool = ...,
-    env: Mapping[str, str] = ...,
-) -> None:
-    pass
 
 
 def add_webhooks(

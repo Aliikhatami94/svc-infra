@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from svc_infra.loaders import GitHubLoader, LoadedContent
+from svc_infra.loaders import GitHubLoader
 
 
 class TestGitHubLoaderInit:

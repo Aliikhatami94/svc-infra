@@ -46,6 +46,9 @@ def make_crud_router_plus_mongo(
     allowed_order_fields: Optional[list[str]] = None,
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
+    read_model = cast(Any, read_schema)
+    page_model = cast(Any, Page[read_schema])  # type: ignore[valid-type]
+
     router_prefix = ("/_mongo" + prefix) if mount_under_db_prefix else prefix
     router = public_router(
         prefix=router_prefix,
@@ -56,7 +59,7 @@ def make_crud_router_plus_mongo(
     # LIST
     @router.get(
         "",
-        response_model=cast(Any, Page[read_schema]),  # type: ignore[valid-type]
+        response_model=page_model,
         description=f"List items in {prefix} collection",
     )
     async def list_items(
@@ -74,14 +77,12 @@ def make_crud_router_plus_mongo(
         else:
             items = await service.list(db, limit=lp.limit, offset=lp.offset, sort=sort)
             total = await service.count(db)
-        return Page[read_schema].from_items(  # type: ignore[valid-type]
-            total=total, items=items, limit=lp.limit, offset=lp.offset
-        )
+        return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
     # GET by id
     @router.get(
         "/{item_id}",
-        response_model=cast(Any, read_schema),  # type: ignore[valid-type]
+        response_model=read_model,
         description=f"Get item from {prefix} collection",
     )
     async def get_item(db: DBDep, item_id: Any):
@@ -93,22 +94,26 @@ def make_crud_router_plus_mongo(
     # CREATE
     @router.post(
         "",
-        response_model=cast(Any, read_schema),  # type: ignore[valid-type]
+        response_model=read_model,
         status_code=201,
         description=f"Create item in {prefix} collection",
     )
     async def create_item(db: DBDep, payload: create_schema = Body(...)):  # type: ignore[valid-type]
-        data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
+        data = cast(Any, payload).model_dump(exclude_unset=True)
         return await service.create(db, data)
 
     # UPDATE
     @router.patch(
         "/{item_id}",
-        response_model=cast(Any, read_schema),  # type: ignore[valid-type]
+        response_model=read_model,
         description=f"Update item in {prefix} collection",
     )
-    async def update_item(db: DBDep, item_id: Any, payload: update_schema = Body(...)):  # type: ignore[valid-type]
-        data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
+    async def update_item(
+        db: DBDep,
+        item_id: Any,
+        payload: update_schema = Body(...),  # type: ignore[valid-type]
+    ):
+        data = cast(Any, payload).model_dump(exclude_unset=True)
         row = await service.update(db, item_id, data)
         if not row:
             raise HTTPException(404, "Not found")

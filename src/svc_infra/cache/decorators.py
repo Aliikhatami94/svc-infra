@@ -7,6 +7,7 @@ invalidating cache on write operations, and managing cache recaching strategies.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, Awaitable, Callable, Iterable, Optional, Union
 
@@ -16,16 +17,12 @@ from svc_infra.cache.backend import alias as _alias
 from svc_infra.cache.backend import setup_cache as _setup_cache
 from svc_infra.cache.backend import wait_ready as _wait_ready
 
-from .keys import (
-    build_key_template,
-    build_key_variants_renderer,
-    create_tags_function,
-    resolve_tags,
-)
+from .keys import build_key_template, build_key_variants_renderer, resolve_tags
 from .recache import RecachePlan, RecacheSpec, execute_recache, recache
 from .resources import Resource, entity, resource
 from .tags import invalidate_tags
 from .ttl import validate_ttl
+from .utils import validate_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -98,41 +95,38 @@ def cache_read(
     ttl_val = validate_ttl(ttl)
     template = build_key_template(key)
     namespace = _alias() or ""
-    # Build a tags function that renders any templates against the call kwargs
-    base_tags_func = create_tags_function(tags)
-
-    def tags_func(*_args, **call_kwargs):
-        try:
-            raw = base_tags_func(*_args, **call_kwargs) or []
-            rendered = []
-            for t in raw:
-                if isinstance(t, str) and ("{" in t and "}" in t):
-                    try:
-                        rendered.append(t.format(**call_kwargs))
-                    except Exception:
-                        # Best effort: fall back to original
-                        rendered.append(t)
-                else:
-                    rendered.append(t)
-            return rendered
-        except Exception:
-            return raw if isinstance(raw, list) else []
+    # Cashews expects `tags` to be an iterable of (template) strings.
+    # If no explicit tags are provided, default to tagging by the key template.
+    # This enables the common pattern:
+    #   @cache_read(key="thing:{id}")
+    #   @cache_write(tags=["thing:{id}"])
+    # where writes invalidate reads without requiring tags on every read.
+    dynamic_tags_func: Callable[..., Iterable[str]] | None = None
+    if tags is None:
+        tags_param: Iterable[str] = (template,)
+    elif callable(tags):
+        # Preserve API surface area, but cashews doesn't accept callables here.
+        # We'll attach tag mappings manually after each call.
+        dynamic_tags_func = tags
+        tags_param = ()
+    else:
+        tags_param = tags
 
     def _decorator(func: Callable[..., Awaitable[Any]]):
         # Try different cashews cache decorator signatures for compatibility
-        cache_kwargs: dict[str, Any] = {"tags": tags_func}
+        cache_kwargs: dict[str, Any] = {"tags": tuple(tags_param)}
         if early_ttl is not None:
             cache_kwargs["early_ttl"] = early_ttl
         if refresh is not None:
             cache_kwargs["refresh"] = refresh
 
         wrapped = None
-        error_msgs = []
+        error_msgs: list[str] = []
 
         # Attempt 1: With prefix parameter (preferred)
         if namespace:
             try:
-                wrapped = _cache.cache(ttl_val, template, prefix=namespace, **cache_kwargs)(func)  # type: ignore[arg-type]  # cashews cache() API
+                wrapped = _cache.cache(ttl_val, template, prefix=namespace, **cache_kwargs)(func)
             except TypeError as e:
                 error_msgs.append(f"prefix parameter: {e}")
 
@@ -144,7 +138,7 @@ def cache_read(
                     if namespace and not template.startswith(f"{namespace}:")
                     else template
                 )
-                wrapped = _cache.cache(ttl_val, key_with_namespace, **cache_kwargs)(func)  # type: ignore[arg-type]  # cashews cache() API
+                wrapped = _cache.cache(ttl_val, key_with_namespace, **cache_kwargs)(func)
             except TypeError as e:
                 error_msgs.append(f"embedded namespace: {e}")
 
@@ -160,7 +154,48 @@ def cache_read(
 
         # Attach key variants renderer for cache writers
         setattr(wrapped, "__svc_key_variants__", build_key_variants_renderer(template))
-        return wrapped
+
+        # If tags were provided as a callable, populate cashews tag sets manually.
+        # This is best-effort and only affects invalidation-by-tag behavior.
+        if dynamic_tags_func is None:
+            return wrapped
+
+        sig = inspect.signature(func)
+        tag_key_prefix = getattr(_cache, "_tags_key_prefix", "_tag:")
+
+        async def _wrapped_with_dynamic_tags(*args, **kwargs):
+            result = await wrapped(*args, **kwargs)
+
+            try:
+                bound = sig.bind_partial(*args, **kwargs)
+                bound.apply_defaults()
+                ctx = dict(bound.arguments)
+
+                rendered_key = validate_cache_key(template.format(**ctx))
+                full_key = f"{namespace}:{rendered_key}" if namespace else rendered_key
+
+                raw_tags = dynamic_tags_func(*args, **kwargs)
+                for t in list(raw_tags) if raw_tags is not None else []:
+                    tag_val = str(t)
+                    if "{" in tag_val and "}" in tag_val:
+                        try:
+                            tag_val = tag_val.format(**ctx)
+                        except Exception:
+                            pass
+                    if tag_val:
+                        await _cache.set_add(tag_key_prefix + tag_val, full_key, expire=ttl_val)
+            except Exception:
+                # Don't let best-effort tag mapping break cache reads.
+                pass
+
+            return result
+
+        setattr(
+            _wrapped_with_dynamic_tags,
+            "__svc_key_variants__",
+            getattr(wrapped, "__svc_key_variants__", None),
+        )
+        return _wrapped_with_dynamic_tags
 
     return _decorator
 

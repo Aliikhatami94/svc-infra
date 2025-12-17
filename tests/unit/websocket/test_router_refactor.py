@@ -4,10 +4,6 @@ Tests DualAPIRouter.websocket() functionality and ws_*_router factories.
 """
 
 import pytest
-
-pytestmark = pytest.mark.websocket
-from unittest.mock import AsyncMock, MagicMock, patch
-
 from fastapi import Depends, FastAPI, WebSocket
 from starlette.testclient import TestClient
 
@@ -19,6 +15,8 @@ from svc_infra.api.fastapi.dual.protected import (
     ws_user_router,
 )
 from svc_infra.api.fastapi.dual.public import ws_public_router
+
+pytestmark = pytest.mark.websocket
 
 
 class TestDualAPIRouterWebSocket:
@@ -121,7 +119,7 @@ class TestWSPublicRouter:
         app.include_router(router)
 
         # Just verify it can be created
-        client = TestClient(app)
+        TestClient(app)
         # WebSocket testing would require async client
 
 
@@ -210,6 +208,7 @@ class TestWSOptionalRouter:
         router = ws_optional_router()
 
         deps = getattr(router, "dependencies", [])
+        assert isinstance(deps, list)
         # May have dependencies for optional auth
         # The key is that it doesn't reject unauthenticated
 

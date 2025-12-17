@@ -837,11 +837,11 @@ class StripeAdapter(ProviderAdapter):
             sub_item,
             **params,
         )
-        items: list[UsageRecordOut] = []
+        usage_records: list[UsageRecordOut] = []
         for s in res.data:
             # No record id in summaries—synthesize a stable id from period start.
             synthesized_id = f"{sub_item}:{getattr(s, 'period', {}).get('start')}"
-            items.append(
+            usage_records.append(
                 UsageRecordOut(
                     id=synthesized_id,
                     quantity=int(getattr(s, "total_usage", 0)),
@@ -855,7 +855,7 @@ class StripeAdapter(ProviderAdapter):
             if getattr(res, "has_more", False) and res.data and hasattr(res.data[-1], "id")
             else None
         )
-        return items, next_cursor
+        return usage_records, next_cursor
 
     async def get_usage_record(self, usage_record_id: str) -> UsageRecordOut:
         # Stripe has no direct "retrieve usage record by id" API.

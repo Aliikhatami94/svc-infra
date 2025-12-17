@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from svc_infra.security.lockout import LockoutConfig, compute_lockout
 
 

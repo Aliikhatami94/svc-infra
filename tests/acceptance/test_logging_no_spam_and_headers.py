@@ -18,8 +18,6 @@ def test_security_headers_present(client):
 def test_no_access_log_spam_for_metrics():
     # Since uvicorn logs to stderr, run a one-shot curl to /metrics in a subprocess and capture stderr
     # We expect the access log line for /metrics to be absent due to filtering.
-    import contextlib
-    import io
     import logging
 
     # Emit a synthetic access-log-like record and assert our filter would drop it when path=/metrics

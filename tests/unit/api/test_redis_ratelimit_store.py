@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from svc_infra.api.fastapi.middleware.ratelimit_store import RedisRateLimitStore
 
 

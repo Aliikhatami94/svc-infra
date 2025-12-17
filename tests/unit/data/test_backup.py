@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from svc_infra.data.backup import BackupHealthReport, verify_backups
+from svc_infra.data.backup import verify_backups
 
 pytestmark = pytest.mark.data_lifecycle
 

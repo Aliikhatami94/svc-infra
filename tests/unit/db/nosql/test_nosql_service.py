@@ -4,15 +4,12 @@ Tests for NoSQL service functionality.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from svc_infra.db.nosql.repository import NoSqlRepository
 from svc_infra.db.nosql.service import NoSqlService
-from tests.unit.db.nosql.conftest import ProductDocumentModel, UserDocumentModel
 
 
 class TestNoSqlService:
@@ -235,16 +232,18 @@ class TestNoSqlService:
             return data
 
         nosql_service.pre_create = custom_pre_create
+        try:
+            # Mock the repository create method
+            expected_result = {**sample_user_document_data, "created_by": "test_user"}
+            nosql_service.repo.create = AsyncMock(return_value=expected_result)
 
-        # Mock the repository create method
-        expected_result = {**sample_user_document_data, "created_by": "test_user"}
-        nosql_service.repo.create = AsyncMock(return_value=expected_result)
+            result = await nosql_service.create(mock_db, sample_user_document_data)
 
-        result = await nosql_service.create(mock_db, sample_user_document_data)
-
-        assert result == expected_result
-        # Verify the pre_create hook was called
-        assert "created_by" in result
+            assert result == expected_result
+            # Verify the pre_create hook was called
+            assert "created_by" in result
+        finally:
+            nosql_service.pre_create = original_pre_create
 
     @pytest.mark.asyncio
     async def test_pre_update_hook(self, nosql_service, mock_db, sample_user_document_data):
@@ -257,14 +256,16 @@ class TestNoSqlService:
             return data
 
         nosql_service.pre_update = custom_pre_update
+        try:
+            # Mock the repository update method
+            expected_result = {**sample_user_document_data, "updated_by": "test_user"}
+            nosql_service.repo.update = AsyncMock(return_value=expected_result)
 
-        # Mock the repository update method
-        expected_result = {**sample_user_document_data, "updated_by": "test_user"}
-        nosql_service.repo.update = AsyncMock(return_value=expected_result)
+            update_data = {"name": "Updated Name"}
+            result = await nosql_service.update(mock_db, "user_123", update_data)
 
-        update_data = {"name": "Updated Name"}
-        result = await nosql_service.update(mock_db, "user_123", update_data)
-
-        assert result == expected_result
-        # Verify the pre_update hook was called
-        assert "updated_by" in result
+            assert result == expected_result
+            # Verify the pre_update hook was called
+            assert "updated_by" in result
+        finally:
+            nosql_service.pre_update = original_pre_update

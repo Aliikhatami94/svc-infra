@@ -81,7 +81,7 @@ class RedisRateLimitStore:
         self.prefix = prefix
         self._clock = clock or time.time
 
-    def _window_key(self, key: str, window: int) -> tuple[str, int, str]:
+    def _window_key(self, key: str, window: int) -> tuple[str, int, int]:
         now = int(self._clock())
         win = now - (now % window)
         redis_key = f"{self.prefix}:{key}:{win}"

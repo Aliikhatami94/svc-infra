@@ -2,7 +2,6 @@
 
 import json
 import tempfile
-from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -324,7 +323,6 @@ class TestLocalBackend:
 
     async def test_railway_volume_detection(self, temp_dir, monkeypatch):
         """Test Railway volume path detection."""
-        import os
 
         monkeypatch.setenv("RAILWAY_VOLUME_MOUNT_PATH", temp_dir)
 

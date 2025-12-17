@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Callable, Optional, Sequence, Type, TypeVar
+from typing import Annotated, Any, Callable, Optional, Sequence, Type, TypeVar, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
@@ -104,7 +104,7 @@ def make_crud_router_plus_sql(
     # -------- GET by id --------
     @router.get(
         "/{item_id}",
-        response_model=read_schema,  # type: ignore[valid-type]
+        response_model=read_schema,
         description=f"Get item of type {model.__name__}",
     )
     async def get_item(item_id: Any, session: SqlSessionDep):
@@ -116,7 +116,7 @@ def make_crud_router_plus_sql(
     # -------- CREATE --------
     @router.post(
         "",
-        response_model=read_schema,  # type: ignore[valid-type]
+        response_model=read_schema,
         status_code=201,
         description=f"Create item of type {model.__name__}",
     )
@@ -125,7 +125,7 @@ def make_crud_router_plus_sql(
         payload: create_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
+            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -135,7 +135,7 @@ def make_crud_router_plus_sql(
     # -------- UPDATE --------
     @router.patch(
         "/{item_id}",
-        response_model=read_schema,  # type: ignore[valid-type]
+        response_model=read_schema,
         description=f"Update item of type {model.__name__}",
     )
     async def update_item(
@@ -144,7 +144,7 @@ def make_crud_router_plus_sql(
         payload: update_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
+            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -193,7 +193,7 @@ def make_tenant_crud_router_plus_sql(
     # Evaluate the base service once to preserve in-memory state across requests in tests/local.
     # Consumers may pass either an instance or a zero-arg factory function.
     try:
-        _base_instance = service_factory() if callable(service_factory) else service_factory  # type: ignore[misc]
+        _base_instance = service_factory() if callable(service_factory) else service_factory
     except TypeError:
         # If the callable requires args, assume it's already an instance
         _base_instance = service_factory
@@ -254,7 +254,7 @@ def make_tenant_crud_router_plus_sql(
             total = await svc.count(session)
         return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
-    @router.get("/{item_id}", response_model=read_schema)  # type: ignore[valid-type]
+    @router.get("/{item_id}", response_model=read_schema)
     async def get_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):
         svc = await _svc(session, tenant_id)
         obj = await svc.get(session, item_id)
@@ -262,7 +262,7 @@ def make_tenant_crud_router_plus_sql(
             raise HTTPException(404, "not_found")
         return obj
 
-    @router.post("", response_model=read_schema, status_code=201)  # type: ignore[valid-type]
+    @router.post("", response_model=read_schema, status_code=201)
     async def create_item(
         session: SqlSessionDep,
         tenant_id: TenantId,
@@ -270,14 +270,14 @@ def make_tenant_crud_router_plus_sql(
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
+            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:
             raise HTTPException(422, "invalid_payload")
         return await svc.create(session, data)
 
-    @router.patch("/{item_id}", response_model=read_schema)  # type: ignore[valid-type]
+    @router.patch("/{item_id}", response_model=read_schema)
     async def update_item(
         item_id: Any,
         session: SqlSessionDep,
@@ -286,7 +286,7 @@ def make_tenant_crud_router_plus_sql(
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
-            data = payload.model_dump(exclude_unset=True)  # type: ignore[union-attr, attr-defined]
+            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:

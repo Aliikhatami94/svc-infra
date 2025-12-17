@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 from svc_infra.db.inbox import InMemoryInboxStore

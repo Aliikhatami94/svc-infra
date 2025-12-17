@@ -11,11 +11,10 @@ Tests WebSocket infrastructure including:
 from __future__ import annotations
 
 import time
-from typing import Any
 
 import jwt
 import pytest
-from fastapi import APIRouter, Depends, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 from starlette.testclient import TestClient
 
 from svc_infra.api.fastapi.auth.ws_security import WSIdentity
@@ -54,7 +53,7 @@ def create_ws_test_app() -> FastAPI:
     @public_router.websocket("/chat/{user_id}")
     async def ws_chat(websocket: WebSocket, user_id: str):
         """Public chat endpoint with user ID from path."""
-        connection_id = await manager.connect(user_id, websocket)
+        await manager.connect(user_id, websocket)
         try:
             while True:
                 data = await websocket.receive_json()
@@ -74,7 +73,7 @@ def create_ws_test_app() -> FastAPI:
         init_data = await websocket.receive_json()
         user_id = init_data.get("user_id", "anonymous")
 
-        connection_id = await manager.connect(user_id, websocket, accept=False)
+        await manager.connect(user_id, websocket, accept=False)
         await manager.join_room(user_id, room_name)
         try:
             while True:
@@ -243,17 +242,16 @@ def test_a23_02_auth_valid_token(valid_token, jwt_secret):
 
 def test_a23_02_auth_invalid_token(jwt_secret):
     """Test connection with invalid JWT token is rejected."""
-    from starlette.websockets import WebSocketDisconnect
 
     app = create_ws_test_app()
 
     with TestClient(app) as client:
         try:
             # Try to connect with invalid token
-            with client.websocket_connect("/ws/secure/me?token=invalid-token") as ws:
+            with client.websocket_connect("/ws/secure/me?token=invalid-token"):
                 # Should not reach here - connection should be rejected
                 pytest.fail("Expected connection to be rejected")
-        except Exception as e:
+        except Exception:
             # Connection should be rejected (403 or disconnect)
             pass  # Expected
 
@@ -265,7 +263,7 @@ def test_a23_02_auth_expired_token(expired_token, jwt_secret):
 
     with TestClient(app) as client:
         try:
-            with client.websocket_connect(f"/ws/secure/me?token={expired_token}") as ws:
+            with client.websocket_connect(f"/ws/secure/me?token={expired_token}"):
                 pytest.fail("Expected connection to be rejected")
         except Exception:
             pass  # Expected
@@ -278,7 +276,7 @@ def test_a23_02_auth_no_token(jwt_secret):
 
     with TestClient(app) as client:
         try:
-            with client.websocket_connect("/ws/secure/me") as ws:
+            with client.websocket_connect("/ws/secure/me"):
                 pytest.fail("Expected connection to be rejected")
         except Exception:
             pass  # Expected

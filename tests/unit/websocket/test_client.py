@@ -4,18 +4,15 @@ Tests connection lifecycle, message handling, error handling,
 and context manager usage.
 """
 
-import pytest
-
-pytestmark = pytest.mark.websocket
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from svc_infra.websocket.client import WebSocketClient
 from svc_infra.websocket.config import WebSocketConfig
-from svc_infra.websocket.exceptions import (
-    ConnectionClosedError,
-    ConnectionFailedError,
-    WebSocketError,
-)
+from svc_infra.websocket.exceptions import ConnectionFailedError, WebSocketError
+
+pytestmark = pytest.mark.websocket
 
 
 class TestWebSocketClientInit:
@@ -269,13 +266,11 @@ class TestWebSocketClientIterator:
     @pytest.mark.asyncio
     async def test_iterator_yields_messages(self):
         """Iterator yields received messages."""
-        from websockets.exceptions import ConnectionClosedOK
 
         client = WebSocketClient("wss://example.com/ws")
 
         # Simulate receiving 2 messages then closing
         messages = ["msg1", "msg2"]
-        call_count = [0]
 
         async def mock_iter():
             for msg in messages:

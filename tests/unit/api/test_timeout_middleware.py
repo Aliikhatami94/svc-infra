@@ -8,8 +8,6 @@ from httpx import ASGITransport
 from starlette.testclient import TestClient  # type: ignore
 
 from svc_infra.api.fastapi.middleware.timeout import BodyReadTimeoutMiddleware
-from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
-from svc_infra.api.fastapi.setup import setup_service_api
 
 fastapi = pytest.importorskip("fastapi")
 router = APIRouter()

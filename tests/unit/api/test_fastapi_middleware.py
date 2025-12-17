@@ -4,10 +4,8 @@ Tests for FastAPI middleware functionality.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, Mock
-
 import pytest
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient
 
 from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware

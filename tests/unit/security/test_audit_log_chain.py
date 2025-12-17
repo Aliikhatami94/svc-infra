@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 
 from svc_infra.security.audit import append_audit_event, verify_audit_chain
-from svc_infra.security.models import AuditLog
 
 
 class FakeDB:

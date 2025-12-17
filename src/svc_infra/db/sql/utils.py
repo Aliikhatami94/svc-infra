@@ -456,10 +456,10 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
             except Exception:
                 connect_args["ssl"] = True  # minimal hint to enable TLS
 
-        kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
+        async_engine_kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
         if connect_args:
-            kwargs["connect_args"] = connect_args
-        return _create_async_engine(u, **kwargs)
+            async_engine_kwargs["connect_args"] = connect_args
+        return _create_async_engine(u, **async_engine_kwargs)
 
     # ----------------- SYNC -----------------
     u = _coerce_sync_driver(u)
@@ -487,10 +487,10 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
         # Optional: if your provider requires it, you can also add:
         # connect_args.setdefault("client_flag", 0)
 
-    kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
+    sync_engine_kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
     if connect_args:
-        kwargs["connect_args"] = connect_args
-    return _create_engine(u, **kwargs)
+        sync_engine_kwargs["connect_args"] = connect_args
+    return _create_engine(u, **sync_engine_kwargs)
 
 
 # ---------- Identifier quoting helpers ----------

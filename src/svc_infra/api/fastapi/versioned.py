@@ -78,7 +78,7 @@ def extract_router(
         nonlocal captured_router
         captured_router = router
 
-    mock_app.include_router = _capture_router
+    setattr(mock_app, "include_router", _capture_router)
 
     # Patch add_prefixed_docs to prevent separate card (no-op if function doesn't call it)
     def _noop_docs(*args: Any, **kwargs: Any) -> None:

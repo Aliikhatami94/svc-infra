@@ -741,7 +741,7 @@ def _create_oauth_router(
         user_id = await _validate_and_decode_jwt_token(raw_auth)
 
         # Load user
-        user = await session.get(user_model, user_id)
+        user = await cast(Any, session).get(user_model, user_id)
         if not user:
             raise HTTPException(401, "invalid_token")
 

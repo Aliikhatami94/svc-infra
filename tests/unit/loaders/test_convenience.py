@@ -5,7 +5,7 @@ Tests the module-level convenience functions and LoadedContent model.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

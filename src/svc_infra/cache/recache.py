@@ -165,7 +165,7 @@ def build_getter_kwargs(
     if isinstance(spec, tuple):
         getter, mapping_or_builder = spec
         getter_params = signature(getter).parameters
-        call_kwargs: dict[str, Any] = {}
+        legacy_call_kwargs: dict[str, Any] = {}
 
         if callable(mapping_or_builder):
             try:
@@ -173,7 +173,7 @@ def build_getter_kwargs(
                 if isinstance(produced, dict):
                     for param_name, value in produced.items():
                         if param_name in getter_params:
-                            call_kwargs[param_name] = value
+                            legacy_call_kwargs[param_name] = value
             except Exception as e:
                 logger.warning(f"Recache mapping function failed: {e}")
         elif isinstance(mapping_or_builder, dict):
@@ -182,25 +182,25 @@ def build_getter_kwargs(
                     continue
                 try:
                     if callable(source):
-                        call_kwargs[getter_param] = source(*mut_args, **mut_kwargs)
+                        legacy_call_kwargs[getter_param] = source(*mut_args, **mut_kwargs)
                     elif isinstance(source, str) and source in mut_kwargs:
-                        call_kwargs[getter_param] = mut_kwargs[source]
+                        legacy_call_kwargs[getter_param] = mut_kwargs[source]
                 except Exception as e:
                     logger.warning(f"Recache parameter mapping failed for {getter_param}: {e}")
 
         # Add direct parameter matches
         for param_name in getter_params.keys():
-            if param_name not in call_kwargs and param_name in mut_kwargs:
-                call_kwargs[param_name] = mut_kwargs[param_name]
+            if param_name not in legacy_call_kwargs and param_name in mut_kwargs:
+                legacy_call_kwargs[param_name] = mut_kwargs[param_name]
 
-        call_kwargs = {k: v for k, v in call_kwargs.items() if k in getter_params}
-        return getter, call_kwargs
+        legacy_call_kwargs = {k: v for k, v in legacy_call_kwargs.items() if k in getter_params}
+        return getter, legacy_call_kwargs
 
     # Handle simple getter function
     getter = spec
     getter_params = signature(getter).parameters
-    call_kwargs = {k: v for k, v in mut_kwargs.items() if k in getter_params}
-    return getter, call_kwargs
+    simple_call_kwargs = {k: v for k, v in mut_kwargs.items() if k in getter_params}
+    return getter, simple_call_kwargs
 
 
 async def execute_recache(

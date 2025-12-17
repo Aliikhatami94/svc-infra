@@ -209,12 +209,15 @@ def _invoice_line_item_to_out(data: dict[str, Any]) -> InvoiceLineItemOut:
     price = data.get("price") or {}
     if not isinstance(price, dict):
         price = {"id": getattr(price, "id", None)}
+    quantity = int(data.get("quantity", 0) or 0)
+    unit_amount = int(data.get("unit_amount", 0) or 0)
+    amount = int(data.get("amount", unit_amount * quantity) or 0)
     return InvoiceLineItemOut(
         id=line_id,
         description=data.get("description"),
         currency=str(data.get("currency", price.get("currency", ""))).upper(),
-        quantity=int(data.get("quantity", 0) or 0),
-        unit_amount=int(data.get("unit_amount", data.get("amount", 0) or 0)),
+        quantity=quantity,
+        amount=amount,
         provider_price_id=price.get("id"),
     )
 

@@ -32,10 +32,10 @@ async def auth_app(mocker) -> FastAPI:
     register_error_handlers(app)
 
     # Set up database mocks
-    mock_session = setup_database_mocks(app)
+    setup_database_mocks(app)
 
     # Set up auth mocks
-    user, api_key, principal = setup_auth_mocks(app, mocker)
+    setup_auth_mocks(app, mocker)
 
     return app
 
@@ -81,7 +81,6 @@ def _auth_env(monkeypatch):
     monkeypatch.setattr(env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False)
 
     # Mock auth settings
-    from svc_infra.api.fastapi.auth.settings import AuthSettings
 
     class MockAuthSettings:
         secret_key = "test-secret-key"

@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import AsyncMock, Mock
-
 import pytest
 
 from svc_infra.cache.ttl import TTL_DEFAULT, TTL_LONG, TTL_SHORT, get_ttl, validate_ttl

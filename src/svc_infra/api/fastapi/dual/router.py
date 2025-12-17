@@ -110,10 +110,11 @@ class DualAPIRouter(APIRouter):
         - Per-route opt-out of OpenAPI param auto-attach: openapi_extra={"x_no_auto_pagination": True}
         """
         # pick response model
+        response_model: Any
         if envelope:
             response_model = Paginated[model]  # type: ignore[valid-type]
         else:
-            response_model = list[model]  # type: ignore[valid-type,assignment]
+            response_model = list[model]  # type: ignore[valid-type]
 
         injector = make_pagination_injector(
             envelope=envelope,

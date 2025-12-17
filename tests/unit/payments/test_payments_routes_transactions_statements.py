@@ -7,8 +7,6 @@ async def test_list_transactions(client, fake_adapter, mocker):
     # Mock the database query result
     from datetime import datetime
 
-    from svc_infra.apf_payments.models import LedgerEntry
-
     # Create mock ledger entries
     mock_entries = [
         mocker.Mock(
@@ -73,28 +71,7 @@ async def test_daily_statements(client, fake_adapter, mocker):
     # Mock the service method directly
     from svc_infra.apf_payments.schemas import StatementRow
 
-    mock_statements = [
-        StatementRow(
-            period_start="2024-01-01T00:00:00",
-            period_end="2024-01-01T23:59:59",
-            currency="USD",
-            gross=1000,
-            refunds=100,
-            fees=50,
-            net=850,
-            count=5,
-        ),
-        StatementRow(
-            period_start="2024-01-02T00:00:00",
-            period_end="2024-01-02T23:59:59",
-            currency="USD",
-            gross=2000,
-            refunds=0,
-            fees=100,
-            net=1900,
-            count=10,
-        ),
-    ]
+    _ = StatementRow
 
     # We need to mock the service method
     # This is complex because it involves database queries

@@ -83,7 +83,7 @@ def add_sql_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "SQL_U
     if url:
 
         @asynccontextmanager
-        async def lifespan(_app: FastAPI):
+        async def lifespan_with_url(_app: FastAPI):
             initialize_session(url)
             try:
                 if existing_lifespan is not None:
@@ -94,12 +94,12 @@ def add_sql_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "SQL_U
             finally:
                 await dispose_session()
 
-        app.router.lifespan_context = lifespan
+        app.router.lifespan_context = lifespan_with_url
         return
 
     # Use lifespan context manager instead of deprecated on_event
     @asynccontextmanager
-    async def lifespan(_app: FastAPI):
+    async def lifespan_from_env(_app: FastAPI):
         env_url = os.getenv(dsn_env)
         if not env_url:
             raise RuntimeError(f"Missing environment variable {dsn_env} for database URL")
@@ -113,7 +113,7 @@ def add_sql_db(app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "SQL_U
         finally:
             await dispose_session()
 
-    app.router.lifespan_context = lifespan
+    app.router.lifespan_context = lifespan_from_env
 
 
 def add_sql_health(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, Iterable, Optional, Sequence, Set, cast
 
@@ -145,7 +146,9 @@ class SqlRepository:
                 setattr(obj, self.soft_delete_flag_field, False)
             await session.flush()
             return True
-        session.delete(obj)
+        delete_result = session.delete(obj)
+        if inspect.isawaitable(delete_result):
+            await delete_result
         await session.flush()
         return True
 

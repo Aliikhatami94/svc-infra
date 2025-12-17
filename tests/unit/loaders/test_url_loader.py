@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from svc_infra.loaders import LoadedContent, URLLoader
+from svc_infra.loaders import URLLoader
 
 
 class TestURLLoaderInit:

@@ -3,13 +3,14 @@
 Tests connection lifecycle, messaging, rooms, and introspection.
 """
 
-import pytest
+from unittest.mock import AsyncMock
 
-pytestmark = pytest.mark.websocket
-from unittest.mock import AsyncMock, MagicMock
+import pytest
 
 from svc_infra.websocket.manager import ConnectionManager
 from svc_infra.websocket.models import ConnectionInfo
+
+pytestmark = pytest.mark.websocket
 
 
 class TestConnectionManagerInit:

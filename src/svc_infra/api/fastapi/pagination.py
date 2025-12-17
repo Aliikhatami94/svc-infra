@@ -220,7 +220,7 @@ def make_pagination_injector(
     # Cursor-only (common case)
     if allow_cursor and not allow_page and not include_filters:
 
-        async def _inject(
+        async def _inject_cursor(
             request: Request,
             cursor: str | None = Query(None),
             limit: int = Query(default_limit, ge=1, le=max_limit),
@@ -238,12 +238,12 @@ def make_pagination_injector(
             )
             return None
 
-        return _inject
+        return _inject_cursor
 
     # Cursor + filters
     if allow_cursor and not allow_page and include_filters:
 
-        async def _inject(
+        async def _inject_cursor_with_filters(
             request: Request,
             cursor: str | None = Query(None),
             limit: int = Query(default_limit, ge=1, le=max_limit),
@@ -275,12 +275,12 @@ def make_pagination_injector(
             )
             return None
 
-        return _inject
+        return _inject_cursor_with_filters
 
     # Page-only
     if not allow_cursor and allow_page:
 
-        async def _inject(
+        async def _inject_page(
             request: Request,
             page: int = Query(1, ge=1),
             page_size: int = Query(default_limit, ge=1, le=max_limit),
@@ -298,10 +298,10 @@ def make_pagination_injector(
             )
             return None
 
-        return _inject
+        return _inject_page
 
     # Both cursor + page (rare; exposes all)
-    async def _inject(
+    async def _inject_all(
         request: Request,
         cursor: str | None = Query(None),
         limit: int = Query(default_limit, ge=1, le=max_limit),
@@ -341,7 +341,7 @@ def make_pagination_injector(
         )
         return None
 
-    return _inject
+    return _inject_all
 
 
 # ----- Convenience helpers for routers -----

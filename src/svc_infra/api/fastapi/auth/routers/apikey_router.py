@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Any, List, Optional, cast
 from uuid import UUID
 
 from fastapi import HTTPException, Query
@@ -98,7 +98,7 @@ def apikey_router():
         description="List API keys. Non-superusers see only their own keys.",
     )
     async def list_keys(sess: SqlSessionDep, p: Identity):
-        q = select(ApiKey)
+        q: Any = select(ApiKey)
         if not getattr(p.user, "is_superuser", False):
             q = q.where(ApiKey.user_id == p.user.id)  # type: ignore[attr-defined]
         rows = (await sess.execute(q)).scalars().all()
@@ -124,7 +124,7 @@ def apikey_router():
         description="Revoke an API key",
     )
     async def revoke_key(key_id: str, sess: SqlSessionDep, p: Identity):
-        row = await sess.get(ApiKey, key_id)
+        row = await cast(Any, sess).get(ApiKey, key_id)
         if not row:
             raise HTTPException(404, "not_found")
 
@@ -148,7 +148,7 @@ def apikey_router():
         p: Identity,
         force: bool = Query(False, description="Allow deleting an active key if True"),
     ):
-        row = await sess.get(ApiKey, key_id)
+        row = await cast(Any, sess).get(ApiKey, key_id)
         if not row:
             return  # 204
 

@@ -28,50 +28,25 @@ async def invalidate_tags(*tags: str) -> int:
     if not tags:
         return 0
 
-    count = 0
+    # Preserve order while de-duplicating.
+    tags_to_delete = list(dict.fromkeys(tags))
 
-    # Strategy 1: Modern cashews invalidate with tags parameter
+    # Cashews supports explicit tag deletion via delete_tags().
     try:
-        result = await _cache.invalidate(tags=list(tags))
-        return int(result) if isinstance(result, int) else len(tags)
-    except (TypeError, AttributeError):
-        pass
+        if hasattr(_cache, "delete_tags"):
+            await _cache.delete_tags(*tags_to_delete)
+            return len(tags_to_delete)
     except Exception as e:
-        logger.warning(f"Modern tag invalidation failed: {e}")
+        logger.warning(f"Cache tag invalidation failed: {e}")
 
-    # Strategy 2: Legacy cashews invalidate with positional args
-    try:
-        result = await _cache.invalidate(*tags)  # type: ignore[arg-type]  # cashews API accepts *tags
-        return int(result) if isinstance(result, int) else len(tags)
-    except (TypeError, AttributeError):
-        pass
-    except Exception as e:
-        logger.warning(f"Legacy tag invalidation failed: {e}")
+    # Fallback: attempt private per-tag deletion when available.
+    deleted = 0
+    for tag in tags_to_delete:
+        try:
+            if hasattr(_cache, "_delete_tag"):
+                await _cache._delete_tag(tag)
+                deleted += 1
+        except Exception as e:
+            logger.debug(f"Tag deletion failed for tag {tag}: {e}")
 
-    # Strategy 3: Individual tag methods
-    for tag in tags:
-        for method_name in ("delete_tag", "invalidate_tag", "tag_invalidate"):
-            if hasattr(_cache, method_name):
-                try:
-                    method = getattr(_cache, method_name)
-                    result = await method(tag)
-                    count += int(result) if isinstance(result, int) else 1
-                    break
-                except Exception as e:
-                    logger.debug(f"Tag method {method_name} failed for tag {tag}: {e}")
-                    continue
-        else:
-            # Strategy 4: Pattern matching fallback
-            for method_name in ("delete_match", "invalidate_match", "invalidate"):
-                if hasattr(_cache, method_name):
-                    try:
-                        method = getattr(_cache, method_name)
-                        pattern = f"*{tag}*"
-                        result = await method(pattern)
-                        count += int(result) if isinstance(result, int) else 1
-                        break
-                    except Exception as e:
-                        logger.debug(f"Pattern method {method_name} failed for tag {tag}: {e}")
-                        continue
-
-    return count
+    return deleted

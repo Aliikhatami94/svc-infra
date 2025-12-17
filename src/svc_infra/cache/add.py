@@ -1,7 +1,4 @@
-from __future__ import annotations
-
-"""
-Easy integration helper to wire the cache backend into an ASGI app lifecycle.
+"""Easy integration helper to wire the cache backend into an ASGI app lifecycle.
 
 Contract:
 - Idempotent: multiple calls are safe; startup/shutdown handlers are registered once.
@@ -12,6 +9,8 @@ Contract:
 This does not replace the per-function decorators (`cache_read`, `cache_write`) and
 does not alter existing direct APIs; it simply standardizes initialization and wiring.
 """
+
+from __future__ import annotations
 
 import logging
 import os
@@ -24,6 +23,15 @@ from svc_infra.cache.backend import shutdown_cache as _shutdown_cache
 from svc_infra.cache.backend import wait_ready as _wait_ready
 
 logger = logging.getLogger(__name__)
+
+
+def _instance() -> Any:
+    """Return the current cache instance.
+
+    This is a thin compatibility shim used by tests and older callers.
+    """
+
+    return _get_cache()
 
 
 def _derive_settings(
@@ -101,7 +109,7 @@ def add_cache(
         # Expose cache instance for convenience
         if expose_state and hasattr(app, "state"):
             try:
-                setattr(app.state, state_key, _get_cache())
+                setattr(app.state, state_key, _instance())
             except Exception:
                 logger.debug("Unable to expose cache instance on app.state", exc_info=True)
 
@@ -138,7 +146,7 @@ def add_cache(
         try:
             setattr(app.state, "_svc_cache_wired", True)
             if expose_state and not hasattr(app.state, state_key):
-                setattr(app.state, state_key, _get_cache())
+                setattr(app.state, state_key, _instance())
         except Exception:
             pass
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from typing import Any
 
 from fastapi import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -157,12 +158,12 @@ class BodyReadTimeoutMiddleware:
         # This is required for streaming responses on ASGI spec < 2.4.
         body_sent = False
 
-        async def _replay_receive() -> dict:
+        async def _replay_receive() -> dict[str, Any]:
             nonlocal body_sent
             if not body_sent:
                 body_sent = True
                 return {"type": "http.request", "body": bytes(buffered), "more_body": False}
             # After body is sent, forward to original receive for disconnect detection
-            return await receive()
+            return dict(await receive())
 
         await self.app(scope, _replay_receive, send)

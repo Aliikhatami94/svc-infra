@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timezone
-
 import pytest
 
 from svc_infra.jobs.scheduler import InMemoryScheduler
