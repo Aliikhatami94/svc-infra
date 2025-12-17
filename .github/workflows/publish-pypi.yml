@@ -1,8 +1,10 @@
 name: Auto publish to PyPI on main
 
 on:
-  push:
-    branches: [ main ]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: publish-pypi
@@ -10,7 +12,8 @@ concurrency:
 
 jobs:
   release:
-    if: ${{ github.actor != 'github-actions[bot]' }}
+    # Only run if CI workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write   # for committing/tagging version bumps
