@@ -10,8 +10,8 @@ try:
     HAS_MOTOR = True
 except ImportError:  # pragma: no cover
     HAS_MOTOR = False
-    AsyncIOMotorDatabase = Any  # type: ignore[assignment,misc]
-    IndexModel = Any  # type: ignore[assignment,misc]
+    AsyncIOMotorDatabase = Any  # type: ignore[assignment, misc]
+    IndexModel = Any  # type: ignore[assignment, misc]
 
 from svc_infra.db.nosql.indexes import normalize_indexes
 from svc_infra.db.nosql.mongo.client import (
