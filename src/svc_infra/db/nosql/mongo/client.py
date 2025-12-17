@@ -8,8 +8,8 @@ try:
     HAS_MOTOR = True
 except ImportError:  # pragma: no cover
     HAS_MOTOR = False
-    AsyncIOMotorClient = Any  # type: ignore[assignment, misc]
-    AsyncIOMotorDatabase = Any  # type: ignore[assignment, misc]
+    AsyncIOMotorClient = Any  # type: ignore[assignment,misc]
+    AsyncIOMotorDatabase = Any  # type: ignore[assignment,misc]
 
 from .settings import MongoSettings
 

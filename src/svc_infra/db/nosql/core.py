@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Sequence, cast
 
 try:
     from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -10,8 +10,8 @@ try:
     HAS_MOTOR = True
 except ImportError:  # pragma: no cover
     HAS_MOTOR = False
-    AsyncIOMotorDatabase = Any  # type: ignore[assignment, misc]
-    IndexModel = Any  # type: ignore[assignment, misc]
+    AsyncIOMotorDatabase = Any  # type: ignore[assignment,misc]
+    IndexModel = Any  # type: ignore[assignment,misc]
 
 from svc_infra.db.nosql.indexes import normalize_indexes
 from svc_infra.db.nosql.mongo.client import (
@@ -46,7 +46,8 @@ async def _apply_indexes(
 ) -> list[str]:
     if not indexes:
         return []
-    return await db[collection].create_indexes(list(indexes))
+    result = await db[collection].create_indexes(list(indexes))
+    return cast(list[str], result)
 
 
 # collection + doc used to "lock" the chosen DB name for this app
