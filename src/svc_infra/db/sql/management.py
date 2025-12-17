@@ -18,7 +18,6 @@ def _py_type(col: Column) -> type:
         return col.type.python_type
 
     from datetime import date, datetime
-    from typing import Any as _Any
     from uuid import UUID
 
     from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text
