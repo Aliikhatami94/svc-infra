@@ -46,22 +46,9 @@ repos:
       - id: ruff
         args: ["--fix", "--exit-non-zero-on-fix"]
 
-  # --- Type checking ---
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
-    hooks:
-      - id: mypy
-        args: ["--config-file=mypy.ini"]
-        additional_dependencies:
-          - pydantic>=2.0
-          - fastapi>=0.109.0
-          - httpx>=0.27.0
-          - types-redis
-          - types-PyYAML
-          - types-python-dateutil
-        exclude: ^tests/
-        pass_filenames: false
-        entry: mypy src/
+  # NOTE: mypy removed from pre-commit - it needs full project dependencies
+  # which pre-commit's isolated environment can't provide. Type checking
+  # happens in CI via `poetry run mypy src` with full dependencies.
 
   # --- Tests (opt-in/manual only) ---
   - repo: local
