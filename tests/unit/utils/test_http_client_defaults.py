@@ -1,7 +1,11 @@
 import httpx
 import pytest
 
-from svc_infra.http import get_default_timeout_seconds, new_async_httpx_client, new_httpx_client
+from svc_infra.http import (
+    get_default_timeout_seconds,
+    new_async_httpx_client,
+    new_httpx_client,
+)
 
 
 @pytest.mark.parametrize("val", ["0.123", "2.5", "10"])  # string env values

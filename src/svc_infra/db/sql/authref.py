@@ -62,4 +62,6 @@ def user_fk_constraint(
     Returns a table-level ForeignKeyConstraint([...], [<auth_table>.<pk>]) for the given column.
     """
     table, _pk_type, pk_name = resolve_auth_table_pk()
-    return ForeignKeyConstraint([column_name], [f"{table}.{pk_name}"], ondelete=ondelete)
+    return ForeignKeyConstraint(
+        [column_name], [f"{table}.{pk_name}"], ondelete=ondelete
+    )

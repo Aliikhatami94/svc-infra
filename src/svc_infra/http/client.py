@@ -71,7 +71,9 @@ def new_httpx_client(
     If propagate_request_id=True (default), X-Request-Id header is added from context.
     """
     timeout = make_timeout(timeout_seconds)
-    merged_headers = _merge_request_id_header(headers) if propagate_request_id else headers
+    merged_headers = (
+        _merge_request_id_header(headers) if propagate_request_id else headers
+    )
     # httpx doesn't accept base_url=None; only pass if non-None
     client_kwargs = {"timeout": timeout, "headers": merged_headers, **kwargs}
     if base_url is not None:
@@ -93,7 +95,9 @@ def new_async_httpx_client(
     If propagate_request_id=True (default), X-Request-Id header is added from context.
     """
     timeout = make_timeout(timeout_seconds)
-    merged_headers = _merge_request_id_header(headers) if propagate_request_id else headers
+    merged_headers = (
+        _merge_request_id_header(headers) if propagate_request_id else headers
+    )
     # httpx doesn't accept base_url=None; only pass if non-None
     client_kwargs = {"timeout": timeout, "headers": merged_headers, **kwargs}
     if base_url is not None:

@@ -138,7 +138,9 @@ def _configure_session_middleware(
     )
     https_env = _parse_bool(env.get("SESSION_COOKIE_SECURE"))
     effective_https_only = (
-        https_only if https_only is not None else (https_env if https_env is not None else False)
+        https_only
+        if https_only is not None
+        else (https_env if https_env is not None else False)
     )
     same_site_env = env.get("SESSION_COOKIE_SAMESITE")
     same_site_raw = same_site_env.strip() if same_site_env else same_site
@@ -156,7 +158,9 @@ def _configure_session_middleware(
         max_age_value = max_age
 
     session_cookie_env = env.get("SESSION_COOKIE_NAME")
-    session_cookie_value = session_cookie_env.strip() if session_cookie_env else session_cookie
+    session_cookie_value = (
+        session_cookie_env.strip() if session_cookie_env else session_cookie
+    )
 
     app.add_middleware(
         SessionMiddleware,

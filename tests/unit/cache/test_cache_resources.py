@@ -98,7 +98,9 @@ class TestResourceCacheRead:
         """Test Resource cache_read with custom key template."""
         res = resource("user", "user_id")
 
-        @res.cache_read(suffix="profile", ttl=300, key_template="custom:user:{user_id}:profile")
+        @res.cache_read(
+            suffix="profile", ttl=300, key_template="custom:user:{user_id}:profile"
+        )
         async def get_user_profile(*, user_id: int):
             return {"id": user_id, "name": "Database User"}
 

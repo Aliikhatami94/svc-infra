@@ -63,7 +63,9 @@ async def get_session() -> AsyncIterator[AsyncSession]:
                 if ms > 0:
                     try:
                         # SET LOCAL applies for the duration of the current transaction only
-                        await session.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": ms})
+                        await session.execute(
+                            text("SET LOCAL statement_timeout = :ms"), {"ms": ms}
+                        )
                     except Exception:
                         # Non-PG dialects (e.g., SQLite) will error; ignore silently
                         pass

@@ -33,7 +33,9 @@ def stable_hash(*args: Any, **kwargs: Any) -> str:
     """
     try:
         # Use JSON serialization for stable, deterministic output
-        raw = json.dumps([args, kwargs], default=str, sort_keys=True, separators=(",", ":"))
+        raw = json.dumps(
+            [args, kwargs], default=str, sort_keys=True, separators=(",", ":")
+        )
     except (TypeError, ValueError) as e:
         # Fallback to repr if JSON serialization fails
         logger.warning(f"JSON serialization failed for hash input, using repr: {e}")

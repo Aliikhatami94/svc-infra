@@ -13,7 +13,9 @@ from svc_infra.security.session import issue_session_and_refresh
 class FakeUser:
     def __init__(self):
         self.id = uuid.uuid4()
-        self.roles = ["admin"]  # maps to permissions including security.session.list/revoke
+        self.roles = [
+            "admin"
+        ]  # maps to permissions including security.session.list/revoke
 
 
 class FakeDB:
@@ -59,7 +61,9 @@ async def test_list_and_revoke_session():
     router = build_session_router()
     # Directly invoke underlying function (not full FastAPI app for brevity)
     list_fn = next(
-        r.endpoint for r in router.routes if r.path == "/sessions/me" and r.methods == {"GET"}
+        r.endpoint
+        for r in router.routes
+        if r.path == "/sessions/me" and r.methods == {"GET"}
     )
     revoke_fn = next(
         r.endpoint

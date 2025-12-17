@@ -56,8 +56,12 @@ class SqlRepository:
             # Filter out soft-deleted rows by timestamp and/or active flag
             if hasattr(self.model, self.soft_delete_field):
                 stmt = stmt.where(getattr(self.model, self.soft_delete_field).is_(None))
-            if self.soft_delete_flag_field and hasattr(self.model, self.soft_delete_flag_field):
-                stmt = stmt.where(getattr(self.model, self.soft_delete_flag_field).is_(True))
+            if self.soft_delete_flag_field and hasattr(
+                self.model, self.soft_delete_flag_field
+            ):
+                stmt = stmt.where(
+                    getattr(self.model, self.soft_delete_flag_field).is_(True)
+                )
         return stmt
 
     # basic ops
@@ -80,7 +84,9 @@ class SqlRepository:
         result = (await session.execute(stmt)).scalars().all()
         return list(result)
 
-    async def count(self, session: AsyncSession, *, where: Optional[Sequence[Any]] = None) -> int:
+    async def count(
+        self, session: AsyncSession, *, where: Optional[Sequence[Any]] = None
+    ) -> int:
         base = self._base_select()
         if where:
             base = base.where(and_(*where))
@@ -150,7 +156,9 @@ class SqlRepository:
             # Check attributes on the instance to support test doubles without class-level fields
             if hasattr(obj, self.soft_delete_field):
                 setattr(obj, self.soft_delete_field, func.now())
-            if self.soft_delete_flag_field and hasattr(obj, self.soft_delete_flag_field):
+            if self.soft_delete_flag_field and hasattr(
+                obj, self.soft_delete_flag_field
+            ):
                 setattr(obj, self.soft_delete_flag_field, False)
             await session.flush()
             return True

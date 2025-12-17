@@ -12,7 +12,12 @@ from ..auth.security import (
 )
 from ..auth.ws_security import AllowWSIdentity, RequireWSIdentity, RequireWSScopes
 from ..openapi.apply import apply_default_responses, apply_default_security
-from ..openapi.responses import DEFAULT_PROTECTED, DEFAULT_PUBLIC, DEFAULT_SERVICE, DEFAULT_USER
+from ..openapi.responses import (
+    DEFAULT_PROTECTED,
+    DEFAULT_PUBLIC,
+    DEFAULT_SERVICE,
+    DEFAULT_USER,
+)
 from .router import DualAPIRouter
 
 
@@ -53,7 +58,9 @@ def protected_router(
 
 
 # USER-ONLY (no API-key-only access)
-def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
+def user_router(
+    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+) -> DualAPIRouter:
     r = DualAPIRouter(dependencies=_merge([RequireUser()], dependencies), **kwargs)
     apply_default_security(
         r, default_security=[{"OAuth2PasswordBearer": []}, {"SessionCookie": []}]
@@ -63,7 +70,9 @@ def user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) 
 
 
 # SERVICE-ONLY (API key required)
-def service_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
+def service_router(
+    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+) -> DualAPIRouter:
     r = DualAPIRouter(dependencies=_merge([RequireService()], dependencies), **kwargs)
     apply_default_security(r, default_security=[{"APIKeyHeader": []}])
     apply_default_responses(r, DEFAULT_SERVICE)
@@ -154,7 +163,9 @@ def ws_optional_router(
     return r
 
 
-def ws_user_router(*, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any) -> DualAPIRouter:
+def ws_user_router(
+    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+) -> DualAPIRouter:
     """
     User-only WebSocket router - requires valid user JWT (no API key).
 
@@ -196,7 +207,9 @@ def ws_scopes_router(
             ...
     """
     r = DualAPIRouter(
-        dependencies=_merge([RequireWSIdentity, RequireWSScopes(*scopes)], dependencies),
+        dependencies=_merge(
+            [RequireWSIdentity, RequireWSScopes(*scopes)], dependencies
+        ),
         **kwargs,
     )
     apply_default_security(

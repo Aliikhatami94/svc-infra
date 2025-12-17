@@ -42,7 +42,9 @@ async def login_client_gaurd(request: Request):
         client_id_raw = form.get("client_id")
         client_secret_raw = form.get("client_secret")
         client_id = client_id_raw.strip() if isinstance(client_id_raw, str) else ""
-        client_secret = client_secret_raw.strip() if isinstance(client_secret_raw, str) else ""
+        client_secret = (
+            client_secret_raw.strip() if isinstance(client_secret_raw, str) else ""
+        )
         if not client_id or not client_secret:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,7 +54,10 @@ async def login_client_gaurd(request: Request):
         # validate against configured clients
         ok = False
         for pc in getattr(st, "password_clients", []) or []:
-            if pc.client_id == client_id and pc.client_secret.get_secret_value() == client_secret:
+            if (
+                pc.client_id == client_id
+                and pc.client_secret.get_secret_value() == client_secret
+            ):
                 ok = True
                 break
 
@@ -98,7 +103,9 @@ def auth_session_router(
             status_lo = await get_lockout_status(session, user_id=None, ip_hash=ip_hash)
             if status_lo.locked and status_lo.next_allowed_at:
                 retry = int(
-                    (status_lo.next_allowed_at - datetime.now(timezone.utc)).total_seconds()
+                    (
+                        status_lo.next_allowed_at - datetime.now(timezone.utc)
+                    ).total_seconds()
                 )
                 raise HTTPException(
                     status_code=429,
@@ -113,7 +120,9 @@ def auth_session_router(
         if not user:
             _, _ = _pwd.verify_and_update(password, _DUMMY_BCRYPT)
             try:
-                await record_attempt(session, user_id=None, ip_hash=ip_hash, success=False)
+                await record_attempt(
+                    session, user_id=None, ip_hash=ip_hash, success=False
+                )
             except Exception:
                 pass
             raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
@@ -122,7 +131,9 @@ def auth_session_router(
         if not getattr(user, "is_active", True):
             raise HTTPException(401, "account_disabled")
 
-        hashed = getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
+        hashed = getattr(user, "hashed_password", None) or getattr(
+            user, "password_hash", None
+        )
         if not hashed:
             try:
                 await record_attempt(
@@ -142,7 +153,9 @@ def auth_session_router(
             )
             if status_user.locked and status_user.next_allowed_at:
                 retry = int(
-                    (status_user.next_allowed_at - datetime.now(timezone.utc)).total_seconds()
+                    (
+                        status_user.next_allowed_at - datetime.now(timezone.utc)
+                    ).total_seconds()
                 )
                 raise HTTPException(
                     status_code=429,

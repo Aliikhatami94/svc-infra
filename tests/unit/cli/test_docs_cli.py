@@ -27,7 +27,9 @@ def test_docs_dynamic_and_unknown_topic_error():
     # unknown topic as dynamic subcommand
     bad = runner.invoke(cli_app, ["docs", "does-not-exist"])
     assert bad.exit_code != 0
-    combined = (bad.stdout or "") + (getattr(bad, "output", "") or "") + (bad.stderr or "")
+    combined = (
+        (bad.stdout or "") + (getattr(bad, "output", "") or "") + (bad.stderr or "")
+    )
     assert "No such command" in combined
 
 

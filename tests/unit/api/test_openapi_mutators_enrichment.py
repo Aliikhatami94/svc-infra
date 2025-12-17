@@ -19,7 +19,9 @@ def test_openapi_has_code_samples_and_problem_examples():
     def ping():  # noqa: D401, ANN202
         return {"ok": True}
 
-    apply_mutators(app, attach_code_samples_mutator(), ensure_problem_examples_mutator())
+    apply_mutators(
+        app, attach_code_samples_mutator(), ensure_problem_examples_mutator()
+    )
 
     with TestClient(app) as client:
         schema = client.get("/openapi.json").json()
@@ -35,7 +37,9 @@ def test_openapi_has_code_samples_and_problem_examples():
     schema_copy["paths"]["/ping"]["get"].setdefault("responses", {})["500"] = {
         "description": "err",
         "content": {
-            "application/problem+json": {"schema": {"$ref": "#/components/schemas/Problem"}}
+            "application/problem+json": {
+                "schema": {"$ref": "#/components/schemas/Problem"}
+            }
         },
     }
     enriched = ensure_problem_examples_mutator()(schema_copy)

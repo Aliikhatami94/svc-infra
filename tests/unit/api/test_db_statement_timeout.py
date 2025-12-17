@@ -1,7 +1,11 @@
 import pytest
 from sqlalchemy import text
 
-from svc_infra.api.fastapi.db.sql.session import dispose_session, get_session, initialize_session
+from svc_infra.api.fastapi.db.sql.session import (
+    dispose_session,
+    get_session,
+    initialize_session,
+)
 
 # Skip test if aiosqlite is not installed (it's an optional dependency)
 pytest.importorskip("aiosqlite")

@@ -104,14 +104,24 @@ class _FakeService:
                 return True
         return False
 
-    async def search(self, session, *, q, fields, limit, offset, order_by=None, where=None):
+    async def search(
+        self, session, *, q, fields, limit, offset, order_by=None, where=None
+    ):
         tid = self._tenant_from_where(where)
-        rows = [r for r in self.data.get(tid, []) if q.lower() in r.get("name", "").lower()]
+        rows = [
+            r for r in self.data.get(tid, []) if q.lower() in r.get("name", "").lower()
+        ]
         return rows[offset : offset + limit]
 
     async def count_filtered(self, session, *, q, fields, where=None):
         tid = self._tenant_from_where(where)
-        return len([r for r in self.data.get(tid, []) if q.lower() in r.get("name", "").lower()])
+        return len(
+            [
+                r
+                for r in self.data.get(tid, [])
+                if q.lower() in r.get("name", "").lower()
+            ]
+        )
 
 
 class _Create(BaseModel):

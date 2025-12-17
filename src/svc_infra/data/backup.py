@@ -30,7 +30,9 @@ def verify_backups(
     now = datetime.now(timezone.utc)
     age_days = (now - last_success).total_seconds() / 86400.0
     ok = retention_days is None or age_days <= max(1, retention_days)
-    return BackupHealthReport(ok=ok, last_success=last_success, retention_days=retention_days)
+    return BackupHealthReport(
+        ok=ok, last_success=last_success, retention_days=retention_days
+    )
 
 
 __all__ = ["BackupHealthReport", "verify_backups"]

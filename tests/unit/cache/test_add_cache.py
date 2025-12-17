@@ -14,9 +14,7 @@ def test_add_cache_wires_startup_shutdown_and_state(monkeypatch):
         "svc_infra.cache.add._wait_ready", new_callable=AsyncMock
     ) as ready_mock, patch(
         "svc_infra.cache.add._shutdown_cache", new_callable=AsyncMock
-    ) as shutdown_mock, patch(
-        "svc_infra.cache.add._instance"
-    ) as instance_mock:
+    ) as shutdown_mock, patch("svc_infra.cache.add._instance") as instance_mock:
         instance_mock.return_value = object()
 
         # Import and wire

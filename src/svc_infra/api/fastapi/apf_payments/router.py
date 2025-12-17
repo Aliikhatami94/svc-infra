@@ -50,7 +50,12 @@ from svc_infra.apf_payments.schemas import (
 from svc_infra.apf_payments.service import PaymentsService
 from svc_infra.api.fastapi.auth.security import OptionalIdentity, Principal
 from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
-from svc_infra.api.fastapi.dual import protected_router, public_router, service_router, user_router
+from svc_infra.api.fastapi.dual import (
+    protected_router,
+    public_router,
+    service_router,
+    user_router,
+)
 from svc_infra.api.fastapi.dual.router import DualAPIRouter
 from svc_infra.api.fastapi.middleware.idempotency import require_idempotency_key
 from svc_infra.api.fastapi.pagination import (
@@ -136,10 +141,14 @@ async def get_service(
                 # allow tests to call without a Request; try identity or fallback
                 if identity and getattr(identity.user or object(), "tenant_id", None):
                     tid = getattr(identity.user, "tenant_id")
-                elif identity and getattr(identity.api_key or object(), "tenant_id", None):
+                elif identity and getattr(
+                    identity.api_key or object(), "tenant_id", None
+                ):
                     tid = getattr(identity.api_key, "tenant_id")
                 else:
-                    raise HTTPException(status_code=400, detail="tenant_context_missing")
+                    raise HTTPException(
+                        status_code=400, detail="tenant_context_missing"
+                    )
         except HTTPException:
             # fallback for routes/tests that don't set context; preserve prior default
             tid = "test_tenant"
@@ -163,7 +172,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Customers"],
     )
-    async def upsert_customer(data: CustomerUpsertIn, svc: PaymentsService = Depends(get_service)):
+    async def upsert_customer(
+        data: CustomerUpsertIn, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.ensure_customer(data)
         await svc.session.flush()
         return out
@@ -186,7 +197,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         out = await svc.create_intent(user_id=None, data=data)
         await svc.session.flush()
         response.headers["Location"] = str(
-            request.url_for("payments_get_intent", provider_intent_id=out.provider_intent_id)
+            request.url_for(
+                "payments_get_intent", provider_intent_id=out.provider_intent_id
+            )
         )
         return out
 
@@ -200,7 +213,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Payment Intents"],
     )
-    async def confirm_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
+    async def confirm_intent(
+        provider_intent_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.confirm_intent(provider_intent_id)
         await svc.session.flush()
         return out
@@ -212,7 +227,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Payment Intents"],
     )
-    async def cancel_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
+    async def cancel_intent(
+        provider_intent_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.cancel_intent(provider_intent_id)
         await svc.session.flush()
         return out
@@ -342,7 +359,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Payment Methods"],
     )
-    async def detach_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):
+    async def detach_method(
+        provider_method_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.detach_payment_method(provider_method_id)
         await svc.session.flush()
         return out
@@ -359,7 +378,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         customer_provider_id: str,
         svc: PaymentsService = Depends(get_service),
     ):
-        out = await svc.set_default_payment_method(customer_provider_id, provider_method_id)
+        out = await svc.set_default_payment_method(
+            customer_provider_id, provider_method_id
+        )
         await svc.session.flush()
         return out
 
@@ -372,7 +393,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Products"],
     )
-    async def create_product(data: ProductCreateIn, svc: PaymentsService = Depends(get_service)):
+    async def create_product(
+        data: ProductCreateIn, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.create_product(data)
         await svc.session.flush()
         return out
@@ -385,7 +408,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Prices"],
     )
-    async def create_price(data: PriceCreateIn, svc: PaymentsService = Depends(get_service)):
+    async def create_price(
+        data: PriceCreateIn, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.create_price(data)
         await svc.session.flush()
         return out
@@ -456,7 +481,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         out = await svc.create_invoice(data)
         await svc.session.flush()
         response.headers["Location"] = str(
-            request.url_for("payments_get_invoice", provider_invoice_id=out.provider_invoice_id)
+            request.url_for(
+                "payments_get_invoice", provider_invoice_id=out.provider_invoice_id
+            )
         )
         return out
 
@@ -481,7 +508,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Invoices"],
     )
-    async def void_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
+    async def void_invoice(
+        provider_invoice_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.void_invoice(provider_invoice_id)
         await svc.session.flush()
         return out
@@ -493,7 +522,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Invoices"],
     )
-    async def pay_invoice(provider_invoice_id: str, svc: PaymentsService = Depends(get_service)):
+    async def pay_invoice(
+        provider_invoice_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         out = await svc.pay_invoice(provider_invoice_id)
         await svc.session.flush()
         return out
@@ -505,7 +536,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_get_intent",
         tags=["Payment Intents"],
     )
-    async def get_intent(provider_intent_id: str, svc: PaymentsService = Depends(get_service)):
+    async def get_intent(
+        provider_intent_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         return await svc.get_intent(provider_intent_id)
 
     # STATEMENTS (rollup)
@@ -726,7 +759,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=DisputeOut,
         tags=["Disputes"],
     )
-    async def get_dispute(provider_dispute_id: str, svc: PaymentsService = Depends(get_service)):
+    async def get_dispute(
+        provider_dispute_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         return await svc.get_dispute(provider_dispute_id)
 
     @prot.post(
@@ -738,7 +773,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     )
     async def submit_dispute_evidence(
         provider_dispute_id: str,
-        evidence: dict = Body(..., embed=True),  # free-form evidence blob you validate internally
+        evidence: dict = Body(
+            ..., embed=True
+        ),  # free-form evidence blob you validate internally
         svc: PaymentsService = Depends(get_service),
     ):
         out = await svc.submit_dispute_evidence(provider_dispute_id, evidence)
@@ -773,7 +810,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         response_model=PayoutOut,
         tags=["Payouts"],
     )
-    async def get_payout(provider_payout_id: str, svc: PaymentsService = Depends(get_service)):
+    async def get_payout(
+        provider_payout_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         return await svc.get_payout(provider_payout_id)
 
     # ===== Webhook replay (operational) =====
@@ -833,7 +872,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         name="payments_get_method",
         tags=["Payment Methods"],
     )
-    async def get_method(provider_method_id: str, svc: PaymentsService = Depends(get_service)):
+    async def get_method(
+        provider_method_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         return await svc.get_payment_method(provider_method_id)
 
     @prot.post(
@@ -1072,7 +1113,9 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         dependencies=[Depends(require_idempotency_key)],
         tags=["Payment Methods"],
     )
-    async def delete_method_alias(alias_id: str, svc: PaymentsService = Depends(get_service)):
+    async def delete_method_alias(
+        alias_id: str, svc: PaymentsService = Depends(get_service)
+    ):
         """
         Removes the local alias/association to a payment method.
         This does **not** delete the underlying payment method at the provider.

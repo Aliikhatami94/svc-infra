@@ -334,7 +334,9 @@ class TestConnectionManagerRooms:
         await manager.join_room("user1", "vip")
         await manager.join_room("user2", "vip")
 
-        sent = await manager.broadcast_to_room("vip", {"msg": "hello"}, exclude_user="user1")
+        sent = await manager.broadcast_to_room(
+            "vip", {"msg": "hello"}, exclude_user="user1"
+        )
 
         assert sent == 1
         ws1.send_json.assert_not_called()

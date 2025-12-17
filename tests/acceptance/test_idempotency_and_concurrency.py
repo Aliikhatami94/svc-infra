@@ -57,7 +57,9 @@ class TestOptimisticLockingAcceptance:
         data2 = r_ok.json()
         assert data2["version"] == 2
         # Update with stale version → 409
-        r_conflict = client.put(f"/cc/items/{item_id}", json={"value": "c", "version": 1})
+        r_conflict = client.put(
+            f"/cc/items/{item_id}", json={"value": "c", "version": 1}
+        )
         assert r_conflict.status_code == 409
         j = r_conflict.json()
         assert j.get("title") == "Conflict"

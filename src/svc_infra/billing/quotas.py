@@ -13,7 +13,9 @@ from svc_infra.api.fastapi.tenancy.context import TenantId
 from .models import PlanEntitlement, Subscription, UsageAggregate
 
 
-async def _current_subscription(session: AsyncSession, tenant_id: str) -> Optional[Subscription]:
+async def _current_subscription(
+    session: AsyncSession, tenant_id: str
+) -> Optional[Subscription]:
     now = datetime.now(tz=timezone.utc)
     row = (
         (

@@ -135,7 +135,9 @@ def setup_oauth_authentication(
     if not providers:
         return
 
-    redirect_url = post_login_redirect or getattr(settings_obj, "post_login_redirect", None) or "/"
+    redirect_url = (
+        post_login_redirect or getattr(settings_obj, "post_login_redirect", None) or "/"
+    )
     oauth_router_instance = oauth_router_with_backend(
         user_model=user_model,
         auth_backend=auth_backend,
@@ -266,7 +268,9 @@ def add_auth_users(
     )
 
     # Make the boot-time strategy and model available to resolvers
-    set_auth_state(user_model=user_model, get_strategy=get_strategy, auth_prefix=auth_prefix)
+    set_auth_state(
+        user_model=user_model, get_strategy=get_strategy, auth_prefix=auth_prefix
+    )
 
     settings_obj = get_auth_settings()
     policy = auth_policy or DefaultAuthPolicy(settings_obj)

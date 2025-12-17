@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 
 class UsageIn(BaseModel):
     metric: str = Field(..., min_length=1, max_length=64)
-    amount: Annotated[int, Field(ge=0, description="Non-negative amount for the metric")]
+    amount: Annotated[
+        int, Field(ge=0, description="Non-negative amount for the metric")
+    ]
     at: Optional[datetime] = Field(
         default=None,
         description="Event timestamp (UTC). Defaults to server time if omitted.",

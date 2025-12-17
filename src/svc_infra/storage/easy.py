@@ -135,7 +135,9 @@ def easy_storage(
         secret_key = kwargs.get("secret_key")
 
         if not access_key or not secret_key:
-            access_key_from_settings, secret_key_from_settings = settings.get_s3_credentials()
+            access_key_from_settings, secret_key_from_settings = (
+                settings.get_s3_credentials()
+            )
             access_key = access_key or access_key_from_settings
             secret_key = secret_key or secret_key_from_settings
 
@@ -169,7 +171,8 @@ def easy_storage(
     elif backend_type == "cloudinary":
         # Cloudinary backend
         raise NotImplementedError(
-            "Cloudinary backend not yet implemented. " "Use 'local' or 's3' backend for now."
+            "Cloudinary backend not yet implemented. "
+            "Use 'local' or 's3' backend for now."
         )
 
     else:

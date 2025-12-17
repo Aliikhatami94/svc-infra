@@ -62,7 +62,8 @@ async def verify_chain_for_tenant(
             events = [
                 e
                 for e in pool
-                if isinstance(e, AuditLog) and (tenant_id is None or e.tenant_id == tenant_id)
+                if isinstance(e, AuditLog)
+                and (tenant_id is None or e.tenant_id == tenant_id)
             ]
         except Exception:  # pragma: no cover
             events = []

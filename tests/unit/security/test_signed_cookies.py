@@ -23,11 +23,15 @@ def test_tamper_detection():
 
 def test_old_key_rotation():
     val = sign_cookie({"sub": "u"}, key="new")
-    ok, _ = verify_cookie(val, key="new", old_keys=["old1", "old2"])  # should pass primary
+    ok, _ = verify_cookie(
+        val, key="new", old_keys=["old1", "old2"]
+    )  # should pass primary
     assert ok
     # A cookie signed with old key should pass when old_keys provided
     old_val = sign_cookie({"sub": "u"}, key="old1")
-    ok2, _ = verify_cookie(old_val, key="new", old_keys=["old1", "old2"])  # verify using old
+    ok2, _ = verify_cookie(
+        old_val, key="new", old_keys=["old1", "old2"]
+    )  # verify using old
     assert ok2
 
 

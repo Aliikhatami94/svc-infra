@@ -35,7 +35,9 @@ async def test_rotating_jwt_strategy_rejects_unrelated_secret():
     unrelated = "other-secret"
     new_secret = "new-secret"
 
-    issuer = JWTStrategy(secret=unrelated, lifetime_seconds=60, token_audience="fastapi-users:auth")
+    issuer = JWTStrategy(
+        secret=unrelated, lifetime_seconds=60, token_audience="fastapi-users:auth"
+    )
     user = type("U", (), {"id": "user-2"})()
     token = await issuer.write_token(user)
 

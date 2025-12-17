@@ -61,7 +61,9 @@ def recache(
     Returns:
         RecachePlan instance
     """
-    return RecachePlan(getter=getter, include=include, rename=rename, extra=extra, key=key)
+    return RecachePlan(
+        getter=getter, include=include, rename=rename, extra=extra, key=key
+    )
 
 
 RecacheSpec = Union[
@@ -182,18 +184,24 @@ def build_getter_kwargs(
                     continue
                 try:
                     if callable(source):
-                        legacy_call_kwargs[getter_param] = source(*mut_args, **mut_kwargs)
+                        legacy_call_kwargs[getter_param] = source(
+                            *mut_args, **mut_kwargs
+                        )
                     elif isinstance(source, str) and source in mut_kwargs:
                         legacy_call_kwargs[getter_param] = mut_kwargs[source]
                 except Exception as e:
-                    logger.warning(f"Recache parameter mapping failed for {getter_param}: {e}")
+                    logger.warning(
+                        f"Recache parameter mapping failed for {getter_param}: {e}"
+                    )
 
         # Add direct parameter matches
         for param_name in getter_params.keys():
             if param_name not in legacy_call_kwargs and param_name in mut_kwargs:
                 legacy_call_kwargs[param_name] = mut_kwargs[param_name]
 
-        legacy_call_kwargs = {k: v for k, v in legacy_call_kwargs.items() if k in getter_params}
+        legacy_call_kwargs = {
+            k: v for k, v in legacy_call_kwargs.items() if k in getter_params
+        }
         return getter, legacy_call_kwargs
 
     # Handle simple getter function
@@ -224,7 +232,9 @@ async def execute_recache(
                         try:
                             await _cache.delete(key_variant)
                         except Exception as e:
-                            logger.debug(f"Failed to delete cache key {key_variant}: {e}")
+                            logger.debug(
+                                f"Failed to delete cache key {key_variant}: {e}"
+                            )
 
                 # Execute the getter to warm the cache
                 await getter(**call_kwargs)
@@ -233,4 +243,6 @@ async def execute_recache(
                 logger.error(f"Recache operation failed: {e}")
 
     # Execute all recache operations concurrently
-    await asyncio.gather(*[_run_single_recache(spec) for spec in specs], return_exceptions=True)
+    await asyncio.gather(
+        *[_run_single_recache(spec) for spec in specs], return_exceptions=True
+    )

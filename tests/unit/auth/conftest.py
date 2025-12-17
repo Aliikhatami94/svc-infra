@@ -25,7 +25,9 @@ async def auth_app(mocker) -> FastAPI:
     app = FastAPI(title="Auth Test App")
 
     # Add error handlers
-    from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
+    from svc_infra.api.fastapi.middleware.errors.catchall import (
+        CatchAllExceptionMiddleware,
+    )
     from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
 
     app.add_middleware(CatchAllExceptionMiddleware)
@@ -78,7 +80,9 @@ def _auth_env(monkeypatch):
     # Force LOCAL env for permissive auth in tests
     from svc_infra.app import env as env_mod
 
-    monkeypatch.setattr(env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False)
+    monkeypatch.setattr(
+        env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False
+    )
 
     # Mock auth settings
 

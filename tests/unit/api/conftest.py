@@ -20,7 +20,9 @@ async def api_app(mocker) -> FastAPI:
     app = FastAPI(title="API Test App")
 
     # Add error handlers
-    from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
+    from svc_infra.api.fastapi.middleware.errors.catchall import (
+        CatchAllExceptionMiddleware,
+    )
     from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
 
     app.add_middleware(CatchAllExceptionMiddleware)

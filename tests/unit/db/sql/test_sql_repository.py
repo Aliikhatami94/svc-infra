@@ -40,7 +40,9 @@ class TestSqlRepository:
         mock_sqlalchemy_session.flush.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_save_with_integrity_error(self, sql_repository, mock_sqlalchemy_session):
+    async def test_save_with_integrity_error(
+        self, sql_repository, mock_sqlalchemy_session
+    ):
         """Test record saving with integrity error."""
         # Mock the session.flush to raise IntegrityError
         mock_sqlalchemy_session.flush = AsyncMock(
@@ -113,7 +115,9 @@ class TestSqlRepository:
         """Test record finding all with filters."""
         # Create mock users
         mock_users = [
-            UserModel(id=1, email="active@example.com", name="Active User", is_active="true"),
+            UserModel(
+                id=1, email="active@example.com", name="Active User", is_active="true"
+            ),
         ]
 
         # Mock the session.execute to return filtered users
@@ -130,7 +134,9 @@ class TestSqlRepository:
         mock_sqlalchemy_session.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_find_all_with_pagination(self, sql_repository, mock_sqlalchemy_session):
+    async def test_find_all_with_pagination(
+        self, sql_repository, mock_sqlalchemy_session
+    ):
         """Test record finding all with pagination."""
         # Create mock users
         mock_users = [

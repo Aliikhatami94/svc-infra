@@ -11,7 +11,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, text
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from svc_infra.db.sql.base import ModelBase

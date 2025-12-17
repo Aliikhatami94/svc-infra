@@ -28,7 +28,9 @@ class IntentCreateIn(BaseModel):
     currency: Currency = Field(..., json_schema_extra={"example": "USD"})
     description: Optional[str] = None
     capture_method: Literal["automatic", "manual"] = "automatic"
-    payment_method_types: list[str] = Field(default_factory=list)  # let provider default
+    payment_method_types: list[str] = Field(
+        default_factory=list
+    )  # let provider default
 
 
 class NextAction(BaseModel):
@@ -134,14 +136,18 @@ class SubscriptionCreateIn(BaseModel):
     price_provider_id: str
     quantity: int = 1
     trial_days: Optional[int] = None
-    proration_behavior: Literal["create_prorations", "none", "always_invoice"] = "create_prorations"
+    proration_behavior: Literal["create_prorations", "none", "always_invoice"] = (
+        "create_prorations"
+    )
 
 
 class SubscriptionUpdateIn(BaseModel):
     price_provider_id: Optional[str] = None
     quantity: Optional[int] = None
     cancel_at_period_end: Optional[bool] = None
-    proration_behavior: Literal["create_prorations", "none", "always_invoice"] = "create_prorations"
+    proration_behavior: Literal["create_prorations", "none", "always_invoice"] = (
+        "create_prorations"
+    )
 
 
 class SubscriptionOut(BaseModel):
@@ -199,7 +205,9 @@ class InvoiceLineItemIn(BaseModel):
     unit_amount: AmountMinor
     currency: Currency
     quantity: Optional[int] = 1
-    provider_price_id: Optional[str] = None  # if linked to a price, unit_amount may be ignored
+    provider_price_id: Optional[str] = (
+        None  # if linked to a price, unit_amount may be ignored
+    )
 
 
 class InvoicesListFilter(BaseModel):

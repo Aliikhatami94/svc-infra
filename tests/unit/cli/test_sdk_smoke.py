@@ -16,7 +16,9 @@ runner = CliRunner()
 def test_sdk_smoke_py_import(monkeypatch, tmp_path: Path):
     openapi = tmp_path / "openapi.json"
     openapi.write_text(
-        json.dumps({"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}})
+        json.dumps(
+            {"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}}
+        )
     )
 
     def fake_check_call(cmd):  # noqa: ANN001
@@ -60,7 +62,9 @@ def test_sdk_smoke_py_import(monkeypatch, tmp_path: Path):
 def test_sdk_smoke_ts_directory(monkeypatch, tmp_path: Path):
     openapi = tmp_path / "openapi.json"
     openapi.write_text(
-        json.dumps({"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}})
+        json.dumps(
+            {"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}}
+        )
     )
 
     def fake_check_call(cmd):  # noqa: ANN001
@@ -89,7 +93,9 @@ def test_sdk_smoke_postman_collection(monkeypatch, tmp_path: Path):
     openapi = tmp_path / "openapi.json"
     out = tmp_path / "postman.json"
     openapi.write_text(
-        json.dumps({"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}})
+        json.dumps(
+            {"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}}
+        )
     )
 
     def fake_check_call(cmd):  # noqa: ANN001

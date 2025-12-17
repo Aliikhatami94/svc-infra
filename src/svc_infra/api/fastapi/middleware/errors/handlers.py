@@ -64,7 +64,9 @@ def problem_response(
         body["errors"] = errors
     if trace_id:
         body["trace_id"] = trace_id
-    return JSONResponse(status_code=status, content=body, media_type=PROBLEM_MT, headers=headers)
+    return JSONResponse(
+        status_code=status, content=body, media_type=PROBLEM_MT, headers=headers
+    )
 
 
 def register_error_handlers(app):
@@ -76,7 +78,11 @@ def register_error_handlers(app):
         return problem_response(
             status=504,
             title="Gateway Timeout",
-            detail=("Upstream request timed out." if IS_PROD else (str(exc) or "httpx timeout")),
+            detail=(
+                "Upstream request timed out."
+                if IS_PROD
+                else (str(exc) or "httpx timeout")
+            ),
             code="GATEWAY_TIMEOUT",
             instance=str(request.url),
             trace_id=trace_id,
@@ -150,7 +156,9 @@ def register_error_handlers(app):
         )
 
     @app.exception_handler(StarletteHTTPException)
-    async def handle_starlette_http_exception(request: Request, exc: StarletteHTTPException):
+    async def handle_starlette_http_exception(
+        request: Request, exc: StarletteHTTPException
+    ):
         trace_id = _trace_id_from_request(request)
         title = {
             401: "Unauthorized",

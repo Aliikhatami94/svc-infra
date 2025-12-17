@@ -113,7 +113,9 @@ async def accept_invitation(
     invitation.used_at = now
 
     # create membership (upsert-like enforced by DB unique constraint)
-    mem = OrganizationMembership(org_id=invitation.org_id, user_id=user_id, role=invitation.role)
+    mem = OrganizationMembership(
+        org_id=invitation.org_id, user_id=user_id, role=invitation.role
+    )
     if hasattr(db, "add"):
         db.add(mem)
         if hasattr(db, "flush"):

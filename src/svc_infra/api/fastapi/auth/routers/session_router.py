@@ -20,7 +20,9 @@ def build_session_router() -> APIRouter:
         response_model=list[dict],
         dependencies=[RequirePermission("security.session.list")],
     )
-    async def list_my_sessions(identity: Identity, session: SqlSessionDep) -> List[dict]:
+    async def list_my_sessions(
+        identity: Identity, session: SqlSessionDep
+    ) -> List[dict]:
         stmt = select(AuthSession).where(AuthSession.user_id == identity.user.id)
         rows = (await session.execute(stmt)).scalars().all()
         return [

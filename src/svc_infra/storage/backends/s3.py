@@ -15,7 +15,12 @@ except ImportError:
     ClientError = Exception
     NoCredentialsError = Exception
 
-from ..base import FileNotFoundError, InvalidKeyError, PermissionDeniedError, StorageError
+from ..base import (
+    FileNotFoundError,
+    InvalidKeyError,
+    PermissionDeniedError,
+    StorageError,
+)
 
 
 class S3Backend:
@@ -69,7 +74,8 @@ class S3Backend:
     ):
         if aioboto3 is None:
             raise ImportError(
-                "aioboto3 is required for S3Backend. " "Install it with: pip install aioboto3"
+                "aioboto3 is required for S3Backend. "
+                "Install it with: pip install aioboto3"
             )
 
         self.bucket = bucket
@@ -125,7 +131,9 @@ class S3Backend:
 
         try:
             session = aioboto3.Session()
-            async with session.client("s3", **self._session_config, **self._client_config) as s3:
+            async with session.client(
+                "s3", **self._session_config, **self._client_config
+            ) as s3:
                 # Upload file
                 await s3.put_object(
                     Bucket=self.bucket,
@@ -157,7 +165,9 @@ class S3Backend:
 
         try:
             session = aioboto3.Session()
-            async with session.client("s3", **self._session_config, **self._client_config) as s3:
+            async with session.client(
+                "s3", **self._session_config, **self._client_config
+            ) as s3:
                 response = await s3.get_object(Bucket=self.bucket, Key=key)
                 async with response["Body"] as stream:
                     return cast(bytes, await stream.read())
@@ -183,7 +193,9 @@ class S3Backend:
 
         try:
             session = aioboto3.Session()
-            async with session.client("s3", **self._session_config, **self._client_config) as s3:
+            async with session.client(
+                "s3", **self._session_config, **self._client_config
+            ) as s3:
                 await s3.delete_object(Bucket=self.bucket, Key=key)
                 return True
 
@@ -202,7 +214,9 @@ class S3Backend:
 
         try:
             session = aioboto3.Session()
-            async with session.client("s3", **self._session_config, **self._client_config) as s3:
+            async with session.client(
+                "s3", **self._session_config, **self._client_config
+            ) as s3:
                 await s3.head_object(Bucket=self.bucket, Key=key)
                 return True
 
@@ -243,7 +257,9 @@ class S3Backend:
 
         try:
             session = aioboto3.Session()
-            async with session.client("s3", **self._session_config, **self._client_config) as s3:
+            async with session.client(
+                "s3", **self._session_config, **self._client_config
+            ) as s3:
                 # Prepare parameters
                 params = {"Bucket": self.bucket, "Key": key}
 
@@ -251,7 +267,9 @@ class S3Backend:
                 if download:
                     # Extract filename from key
                     filename = key.split("/")[-1]
-                    params["ResponseContentDisposition"] = f'attachment; filename="{filename}"'
+                    params["ResponseContentDisposition"] = (
+                        f'attachment; filename="{filename}"'
+                    )
 
                 # Generate presigned URL
                 url = await s3.generate_presigned_url(
@@ -274,7 +292,9 @@ class S3Backend:
         """List stored keys with optional prefix filter."""
         try:
             session = aioboto3.Session()
-            async with session.client("s3", **self._session_config, **self._client_config) as s3:
+            async with session.client(
+                "s3", **self._session_config, **self._client_config
+            ) as s3:
                 params = {
                     "Bucket": self.bucket,
                     "MaxKeys": limit,
@@ -300,13 +320,17 @@ class S3Backend:
 
         try:
             session = aioboto3.Session()
-            async with session.client("s3", **self._session_config, **self._client_config) as s3:
+            async with session.client(
+                "s3", **self._session_config, **self._client_config
+            ) as s3:
                 response = await s3.head_object(Bucket=self.bucket, Key=key)
 
                 # Extract metadata
                 metadata = {
                     "size": response["ContentLength"],
-                    "content_type": response.get("ContentType", "application/octet-stream"),
+                    "content_type": response.get(
+                        "ContentType", "application/octet-stream"
+                    ),
                     "created_at": response["LastModified"].isoformat(),
                 }
 

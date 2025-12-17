@@ -41,7 +41,9 @@ class RedisJobQueue(JobQueue):
       - {p}:dlq (LIST)          dead-letter job ids
     """
 
-    def __init__(self, client: Redis, *, prefix: str = "jobs", visibility_timeout: int = 60):
+    def __init__(
+        self, client: Redis, *, prefix: str = "jobs", visibility_timeout: int = 60
+    ):
         self._r = client
         self._p = prefix
         self._vt = visibility_timeout
@@ -96,7 +98,9 @@ class RedisJobQueue(JobQueue):
 
     def _requeue_timed_out_processing(self) -> None:
         now_ts = int(datetime.now(timezone.utc).timestamp())
-        ids = cast(list[Any], self._r.zrangebyscore(self._k("processing_vt"), "-inf", now_ts))
+        ids = cast(
+            list[Any], self._r.zrangebyscore(self._k("processing_vt"), "-inf", now_ts)
+        )
         if not ids:
             return
         pipe = self._r.pipeline()
@@ -135,13 +139,19 @@ class RedisJobQueue(JobQueue):
                 logger.warning("Lua script failed, using non-atomic reserve: %s", e)
                 jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
                 if jid:
-                    job_id_tmp = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
+                    job_id_tmp = (
+                        jid.decode()
+                        if isinstance(jid, (bytes, bytearray))
+                        else str(jid)
+                    )
                     self._r.zadd(self._k("processing_vt"), {job_id_tmp: visible_at})
         else:
             # Non-atomic fallback (for fakeredis in tests, or older Redis versions)
             jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
             if jid:
-                job_id_tmp = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
+                job_id_tmp = (
+                    jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
+                )
                 self._r.zadd(self._k("processing_vt"), {job_id_tmp: visible_at})
 
         if not jid:
@@ -236,7 +246,9 @@ class RedisJobQueue(JobQueue):
         available_at_ts = now_ts + delay
         mapping: dict[str, str] = {
             "last_error": error or "",
-            "available_at": datetime.fromtimestamp(available_at_ts, tz=timezone.utc).isoformat(),
+            "available_at": datetime.fromtimestamp(
+                available_at_ts, tz=timezone.utc
+            ).isoformat(),
         }
         self._r.hset(key, mapping=mapping)
         self._r.lrem(self._k("processing"), 1, job_id)

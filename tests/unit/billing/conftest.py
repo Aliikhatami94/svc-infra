@@ -12,7 +12,9 @@ async def app(mocker) -> FastAPI:
     app = FastAPI()
 
     # Error handling and idempotency middleware similar to payments tests
-    from svc_infra.api.fastapi.middleware.errors.catchall import CatchAllExceptionMiddleware
+    from svc_infra.api.fastapi.middleware.errors.catchall import (
+        CatchAllExceptionMiddleware,
+    )
     from svc_infra.api.fastapi.middleware.errors.handlers import register_error_handlers
     from svc_infra.api.fastapi.middleware.idempotency import IdempotencyMiddleware
 

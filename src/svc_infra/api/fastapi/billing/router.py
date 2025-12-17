@@ -9,7 +9,12 @@ from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
 from svc_infra.api.fastapi.middleware.idempotency import require_idempotency_key
 from svc_infra.api.fastapi.tenancy.context import TenantId
 from svc_infra.billing.async_service import AsyncBillingService
-from svc_infra.billing.schemas import UsageAckOut, UsageAggregateRow, UsageAggregatesOut, UsageIn
+from svc_infra.billing.schemas import (
+    UsageAckOut,
+    UsageAggregateRow,
+    UsageAggregatesOut,
+    UsageIn,
+)
 
 router = APIRouter(prefix="/_billing", tags=["Billing"])
 
@@ -53,7 +58,9 @@ async def list_aggregates(
     date_to: Optional[datetime] = None,
     svc: Annotated[AsyncBillingService, Depends(get_service)] = None,  # type: ignore[assignment]
 ):
-    rows = await svc.list_daily_aggregates(metric=metric, date_from=date_from, date_to=date_to)
+    rows = await svc.list_daily_aggregates(
+        metric=metric, date_from=date_from, date_to=date_to
+    )
     items = [
         UsageAggregateRow(
             period_start=r.period_start,

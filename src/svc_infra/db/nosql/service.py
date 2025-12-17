@@ -43,7 +43,9 @@ class NoSqlService:
     async def search(
         self, db, *, q: str, fields: Sequence[str], limit: int, offset: int, sort=None
     ):
-        return await self.repo.search(db, q=q, fields=fields, limit=limit, offset=offset, sort=sort)
+        return await self.repo.search(
+            db, q=q, fields=fields, limit=limit, offset=offset, sort=sort
+        )
 
     async def count_filtered(self, db, *, q: str, fields: Sequence[str]) -> int:
         return await self.repo.count_filtered(db, q=q, fields=fields)

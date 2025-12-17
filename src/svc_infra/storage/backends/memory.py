@@ -57,7 +57,9 @@ class MemoryBackend:
             raise InvalidKeyError("Key cannot exceed 1024 characters")
 
         # Check for safe characters
-        safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/")
+        safe_chars = set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/"
+        )
         if not all(c in safe_chars for c in key):
             raise InvalidKeyError(
                 "Key can only contain alphanumeric, dot, dash, underscore, and slash"

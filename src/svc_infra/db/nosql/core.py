@@ -7,7 +7,12 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import IndexModel
 
 from svc_infra.db.nosql.indexes import normalize_indexes
-from svc_infra.db.nosql.mongo.client import acquire_db, close_mongo, init_mongo, ping_mongo
+from svc_infra.db.nosql.mongo.client import (
+    acquire_db,
+    close_mongo,
+    init_mongo,
+    ping_mongo,
+)
 from svc_infra.db.nosql.resource import NoSqlResource
 from svc_infra.db.nosql.utils import (
     get_mongo_dbname_from_env,
@@ -48,7 +53,9 @@ async def assert_db_locked(
     registry = db.client.get_database(_REG_DB)
     await registry[_REG_COLL].create_index("service_id", unique=True)
 
-    doc = await registry[_REG_COLL].find_one({"service_id": service_id}, projection={"db_name": 1})
+    doc = await registry[_REG_COLL].find_one(
+        {"service_id": service_id}, projection={"db_name": 1}
+    )
     if doc is None:
         await registry[_REG_COLL].insert_one(
             {"service_id": service_id, "db_name": expected_db_name}
@@ -91,9 +98,13 @@ async def prepare_mongo(
 
     expected_db = get_mongo_dbname_from_env(required=True)
     if db.name != expected_db:
-        raise RuntimeError(f"Connected to Mongo DB '{db.name}', but env says '{expected_db}'.")
+        raise RuntimeError(
+            f"Connected to Mongo DB '{db.name}', but env says '{expected_db}'."
+        )
 
-    await assert_db_locked(db, expected_db, service_id=service_id, allow_rebind=allow_rebind)
+    await assert_db_locked(
+        db, expected_db, service_id=service_id, allow_rebind=allow_rebind
+    )
 
     # collections
     colls = [r.resolved_collection() for r in resources]
@@ -109,7 +120,9 @@ async def prepare_mongo(
             names = await _apply_indexes(db, collection=coll, indexes=idx_models)
             created_idx[coll] = names
 
-    return PrepareResult(ok=True, created_collections=created_colls, created_indexes=created_idx)
+    return PrepareResult(
+        ok=True, created_collections=created_colls, created_indexes=created_idx
+    )
 
 
 def setup_and_prepare(

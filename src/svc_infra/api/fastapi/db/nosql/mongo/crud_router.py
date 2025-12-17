@@ -82,7 +82,9 @@ def make_crud_router_plus_mongo(
         else:
             items = await service.list(db, limit=lp.limit, offset=lp.offset, sort=sort)
             total = await service.count(db)
-        return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
+        return Page[Any].from_items(
+            total=total, items=items, limit=lp.limit, offset=lp.offset
+        )
 
     # GET by id
     @router.get(

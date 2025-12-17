@@ -24,8 +24,12 @@ class SqlService:
     async def pre_update(self, data: dict[str, Any]) -> dict[str, Any]:
         return data
 
-    async def list(self, session: AsyncSession, *, limit: int, offset: int, order_by=None):
-        return await self.repo.list(session, limit=limit, offset=offset, order_by=order_by)
+    async def list(
+        self, session: AsyncSession, *, limit: int, offset: int, order_by=None
+    ):
+        return await self.repo.list(
+            session, limit=limit, offset=offset, order_by=order_by
+        )
 
     async def count(self, session: AsyncSession) -> int:
         return await self.repo.count(session)
@@ -41,9 +45,13 @@ class SqlService:
             # unique constraint or not-null -> 409/400 instead of 500
             msg = str(e.orig) if getattr(e, "orig", None) else str(e)
             if "duplicate key value" in msg or "UniqueViolation" in msg:
-                raise HTTPException(status_code=409, detail="Record already exists.") from e
+                raise HTTPException(
+                    status_code=409, detail="Record already exists."
+                ) from e
             if "not-null" in msg or "NotNullViolation" in msg:
-                raise HTTPException(status_code=400, detail="Missing required field.") from e
+                raise HTTPException(
+                    status_code=400, detail="Missing required field."
+                ) from e
             raise  # unknown, let your error middleware turn into 500
 
     async def update(self, session: AsyncSession, id_value: Any, data: dict[str, Any]):
@@ -67,7 +75,9 @@ class SqlService:
             session, q=q, fields=fields, limit=limit, offset=offset, order_by=order_by
         )
 
-    async def count_filtered(self, session: AsyncSession, *, q: str, fields: Sequence[str]) -> int:
+    async def count_filtered(
+        self, session: AsyncSession, *, q: str, fields: Sequence[str]
+    ) -> int:
         return await self.repo.count_filtered(session, q=q, fields=fields)
 
     async def exists(self, session: AsyncSession, *, where):

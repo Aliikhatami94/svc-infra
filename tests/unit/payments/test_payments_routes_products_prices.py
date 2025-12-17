@@ -96,7 +96,9 @@ async def test_list_products_with_active_filter(client, fake_adapter, mocker):
     res = await client.get("/payments/products?active=true")
     assert res.status_code == 200
 
-    fake_adapter.list_products.assert_awaited_once_with(active=True, limit=50, cursor=None)
+    fake_adapter.list_products.assert_awaited_once_with(
+        active=True, limit=50, cursor=None
+    )
 
 
 @pytest.mark.asyncio
@@ -263,7 +265,9 @@ async def test_update_price(client, fake_adapter, mocker):
     )
     fake_adapter.update_price.return_value = mock_price
 
-    res = await client.post("/payments/prices/price_123", json={"active": False}, headers=IDEMP)
+    res = await client.post(
+        "/payments/prices/price_123", json={"active": False}, headers=IDEMP
+    )
 
     assert res.status_code == 200
     body = res.json()

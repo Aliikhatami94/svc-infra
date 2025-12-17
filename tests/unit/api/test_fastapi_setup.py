@@ -81,7 +81,9 @@ def test_easy_app_options_merge_prefers_overrides():
     )
     override = EasyAppOptions(
         logging=LoggingOptions(enable=False, level="DEBUG", fmt=None),
-        observability=ObservabilityOptions(enable=False, skip_metric_paths=["/metrics"]),
+        observability=ObservabilityOptions(
+            enable=False, skip_metric_paths=["/metrics"]
+        ),
     )
 
     merged = base.merged_with(override)
@@ -101,7 +103,9 @@ def test_easy_service_app_respects_logging_and_observability_flags(monkeypatch, 
     setup_logging = mocker.patch("svc_infra.api.fastapi.ease.setup_logging")
     add_obs = mocker.patch("svc_infra.api.fastapi.ease.add_observability")
 
-    easy_service_app(name="Svc", release="1.0.0", enable_logging=False, enable_observability=False)
+    easy_service_app(
+        name="Svc", release="1.0.0", enable_logging=False, enable_observability=False
+    )
 
     setup_logging.assert_not_called()
     add_obs.assert_not_called()
@@ -152,16 +156,24 @@ def test_setup_service_api_infers_root_include_api_key(mocker):
         records.append((spec.tag if spec else None, include_api_key, server_url))
         return ()
 
-    mocker.patch("svc_infra.api.fastapi.setup.register_all_routers", side_effect=fake_register)
+    mocker.patch(
+        "svc_infra.api.fastapi.setup.register_all_routers", side_effect=fake_register
+    )
     mocker.patch(
         "svc_infra.api.fastapi.setup.render_index_html",
         side_effect=fake_render_index_html,
     )
     mocker.patch("svc_infra.api.fastapi.setup.apply_mutators")
-    mocker.patch("svc_infra.api.fastapi.setup.setup_mutators", side_effect=fake_setup_mutators)
+    mocker.patch(
+        "svc_infra.api.fastapi.setup.setup_mutators", side_effect=fake_setup_mutators
+    )
 
     service = ServiceInfo(name="Svc", release="1.0")
-    specs = [APIVersionSpec(tag="v1", routers_package="svc_infra.sample", include_api_key=True)]
+    specs = [
+        APIVersionSpec(
+            tag="v1", routers_package="svc_infra.sample", include_api_key=True
+        )
+    ]
 
     app = setup_service_api(service=service, versions=specs)
 
@@ -187,7 +199,9 @@ def _build_service_app(
     focus on middleware and configuration.
     """
     mocker.patch("svc_infra.api.fastapi.setup.register_all_routers")
-    mocker.patch("svc_infra.api.fastapi.setup.render_index_html", return_value="<html></html>")
+    mocker.patch(
+        "svc_infra.api.fastapi.setup.render_index_html", return_value="<html></html>"
+    )
     service = ServiceInfo(name="Payments", release="1.2.3")
     specs = versions or [APIVersionSpec(tag="v1")]
     return setup_service_api(
@@ -200,7 +214,9 @@ def _build_service_app(
 
 def test_setup_service_api_mounts_versions_and_calls_router_registration(mocker):
     register = mocker.patch("svc_infra.api.fastapi.setup.register_all_routers")
-    mocker.patch("svc_infra.api.fastapi.setup.render_index_html", return_value="<html></html>")
+    mocker.patch(
+        "svc_infra.api.fastapi.setup.render_index_html", return_value="<html></html>"
+    )
 
     service = ServiceInfo(name="Payments", release="1.2.3")
     specs = [APIVersionSpec(tag="v1", routers_package="svc_infra.api.fastapi.payments")]

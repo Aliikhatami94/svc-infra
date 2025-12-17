@@ -23,7 +23,9 @@ class UserModel(Base):
     name = Column(String(255), nullable=True)
     is_active = Column(String(10), default="true")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ProductModel(Base):
@@ -35,7 +37,9 @@ class ProductModel(Base):
     price = Column(Integer, nullable=False)  # Price in cents
     active = Column(String(10), default="true")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 @pytest.fixture

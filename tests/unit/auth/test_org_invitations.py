@@ -5,8 +5,16 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from svc_infra.security.models import Organization, OrganizationInvitation, OrganizationMembership
-from svc_infra.security.org_invites import accept_invitation, issue_invitation, resend_invitation
+from svc_infra.security.models import (
+    Organization,
+    OrganizationInvitation,
+    OrganizationMembership,
+)
+from svc_infra.security.org_invites import (
+    accept_invitation,
+    issue_invitation,
+    resend_invitation,
+)
 
 
 class FakeDB:
@@ -27,14 +35,18 @@ async def test_issue_resend_accept_invitation():
     db.add(org)
 
     # issue
-    raw1, inv1 = await issue_invitation(db, org_id=org.id, email="User@Email.com", role="member")
+    raw1, inv1 = await issue_invitation(
+        db, org_id=org.id, email="User@Email.com", role="member"
+    )
     assert isinstance(raw1, str) and len(raw1) >= 64
     assert isinstance(inv1, OrganizationInvitation)
     assert inv1.email == "user@email.com"
     assert inv1.revoked_at is None and inv1.used_at is None
 
     # issue again for the same email auto-revokes previous and creates a new one
-    raw2, inv2 = await issue_invitation(db, org_id=org.id, email="user@email.com", role="member")
+    raw2, inv2 = await issue_invitation(
+        db, org_id=org.id, email="user@email.com", role="member"
+    )
     assert inv1.revoked_at is not None
     assert inv2.revoked_at is None
     assert raw2 != raw1
@@ -67,7 +79,9 @@ async def test_invitation_expiry_and_revocation():
         await accept_invitation(db, invitation=inv, user_id=uuid.uuid4())
 
     # Revoked invitation
-    raw2, inv2 = await issue_invitation(db, org_id=org.id, email="c@d.com", role="admin")
+    raw2, inv2 = await issue_invitation(
+        db, org_id=org.id, email="c@d.com", role="admin"
+    )
     inv2.revoked_at = datetime.now(timezone.utc)
     with pytest.raises(ValueError):
         await accept_invitation(db, invitation=inv2, user_id=uuid.uuid4())

@@ -98,7 +98,9 @@ def add_admin(
 
     r = admin_router(prefix=base_path, tags=["admin"])  # role-gated
 
-    async def _default_user_getter(request: Request, user_id: str, session: SqlSessionDep):
+    async def _default_user_getter(
+        request: Request, user_id: str, session: SqlSessionDep
+    ):
         try:
             UserModel, _, _ = get_auth_state()
         except Exception:
@@ -180,7 +182,9 @@ def add_admin(
     def _compose_override():
         existing = app.dependency_overrides.get(_current_principal)
         if existing and getattr(existing, "_is_admin_impersonation_override", False):
-            dep_provider = getattr(existing, "_admin_impersonation_base", _current_principal)
+            dep_provider = getattr(
+                existing, "_admin_impersonation_base", _current_principal
+            )
         else:
             dep_provider = existing or _current_principal
 
@@ -217,7 +221,9 @@ def add_admin(
                     setattr(target, "roles", actor_roles)
             except Exception:
                 # Best-effort; if target object is immutable, fallback by wrapping
-                target = SimpleNamespace(id=getattr(target, "id", target_id), roles=actor_roles)
+                target = SimpleNamespace(
+                    id=getattr(target, "id", target_id), roles=actor_roles
+                )
             base.user = target
             base.via = "impersonated"
             return base

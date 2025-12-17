@@ -7,13 +7,18 @@ from typing import Callable, Optional
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore, RateLimitStore
+from svc_infra.api.fastapi.middleware.ratelimit_store import (
+    InMemoryRateLimitStore,
+    RateLimitStore,
+)
 from svc_infra.obs.metrics import emit_rate_limited
 
 logger = logging.getLogger(__name__)
 
 try:
-    from svc_infra.api.fastapi.tenancy.context import resolve_tenant_id as _resolve_tenant_id
+    from svc_infra.api.fastapi.tenancy.context import (
+        resolve_tenant_id as _resolve_tenant_id,
+    )
 except Exception:  # pragma: no cover - minimal builds
     _resolve_tenant_id = None  # type: ignore[assignment]
 
@@ -25,7 +30,9 @@ class RateLimiter:
         limit: int,
         window: int = 60,
         key_fn: Callable = lambda r: "global",
-        limit_resolver: Optional[Callable[[Request, Optional[str]], Optional[int]]] = None,
+        limit_resolver: Optional[
+            Callable[[Request, Optional[str]], Optional[int]]
+        ] = None,
         scope_by_tenant: bool = False,
         store: RateLimitStore | None = None,
     ):

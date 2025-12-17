@@ -26,9 +26,13 @@ class RotatingJWTStrategy(JWTStrategy):
         aud_list: list[str] = (
             [token_audience]
             if isinstance(token_audience, str)
-            else list(token_audience) if token_audience else []
+            else list(token_audience)
+            if token_audience
+            else []
         ) or ["fastapi-users:auth"]
-        super().__init__(secret=secret, lifetime_seconds=lifetime_seconds, token_audience=aud_list)
+        super().__init__(
+            secret=secret, lifetime_seconds=lifetime_seconds, token_audience=aud_list
+        )
         self._verify_secrets: List[str] = [secret] + list(old_secrets or [])
         self._lifetime_seconds = lifetime_seconds
 
@@ -58,7 +62,9 @@ class RotatingJWTStrategy(JWTStrategy):
             else:
                 aud_list = audience
             try:
-                return decode_jwt(token, self.decode_key, aud_list, algorithms=[self.algorithm])
+                return decode_jwt(
+                    token, self.decode_key, aud_list, algorithms=[self.algorithm]
+                )
             except jwt.PyJWTError:
                 pass
 

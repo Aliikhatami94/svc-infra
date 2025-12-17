@@ -47,7 +47,9 @@ class InflightTrackerMiddleware:
         try:
             await self.app(scope, receive, send)
         finally:
-            state._inflight_requests = max(0, getattr(state, "_inflight_requests", 1) - 1)
+            state._inflight_requests = max(
+                0, getattr(state, "_inflight_requests", 1) - 1
+            )
 
 
 async def _wait_for_drain(app: FastAPI, grace: float) -> None:
@@ -68,7 +70,9 @@ async def _wait_for_drain(app: FastAPI, grace: float) -> None:
         )
 
 
-def install_graceful_shutdown(app: FastAPI, *, grace_seconds: Optional[float] = None) -> None:
+def install_graceful_shutdown(
+    app: FastAPI, *, grace_seconds: Optional[float] = None
+) -> None:
     """Install inflight tracking and lifespan hooks to wait for requests to drain.
 
     - Adds InflightTrackerMiddleware
@@ -76,7 +80,11 @@ def install_graceful_shutdown(app: FastAPI, *, grace_seconds: Optional[float] = 
     """
     app.add_middleware(InflightTrackerMiddleware)
 
-    g = float(grace_seconds) if grace_seconds is not None else _get_grace_period_seconds()
+    g = (
+        float(grace_seconds)
+        if grace_seconds is not None
+        else _get_grace_period_seconds()
+    )
 
     # Preserve any existing lifespan and wrap it so our drain runs on shutdown.
     previous_lifespan = getattr(app.router, "lifespan_context", None)

@@ -116,7 +116,8 @@ def get_ws_manager(app_or_request: FastAPI | Request) -> ConnectionManager:
     manager = getattr(app.state, _WS_MANAGER_ATTR, None)
     if manager is None:
         raise RuntimeError(
-            "WebSocket manager not found. " "Did you forget to call add_websocket_manager(app)?"
+            "WebSocket manager not found. "
+            "Did you forget to call add_websocket_manager(app)?"
         )
     return cast(ConnectionManager, manager)
 

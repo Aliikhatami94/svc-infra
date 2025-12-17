@@ -26,8 +26,12 @@ class _Repo(SqlRepository):
         self._search = AsyncMock(return_value=[])
         self._count_filtered = AsyncMock(return_value=0)
 
-    async def list(self, session, *, limit: int, offset: int, order_by=None, where=None):
-        return await self._list(session, limit=limit, offset=offset, order_by=order_by, where=where)
+    async def list(
+        self, session, *, limit: int, offset: int, order_by=None, where=None
+    ):
+        return await self._list(
+            session, limit=limit, offset=offset, order_by=order_by, where=where
+        )
 
     async def count(self, session, *, where=None):
         return await self._count(session, where=where)
@@ -44,7 +48,9 @@ class _Repo(SqlRepository):
     async def delete(self, session, id_value, *, where=None):
         return await self._delete(session, id_value, where=where)
 
-    async def search(self, session, *, q, fields, limit, offset, order_by=None, where=None):
+    async def search(
+        self, session, *, q, fields, limit, offset, order_by=None, where=None
+    ):
         return await self._search(
             session,
             q=q,

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from svc_infra.security.passwords import PasswordPolicy, PasswordValidationError, validate_password
+from svc_infra.security.passwords import (
+    PasswordPolicy,
+    PasswordValidationError,
+    validate_password,
+)
 
 
 @pytest.mark.parametrize(

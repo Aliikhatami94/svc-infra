@@ -85,7 +85,9 @@ def _setup_cors(app: FastAPI, public_cors_origins: list[str] | str | None = None
     if isinstance(public_cors_origins, list):
         param_origins = [o.strip() for o in public_cors_origins if o and o.strip()]
     elif isinstance(public_cors_origins, str):
-        param_origins = [o.strip() for o in public_cors_origins.split(",") if o and o.strip()]
+        param_origins = [
+            o.strip() for o in public_cors_origins.split(",") if o and o.strip()
+        ]
     else:
         param_origins = []
 
@@ -174,7 +176,9 @@ def _dump_or_none(model):
 def _build_child_app(
     service: ServiceInfo, spec: APIVersionSpec, skip_paths: list[str] | None = None
 ) -> FastAPI:
-    title = f"{service.name} • {spec.tag}" if getattr(spec, "tag", None) else service.name
+    title = (
+        f"{service.name} • {spec.tag}" if getattr(spec, "tag", None) else service.name
+    )
     child = FastAPI(
         title=title,
         version=service.release,
@@ -188,7 +192,9 @@ def _build_child_app(
     _setup_middlewares(child, skip_paths=skip_paths)
 
     # ---- OpenAPI pipeline (DRY!) ----
-    include_api_key = bool(spec.include_api_key) if spec.include_api_key is not None else False
+    include_api_key = (
+        bool(spec.include_api_key) if spec.include_api_key is not None else False
+    )
     tag_str = str(spec.tag).strip("/")
     mount_path = f"/{tag_str}"
     server_url = (
@@ -266,7 +272,9 @@ def _build_parent_app(
     )
     # app-provided root routers
     for pkg in _coerce_list(root_routers):
-        register_all_routers(parent, base_package=pkg, prefix="", environment=CURRENT_ENVIRONMENT)
+        register_all_routers(
+            parent, base_package=pkg, prefix="", environment=CURRENT_ENVIRONMENT
+        )
 
     return parent
 
@@ -295,11 +303,15 @@ class RouteLoggerMiddleware:
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
                 route = scope.get("route")
-                route_path = getattr(route, "path_format", None) or getattr(route, "path", None)
+                route_path = getattr(route, "path_format", None) or getattr(
+                    route, "path", None
+                )
                 if route_path:
                     root_path = scope.get("root_path", "") or ""
                     headers = list(message.get("headers", []))
-                    headers.append((b"x-handled-by", f"{method} {root_path}{route_path}".encode()))
+                    headers.append(
+                        (b"x-handled-by", f"{method} {root_path}{route_path}".encode())
+                    )
                     message = {**message, "headers": headers}
             await send(message)
 
@@ -355,7 +367,9 @@ def setup_service_api(
         cards.append(
             CardSpec(
                 tag="",
-                docs=DocTargets(swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"),
+                docs=DocTargets(
+                    swagger="/docs", redoc="/redoc", openapi_json="/openapi.json"
+                ),
             )
         )
 
@@ -379,11 +393,15 @@ def setup_service_api(
                 cards.append(
                     CardSpec(
                         tag=scope.strip("/"),
-                        docs=DocTargets(swagger=swagger, redoc=redoc, openapi_json=openapi_json),
+                        docs=DocTargets(
+                            swagger=swagger, redoc=redoc, openapi_json=openapi_json
+                        ),
                     )
                 )
 
-        html = render_index_html(service_name=service.name, release=service.release, cards=cards)
+        html = render_index_html(
+            service_name=service.name, release=service.release, cards=cards
+        )
         return HTMLResponse(html)
 
     return parent

@@ -193,7 +193,9 @@ def _acceptance_app_ready():
             # Use wait_for with timeout to prevent infinite hang
             try:
                 loop.run_until_complete(
-                    asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True), timeout=2.0)
+                    asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True), timeout=2.0
+                    )
                 )
             except asyncio.TimeoutError:
                 pass  # Tasks didn't complete in time, force close

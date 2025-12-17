@@ -5,7 +5,9 @@ from typing import Any, Callable
 from fastapi import APIRouter
 
 
-def apply_default_security(router: APIRouter, *, default_security: list[dict] | None) -> None:
+def apply_default_security(
+    router: APIRouter, *, default_security: list[dict] | None
+) -> None:
     if default_security is None:
         return
     original_add = router.add_api_route

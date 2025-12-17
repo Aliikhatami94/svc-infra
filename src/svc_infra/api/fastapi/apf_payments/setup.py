@@ -34,7 +34,9 @@ def _maybe_register_default_providers(
             pass
     if adapters:
         for a in adapters:
-            reg.register(cast("ProviderAdapter", a))  # must implement ProviderAdapter protocol
+            reg.register(
+                cast("ProviderAdapter", a)
+            )  # must implement ProviderAdapter protocol
 
 
 def add_payments(
@@ -43,7 +45,8 @@ def add_payments(
     prefix: str = "/payments",
     register_default_providers: bool = True,
     adapters: Optional[Iterable[object]] = None,
-    include_in_docs: bool | None = None,  # None = keep your env-based default visibility
+    include_in_docs: bool
+    | None = None,  # None = keep your env-based default visibility
 ) -> None:
     """
     One-call payments installer.
@@ -57,7 +60,9 @@ def add_payments(
     for r in build_payments_routers(prefix=prefix):
         app.include_router(
             r,
-            include_in_schema=True if include_in_docs is None else bool(include_in_docs),
+            include_in_schema=True
+            if include_in_docs is None
+            else bool(include_in_docs),
         )
 
     # Store the startup function to be called by lifespan if needed

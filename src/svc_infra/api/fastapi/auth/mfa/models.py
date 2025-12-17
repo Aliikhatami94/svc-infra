@@ -4,7 +4,9 @@ from typing import Optional
 from pydantic import BaseModel
 
 # --- Email OTP store (replace with Redis in prod) ---
-EMAIL_OTP_STORE: dict[str, dict] = {}  # key = uid (or jti), value={hash,exp,attempts,next_send}
+EMAIL_OTP_STORE: dict[
+    str, dict
+] = {}  # key = uid (or jti), value={hash,exp,attempts,next_send}
 
 
 class StartSetupOut(BaseModel):

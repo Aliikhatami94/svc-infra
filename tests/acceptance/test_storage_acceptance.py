@@ -235,7 +235,10 @@ class TestStorageAcceptance:
         - All files retrievable
         - Correct count in listing
         """
-        files = [{"filename": f"concurrent-{i}.txt", "content": f"Content {i}"} for i in range(5)]
+        files = [
+            {"filename": f"concurrent-{i}.txt", "content": f"Content {i}"}
+            for i in range(5)
+        ]
 
         # Upload all files
         for file_data in files:

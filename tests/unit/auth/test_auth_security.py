@@ -94,10 +94,14 @@ class TestAuthGuards:
 
         user = Mock()
         user.roles = ["admin", "user"]
-        app.dependency_overrides[_current_principal] = lambda: Principal(user=user, scopes=["read"])
+        app.dependency_overrides[_current_principal] = lambda: Principal(
+            user=user, scopes=["read"]
+        )
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/guarded")
 
         assert response.status_code == 200
@@ -117,7 +121,9 @@ class TestAuthGuards:
         app.dependency_overrides[_current_principal] = lambda: Principal(user=user)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/guarded")
 
         assert response.status_code == 403
@@ -134,7 +140,9 @@ class TestAuthGuards:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/scoped")
 
         assert response.status_code == 200
@@ -152,7 +160,9 @@ class TestAuthGuards:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/scoped")
 
         assert response.status_code == 403
@@ -170,7 +180,9 @@ class TestAuthGuards:
         app.dependency_overrides[_current_principal] = lambda: Principal(user=user)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/user-only")
 
         assert response.status_code == 200
@@ -184,10 +196,14 @@ class TestAuthGuards:
         async def user_only(principal=RequireUser()):
             return {"ok": True}
 
-        app.dependency_overrides[_current_principal] = lambda: Principal(user=None, api_key=Mock())
+        app.dependency_overrides[_current_principal] = lambda: Principal(
+            user=None, api_key=Mock()
+        )
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/user-only")
 
         assert response.status_code == 401
@@ -207,7 +223,9 @@ class TestAuthGuards:
         )
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/service-only")
 
         assert response.status_code == 200
@@ -224,7 +242,9 @@ class TestAuthGuards:
         app.dependency_overrides[_current_principal] = lambda: Principal(user=Mock())
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/service-only")
 
         assert response.status_code == 401

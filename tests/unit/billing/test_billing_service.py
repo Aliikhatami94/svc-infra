@@ -51,7 +51,9 @@ def test_record_and_aggregate_and_invoice(sync_session: Session):
     now = datetime(2025, 1, 1, 10, tzinfo=timezone.utc)
 
     # Act: record usage
-    evt_id = bs.record_usage(metric="tokens", amount=5, at=now, idempotency_key="k1", metadata=None)
+    evt_id = bs.record_usage(
+        metric="tokens", amount=5, at=now, idempotency_key="k1", metadata=None
+    )
     assert evt_id
 
     # Aggregate
@@ -106,5 +108,7 @@ def test_idempotency_unique(sync_session: Session):
     bs.record_usage(metric="x", amount=1, at=now, idempotency_key="dup", metadata=None)
     with pytest.raises(IntegrityError):
         # second with same idempotency should violate unique constraint on flush
-        bs.record_usage(metric="x", amount=1, at=now, idempotency_key="dup", metadata=None)
+        bs.record_usage(
+            metric="x", amount=1, at=now, idempotency_key="dup", metadata=None
+        )
         sync_session.commit()

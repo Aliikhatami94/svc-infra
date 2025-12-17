@@ -43,7 +43,9 @@ jobs:
     return p
 
 
-def write_openapi_lint_config(*, target_dir: str | Path, name: str = ".redocly.yaml") -> Path:
+def write_openapi_lint_config(
+    *, target_dir: str | Path, name: str = ".redocly.yaml"
+) -> Path:
     """Write a minimal OpenAPI lint config placeholder (Redocly)."""
     p = Path(target_dir) / name
     content = """

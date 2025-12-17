@@ -18,7 +18,9 @@ def _make_app(with_admin: bool) -> FastAPI:
 
     # Make a simple principal; toggle admin role
     def _principal():
-        user = types.SimpleNamespace(id="u-actor", roles=["admin"] if with_admin else ["user"])
+        user = types.SimpleNamespace(
+            id="u-actor", roles=["admin"] if with_admin else ["user"]
+        )
         return Principal(user=user, scopes=[], via="jwt")
 
     # Impersonation user loader just echoes back an object with id
@@ -40,7 +42,9 @@ def test_start_requires_permission_and_logs(caplog):
     # Without admin → forbidden
     app = _make_app(with_admin=False)
     with TestClient(app) as c:
-        r = c.post("/admin/impersonate/start", json={"user_id": "u-imp", "reason": "unit"})
+        r = c.post(
+            "/admin/impersonate/start", json={"user_id": "u-imp", "reason": "unit"}
+        )
         assert r.status_code == 403
 
     # With admin → 204 and log emitted
@@ -48,20 +52,28 @@ def test_start_requires_permission_and_logs(caplog):
     with TestClient(app) as c:
         caplog.clear()
         with caplog.at_level("INFO"):
-            r = c.post("/admin/impersonate/start", json={"user_id": "u-imp", "reason": "unit"})
+            r = c.post(
+                "/admin/impersonate/start", json={"user_id": "u-imp", "reason": "unit"}
+            )
         assert r.status_code == 204
         # Assert a start event was logged
-        assert any("admin.impersonation.started" in rec.getMessage() for rec in caplog.records)
+        assert any(
+            "admin.impersonation.started" in rec.getMessage() for rec in caplog.records
+        )
 
 
 def test_stop_logs(caplog):
     app = _make_app(with_admin=True)
     with TestClient(app) as c:
         # Start first to set cookie
-        r = c.post("/admin/impersonate/start", json={"user_id": "u-imp", "reason": "unit"})
+        r = c.post(
+            "/admin/impersonate/start", json={"user_id": "u-imp", "reason": "unit"}
+        )
         assert r.status_code == 204
         caplog.clear()
         with caplog.at_level("INFO"):
             r = c.post("/admin/impersonate/stop")
         assert r.status_code == 204
-        assert any("admin.impersonation.stopped" in rec.getMessage() for rec in caplog.records)
+        assert any(
+            "admin.impersonation.stopped" in rec.getMessage() for rec in caplog.records
+        )

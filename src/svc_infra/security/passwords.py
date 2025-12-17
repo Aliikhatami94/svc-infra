@@ -60,7 +60,9 @@ def validate_password(pw: str, policy: PasswordPolicy | None = None) -> None:
     if policy.forbid_common:
         lowered = pw.lower()
         # Reject if whole password matches a common one or contains it as a substring
-        if lowered in COMMON_PASSWORDS or any(term in lowered for term in COMMON_PASSWORDS):
+        if lowered in COMMON_PASSWORDS or any(
+            term in lowered for term in COMMON_PASSWORDS
+        ):
             reasons.append("common_password")
     if policy.forbid_breached and not HIBP_DISABLED:
         if _breached_checker and _breached_checker(pw):

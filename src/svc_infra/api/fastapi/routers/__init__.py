@@ -9,7 +9,13 @@ from typing import Any, Optional
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
-from svc_infra.app.env import ALL_ENVIRONMENTS, CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV, Environment
+from svc_infra.app.env import (
+    ALL_ENVIRONMENTS,
+    CURRENT_ENVIRONMENT,
+    DEV_ENV,
+    LOCAL_ENV,
+    Environment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +55,9 @@ def _validate_base_package(base_package: str) -> ModuleType:
     try:
         package_module: ModuleType = importlib.import_module(base_package)
     except Exception as exc:
-        raise RuntimeError(f"Could not import base_package '{base_package}': {exc}") from exc
+        raise RuntimeError(
+            f"Could not import base_package '{base_package}': {exc}"
+        ) from exc
 
     if not hasattr(package_module, "__path__"):
         raise RuntimeError(
@@ -64,7 +72,11 @@ def _normalize_environment(environment: Optional[Environment | str]) -> Environm
     return (
         CURRENT_ENVIRONMENT
         if environment is None
-        else (Environment(environment) if not isinstance(environment, Environment) else environment)
+        else (
+            Environment(environment)
+            if not isinstance(environment, Environment)
+            else environment
+        )
     )
 
 
@@ -87,9 +99,12 @@ def _is_router_excluded_by_environment(
 
     # Support ALL_ENVIRONMENTS as a special value
     if router_excluded_envs is ALL_ENVIRONMENTS or (
-        isinstance(router_excluded_envs, set) and router_excluded_envs == ALL_ENVIRONMENTS
+        isinstance(router_excluded_envs, set)
+        and router_excluded_envs == ALL_ENVIRONMENTS
     ):
-        logger.debug(f"Skipping router module {module_name} due to ALL_ENVIRONMENTS exclusion.")
+        logger.debug(
+            f"Skipping router module {module_name} due to ALL_ENVIRONMENTS exclusion."
+        )
         return True
 
     # Normalize to set of Environment or str
@@ -102,11 +117,16 @@ def _is_router_excluded_by_environment(
     normalized_excluded_envs: set[Environment | str] = set()
     for e in router_excluded_envs:
         try:
-            normalized_excluded_envs.add(Environment(e) if not isinstance(e, Environment) else e)
+            normalized_excluded_envs.add(
+                Environment(e) if not isinstance(e, Environment) else e
+            )
         except Exception:
             normalized_excluded_envs.add(str(e))
 
-    if environment in normalized_excluded_envs or str(environment) in normalized_excluded_envs:
+    if (
+        environment in normalized_excluded_envs
+        or str(environment) in normalized_excluded_envs
+    ):
         logger.debug(
             f"Skipping router module {module_name} due to ROUTER_EXCLUDED_ENVIRONMENTS restriction: {router_excluded_envs}"
         )
@@ -230,18 +250,24 @@ def register_all_routers(
     """
     if base_package is None:
         if __package__ is None:
-            raise RuntimeError("Cannot derive base_package; please pass base_package explicitly.")
+            raise RuntimeError(
+                "Cannot derive base_package; please pass base_package explicitly."
+            )
         base_package = __package__
 
     package_module = _validate_base_package(base_package)
     environment = _normalize_environment(environment)
-    force_include = _should_force_include_in_schema(environment, force_include_in_schema)
+    force_include = _should_force_include_in_schema(
+        environment, force_include_in_schema
+    )
 
     for _, module_name, _ in pkgutil.walk_packages(
         package_module.__path__, prefix=f"{base_package}."
     ):
         if _should_skip_module(module_name):
-            logger.debug("Skipping router module due to exclusion/private: %s", module_name)
+            logger.debug(
+                "Skipping router module due to exclusion/private: %s", module_name
+            )
             continue
 
         try:
@@ -250,4 +276,6 @@ def register_all_routers(
             logger.exception("Failed to import router module %s: %s", module_name, exc)
             continue
 
-        _process_router_module(app, module, module_name, prefix, environment, force_include)
+        _process_router_module(
+            app, module, module_name, prefix, environment, force_include
+        )

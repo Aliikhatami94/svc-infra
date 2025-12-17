@@ -7,12 +7,16 @@ from starlette.testclient import TestClient
 
 import svc_infra.obs.metrics as metrics
 from svc_infra.api.fastapi.middleware.ratelimit import SimpleRateLimitMiddleware
-from svc_infra.api.fastapi.middleware.request_size_limit import RequestSizeLimitMiddleware
+from svc_infra.api.fastapi.middleware.request_size_limit import (
+    RequestSizeLimitMiddleware,
+)
 
 
 def test_emit_rate_limited_hook_called(monkeypatch):
     app = FastAPI()
-    app.add_middleware(SimpleRateLimitMiddleware, limit=1, window=5, key_fn=lambda r: "k")
+    app.add_middleware(
+        SimpleRateLimitMiddleware, limit=1, window=5, key_fn=lambda r: "k"
+    )
 
     @app.get("/ping")
     def ping():

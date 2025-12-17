@@ -118,9 +118,7 @@ async def wait_ready(timeout: float = DEFAULT_READINESS_TIMEOUT) -> None:
         retrieved_value = await _cache.get(probe_key)
 
         if retrieved_value != PROBE_VALUE:
-            error_msg = (
-                f"Cache readiness probe failed. Expected '{PROBE_VALUE}', got '{retrieved_value}'"
-            )
+            error_msg = f"Cache readiness probe failed. Expected '{PROBE_VALUE}', got '{retrieved_value}'"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 

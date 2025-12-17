@@ -299,7 +299,9 @@ class TestURLLoaderLoad:
 
             error_response = MagicMock()
             error_response.status_code = 404
-            error = httpx.HTTPStatusError("Not Found", request=MagicMock(), response=error_response)
+            error = httpx.HTTPStatusError(
+                "Not Found", request=MagicMock(), response=error_response
+            )
 
             mock_client.get.side_effect = [success_response, error]
 
@@ -320,7 +322,9 @@ class TestURLLoaderLoad:
 
             response = MagicMock()
             response.status_code = 404
-            error = httpx.HTTPStatusError("Not Found", request=MagicMock(), response=response)
+            error = httpx.HTTPStatusError(
+                "Not Found", request=MagicMock(), response=response
+            )
             mock_client.get.side_effect = error
 
             with pytest.raises(RuntimeError, match="HTTP 404"):
@@ -411,7 +415,9 @@ class TestURLLoaderSync:
     def test_load_sync_works(self):
         """Test that load_sync() works in non-async context."""
         # This is an integration test that actually makes HTTP requests
-        loader = URLLoader("https://raw.githubusercontent.com/nfraxlab/svc-infra/main/README.md")
+        loader = URLLoader(
+            "https://raw.githubusercontent.com/nfraxlab/svc-infra/main/README.md"
+        )
 
         try:
             contents = loader.load_sync()

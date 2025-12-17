@@ -98,7 +98,9 @@ PLATFORM_SIGNATURES: dict[Platform, tuple[str, ...]] = {
     Platform.AZURE_APP_SERVICE: ("WEBSITE_SITE_NAME", "WEBSITE_INSTANCE_ID"),
     # Generic container/orchestration (check last)
     Platform.KUBERNETES: ("KUBERNETES_SERVICE_HOST", "KUBERNETES_PORT"),
-    Platform.DOCKER: ("DOCKER_CONTAINER",),  # User must set this; no reliable auto-detect
+    Platform.DOCKER: (
+        "DOCKER_CONTAINER",
+    ),  # User must set this; no reliable auto-detect
 }
 
 # Container detection paths (Linux-specific)
@@ -167,7 +169,9 @@ def get_platform() -> Platform:
 
 
 # Platform category groupings
-AWS_PLATFORMS = frozenset({Platform.AWS_ECS, Platform.AWS_LAMBDA, Platform.AWS_BEANSTALK})
+AWS_PLATFORMS = frozenset(
+    {Platform.AWS_ECS, Platform.AWS_LAMBDA, Platform.AWS_BEANSTALK}
+)
 GCP_PLATFORMS = frozenset({Platform.CLOUD_RUN, Platform.APP_ENGINE, Platform.GCE})
 AZURE_PLATFORMS = frozenset(
     {
@@ -176,7 +180,9 @@ AZURE_PLATFORMS = frozenset(
         Platform.AZURE_APP_SERVICE,
     }
 )
-PAAS_PLATFORMS = frozenset({Platform.RAILWAY, Platform.RENDER, Platform.FLY, Platform.HEROKU})
+PAAS_PLATFORMS = frozenset(
+    {Platform.RAILWAY, Platform.RENDER, Platform.FLY, Platform.HEROKU}
+)
 
 
 def is_aws() -> bool:

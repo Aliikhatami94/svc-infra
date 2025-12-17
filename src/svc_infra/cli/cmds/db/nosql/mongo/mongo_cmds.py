@@ -172,7 +172,9 @@ def cmd_ping(
 
     import asyncio
 
-    from svc_infra.db.nosql.mongo.client import acquire_db  # local import to avoid side effects
+    from svc_infra.db.nosql.mongo.client import (
+        acquire_db,
+    )  # local import to avoid side effects
 
     async def _run():
         await init_mongo()

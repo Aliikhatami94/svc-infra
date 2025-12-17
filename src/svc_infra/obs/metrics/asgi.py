@@ -186,9 +186,13 @@ class PrometheusMiddleware:
                     if _http_requests_total:
                         _http_requests_total.labels(method, route_for_stats, code).inc()
                     if _http_request_duration:
-                        _http_request_duration.labels(route_for_stats, method).observe(elapsed)
+                        _http_request_duration.labels(route_for_stats, method).observe(
+                            elapsed
+                        )
                     if _http_response_size:
-                        _http_response_size.labels(route_for_stats, method).observe(bytes_sent)
+                        _http_response_size.labels(route_for_stats, method).observe(
+                            bytes_sent
+                        )
                 except Exception:
                     pass
                 try:
@@ -237,7 +241,9 @@ def metrics_endpoint():
         return handler
 
 
-def add_prometheus(app, *, path: str = "/metrics", skip_paths: Optional[Iterable[str]] = None):
+def add_prometheus(
+    app, *, path: str = "/metrics", skip_paths: Optional[Iterable[str]] = None
+):
     """Convenience for FastAPI/Starlette apps."""
     # Add middleware
     app.add_middleware(

@@ -4,7 +4,17 @@ import base64
 import contextvars
 import json
 import logging
-from typing import Any, Callable, Generic, Iterable, List, Optional, Sequence, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    TypeVar,
+    cast,
+)
 
 from fastapi import Query, Request
 from pydantic import BaseModel, Field
@@ -88,7 +98,9 @@ class PaginationContext(Generic[T]):
 
     @property
     def cursor(self) -> Optional[str]:
-        return (self.cursor_params or CursorParams()).cursor if self.allow_cursor else None
+        return (
+            (self.cursor_params or CursorParams()).cursor if self.allow_cursor else None
+        )
 
     @property
     def limit(self) -> int:
@@ -106,7 +118,11 @@ class PaginationContext(Generic[T]):
 
     @property
     def page_size(self) -> Optional[int]:
-        return self.page_params.page_size if (self.allow_page and self.page_params) else None
+        return (
+            self.page_params.page_size
+            if (self.allow_page and self.page_params)
+            else None
+        )
 
     @property
     def offset(self) -> int:
@@ -134,8 +150,8 @@ class PaginationContext(Generic[T]):
         return _encode_cursor({"after": last_key})
 
 
-_pagination_ctx: contextvars.ContextVar[PaginationContext | None] = contextvars.ContextVar(
-    "pagination_ctx", default=None
+_pagination_ctx: contextvars.ContextVar[PaginationContext | None] = (
+    contextvars.ContextVar("pagination_ctx", default=None)
 )
 
 
@@ -155,7 +171,9 @@ def use_pagination() -> PaginationContext:
 
 
 # ---------- Utilities ----------
-def text_filter(items: Iterable[T], q: Optional[str], *getters: Callable[[T], str]) -> list[T]:
+def text_filter(
+    items: Iterable[T], q: Optional[str], *getters: Callable[[T], str]
+) -> list[T]:
     if not q:
         return list(items)
     ql = q.lower()

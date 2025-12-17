@@ -105,7 +105,9 @@ async def upload_document(
     checksum = f"sha256:{hashlib.sha256(file).hexdigest()}"
 
     # Upload file to storage backend
-    await storage.put(storage_path, file, content_type=content_type, metadata=metadata or {})
+    await storage.put(
+        storage_path, file, content_type=content_type, metadata=metadata or {}
+    )
 
     # Create document metadata
     doc = Document(

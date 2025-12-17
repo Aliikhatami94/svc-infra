@@ -104,9 +104,13 @@ class EasyAppOptions(BaseModel):
                 else self.logging.enable
             ),
             level=(
-                override.logging.level if override.logging.level is not None else self.logging.level
+                override.logging.level
+                if override.logging.level is not None
+                else self.logging.level
             ),
-            fmt=override.logging.fmt if override.logging.fmt is not None else self.logging.fmt,
+            fmt=override.logging.fmt
+            if override.logging.fmt is not None
+            else self.logging.fmt,
         )
 
         # observability

@@ -129,7 +129,9 @@ def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
         return local
     if nonprod is not None:
         return nonprod
-    raise ValueError("pick(): No value found for environment and 'nonprod' was not provided.")
+    raise ValueError(
+        "pick(): No value found for environment and 'nonprod' was not provided."
+    )
 
 
 def find_env_file(start: Optional[Path] = None) -> Optional[Path]:

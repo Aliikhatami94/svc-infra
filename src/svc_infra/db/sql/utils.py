@@ -83,7 +83,9 @@ def _compose_url_from_parts() -> Optional[str]:
       DB_PARAMS (raw query string like 'sslmode=require&connect_timeout=5')
     """
     dialect = os.getenv("DB_DIALECT", "").strip() or "postgresql"
-    driver = os.getenv("DB_DRIVER", "").strip()  # e.g. asyncpg, psycopg, pymysql, aiosqlite
+    driver = os.getenv(
+        "DB_DRIVER", ""
+    ).strip()  # e.g. asyncpg, psycopg, pymysql, aiosqlite
     host = os.getenv("DB_HOST", "").strip() or None
     port = os.getenv("DB_PORT", "").strip() or None
     db = os.getenv("DB_NAME", "").strip() or None
@@ -374,11 +376,17 @@ def _ensure_ssl_default(u: URL) -> URL:
     driver = (u.drivername or "").lower()
 
     # If any SSL hint already present, do nothing
-    if any(k in u.query for k in ("sslmode", "ssl", "sslrootcert", "sslcert", "sslkey")):
+    if any(
+        k in u.query for k in ("sslmode", "ssl", "sslrootcert", "sslcert", "sslkey")
+    ):
         return u
 
     # Allow env override; support both common spellings
-    mode_env = os.getenv("DB_SSLMODE_DEFAULT") or os.getenv("PGSSLMODE") or os.getenv("PGSSL_MODE")
+    mode_env = (
+        os.getenv("DB_SSLMODE_DEFAULT")
+        or os.getenv("PGSSLMODE")
+        or os.getenv("PGSSL_MODE")
+    )
     mode = (mode_env or "").strip()
 
     if "+asyncpg" in driver:
@@ -395,7 +403,9 @@ def _ensure_ssl_default_async(u: URL) -> URL:
     backend = (u.get_backend_name() or "").lower()
     if backend in ("postgresql", "postgres"):
         # asyncpg prefers 'ssl=true' via SQLAlchemy param; if already present, keep it
-        if any(k in u.query for k in ("ssl", "sslmode", "sslrootcert", "sslcert", "sslkey")):
+        if any(
+            k in u.query for k in ("ssl", "sslmode", "sslrootcert", "sslcert", "sslkey")
+        ):
             return u
         return u.set(query={**u.query, "ssl": "true"})
     return u
@@ -410,7 +420,9 @@ def _certifi_ca() -> str | None:
         return None
 
 
-def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncEngineType]:
+def build_engine(
+    url: URL | str, echo: bool = False
+) -> Union[SyncEngine, AsyncEngineType]:
     u = make_url(url) if isinstance(url, str) else url
 
     # Keep your existing PG helpers
@@ -433,7 +445,9 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
             # asyncpg doesn't accept sslmode or ssl=true in query params
             # Remove these and set ssl='require' in connect_args
             if "ssl" in u.query or "sslmode" in u.query:
-                new_query = {k: v for k, v in u.query.items() if k not in ("ssl", "sslmode")}
+                new_query = {
+                    k: v for k, v in u.query.items() if k not in ("ssl", "sslmode")
+                }
                 u = u.set(query=new_query)
             # Set ssl in connect_args - 'require' is safest for hosted databases
             connect_args["ssl"] = "require"
@@ -447,7 +461,11 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
                 import ssl
 
                 ca = _certifi_ca()
-                ctx = ssl.create_default_context(cafile=ca) if ca else ssl.create_default_context()
+                ctx = (
+                    ssl.create_default_context(cafile=ca)
+                    if ca
+                    else ssl.create_default_context()
+                )
                 # if your host uses a public CA, verification works;
                 # if not, you can relax verification (not recommended):
                 #   ctx.check_hostname = False
@@ -464,7 +482,9 @@ def build_engine(url: URL | str, echo: bool = False) -> Union[SyncEngine, AsyncE
     # ----------------- SYNC -----------------
     u = _coerce_sync_driver(u)
     if _create_engine is None:
-        raise RuntimeError("SQLAlchemy create_engine is not available in this environment.")
+        raise RuntimeError(
+            "SQLAlchemy create_engine is not available in this environment."
+        )
 
     dn = (u.drivername or "").lower()
 
@@ -597,7 +617,9 @@ async def _mysql_create_database_async(url: URL) -> None:
     engine: AsyncEngineType = build_engine(base_url)  # type: ignore[assignment]
     async with engine.begin() as conn:
         exists = await conn.scalar(
-            text("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = :name"),
+            text(
+                "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = :name"
+            ),
             {"name": target_db},
         )
         if not exists:
@@ -614,7 +636,9 @@ def _mysql_create_database_sync(url: URL) -> None:
     engine: SyncEngine = build_engine(base_url)  # type: ignore[assignment]
     with engine.begin() as conn:
         exists = conn.scalar(
-            text("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = :name"),
+            text(
+                "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = :name"
+            ),
             {"name": target_db},
         )
         if not exists:
@@ -903,7 +927,9 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
                         )
                         missing = any((ver not in local_ids) for (ver,) in rows)
                         if missing:
-                            sync_conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+                            sync_conn.execute(
+                                text("DROP TABLE IF EXISTS alembic_version")
+                            )
 
                     await conn.run_sync(_check_and_maybe_drop)
             finally:
@@ -917,7 +943,11 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
                 insp = inspect(c)
                 if not insp.has_table("alembic_version"):
                     return
-                rows = list(c.execute(text("SELECT version_num FROM alembic_version")).fetchall())
+                rows = list(
+                    c.execute(
+                        text("SELECT version_num FROM alembic_version")
+                    ).fetchall()
+                )
                 missing = any((ver not in local_ids) for (ver,) in rows)
                 if missing:
                     c.execute(text("DROP TABLE IF EXISTS alembic_version"))

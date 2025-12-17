@@ -173,7 +173,9 @@ class NoSqlRepository:
         regex = {"$regex": q, "$options": "i"}
         or_filter = [{"$or": [{f: regex} for f in fields]}] if fields else []
         filt = (
-            self._merge_and(self._alive_filter(), *or_filter) if or_filter else self._alive_filter()
+            self._merge_and(self._alive_filter(), *or_filter)
+            if or_filter
+            else self._alive_filter()
         )
         cursor = db[self.collection_name].find(filt).skip(offset).limit(limit)
         if sort:
@@ -188,5 +190,7 @@ class NoSqlRepository:
 
     async def exists(self, db, *, where: Iterable[Dict[str, Any]]) -> bool:
         filt = self._merge_and(self._alive_filter(), *list(where))
-        doc = await db[self.collection_name].find_one(filt, projection={self.id_field: 1})
+        doc = await db[self.collection_name].find_one(
+            filt, projection={self.id_field: 1}
+        )
         return doc is not None

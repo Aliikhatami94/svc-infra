@@ -144,7 +144,9 @@ class PaymentsService:
 
     # --- Intents --------------------------------------------------------------
 
-    async def create_intent(self, user_id: Optional[str], data: IntentCreateIn) -> IntentOut:
+    async def create_intent(
+        self, user_id: Optional[str], data: IntentCreateIn
+    ) -> IntentOut:
         adapter = self._get_adapter()
         out = await adapter.create_intent(data, user_id=user_id)
         self.session.add(
@@ -215,7 +217,9 @@ class PaymentsService:
 
     # --- Webhooks -------------------------------------------------------------
 
-    async def handle_webhook(self, provider: str, signature: str | None, payload: bytes) -> dict:
+    async def handle_webhook(
+        self, provider: str, signature: str | None, payload: bytes
+    ) -> dict:
         adapter = self._get_adapter()
         parsed = await adapter.verify_and_parse_webhook(signature, payload)
         self.session.add(
@@ -313,7 +317,9 @@ class PaymentsService:
                     )
                 )
 
-    async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
+    async def attach_payment_method(
+        self, data: PaymentMethodAttachIn
+    ) -> PaymentMethodOut:
         out = await self._get_adapter().attach_payment_method(data)
         # Upsert locally for quick listing
         pm = PayPaymentMethod(
@@ -330,7 +336,9 @@ class PaymentsService:
         self.session.add(pm)
         return out
 
-    async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:
+    async def list_payment_methods(
+        self, provider_customer_id: str
+    ) -> list[PaymentMethodOut]:
         return await self._get_adapter().list_payment_methods(provider_customer_id)
 
     async def detach_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
@@ -393,14 +401,18 @@ class PaymentsService:
     async def update_subscription(
         self, provider_subscription_id: str, data: SubscriptionUpdateIn
     ) -> SubscriptionOut:
-        out = await self._get_adapter().update_subscription(provider_subscription_id, data)
+        out = await self._get_adapter().update_subscription(
+            provider_subscription_id, data
+        )
         # Optionally reflect status/quantity locally (query + update if exists)
         return out
 
     async def cancel_subscription(
         self, provider_subscription_id: str, at_period_end: bool = True
     ) -> SubscriptionOut:
-        out = await self._get_adapter().cancel_subscription(provider_subscription_id, at_period_end)
+        out = await self._get_adapter().cancel_subscription(
+            provider_subscription_id, at_period_end
+        )
         return out
 
     # --- Invoices ---
@@ -445,15 +457,15 @@ class PaymentsService:
         q = select(
             func.date_trunc("day", LedgerEntry.ts).label("day"),
             LedgerEntry.currency,
-            func.sum(func.case((LedgerEntry.kind == "payment", LedgerEntry.amount), else_=0)).label(
-                "gross"
-            ),
-            func.sum(func.case((LedgerEntry.kind == "refund", LedgerEntry.amount), else_=0)).label(
-                "refunds"
-            ),
-            func.sum(func.case((LedgerEntry.kind == "fee", LedgerEntry.amount), else_=0)).label(
-                "fees"
-            ),
+            func.sum(
+                func.case((LedgerEntry.kind == "payment", LedgerEntry.amount), else_=0)
+            ).label("gross"),
+            func.sum(
+                func.case((LedgerEntry.kind == "refund", LedgerEntry.amount), else_=0)
+            ).label("refunds"),
+            func.sum(
+                func.case((LedgerEntry.kind == "fee", LedgerEntry.amount), else_=0)
+            ).label("fees"),
             func.count().label("count"),
         )
         if date_from:
@@ -466,9 +478,9 @@ class PaymentsService:
                 q = q.where(LedgerEntry.ts <= datetime.fromisoformat(date_to))
             except Exception:
                 pass
-        q = q.group_by(func.date_trunc("day", LedgerEntry.ts), LedgerEntry.currency).order_by(
-            func.date_trunc("day", LedgerEntry.ts).desc()
-        )
+        q = q.group_by(
+            func.date_trunc("day", LedgerEntry.ts), LedgerEntry.currency
+        ).order_by(func.date_trunc("day", LedgerEntry.ts).desc())
 
         rows = (await self.session.execute(q)).all()
         out: list[StatementRow] = []
@@ -490,7 +502,9 @@ class PaymentsService:
             )
         return out
 
-    async def capture_intent(self, provider_intent_id: str, data: CaptureIn) -> IntentOut:
+    async def capture_intent(
+        self, provider_intent_id: str, data: CaptureIn
+    ) -> IntentOut:
         out = await self._get_adapter().capture_intent(
             provider_intent_id,
             amount=int(data.amount) if data.amount is not None else None,
@@ -525,7 +539,9 @@ class PaymentsService:
                         )
         return out
 
-    async def list_intents(self, f: IntentListFilter) -> tuple[list[IntentOut], str | None]:
+    async def list_intents(
+        self, f: IntentListFilter
+    ) -> tuple[list[IntentOut], str | None]:
         return await self._get_adapter().list_intents(
             customer_provider_id=f.customer_provider_id,
             status=f.status,
@@ -537,9 +553,13 @@ class PaymentsService:
     async def add_invoice_line_item(
         self, provider_invoice_id: str, data: InvoiceLineItemIn
     ) -> InvoiceOut:
-        return await self._get_adapter().add_invoice_line_item(provider_invoice_id, data)
+        return await self._get_adapter().add_invoice_line_item(
+            provider_invoice_id, data
+        )
 
-    async def list_invoices(self, f: InvoicesListFilter) -> tuple[list[InvoiceOut], str | None]:
+    async def list_invoices(
+        self, f: InvoicesListFilter
+    ) -> tuple[list[InvoiceOut], str | None]:
         return await self._get_adapter().list_invoices(
             customer_provider_id=f.customer_provider_id,
             status=f.status,
@@ -576,7 +596,9 @@ class PaymentsService:
         )
         return out
 
-    async def confirm_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
+    async def confirm_setup_intent(
+        self, provider_setup_intent_id: str
+    ) -> SetupIntentOut:
         out = await self._get_adapter().confirm_setup_intent(provider_setup_intent_id)
         row = await self.session.scalar(
             select(PaySetupIntent).where(
@@ -627,13 +649,17 @@ class PaymentsService:
     async def list_disputes(
         self, *, status: Optional[str], limit: int, cursor: Optional[str]
     ) -> tuple[list[DisputeOut], Optional[str]]:
-        return await self._get_adapter().list_disputes(status=status, limit=limit, cursor=cursor)
+        return await self._get_adapter().list_disputes(
+            status=status, limit=limit, cursor=cursor
+        )
 
     async def get_dispute(self, provider_dispute_id: str) -> DisputeOut:
         out = await self._get_adapter().get_dispute(provider_dispute_id)
         # Upsert locally
         row = await self.session.scalar(
-            select(PayDispute).where(PayDispute.provider_dispute_id == provider_dispute_id)
+            select(PayDispute).where(
+                PayDispute.provider_dispute_id == provider_dispute_id
+            )
         )
         if row:
             row.status = out.status
@@ -654,11 +680,17 @@ class PaymentsService:
             )
         return out
 
-    async def submit_dispute_evidence(self, provider_dispute_id: str, evidence: dict) -> DisputeOut:
-        out = await self._get_adapter().submit_dispute_evidence(provider_dispute_id, evidence)
+    async def submit_dispute_evidence(
+        self, provider_dispute_id: str, evidence: dict
+    ) -> DisputeOut:
+        out = await self._get_adapter().submit_dispute_evidence(
+            provider_dispute_id, evidence
+        )
         # reflect status
         row = await self.session.scalar(
-            select(PayDispute).where(PayDispute.provider_dispute_id == provider_dispute_id)
+            select(PayDispute).where(
+                PayDispute.provider_dispute_id == provider_dispute_id
+            )
         )
         if row:
             row.status = out.status
@@ -728,7 +760,9 @@ class PaymentsService:
         return len(rows)
 
     # ---- Customers ----
-    async def list_customers(self, f: CustomersListFilter) -> tuple[list[CustomerOut], str | None]:
+    async def list_customers(
+        self, f: CustomersListFilter
+    ) -> tuple[list[CustomerOut], str | None]:
         adapter = self._get_adapter()
         try:
             return await adapter.list_customers(
@@ -771,7 +805,9 @@ class PaymentsService:
             raise RuntimeError("Customer not found")
         # upsert locally
         row = await self.session.scalar(
-            select(PayCustomer).where(PayCustomer.provider_customer_id == provider_customer_id)
+            select(PayCustomer).where(
+                PayCustomer.provider_customer_id == provider_customer_id
+            )
         )
         if not row:
             self.session.add(
@@ -791,13 +827,19 @@ class PaymentsService:
     async def list_products(
         self, *, active: bool | None, limit: int, cursor: str | None
     ) -> tuple[list[ProductOut], str | None]:
-        return await self._get_adapter().list_products(active=active, limit=limit, cursor=cursor)
+        return await self._get_adapter().list_products(
+            active=active, limit=limit, cursor=cursor
+        )
 
-    async def update_product(self, provider_product_id: str, data: ProductUpdateIn) -> ProductOut:
+    async def update_product(
+        self, provider_product_id: str, data: ProductUpdateIn
+    ) -> ProductOut:
         out = await self._get_adapter().update_product(provider_product_id, data)
         # reflect DB
         row = await self.session.scalar(
-            select(PayProduct).where(PayProduct.provider_product_id == provider_product_id)
+            select(PayProduct).where(
+                PayProduct.provider_product_id == provider_product_id
+            )
         )
         if row:
             if data.name is not None:
@@ -824,7 +866,9 @@ class PaymentsService:
             cursor=cursor,
         )
 
-    async def update_price(self, provider_price_id: str, data: PriceUpdateIn) -> PriceOut:
+    async def update_price(
+        self, provider_price_id: str, data: PriceUpdateIn
+    ) -> PriceOut:
         out = await self._get_adapter().update_price(provider_price_id, data)
         row = await self.session.scalar(
             select(PayPrice).where(PayPrice.provider_price_id == provider_price_id)

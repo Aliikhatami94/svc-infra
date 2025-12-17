@@ -35,26 +35,16 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=500"]
 
-  # --- Formatting ---
-  - repo: https://github.com/psf/black
-    rev: 24.8.0
+  # --- Ruff: Formatting + Linting (matches CI) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
     hooks:
-      - id: black
+      # Run the formatter (replaces black + isort)
+      - id: ruff-format
         args: ["--line-length", "100"]
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: ["--profile", "black", "--line-length", "100"]
-
-  # --- Linting ---
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.1.1
-    hooks:
-      - id: flake8
-        args: ["--select=E,F", "--exclude=.venv,venv,build,dist,node_modules,.git"]
-        # additional_dependencies: [flake8-bugbear]
+      # Run the linter (replaces flake8)
+      - id: ruff
+        args: ["--fix", "--exit-non-zero-on-fix"]
 
   # --- Type checking ---
   - repo: https://github.com/pre-commit/mirrors-mypy

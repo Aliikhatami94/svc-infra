@@ -6,7 +6,10 @@ from pathlib import Path
 import typer
 
 from svc_infra.dx.changelog import Commit, generate_release_section
-from svc_infra.dx.checks import check_migrations_up_to_date, check_openapi_problem_schema
+from svc_infra.dx.checks import (
+    check_migrations_up_to_date,
+    check_openapi_problem_schema,
+)
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -34,7 +37,9 @@ def cmd_migrations(project_root: str = typer.Option(".", help="Project root")):
 @app.command("changelog")
 def cmd_changelog(
     version: str = typer.Argument(..., help="Version (e.g., 0.1.604)"),
-    commits_file: str = typer.Option(None, help="Path to JSON lines of commits (sha,subject)"),
+    commits_file: str = typer.Option(
+        None, help="Path to JSON lines of commits (sha,subject)"
+    ),
 ):
     """Generate a changelog section from commit messages.
 
@@ -51,7 +56,9 @@ def cmd_changelog(
         )
         raise typer.Exit(2)
     rows = [
-        json.loads(line) for line in Path(commits_file).read_text().splitlines() if line.strip()
+        json.loads(line)
+        for line in Path(commits_file).read_text().splitlines()
+        if line.strip()
     ]
     commits = [Commit(sha=r["sha"], subject=r["subject"]) for r in rows]
     out = generate_release_section(version=version, commits=commits)
@@ -60,7 +67,9 @@ def cmd_changelog(
 
 @app.command("ci")
 def cmd_ci(
-    run: bool = typer.Option(False, help="Execute the steps; default just prints a plan"),
+    run: bool = typer.Option(
+        False, help="Execute the steps; default just prints a plan"
+    ),
     openapi: str | None = typer.Option(None, help="Path to OpenAPI JSON to lint"),
     project_root: str = typer.Option(".", help="Project root for migrations check"),
 ):

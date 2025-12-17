@@ -39,7 +39,9 @@ class TestRequireIdentity:
         app.dependency_overrides[_current_principal] = lambda: mock_principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -63,7 +65,9 @@ class TestRequireIdentity:
         app.dependency_overrides[_current_principal] = _raise_auth_error
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             # Should fail without proper auth
@@ -89,7 +93,9 @@ class TestAllowIdentity:
         app.dependency_overrides[_optional_principal] = lambda: mock_principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -113,7 +119,9 @@ class TestAllowIdentity:
         app.dependency_overrides[_optional_principal] = lambda: None
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -140,7 +148,9 @@ class TestRequireUser:
         app.dependency_overrides[_current_principal] = lambda: mock_principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -170,7 +180,9 @@ class TestRequireUser:
         app.dependency_overrides[_current_principal] = lambda: service_principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             # Should fail because it's a service principal, not a user
@@ -203,7 +215,9 @@ class TestRequireService:
         app.dependency_overrides[_current_principal] = lambda: service_principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -233,7 +247,9 @@ class TestRequireService:
         app.dependency_overrides[_current_principal] = lambda: user_principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             # Should fail because it's a user principal, not a service
@@ -263,7 +279,9 @@ class TestRequireScopes:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -291,7 +309,9 @@ class TestRequireScopes:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             # Should fail due to insufficient scopes
@@ -321,7 +341,9 @@ class TestRequireAnyScope:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -348,7 +370,9 @@ class TestRequireAnyScope:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             # Should fail due to no matching scopes
@@ -381,7 +405,9 @@ class TestRequireRoles:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -411,7 +437,9 @@ class TestRequireRoles:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             # Should fail due to insufficient roles
@@ -444,7 +472,9 @@ class TestRequireRoles:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -487,7 +517,9 @@ class TestGuardCombinations:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200
@@ -528,7 +560,9 @@ class TestGuardCombinations:
         app.dependency_overrides[_current_principal] = lambda: principal
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get("/test")
 
             assert response.status_code == 200

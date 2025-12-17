@@ -46,7 +46,9 @@ class BillingService:
 
     def aggregate_daily(self, *, metric: str, day_start: datetime) -> None:
         # Compute [day_start, day_start+1d)
-        next_day = day_start.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        next_day = day_start.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
         total = 0
         rows = self.session.execute(
             select(UsageEvent).where(

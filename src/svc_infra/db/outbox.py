@@ -19,7 +19,9 @@ class OutboxStore(Protocol):
     def enqueue(self, topic: str, payload: Dict[str, Any]) -> OutboxMessage:
         pass
 
-    def fetch_next(self, *, topics: Optional[Iterable[str]] = None) -> Optional[OutboxMessage]:
+    def fetch_next(
+        self, *, topics: Optional[Iterable[str]] = None
+    ) -> Optional[OutboxMessage]:
         """Return the next undispatched, unprocessed message (FIFO per-topic), or None.
 
         Notes:
@@ -48,7 +50,9 @@ class InMemoryOutboxStore:
         self._messages.append(msg)
         return msg
 
-    def fetch_next(self, *, topics: Optional[Iterable[str]] = None) -> Optional[OutboxMessage]:
+    def fetch_next(
+        self, *, topics: Optional[Iterable[str]] = None
+    ) -> Optional[OutboxMessage]:
         allowed = set(topics) if topics else None
         for msg in self._messages:
             if msg.processed_at is not None:

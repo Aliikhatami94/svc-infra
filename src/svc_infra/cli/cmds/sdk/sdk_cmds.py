@@ -4,7 +4,9 @@ import subprocess
 
 import typer
 
-app = typer.Typer(no_args_is_help=True, add_completion=False, help="Generate SDKs from OpenAPI.")
+app = typer.Typer(
+    no_args_is_help=True, add_completion=False, help="Generate SDKs from OpenAPI."
+)
 
 
 def _echo(cmd: list[str]):
@@ -28,7 +30,9 @@ def _parse_bool(val: str | bool | None, default: bool = True) -> bool:
 def sdk_ts(
     openapi: str = typer.Argument(..., help="Path to OpenAPI JSON"),
     outdir: str = typer.Option("sdk-ts", help="Output directory"),
-    dry_run: str = typer.Option("true", help="Print commands instead of running (true/false)"),
+    dry_run: str = typer.Option(
+        "true", help="Print commands instead of running (true/false)"
+    ),
 ):
     """Generate a TypeScript SDK (openapi-typescript-codegen as default)."""
     cmd = [
@@ -51,7 +55,9 @@ def sdk_py(
     openapi: str = typer.Argument(..., help="Path to OpenAPI JSON"),
     outdir: str = typer.Option("sdk-py", help="Output directory"),
     package_name: str = typer.Option("client_sdk", help="Python package name"),
-    dry_run: str = typer.Option("true", help="Print commands instead of running (true/false)"),
+    dry_run: str = typer.Option(
+        "true", help="Print commands instead of running (true/false)"
+    ),
 ):
     """Generate a Python SDK via openapi-generator-cli with "python" generator."""
     cmd = [
@@ -78,8 +84,12 @@ def sdk_py(
 @app.command("postman")
 def sdk_postman(
     openapi: str = typer.Argument(..., help="Path to OpenAPI JSON"),
-    out: str = typer.Option("postman_collection.json", help="Output Postman collection"),
-    dry_run: str = typer.Option("true", help="Print commands instead of running (true/false)"),
+    out: str = typer.Option(
+        "postman_collection.json", help="Output Postman collection"
+    ),
+    dry_run: str = typer.Option(
+        "true", help="Print commands instead of running (true/false)"
+    ),
 ):
     """Convert OpenAPI to a Postman collection via openapi-to-postmanv2."""
     cmd = [

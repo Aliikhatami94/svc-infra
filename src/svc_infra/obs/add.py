@@ -68,7 +68,11 @@ def add_observability(
                 # Mount /metrics endpoint without re-adding middleware
                 try:
                     from svc_infra.api.fastapi.dual.public import public_router
-                    from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV
+                    from svc_infra.app.env import (
+                        CURRENT_ENVIRONMENT,
+                        DEV_ENV,
+                        LOCAL_ENV,
+                    )
 
                     router = public_router()
                     router.add_api_route(
@@ -86,7 +90,9 @@ def add_observability(
     # --- DB pool metrics (best effort) — also lazy
     if db_engines:
         try:
-            from svc_infra.obs.metrics.sqlalchemy import bind_sqlalchemy_pool_metrics  # lazy
+            from svc_infra.obs.metrics.sqlalchemy import (
+                bind_sqlalchemy_pool_metrics,
+            )  # lazy
 
             for eng in db_engines:
                 try:
@@ -98,7 +104,10 @@ def add_observability(
 
     # --- HTTP client metrics (best effort) — import lazily
     try:
-        from svc_infra.obs.metrics.http import instrument_httpx, instrument_requests  # lazy
+        from svc_infra.obs.metrics.http import (
+            instrument_httpx,
+            instrument_requests,
+        )  # lazy
 
         try:
             instrument_requests()

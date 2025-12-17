@@ -12,7 +12,9 @@ def test_billing_usage_ingest_returns_202(client):
         "amount": 3,
         "idempotency_key": "acc-k1",
     }
-    r = client.post("/_billing/usage", json=payload, headers={"Idempotency-Key": "acc-k1"})
+    r = client.post(
+        "/_billing/usage", json=payload, headers={"Idempotency-Key": "acc-k1"}
+    )
     assert r.status_code == 202
     body = r.json()
     assert body.get("accepted") is True

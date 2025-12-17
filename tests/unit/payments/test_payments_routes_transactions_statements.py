@@ -86,7 +86,9 @@ async def test_daily_statements(client, fake_adapter, mocker):
 @pytest.mark.asyncio
 async def test_daily_statements_with_date_filters(client, fake_adapter, mocker):
     """Test daily statements with date range filters"""
-    res = await client.get("/payments/statements/daily?date_from=2024-01-01&date_to=2024-01-31")
+    res = await client.get(
+        "/payments/statements/daily?date_from=2024-01-01&date_to=2024-01-31"
+    )
     # This will fail because we don't have real database entries
     # But we can verify the endpoint exists and accepts parameters
     assert res.status_code in [200, 500]  # 500 if no data, 200 if mock data works

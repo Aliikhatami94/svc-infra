@@ -20,7 +20,9 @@ def set_conditional_headers(
         resp.headers["Last-Modified"] = format_datetime(last_modified)
 
 
-def maybe_not_modified(request: Request, etag: str | None, last_modified: datetime | None) -> bool:
+def maybe_not_modified(
+    request: Request, etag: str | None, last_modified: datetime | None
+) -> bool:
     inm = request.headers.get("If-None-Match")
     ims = request.headers.get("If-Modified-Since")
     etag_ok = etag and inm and etag in [t.strip() for t in inm.split(",")]

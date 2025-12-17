@@ -115,7 +115,11 @@ class IdempotencyMiddleware:
                     },
                 )
                 return
-            if existing and existing.status is not None and existing.body_b64 is not None:
+            if (
+                existing
+                and existing.status is not None
+                and existing.body_b64 is not None
+            ):
                 await self._send_cached_response(send, existing)
                 return
 
@@ -178,7 +182,9 @@ class IdempotencyMiddleware:
         await send({"type": "http.response.body", "body": body, "more_body": False})
 
     async def _send_cached_response(self, send, existing) -> None:
-        headers = [(k.encode(), v.encode()) for k, v in (existing.headers or {}).items()]
+        headers = [
+            (k.encode(), v.encode()) for k, v in (existing.headers or {}).items()
+        ]
         if existing.media_type:
             headers.append((b"content-type", existing.media_type.encode()))
         await send(
@@ -202,4 +208,6 @@ async def require_idempotency_key(
     request: Request,
 ) -> None:
     if not idempotency_key.strip():
-        raise HTTPException(status_code=400, detail="Idempotency-Key must not be empty.")
+        raise HTTPException(
+            status_code=400, detail="Idempotency-Key must not be empty."
+        )

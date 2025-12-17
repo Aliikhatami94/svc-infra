@@ -71,7 +71,9 @@ class LocalBackend:
             raise InvalidKeyError("Key cannot exceed 1024 characters")
 
         # Check for safe characters
-        safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/")
+        safe_chars = set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/"
+        )
         if not all(c in safe_chars for c in key):
             raise InvalidKeyError(
                 "Key can only contain alphanumeric, dot, dash, underscore, and slash"
@@ -95,7 +97,9 @@ class LocalBackend:
         ).hexdigest()
         return signature
 
-    def _verify_signature(self, key: str, expires_at: int, download: bool, signature: str) -> bool:
+    def _verify_signature(
+        self, key: str, expires_at: int, download: bool, signature: str
+    ) -> bool:
         """Verify HMAC signature."""
         expected = self._sign_url(key, expires_at, download)
         return hmac.compare_digest(expected, signature)
@@ -236,7 +240,9 @@ class LocalBackend:
         url = f"{self.base_url}/{key}?{urlencode(params)}"
         return url
 
-    def verify_url(self, key: str, expires: str, signature: str, download: bool = False) -> bool:
+    def verify_url(
+        self, key: str, expires: str, signature: str, download: bool = False
+    ) -> bool:
         """
         Verify a signed URL (for use in file serving endpoint).
 
@@ -317,7 +323,9 @@ class LocalBackend:
             return {
                 "size": stat.st_size,
                 "content_type": "application/octet-stream",
-                "created_at": datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc).isoformat(),
+                "created_at": datetime.fromtimestamp(
+                    stat.st_ctime, tz=timezone.utc
+                ).isoformat(),
             }
 
         try:

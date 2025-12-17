@@ -114,7 +114,9 @@ def mfa_router(
         # )).scalar_one()
         # assert fresh_secret == secret
 
-        return StartSetupOut(otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri))
+        return StartSetupOut(
+            otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri)
+        )
 
     @u.post(
         MFA_CONFIRM_PATH,
@@ -207,7 +209,9 @@ def mfa_router(
         if not getattr(user, "is_active", True):
             raise HTTPException(401, "account_disabled")
 
-        if (not getattr(user, "mfa_enabled", False)) or (not getattr(user, "mfa_secret", None)):
+        if (not getattr(user, "mfa_enabled", False)) or (
+            not getattr(user, "mfa_secret", None)
+        ):
             raise HTTPException(401, "MFA not enabled")
 
         # 3) verify TOTP or fallback
@@ -249,7 +253,9 @@ def mfa_router(
         # 4) mint normal JWT and set cookie
         token = await strategy.write_token(user)
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
-        cp = compute_cookie_params(request, name=st.auth_cookie_name)  # <-- pass Request here
+        cp = compute_cookie_params(
+            request, name=st.auth_cookie_name
+        )  # <-- pass Request here
         resp.set_cookie(**cp, value=token)
         return resp
 

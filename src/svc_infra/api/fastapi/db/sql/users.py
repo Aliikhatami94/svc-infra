@@ -5,7 +5,11 @@ from uuid import UUID
 
 from fastapi import Depends
 from fastapi_users import FastAPIUsers
-from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
+from fastapi_users.authentication import (
+    AuthenticationBackend,
+    BearerTransport,
+    JWTStrategy,
+)
 from fastapi_users.manager import BaseUserManager, UUIDIDMixin
 
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
@@ -47,7 +51,9 @@ def get_fastapi_users(
 
         async def on_after_register(self, user: Any, request=None):
             st = get_auth_settings()
-            if CURRENT_ENVIRONMENT in (DEV_ENV, LOCAL_ENV) and bool(st.auto_verify_in_dev):
+            if CURRENT_ENVIRONMENT in (DEV_ENV, LOCAL_ENV) and bool(
+                st.auto_verify_in_dev
+            ):
                 await self.user_db.update(user, {"is_verified": True})
                 return
             await self.request_verify(user, request)
@@ -110,7 +116,9 @@ def get_fastapi_users(
                 old_secrets=old,
                 token_audience=audience,
             )
-        return JWTStrategy(secret=secret, lifetime_seconds=lifetime, token_audience=audience)
+        return JWTStrategy(
+            secret=secret, lifetime_seconds=lifetime, token_audience=audience
+        )
 
     bearer_transport = BearerTransport(tokenUrl=auth_login_path)
     auth_backend = AuthenticationBackend(

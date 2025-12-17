@@ -23,7 +23,9 @@ app = typer.Typer(no_args_is_help=True, add_completion=False, help=_HELP)
 pre_cli(app)
 
 # --- db ops group ---
-db_app = typer.Typer(no_args_is_help=True, add_completion=False, help="Database operations")
+db_app = typer.Typer(
+    no_args_is_help=True, add_completion=False, help="Database operations"
+)
 register_db_ops(db_app)
 app.add_typer(db_app, name="db")
 
@@ -35,18 +37,24 @@ register_sql_export(sql_app)
 app.add_typer(sql_app, name="sql")
 
 # --- mongo group ---
-mongo_app = typer.Typer(no_args_is_help=True, add_completion=False, help="MongoDB commands")
+mongo_app = typer.Typer(
+    no_args_is_help=True, add_completion=False, help="MongoDB commands"
+)
 register_mongo(mongo_app)
 register_mongo_scaffold(mongo_app)
 app.add_typer(mongo_app, name="mongo")
 
 # --- health group ---
-health_app = typer.Typer(no_args_is_help=True, add_completion=False, help="Health checks")
+health_app = typer.Typer(
+    no_args_is_help=True, add_completion=False, help="Health checks"
+)
 register_health(health_app)
 app.add_typer(health_app, name="health")
 
 # -- obs group ---
-obs_app = typer.Typer(no_args_is_help=True, add_completion=False, help="Observability commands")
+obs_app = typer.Typer(
+    no_args_is_help=True, add_completion=False, help="Observability commands"
+)
 register_obs(obs_app)
 app.add_typer(obs_app, name="obs")
 

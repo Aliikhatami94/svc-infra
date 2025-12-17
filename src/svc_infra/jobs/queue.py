@@ -42,7 +42,9 @@ class Job:
 
 
 class JobQueue(Protocol):
-    def enqueue(self, name: str, payload: Dict[str, Any], *, delay_seconds: int = 0) -> Job:
+    def enqueue(
+        self, name: str, payload: Dict[str, Any], *, delay_seconds: int = 0
+    ) -> Job:
         pass
 
     def reserve_next(self) -> Optional[Job]:
@@ -70,16 +72,24 @@ class InMemoryJobQueue:
         self._seq += 1
         return str(self._seq)
 
-    def enqueue(self, name: str, payload: Dict[str, Any], *, delay_seconds: int = 0) -> Job:
+    def enqueue(
+        self, name: str, payload: Dict[str, Any], *, delay_seconds: int = 0
+    ) -> Job:
         when = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
-        job = Job(id=self._next_id(), name=name, payload=dict(payload), available_at=when)
+        job = Job(
+            id=self._next_id(), name=name, payload=dict(payload), available_at=when
+        )
         self._jobs.append(job)
         return job
 
     def reserve_next(self) -> Optional[Job]:
         now = datetime.now(timezone.utc)
         for job in self._jobs:
-            if job.available_at <= now and job.attempts >= 0 and job.attempts < job.max_attempts:
+            if (
+                job.available_at <= now
+                and job.attempts >= 0
+                and job.attempts < job.max_attempts
+            ):
                 job.attempts += 1
                 return job
         return None

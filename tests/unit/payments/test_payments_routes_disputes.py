@@ -117,7 +117,9 @@ async def test_submit_dispute_evidence(client, fake_adapter, mocker):
     assert body["provider_dispute_id"] == "dp_123"
     assert body["status"] == "under_review"
 
-    fake_adapter.submit_dispute_evidence.assert_awaited_once_with("dp_123", evidence_data)
+    fake_adapter.submit_dispute_evidence.assert_awaited_once_with(
+        "dp_123", evidence_data
+    )
 
 
 @pytest.mark.asyncio
@@ -148,4 +150,6 @@ async def test_submit_dispute_evidence_minimal(client, fake_adapter, mocker):
     assert body["provider_dispute_id"] == "dp_123"
     assert body["status"] == "under_review"
 
-    fake_adapter.submit_dispute_evidence.assert_awaited_once_with("dp_123", evidence_data)
+    fake_adapter.submit_dispute_evidence.assert_awaited_once_with(
+        "dp_123", evidence_data
+    )

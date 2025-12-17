@@ -379,7 +379,9 @@ def test_a23_05_room_isolation():
 
                     if send_message:
                         time.sleep(0.1)
-                        ws.send_json({"type": "message", "text": f"message to {room_name}"})
+                        ws.send_json(
+                            {"type": "message", "text": f"message to {room_name}"}
+                        )
 
                     try:
                         data = ws.receive_json()
@@ -390,9 +392,13 @@ def test_a23_05_room_isolation():
             pass
 
     # User in room1 sends message (daemon=True to avoid blocking process exit)
-    t1 = threading.Thread(target=room_client, args=("room1", "user1", True), daemon=True)
+    t1 = threading.Thread(
+        target=room_client, args=("room1", "user1", True), daemon=True
+    )
     # User in room2 should NOT receive message from room1
-    t2 = threading.Thread(target=room_client, args=("room2", "user2", False), daemon=True)
+    t2 = threading.Thread(
+        target=room_client, args=("room2", "user2", False), daemon=True
+    )
 
     t1.start()
     t2.start()

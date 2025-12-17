@@ -22,7 +22,16 @@ from fastapi.responses import JSONResponse
 from fastapi_users.authentication import JWTStrategy
 from fastapi_users.password import PasswordHelper
 from httpx import ASGITransport
-from sqlalchemy import Column, DateTime, MetaData, String, Table, create_engine, select, text
+from sqlalchemy import (
+    Column,
+    DateTime,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    select,
+    text,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from svc_infra.apf_payments import settings as payments_settings
@@ -46,8 +55,14 @@ from svc_infra.api.fastapi.auth.security import (
 )
 from svc_infra.api.fastapi.billing.setup import add_billing as _add_billing
 from svc_infra.api.fastapi.db.sql.session import get_session
-from svc_infra.api.fastapi.ease import EasyAppOptions, ObservabilityOptions, easy_service_app
-from svc_infra.api.fastapi.middleware.errors.handlers import problem_response as _problem_response
+from svc_infra.api.fastapi.ease import (
+    EasyAppOptions,
+    ObservabilityOptions,
+    easy_service_app,
+)
+from svc_infra.api.fastapi.middleware.errors.handlers import (
+    problem_response as _problem_response,
+)
 from svc_infra.api.fastapi.middleware.errors.handlers import (
     register_error_handlers as _register_error_handlers,
 )
@@ -62,9 +77,13 @@ from svc_infra.api.fastapi.middleware.timeout import (
 )
 from svc_infra.api.fastapi.ops.add import add_maintenance_mode as _add_maintenance_mode
 from svc_infra.api.fastapi.ops.add import add_probes as _add_probes
-from svc_infra.api.fastapi.ops.add import circuit_breaker_dependency as _circuit_breaker_dependency
+from svc_infra.api.fastapi.ops.add import (
+    circuit_breaker_dependency as _circuit_breaker_dependency,
+)
 from svc_infra.api.fastapi.tenancy.context import TenantId as _TenantId
-from svc_infra.api.fastapi.tenancy.context import set_tenant_resolver as _set_tenant_resolver
+from svc_infra.api.fastapi.tenancy.context import (
+    set_tenant_resolver as _set_tenant_resolver,
+)
 from svc_infra.jobs.easy import easy_jobs
 from svc_infra.jobs.queue import Job
 from svc_infra.jobs.worker import process_one
@@ -78,7 +97,9 @@ from svc_infra.webhooks.signing import verify_any
 # Minimal acceptance app wiring the library's routers and defaults
 os.environ.setdefault("PAYMENTS_PROVIDER", "fake")
 
-payments_settings._SETTINGS = payments_settings.PaymentsSettings(default_provider="fake")
+payments_settings._SETTINGS = payments_settings.PaymentsSettings(
+    default_provider="fake"
+)
 # Provide a tiny SQLite engine so db_pool_* metrics are bound during acceptance
 _engine = create_engine("sqlite:///:memory:")
 # Trigger a connection once so pool metrics initialize label series
@@ -191,7 +212,9 @@ async def _slow_body(request: Request):
     """
     # Heuristic: generators in the test client are sent with Transfer-Encoding: chunked
     is_chunked = request.headers.get("transfer-encoding", "").lower() == "chunked"
-    missing_length = "content-length" not in {k.lower(): v for k, v in request.headers.items()}
+    missing_length = "content-length" not in {
+        k.lower(): v for k, v in request.headers.items()
+    }
     if is_chunked or missing_length:
         trace_id = None
         for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
@@ -353,12 +376,16 @@ class FakeAdapter(ProviderAdapter):
         m = await self.get_payment_method(provider_method_id)
         return m
 
-    async def get_intent(self, provider_intent_id: str) -> IntentOut:  # non-protocol helper
+    async def get_intent(
+        self, provider_intent_id: str
+    ) -> IntentOut:  # non-protocol helper
         return await self.hydrate_intent(provider_intent_id)
 
 
 # Install payments under /payments using the fake adapter (skip default provider registration).
-add_payments(app, prefix="/payments", register_default_providers=False, adapters=[FakeAdapter()])
+add_payments(
+    app, prefix="/payments", register_default_providers=False, adapters=[FakeAdapter()]
+)
 
 # Mount internal billing router under /_billing for acceptance smoke tests
 _add_billing(app)
@@ -736,7 +763,9 @@ async def run_fixtures_once():
 
     # Return all users for visibility
     with _dl_engine.begin() as conn:
-        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
+        rows = conn.execute(
+            select(_users.c.id, _users.c.email, _users.c.deleted_at)
+        ).all()
         return {"users": [dict(r._mapping) for r in rows]}
 
 
@@ -829,7 +858,9 @@ async def run_retention_purge_endpoint(
     affected = await run_retention_purge(_SyncToAsyncSession(_dl_engine), [policy])
     # Return current table state for visibility
     with _dl_engine.begin() as conn:
-        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
+        rows = conn.execute(
+            select(_users.c.id, _users.c.email, _users.c.deleted_at)
+        ).all()
         return {"affected": affected, "users": [dict(r._mapping) for r in rows]}
 
 
@@ -1223,13 +1254,19 @@ def _require_current_user(request: Request) -> _AUser:
 @_auth_router.post("/keys", status_code=201)
 async def _accept_apikey_create(request: Request, payload: dict = Body(...)):
     user = _require_current_user(request)
-    owner_id = uuid.UUID(str(payload.get("user_id"))) if payload.get("user_id") else user.id
+    owner_id = (
+        uuid.UUID(str(payload.get("user_id"))) if payload.get("user_id") else user.id
+    )
     if owner_id != user.id and not user.is_superuser:
         raise HTTPException(403, "forbidden")
     name = (payload.get("name") or "").strip() or "Key"
     scopes = list(payload.get("scopes") or [])
     ttl_hours = payload.get("ttl_hours", 24 * 365)
-    expires = (datetime.now(timezone.utc) + timedelta(hours=int(ttl_hours))) if ttl_hours else None
+    expires = (
+        (datetime.now(timezone.utc) + timedelta(hours=int(ttl_hours)))
+        if ttl_hours
+        else None
+    )
     row = _AApiKey(user_id=owner_id, name=name, scopes=scopes, expires_at=expires)
     _keys_by_id[row.id] = row
     _keys_by_user.setdefault(owner_id, []).append(row.id)
@@ -1377,7 +1414,9 @@ _rate_limit_events: list[dict] = []
 
 
 def _record_rate_limit_event(key: str, limit: int, retry_after: int) -> None:
-    _rate_limit_events.append({"key": key, "limit": int(limit), "retry_after": int(retry_after)})
+    _rate_limit_events.append(
+        {"key": key, "limit": int(limit), "retry_after": int(retry_after)}
+    )
 
 
 @_abuse.post("/hooks/rate-limit/enable")
@@ -1721,7 +1760,9 @@ def _should_use_asgi_transport(url: str) -> bool:
 async def _local_post(url: str, json_body: dict, headers: dict) -> httpx.Response:
     # Use ASGITransport to avoid real network when targeting testserver
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
         # Strip scheme+host if present to avoid double host
         path = urlparse(url).path or "/"
         return await client.post(path, json=json_body, headers=headers)
@@ -1771,7 +1812,10 @@ async def _accept_webhook_delivery(job: Job) -> None:
     }
     if subscription_id:
         headers["X-Webhook-Subscription"] = str(subscription_id)
-    if isinstance(delivery_payload, dict) and delivery_payload.get("version") is not None:
+    if (
+        isinstance(delivery_payload, dict)
+        and delivery_payload.get("version") is not None
+    ):
         headers["X-Payload-Version"] = str(delivery_payload.get("version"))
     # Post using ASGI when targeting testserver, else real HTTP
     if _should_use_asgi_transport(url):
@@ -1780,7 +1824,9 @@ async def _accept_webhook_delivery(job: Job) -> None:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(url, json=delivery_payload, headers=headers)
     if 200 <= resp.status_code < 300:
-        app.state.webhooks_inbox.mark_if_new(f"webhook:{outbox_id}", ttl_seconds=24 * 3600)
+        app.state.webhooks_inbox.mark_if_new(
+            f"webhook:{outbox_id}", ttl_seconds=24 * 3600
+        )
         app.state.webhooks_outbox.mark_processed(int(outbox_id))
         return
     raise RuntimeError(f"webhook delivery failed: {resp.status_code}")

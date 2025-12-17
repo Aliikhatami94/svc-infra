@@ -3,7 +3,11 @@
 import pytest
 
 from svc_infra.storage.backends.memory import MemoryBackend
-from svc_infra.storage.base import FileNotFoundError, InvalidKeyError, QuotaExceededError
+from svc_infra.storage.base import (
+    FileNotFoundError,
+    InvalidKeyError,
+    QuotaExceededError,
+)
 
 
 @pytest.mark.storage

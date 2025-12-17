@@ -94,7 +94,9 @@ class RedisRateLimitStore:
         pipe.incr(rkey)
         pipe.ttl(rkey)
         count, ttl = pipe.execute()
-        if ttl == -1:  # key exists without expire or just created; set expire to end of window
+        if (
+            ttl == -1
+        ):  # key exists without expire or just created; set expire to end of window
             expire_sec = (win + window) - now
             if expire_sec <= 0:
                 expire_sec = window

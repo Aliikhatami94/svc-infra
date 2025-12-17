@@ -73,7 +73,9 @@ def _ensure_utc_isoformat(value: Any) -> str | None:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc).isoformat()
     if isinstance(value, date):
-        return datetime(value.year, value.month, value.day, tzinfo=timezone.utc).isoformat()
+        return datetime(
+            value.year, value.month, value.day, tzinfo=timezone.utc
+        ).isoformat()
     try:
         parsed = datetime.fromisoformat(str(value))
         if parsed.tzinfo is None:
@@ -114,7 +116,9 @@ def _payment_method_to_out(data: dict[str, Any]) -> PaymentMethodOut:
     return PaymentMethodOut(
         id=method_id,
         provider="aiydan",
-        provider_customer_id=str(data.get("provider_customer_id") or data.get("customer_id") or ""),
+        provider_customer_id=str(
+            data.get("provider_customer_id") or data.get("customer_id") or ""
+        ),
         provider_method_id=method_id,
         brand=card.get("brand") or data.get("brand"),
         last4=card.get("last4") or data.get("last4"),
@@ -195,7 +199,9 @@ def _invoice_to_out(data: dict[str, Any]) -> InvoiceOut:
         id=invoice_id,
         provider="aiydan",
         provider_invoice_id=invoice_id,
-        provider_customer_id=str(data.get("provider_customer_id") or data.get("customer_id") or ""),
+        provider_customer_id=str(
+            data.get("provider_customer_id") or data.get("customer_id") or ""
+        ),
         status=str(data.get("status", "")),
         amount_due=int(data.get("amount_due", data.get("amount") or 0) or 0),
         currency=str(data.get("currency", "")).upper(),
@@ -229,7 +235,9 @@ def _refund_to_out(data: dict[str, Any]) -> RefundOut:
         provider="aiydan",
         provider_refund_id=refund_id,
         provider_payment_intent_id=str(
-            data.get("provider_payment_intent_id") or data.get("payment_intent_id") or ""
+            data.get("provider_payment_intent_id")
+            or data.get("payment_intent_id")
+            or ""
         ),
         amount=int(data.get("amount", 0) or 0),
         currency=str(data.get("currency", "")).upper(),
@@ -281,10 +289,14 @@ def _usage_record_to_out(data: dict[str, Any]) -> UsageRecordOut:
         quantity=int(data.get("quantity", 0) or 0),
         timestamp=data.get("timestamp"),
         subscription_item=(
-            str(data.get("subscription_item")) if data.get("subscription_item") else None
+            str(data.get("subscription_item"))
+            if data.get("subscription_item")
+            else None
         ),
         provider_price_id=(
-            str(data.get("provider_price_id")) if data.get("provider_price_id") else None
+            str(data.get("provider_price_id"))
+            if data.get("provider_price_id")
+            else None
         ),
         action=action,
     )
@@ -305,7 +317,8 @@ def _balance_snapshot_to_out(data: dict[str, Any]) -> BalanceSnapshotOut:
             return out
         if isinstance(side, dict):
             return [
-                {"currency": str(cur).upper(), "amount": int(amt or 0)} for cur, amt in side.items()
+                {"currency": str(cur).upper(), "amount": int(amt or 0)}
+                for cur, amt in side.items()
             ]
         return []
 
@@ -357,7 +370,9 @@ class AiydanAdapter(ProviderAdapter):
         if client is not None:
             self._client = client
             self._webhook_secret = (
-                cfg.webhook_secret.get_secret_value() if cfg and cfg.webhook_secret else None
+                cfg.webhook_secret.get_secret_value()
+                if cfg and cfg.webhook_secret
+                else None
             )
             return
         if cfg is None:
@@ -377,32 +392,44 @@ class AiydanAdapter(ProviderAdapter):
         if cfg.base_url:
             kwargs["base_url"] = cfg.base_url
         self._client = client_class(**kwargs)
-        self._webhook_secret = cfg.webhook_secret.get_secret_value() if cfg.webhook_secret else None
+        self._webhook_secret = (
+            cfg.webhook_secret.get_secret_value() if cfg.webhook_secret else None
+        )
 
     async def ensure_customer(self, data: CustomerUpsertIn) -> CustomerOut:
         payload = data.model_dump(exclude_none=True)
         result = await _maybe_await(self._client.ensure_customer(payload))
         return _customer_to_out(result)
 
-    async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
+    async def attach_payment_method(
+        self, data: PaymentMethodAttachIn
+    ) -> PaymentMethodOut:
         payload = data.model_dump(exclude_none=True)
         result = await _maybe_await(self._client.attach_payment_method(payload))
         return _payment_method_to_out(result)
 
-    async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:
-        result = await _maybe_await(self._client.list_payment_methods(provider_customer_id))
+    async def list_payment_methods(
+        self, provider_customer_id: str
+    ) -> list[PaymentMethodOut]:
+        result = await _maybe_await(
+            self._client.list_payment_methods(provider_customer_id)
+        )
         methods = _ensure_sequence(result)
         return [_payment_method_to_out(method) for method in methods]
 
     async def detach_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
-        result = await _maybe_await(self._client.detach_payment_method(provider_method_id))
+        result = await _maybe_await(
+            self._client.detach_payment_method(provider_method_id)
+        )
         return _payment_method_to_out(result)
 
     async def set_default_payment_method(
         self, provider_customer_id: str, provider_method_id: str
     ) -> PaymentMethodOut:
         result = await _maybe_await(
-            self._client.set_default_payment_method(provider_customer_id, provider_method_id)
+            self._client.set_default_payment_method(
+                provider_customer_id, provider_method_id
+            )
         )
         return _payment_method_to_out(result)
 
@@ -414,7 +441,9 @@ class AiydanAdapter(ProviderAdapter):
         self, provider_method_id: str, data: PaymentMethodUpdateIn
     ) -> PaymentMethodOut:
         payload = data.model_dump(exclude_none=True)
-        result = await _maybe_await(self._client.update_payment_method(provider_method_id, payload))
+        result = await _maybe_await(
+            self._client.update_payment_method(provider_method_id, payload)
+        )
         return _payment_method_to_out(result)
 
     async def create_product(self, data: ProductCreateIn) -> ProductOut:
@@ -435,9 +464,13 @@ class AiydanAdapter(ProviderAdapter):
         items, next_cursor = _ensure_list_response(result)
         return [_product_to_out(item) for item in items], next_cursor
 
-    async def update_product(self, provider_product_id: str, data: ProductUpdateIn) -> ProductOut:
+    async def update_product(
+        self, provider_product_id: str, data: ProductUpdateIn
+    ) -> ProductOut:
         payload = data.model_dump(exclude_none=True)
-        result = await _maybe_await(self._client.update_product(provider_product_id, payload))
+        result = await _maybe_await(
+            self._client.update_product(provider_product_id, payload)
+        )
         return _product_to_out(result)
 
     async def create_price(self, data: PriceCreateIn) -> PriceOut:
@@ -468,9 +501,13 @@ class AiydanAdapter(ProviderAdapter):
         items, next_cursor = _ensure_list_response(result)
         return [_price_to_out(item) for item in items], next_cursor
 
-    async def update_price(self, provider_price_id: str, data: PriceUpdateIn) -> PriceOut:
+    async def update_price(
+        self, provider_price_id: str, data: PriceUpdateIn
+    ) -> PriceOut:
         payload = data.model_dump(exclude_none=True)
-        result = await _maybe_await(self._client.update_price(provider_price_id, payload))
+        result = await _maybe_await(
+            self._client.update_price(provider_price_id, payload)
+        )
         return _price_to_out(result)
 
     async def create_subscription(self, data: SubscriptionCreateIn) -> SubscriptionOut:
@@ -496,7 +533,9 @@ class AiydanAdapter(ProviderAdapter):
         return _subscription_to_out(result)
 
     async def get_subscription(self, provider_subscription_id: str) -> SubscriptionOut:
-        result = await _maybe_await(self._client.get_subscription(provider_subscription_id))
+        result = await _maybe_await(
+            self._client.get_subscription(provider_subscription_id)
+        )
         return _subscription_to_out(result)
 
     async def list_subscriptions(
@@ -591,7 +630,9 @@ class AiydanAdapter(ProviderAdapter):
         items, next_cursor = _ensure_list_response(result)
         return [_invoice_line_item_to_out(item) for item in items], next_cursor
 
-    async def create_intent(self, data: IntentCreateIn, *, user_id: str | None) -> IntentOut:
+    async def create_intent(
+        self, data: IntentCreateIn, *, user_id: str | None
+    ) -> IntentOut:
         payload = data.model_dump(exclude_none=True)
         if user_id is not None:
             payload["user_id"] = user_id
@@ -608,15 +649,21 @@ class AiydanAdapter(ProviderAdapter):
 
     async def refund(self, provider_intent_id: str, data: RefundIn) -> IntentOut:
         payload = data.model_dump(exclude_none=True)
-        result = await _maybe_await(self._client.refund_intent(provider_intent_id, payload))
+        result = await _maybe_await(
+            self._client.refund_intent(provider_intent_id, payload)
+        )
         return _intent_to_out(result)
 
     async def hydrate_intent(self, provider_intent_id: str) -> IntentOut:
         result = await _maybe_await(self._client.get_intent(provider_intent_id))
         return _intent_to_out(result)
 
-    async def capture_intent(self, provider_intent_id: str, *, amount: int | None) -> IntentOut:
-        result = await _maybe_await(self._client.capture_intent(provider_intent_id, amount=amount))
+    async def capture_intent(
+        self, provider_intent_id: str, *, amount: int | None
+    ) -> IntentOut:
+        result = await _maybe_await(
+            self._client.capture_intent(provider_intent_id, amount=amount)
+        )
         return _intent_to_out(result)
 
     async def list_intents(
@@ -676,7 +723,9 @@ class AiydanAdapter(ProviderAdapter):
         result = await _maybe_await(self._client.get_dispute(provider_dispute_id))
         return _dispute_to_out(result)
 
-    async def submit_dispute_evidence(self, provider_dispute_id: str, evidence: dict) -> DisputeOut:
+    async def submit_dispute_evidence(
+        self, provider_dispute_id: str, evidence: dict
+    ) -> DisputeOut:
         result = await _maybe_await(
             self._client.submit_dispute_evidence(provider_dispute_id, evidence)
         )
@@ -693,7 +742,9 @@ class AiydanAdapter(ProviderAdapter):
     async def list_payouts(
         self, *, limit: int, cursor: str | None
     ) -> tuple[list[PayoutOut], str | None]:
-        result = await _maybe_await(self._client.list_payouts(limit=limit, cursor=cursor))
+        result = await _maybe_await(
+            self._client.list_payouts(limit=limit, cursor=cursor)
+        )
         items, next_cursor = _ensure_list_response(result)
         return [_payout_to_out(item) for item in items], next_cursor
 
@@ -753,8 +804,12 @@ class AiydanAdapter(ProviderAdapter):
             next_action=NextAction(type=(result.get("next_action") or {}).get("type")),
         )
 
-    async def confirm_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
-        result = await _maybe_await(self._client.confirm_setup_intent(provider_setup_intent_id))
+    async def confirm_setup_intent(
+        self, provider_setup_intent_id: str
+    ) -> SetupIntentOut:
+        result = await _maybe_await(
+            self._client.confirm_setup_intent(provider_setup_intent_id)
+        )
         return SetupIntentOut(
             id=_coerce_id(result, "provider_setup_intent_id", "setup_intent_id", "id"),
             provider="aiydan",
@@ -767,7 +822,9 @@ class AiydanAdapter(ProviderAdapter):
         )
 
     async def get_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
-        result = await _maybe_await(self._client.get_setup_intent(provider_setup_intent_id))
+        result = await _maybe_await(
+            self._client.get_setup_intent(provider_setup_intent_id)
+        )
         return SetupIntentOut(
             id=_coerce_id(result, "provider_setup_intent_id", "setup_intent_id", "id"),
             provider="aiydan",
@@ -781,7 +838,9 @@ class AiydanAdapter(ProviderAdapter):
 
     async def resume_intent_after_action(self, provider_intent_id: str) -> IntentOut:
         if hasattr(self._client, "resume_intent_after_action"):
-            result = await _maybe_await(self._client.resume_intent_after_action(provider_intent_id))
+            result = await _maybe_await(
+                self._client.resume_intent_after_action(provider_intent_id)
+            )
         else:
             result = await _maybe_await(self._client.get_intent(provider_intent_id))
         return _intent_to_out(result)

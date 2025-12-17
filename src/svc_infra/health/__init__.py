@@ -795,7 +795,9 @@ def add_startup_probe(
         else:
             # Log which checks failed
             result = await registry.check_all()
-            failed = [c.name for c in result.checks if c.status == HealthStatus.UNHEALTHY]
+            failed = [
+                c.name for c in result.checks if c.status == HealthStatus.UNHEALTHY
+            ]
             error_msg = f"Dependencies not ready after {timeout}s: {failed}"
             logger.error(error_msg)
             raise RuntimeError(error_msg)

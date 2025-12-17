@@ -64,8 +64,8 @@ class ConnectionManager:
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
         # user_id -> list of (connection_id, WebSocket, ConnectionInfo)
-        self._connections: dict[str, list[tuple[str, WebSocket, ConnectionInfo]]] = defaultdict(
-            list
+        self._connections: dict[str, list[tuple[str, WebSocket, ConnectionInfo]]] = (
+            defaultdict(list)
         )
         # room -> set of user_ids
         self._rooms: dict[str, set[str]] = defaultdict(set)
@@ -121,7 +121,9 @@ class ConnectionManager:
 
         return connection_id
 
-    async def disconnect(self, user_id: str, websocket: WebSocket | None = None) -> None:
+    async def disconnect(
+        self, user_id: str, websocket: WebSocket | None = None
+    ) -> None:
         """
         Remove connection(s) for a user.
 

@@ -3,7 +3,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from svc_infra.api.fastapi.middleware.request_size_limit import RequestSizeLimitMiddleware
+from svc_infra.api.fastapi.middleware.request_size_limit import (
+    RequestSizeLimitMiddleware,
+)
 
 
 def test_request_size_limit_blocks_large_payload():

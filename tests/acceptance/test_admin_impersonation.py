@@ -14,7 +14,9 @@ def local_client(_acceptance_app_ready):
 
 class TestAdminImpersonation:
     def test_start_forbidden_without_admin(self, local_client: TestClient):
-        r = local_client.post("/admin/impersonate/start", json={"user_id": "u-2", "reason": "t"})
+        r = local_client.post(
+            "/admin/impersonate/start", json={"user_id": "u-2", "reason": "t"}
+        )
         assert r.status_code == 403
 
     def test_start_and_effect_with_admin(self, local_client: TestClient):

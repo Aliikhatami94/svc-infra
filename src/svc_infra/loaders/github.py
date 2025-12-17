@@ -142,7 +142,9 @@ class GitHubLoader(BaseLoader):
 
         # Validate repo format
         if "/" not in repo or repo.count("/") != 1:
-            raise ValueError(f"Invalid repo format: {repo!r}. Expected 'owner/repo' format.")
+            raise ValueError(
+                f"Invalid repo format: {repo!r}. Expected 'owner/repo' format."
+            )
 
         self.repo = repo
         self.path = path.strip("/")

@@ -117,7 +117,9 @@ async def test_list_usage_records(client, fake_adapter, mocker):
 
 
 @pytest.mark.asyncio
-async def test_list_usage_records_with_subscription_item_filter(client, fake_adapter, mocker):
+async def test_list_usage_records_with_subscription_item_filter(
+    client, fake_adapter, mocker
+):
     """Test usage record listing filtered by subscription item"""
     fake_adapter.list_usage_records.return_value = ([], None)
 
@@ -128,7 +130,9 @@ async def test_list_usage_records_with_subscription_item_filter(client, fake_ada
 
 
 @pytest.mark.asyncio
-async def test_list_usage_records_with_provider_price_filter(client, fake_adapter, mocker):
+async def test_list_usage_records_with_provider_price_filter(
+    client, fake_adapter, mocker
+):
     """Test usage record listing filtered by provider price"""
     fake_adapter.list_usage_records.return_value = ([], None)
 

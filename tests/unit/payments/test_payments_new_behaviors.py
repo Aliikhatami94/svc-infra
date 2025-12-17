@@ -26,7 +26,9 @@ class DummyClient:
         obj = {
             "id": pid,
             "status": (
-                "requires_capture" if payload.get("capture_method") == "manual" else "succeeded"
+                "requires_capture"
+                if payload.get("capture_method") == "manual"
+                else "succeeded"
             ),
             "amount": payload.get("amount", 0),
             "currency": payload.get("currency", "USD"),
@@ -150,7 +152,9 @@ async def test_balance_snapshot_and_usage_record(mocker):
     reg = get_provider_registry()
     reg.register(adapter)
     fake_session = FakeSession()
-    service = PaymentsService(session=fake_session, tenant_id="tenant_x", provider_name="aiydan")
+    service = PaymentsService(
+        session=fake_session, tenant_id="tenant_x", provider_name="aiydan"
+    )
 
     snap = await service.get_balance_snapshot()
     assert isinstance(snap, BalanceSnapshotOut)
@@ -169,14 +173,18 @@ async def test_tenant_persistence_and_ledger(mocker):
     reg = get_provider_registry()
     reg.register(adapter)
     fake_session = FakeSession()
-    service = PaymentsService(session=fake_session, tenant_id="tenant_y", provider_name="aiydan")
+    service = PaymentsService(
+        session=fake_session, tenant_id="tenant_y", provider_name="aiydan"
+    )
 
     intent_out = await service.create_intent(
         user_id=None, data=IntentCreateIn(amount=1000, currency="USD")
     )
     await fake_session.flush()
     row = await fake_session.scalar(
-        select(PayIntent).where(PayIntent.provider_intent_id == intent_out.provider_intent_id)
+        select(PayIntent).where(
+            PayIntent.provider_intent_id == intent_out.provider_intent_id
+        )
     )
     assert row is not None
     assert row.tenant_id == "tenant_y"

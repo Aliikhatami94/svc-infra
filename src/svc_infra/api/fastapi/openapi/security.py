@@ -6,7 +6,9 @@ from .mutators import auth_mutator
 from .pipeline import apply_mutators
 
 
-def _normalize_security_list(sec: list | None, *, drop_schemes: set[str] | None = None) -> list:
+def _normalize_security_list(
+    sec: list | None, *, drop_schemes: set[str] | None = None
+) -> list:
     if not sec:
         return []
     drop_schemes = drop_schemes or set()

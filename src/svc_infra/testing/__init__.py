@@ -233,7 +233,9 @@ class MockCache:
         # Clean up expired entries
         now = time.time()
         self._store = {
-            k: v for k, v in self._store.items() if v.expires_at is None or v.expires_at > now
+            k: v
+            for k, v in self._store.items()
+            if v.expires_at is None or v.expires_at > now
         }
         return len(self._store)
 
@@ -319,7 +321,9 @@ class MockJobQueue:
 
         return decorator
 
-    def register_handler(self, name: str, handler: Callable[[Dict[str, Any]], Any]) -> None:
+    def register_handler(
+        self, name: str, handler: Callable[[Dict[str, Any]], Any]
+    ) -> None:
         """
         Register a job handler function.
 

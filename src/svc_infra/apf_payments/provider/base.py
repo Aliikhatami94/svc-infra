@@ -42,10 +42,14 @@ class ProviderAdapter(Protocol):
     async def ensure_customer(self, data: CustomerUpsertIn) -> CustomerOut:
         pass
 
-    async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
+    async def attach_payment_method(
+        self, data: PaymentMethodAttachIn
+    ) -> PaymentMethodOut:
         pass
 
-    async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:
+    async def list_payment_methods(
+        self, provider_customer_id: str
+    ) -> list[PaymentMethodOut]:
         pass
 
     async def detach_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
@@ -87,7 +91,9 @@ class ProviderAdapter(Protocol):
     async def pay_invoice(self, provider_invoice_id: str) -> InvoiceOut:
         pass
 
-    async def create_intent(self, data: IntentCreateIn, *, user_id: str | None) -> IntentOut:
+    async def create_intent(
+        self, data: IntentCreateIn, *, user_id: str | None
+    ) -> IntentOut:
         pass
 
     async def confirm_intent(self, provider_intent_id: str) -> IntentOut:
@@ -107,7 +113,9 @@ class ProviderAdapter(Protocol):
     ) -> dict[str, Any]:
         pass
 
-    async def capture_intent(self, provider_intent_id: str, *, amount: int | None) -> IntentOut:
+    async def capture_intent(
+        self, provider_intent_id: str, *, amount: int | None
+    ) -> IntentOut:
         pass
 
     async def list_intents(
@@ -150,7 +158,9 @@ class ProviderAdapter(Protocol):
     async def create_setup_intent(self, data: SetupIntentCreateIn) -> SetupIntentOut:
         pass
 
-    async def confirm_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
+    async def confirm_setup_intent(
+        self, provider_setup_intent_id: str
+    ) -> SetupIntentOut:
         pass
 
     async def get_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
@@ -169,7 +179,9 @@ class ProviderAdapter(Protocol):
     async def get_dispute(self, provider_dispute_id: str) -> DisputeOut:
         pass
 
-    async def submit_dispute_evidence(self, provider_dispute_id: str, evidence: dict) -> DisputeOut:
+    async def submit_dispute_evidence(
+        self, provider_dispute_id: str, evidence: dict
+    ) -> DisputeOut:
         pass
 
     # --- Balance & Payouts ---
@@ -208,7 +220,9 @@ class ProviderAdapter(Protocol):
     ) -> tuple[list[ProductOut], str | None]:
         pass
 
-    async def update_product(self, provider_product_id: str, data: ProductUpdateIn) -> ProductOut:
+    async def update_product(
+        self, provider_product_id: str, data: ProductUpdateIn
+    ) -> ProductOut:
         pass
 
     async def get_price(self, provider_price_id: str) -> PriceOut:
@@ -224,7 +238,9 @@ class ProviderAdapter(Protocol):
     ) -> tuple[list[PriceOut], str | None]:
         pass
 
-    async def update_price(self, provider_price_id: str, data: PriceUpdateIn) -> PriceOut:
+    async def update_price(
+        self, provider_price_id: str, data: PriceUpdateIn
+    ) -> PriceOut:
         pass
 
     # --- Subscriptions ---

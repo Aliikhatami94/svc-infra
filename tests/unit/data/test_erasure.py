@@ -39,4 +39,6 @@ async def test_run_erasure_with_sync_and_async_steps():
 
     assert total == 3
     assert calls == ["s1", "s2"]
-    assert events and events[0][0] == "erasure.completed" and events[0][1]["affected"] == 3
+    assert (
+        events and events[0][0] == "erasure.completed" and events[0][1]["affected"] == 3
+    )

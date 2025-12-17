@@ -91,7 +91,9 @@ class InMemoryAuditLogStore:
         self._events.append(event)
         return event
 
-    def list(self, *, tenant_id: str | None = None, limit: int | None = None) -> list[AuditEvent]:
+    def list(
+        self, *, tenant_id: str | None = None, limit: int | None = None
+    ) -> list[AuditEvent]:
         out = [e for e in self._events if tenant_id is None or e.tenant_id == tenant_id]
         if limit is not None:
             return out[-int(limit) :]
@@ -120,7 +122,9 @@ async def append_audit_event(
     prev_hash: Optional[str] = None
     if prev_event is not None:
         prev_hash = prev_event.hash
-    elif select is not None and hasattr(db, "execute"):  # attempt DB lookup for previous event
+    elif select is not None and hasattr(
+        db, "execute"
+    ):  # attempt DB lookup for previous event
         try:
             stmt = (
                 select(AuditLog)

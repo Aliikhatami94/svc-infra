@@ -16,7 +16,9 @@ def add_probes(
     """Mount basic liveness/readiness/startup probes under prefix."""
     from svc_infra.api.fastapi.dual.public import public_router
 
-    router = public_router(prefix=prefix, tags=["ops"], include_in_schema=include_in_schema)
+    router = public_router(
+        prefix=prefix, tags=["ops"], include_in_schema=include_in_schema
+    )
 
     @router.get("/live")
     async def live() -> JSONResponse:  # noqa: D401, ANN201

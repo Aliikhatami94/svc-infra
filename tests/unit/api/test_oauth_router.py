@@ -19,7 +19,9 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
 
     # Stub out the OAuth client so we don't need real provider interactions.
     class DummyClient:
-        async def authorize_access_token(self, *args, **kwargs):  # pragma: no cover - patched
+        async def authorize_access_token(
+            self, *args, **kwargs
+        ):  # pragma: no cover - patched
             return {"access_token": "token"}
 
     class DummyOAuth:
@@ -45,7 +47,9 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
     async def fake_extract_user_info(request, client, token, provider, cfg, nonce):
         return ("user@example.com", "User", "provider-id", True, {})
 
-    user = SimpleNamespace(id="user-id", is_active=True, tenant_id=None, last_login=None)
+    user = SimpleNamespace(
+        id="user-id", is_active=True, tenant_id=None, last_login=None
+    )
 
     async def fake_process_user_authentication(
         session,
@@ -66,7 +70,9 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
     async def fake_handle_mfa(policy, user, redirect_url):
         return None
 
-    async def fake_issue_session_and_refresh(session, user_id, tenant_id, user_agent, ip_hash):
+    async def fake_issue_session_and_refresh(
+        session, user_id, tenant_id, user_agent, ip_hash
+    ):
         return "refresh-token", SimpleNamespace(id="refresh-id")
 
     async def fake_set_cookie_on_response(resp, auth_backend, user, *, refresh_raw):
@@ -76,7 +82,9 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
     def fake_clean_state(request, provider):  # pragma: no cover - trivial
         return None
 
-    monkeypatch.setattr(oauth_router_module, "_validate_oauth_state", fake_validate_oauth_state)
+    monkeypatch.setattr(
+        oauth_router_module, "_validate_oauth_state", fake_validate_oauth_state
+    )
     monkeypatch.setattr(
         oauth_router_module, "_exchange_code_for_token", fake_exchange_code_for_token
     )
@@ -95,8 +103,12 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
     monkeypatch.setattr(
         oauth_router_module, "issue_session_and_refresh", fake_issue_session_and_refresh
     )
-    monkeypatch.setattr(oauth_router_module, "_set_cookie_on_response", fake_set_cookie_on_response)
-    monkeypatch.setattr(oauth_router_module, "_clean_oauth_session_state", fake_clean_state)
+    monkeypatch.setattr(
+        oauth_router_module, "_set_cookie_on_response", fake_set_cookie_on_response
+    )
+    monkeypatch.setattr(
+        oauth_router_module, "_clean_oauth_session_state", fake_clean_state
+    )
 
     class DummyPolicy:
         def __init__(self):
@@ -143,7 +155,10 @@ async def test_oauth_callback_success_returns_redirect_with_cookies(monkeypatch)
 
     assert response.status_code == 302
     # Cross-origin redirect appends token as URL fragment for client-side extraction
-    assert response.headers["location"] == "https://app.example.com/welcome#access_token=jwt-token"
+    assert (
+        response.headers["location"]
+        == "https://app.example.com/welcome#access_token=jwt-token"
+    )
     assert response.cookies.get("auth-cookie") == "jwt-token"
     assert response.cookies.get("refresh-cookie") == "refresh-token"
     assert policy.success_called is True

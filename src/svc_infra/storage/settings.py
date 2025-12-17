@@ -52,9 +52,11 @@ class StorageSettings(BaseSettings):
     """
 
     # Backend selection
-    storage_backend: Optional[Literal["local", "s3", "gcs", "cloudinary", "memory"]] = Field(
-        default=None,
-        description="Storage backend type (auto-detected if not set)",
+    storage_backend: Optional[Literal["local", "s3", "gcs", "cloudinary", "memory"]] = (
+        Field(
+            default=None,
+            description="Storage backend type (auto-detected if not set)",
+        )
     )
 
     # Local backend settings

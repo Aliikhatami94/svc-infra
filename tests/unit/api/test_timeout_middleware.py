@@ -70,7 +70,9 @@ async def test_body_read_timeout_returns_408_problem():
             await asyncio.sleep(0.2)
             yield b"1}"
 
-        r = await client.post("/echo", content=gen(), headers={"content-type": "application/json"})
+        r = await client.post(
+            "/echo", content=gen(), headers={"content-type": "application/json"}
+        )
         assert r.status_code == 408
         body = r.json()
         assert body.get("title") == "Request Timeout"

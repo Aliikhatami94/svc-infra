@@ -114,7 +114,9 @@ def wait_for_database(
 
         if elapsed >= timeout:
             if verbose:
-                logger.error(f"Database not ready after {timeout}s ({attempt} attempts)")
+                logger.error(
+                    f"Database not ready after {timeout}s ({attempt} attempts)"
+                )
                 _flush()
             return False
 
@@ -128,7 +130,9 @@ def wait_for_database(
         except Exception as e:
             if verbose:
                 remaining = timeout - elapsed
-                logger.debug(f"Database not ready ({e}), retrying... ({remaining:.0f}s remaining)")
+                logger.debug(
+                    f"Database not ready ({e}), retrying... ({remaining:.0f}s remaining)"
+                )
                 _flush()
             time.sleep(interval)
 

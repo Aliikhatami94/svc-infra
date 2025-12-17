@@ -111,7 +111,9 @@ def add_cache(
             try:
                 setattr(app.state, state_key, _instance())
             except Exception:
-                logger.debug("Unable to expose cache instance on app.state", exc_info=True)
+                logger.debug(
+                    "Unable to expose cache instance on app.state", exc_info=True
+                )
 
     async def _shutdown():
         try:
@@ -151,7 +153,9 @@ def add_cache(
             pass
 
     if register_ok:
-        logger.info("Cache wired: url=%s namespace=%s", eff_url, f"{eff_prefix}:{eff_version}")
+        logger.info(
+            "Cache wired: url=%s namespace=%s", eff_url, f"{eff_prefix}:{eff_version}"
+        )
     else:
         # If we cannot register handlers, at least initialize now
         try:

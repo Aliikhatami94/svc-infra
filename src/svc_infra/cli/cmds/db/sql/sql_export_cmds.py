@@ -20,9 +20,15 @@ except Exception:  # pragma: no cover - fallback when async extras unavailable
 
 
 def export_tenant(
-    table: str = typer.Argument(..., help="Qualified table name to export (e.g., public.items)"),
-    tenant_id: str = typer.Option(..., "--tenant-id", help="Tenant id value to filter by."),
-    tenant_field: str = typer.Option("tenant_id", help="Column name for tenant id filter."),
+    table: str = typer.Argument(
+        ..., help="Qualified table name to export (e.g., public.items)"
+    ),
+    tenant_id: str = typer.Option(
+        ..., "--tenant-id", help="Tenant id value to filter by."
+    ),
+    tenant_field: str = typer.Option(
+        "tenant_id", help="Column name for tenant id filter."
+    ),
     output: Optional[Path] = typer.Option(
         None, "--output", help="Output file; defaults to stdout."
     ),

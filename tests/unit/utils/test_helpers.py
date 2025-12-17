@@ -66,7 +66,9 @@ async def create_test_client(app: FastAPI) -> AsyncClient:
     return AsyncClient(transport=transport, base_url="http://testserver")
 
 
-def assert_json_response(response_data: Dict[str, Any], expected_status: int = 200) -> None:
+def assert_json_response(
+    response_data: Dict[str, Any], expected_status: int = 200
+) -> None:
     """Assert that a response has the expected JSON structure."""
     assert isinstance(response_data, dict)
     # Add more specific assertions as needed
@@ -176,7 +178,9 @@ def setup_auth_mocks(app: FastAPI, mocker, user=None, api_key=None, principal=No
     app.dependency_overrides[_current_principal] = _mock_principal
     app.dependency_overrides[_optional_principal] = _mock_optional_principal
     app.dependency_overrides[resolve_api_key] = _mock_resolve_api_key
-    app.dependency_overrides[resolve_bearer_or_cookie_principal] = _mock_resolve_bearer_or_cookie
+    app.dependency_overrides[resolve_bearer_or_cookie_principal] = (
+        _mock_resolve_bearer_or_cookie
+    )
 
     return user, api_key, principal
 

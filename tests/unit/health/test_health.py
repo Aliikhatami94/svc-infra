@@ -238,7 +238,9 @@ class TestHealthRegistry:
 
         async def slow_check() -> HealthCheckResult:
             await asyncio.sleep(10)
-            return HealthCheckResult(name="slow", status=HealthStatus.HEALTHY, latency_ms=0)
+            return HealthCheckResult(
+                name="slow", status=HealthStatus.HEALTHY, latency_ms=0
+            )
 
         registry.add("slow", slow_check, timeout=0.1)
         result = await registry.check_one("slow")
@@ -272,7 +274,9 @@ class TestHealthRegistry:
         registry = HealthRegistry()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="h", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="h", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         registry.add("one", healthy)
         registry.add("two", healthy)
@@ -287,10 +291,14 @@ class TestHealthRegistry:
         registry = HealthRegistry()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="h", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="h", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         async def unhealthy() -> HealthCheckResult:
-            return HealthCheckResult(name="u", status=HealthStatus.UNHEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="u", status=HealthStatus.UNHEALTHY, latency_ms=1
+            )
 
         registry.add("healthy", healthy, critical=True)
         registry.add("unhealthy", unhealthy, critical=True)
@@ -304,10 +312,14 @@ class TestHealthRegistry:
         registry = HealthRegistry()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="h", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="h", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         async def unhealthy() -> HealthCheckResult:
-            return HealthCheckResult(name="u", status=HealthStatus.UNHEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="u", status=HealthStatus.UNHEALTHY, latency_ms=1
+            )
 
         registry.add("healthy", healthy, critical=True)
         registry.add("cache", unhealthy, critical=False)
@@ -321,7 +333,9 @@ class TestHealthRegistry:
         registry = HealthRegistry()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="h", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="h", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         registry.add("test", healthy)
 
@@ -334,7 +348,9 @@ class TestHealthRegistry:
         registry = HealthRegistry()
 
         async def unhealthy() -> HealthCheckResult:
-            return HealthCheckResult(name="u", status=HealthStatus.UNHEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="u", status=HealthStatus.UNHEALTHY, latency_ms=1
+            )
 
         registry.add("test", unhealthy)
 
@@ -351,8 +367,12 @@ class TestHealthRegistry:
             nonlocal call_count
             call_count += 1
             if call_count >= 3:
-                return HealthCheckResult(name="e", status=HealthStatus.HEALTHY, latency_ms=1)
-            return HealthCheckResult(name="e", status=HealthStatus.UNHEALTHY, latency_ms=1)
+                return HealthCheckResult(
+                    name="e", status=HealthStatus.HEALTHY, latency_ms=1
+                )
+            return HealthCheckResult(
+                name="e", status=HealthStatus.UNHEALTHY, latency_ms=1
+            )
 
         registry.add("test", eventually_healthy)
 
@@ -366,10 +386,14 @@ class TestHealthRegistry:
         registry = HealthRegistry()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="h", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="h", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         async def unhealthy() -> HealthCheckResult:
-            return HealthCheckResult(name="u", status=HealthStatus.UNHEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="u", status=HealthStatus.UNHEALTHY, latency_ms=1
+            )
 
         registry.add("healthy", healthy)
         registry.add("unhealthy", unhealthy)
@@ -401,8 +425,12 @@ class TestAggregatedHealthResult:
         result = AggregatedHealthResult(
             status=HealthStatus.DEGRADED,
             checks=[
-                HealthCheckResult(name="db", status=HealthStatus.HEALTHY, latency_ms=5.0),
-                HealthCheckResult(name="cache", status=HealthStatus.UNHEALTHY, latency_ms=100.0),
+                HealthCheckResult(
+                    name="db", status=HealthStatus.HEALTHY, latency_ms=5.0
+                ),
+                HealthCheckResult(
+                    name="cache", status=HealthStatus.UNHEALTHY, latency_ms=100.0
+                ),
             ],
         )
         d = result.to_dict()
@@ -658,7 +686,9 @@ class TestCheckTcp:
     @pytest.mark.asyncio
     async def test_connection_refused(self) -> None:
         """Test connection refused."""
-        with patch("asyncio.open_connection", side_effect=OSError("Connection refused")):
+        with patch(
+            "asyncio.open_connection", side_effect=OSError("Connection refused")
+        ):
             check = check_tcp("localhost", 9999)
             result = await check()
             assert result.status == HealthStatus.UNHEALTHY
@@ -735,7 +765,9 @@ class TestAddHealthRoutes:
         registry = HealthRegistry()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="test", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="test", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         registry.add("test", healthy)
         add_health_routes(app, registry)
@@ -758,7 +790,9 @@ class TestAddHealthRoutes:
         registry = HealthRegistry()
 
         async def unhealthy() -> HealthCheckResult:
-            return HealthCheckResult(name="test", status=HealthStatus.UNHEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="test", status=HealthStatus.UNHEALTHY, latency_ms=1
+            )
 
         registry.add("test", unhealthy)
         add_health_routes(app, registry)
@@ -780,7 +814,9 @@ class TestAddHealthRoutes:
         registry = HealthRegistry()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="db", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="db", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         registry.add("db", healthy)
         add_health_routes(app, registry)
@@ -822,7 +858,9 @@ class TestAddStartupProbe:
         app = FastAPI()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="test", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="test", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         add_startup_probe(app, [healthy], timeout=5)
 
@@ -840,7 +878,9 @@ class TestAddStartupProbe:
         app = FastAPI()
 
         async def unhealthy() -> HealthCheckResult:
-            return HealthCheckResult(name="test", status=HealthStatus.UNHEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="test", status=HealthStatus.UNHEALTHY, latency_ms=1
+            )
 
         add_startup_probe(app, [unhealthy], timeout=0.3, interval=0.1)
 
@@ -860,7 +900,9 @@ class TestAddDependencyHealth:
         app = FastAPI()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="test", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="test", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         add_dependency_health(app, "db", healthy)
 
@@ -874,7 +916,9 @@ class TestAddDependencyHealth:
         app = FastAPI()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="test", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="test", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         add_dependency_health(app, "db", healthy)
         add_dependency_health(app, "cache", healthy, critical=False)
@@ -890,7 +934,9 @@ class TestAddDependencyHealth:
         app = NoStateApp()
 
         async def healthy() -> HealthCheckResult:
-            return HealthCheckResult(name="test", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="test", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         with pytest.raises(ValueError, match="state"):
             add_dependency_health(app, "db", healthy)  # type: ignore
@@ -911,7 +957,9 @@ class TestEdgeCases:
 
         async def slow_check() -> HealthCheckResult:
             await asyncio.sleep(0.1)  # 100ms
-            return HealthCheckResult(name="slow", status=HealthStatus.HEALTHY, latency_ms=0)
+            return HealthCheckResult(
+                name="slow", status=HealthStatus.HEALTHY, latency_ms=0
+            )
 
         registry.add("slow", slow_check, timeout=5)
         result = await registry.check_one("slow")
@@ -930,7 +978,9 @@ class TestEdgeCases:
 
             start_times.append(time_mod.perf_counter())
             await asyncio.sleep(0.1)
-            return HealthCheckResult(name="t", status=HealthStatus.HEALTHY, latency_ms=1)
+            return HealthCheckResult(
+                name="t", status=HealthStatus.HEALTHY, latency_ms=1
+            )
 
         registry.add("one", track_time)
         registry.add("two", track_time)

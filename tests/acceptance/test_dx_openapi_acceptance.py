@@ -49,7 +49,9 @@ def test_a901_openapi_valid_and_examples_present(client: httpx.Client):
     responses = comps.get("responses") or {}
     found_example = False
     for resp in responses.values():
-        mt = isinstance(resp, dict) and (resp.get("content") or {}).get("application/problem+json")
+        mt = isinstance(resp, dict) and (resp.get("content") or {}).get(
+            "application/problem+json"
+        )
         if not isinstance(mt, dict):
             continue
         examples = mt.get("examples")
@@ -93,7 +95,9 @@ def test_a903_openapi_simple_lints(client: httpx.Client):
         resps = op.get("responses") or {}
         for resp in resps.values():
             if isinstance(resp, dict) and "$ref" in resp:
-                assert list(resp.keys()) == ["$ref"], "response $ref must not have siblings"
+                assert list(resp.keys()) == [
+                    "$ref"
+                ], "response $ref must not have siblings"
 
     # 2) application/problem+json responses should reference #/components/schemas/Problem
     comps = data.get("components") or {}
@@ -104,4 +108,7 @@ def test_a903_openapi_simple_lints(client: httpx.Client):
         prob = content.get("application/problem+json")
         if isinstance(prob, dict):
             sch = prob.get("schema")
-            assert isinstance(sch, dict) and sch.get("$ref") == "#/components/schemas/Problem"
+            assert (
+                isinstance(sch, dict)
+                and sch.get("$ref") == "#/components/schemas/Problem"
+            )

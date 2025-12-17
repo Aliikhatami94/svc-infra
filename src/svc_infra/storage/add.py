@@ -145,7 +145,9 @@ def add_storage(
                     # Return file
                     return StreamingResponse(
                         iter([data]),
-                        media_type=metadata.get("content_type", "application/octet-stream"),
+                        media_type=metadata.get(
+                            "content_type", "application/octet-stream"
+                        ),
                         headers={
                             "Content-Disposition": content_disposition,
                             "Content-Length": str(len(data)),
@@ -195,7 +197,8 @@ def get_storage(request: Request) -> StorageBackend:
     """
     if not hasattr(request.app.state, "storage"):
         raise RuntimeError(
-            "Storage not initialized. " "Call add_storage(app) during application setup."
+            "Storage not initialized. "
+            "Call add_storage(app) during application setup."
         )
 
     return cast(StorageBackend, request.app.state.storage)

@@ -20,7 +20,9 @@ class ConsoleSender:
 
 
 class SMTPSender:
-    def __init__(self, host: str, port: int, username: str, password: str, from_addr: str) -> None:
+    def __init__(
+        self, host: str, port: int, username: str, password: str, from_addr: str
+    ) -> None:
         self.host = host
         self.port = port
         self.username = username

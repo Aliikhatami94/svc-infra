@@ -114,7 +114,9 @@ class TestEasyStorage:
         """Test Backblaze B2 detection with logging."""
         monkeypatch.setenv("STORAGE_BACKEND", "s3")
         monkeypatch.setenv("STORAGE_S3_BUCKET", "b2-bucket")
-        monkeypatch.setenv("STORAGE_S3_ENDPOINT", "https://s3.us-west-001.backblazeb2.com")
+        monkeypatch.setenv(
+            "STORAGE_S3_ENDPOINT", "https://s3.us-west-001.backblazeb2.com"
+        )
 
         with caplog.at_level(logging.INFO):
             backend = easy_storage()
@@ -290,7 +292,9 @@ class TestEasyStorageLogging:
             easy_storage(backend="memory")
 
         # Should log backend creation or selection
-        assert len(caplog.records) >= 0  # May or may not log depending on implementation
+        assert (
+            len(caplog.records) >= 0
+        )  # May or may not log depending on implementation
 
     def test_logs_railway_detection(self, monkeypatch, caplog):
         """Test Railway detection logging."""

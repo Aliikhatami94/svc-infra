@@ -273,7 +273,9 @@ def normalize_problem_and_examples_mutator():
         if not isinstance(val, dict):
             return
         inst = val.get("instance")
-        if isinstance(inst, str) and (inst.startswith("/") or inst.startswith("about:")):
+        if isinstance(inst, str) and (
+            inst.startswith("/") or inst.startswith("about:")
+        ):
             # make absolute to satisfy format: uri
             val["instance"] = ABSOLUTE_INSTANCE
 
@@ -496,7 +498,9 @@ def ensure_global_tags_mutator(default_desc: str = "Operations related to {tag}.
                     existing_map[name]["description"] = default_desc.format(tag=name)
 
         if existing_map:
-            schema["tags"] = sorted(existing_map.values(), key=lambda x: x.get("name", ""))
+            schema["tags"] = sorted(
+                existing_map.values(), key=lambda x: x.get("name", "")
+            )
 
         return schema
 
@@ -653,7 +657,9 @@ def ensure_request_body_descriptions_mutator(
             if isinstance(rb, dict):
                 desc = rb.get("description")
                 if not isinstance(desc, str) or not desc.strip():
-                    rb["description"] = default_template.format(method=method.upper(), path=path)
+                    rb["description"] = default_template.format(
+                        method=method.upper(), path=path
+                    )
         return schema
 
     return m
@@ -841,7 +847,9 @@ def inject_safe_examples_mutator():
     """
 
     def _has_examples(mt_obj: dict) -> bool:
-        return isinstance(mt_obj, dict) and ("example" in mt_obj or "examples" in mt_obj)
+        return isinstance(mt_obj, dict) and (
+            "example" in mt_obj or "examples" in mt_obj
+        )
 
     def m(schema: dict) -> dict:
         schema = dict(schema)
@@ -1087,7 +1095,11 @@ def ensure_success_examples_mutator():
                 if not (200 <= ic < 300) or ic == 204:
                     continue
                 mt_obj = (resp.get("content") or {}).get("application/json")
-                if not isinstance(mt_obj, dict) or "example" in mt_obj or "examples" in mt_obj:
+                if (
+                    not isinstance(mt_obj, dict)
+                    or "example" in mt_obj
+                    or "examples" in mt_obj
+                ):
                     continue
                 sch = mt_obj.get("schema") or {}
 
@@ -1187,7 +1199,9 @@ def ensure_problem_examples_mutator():
                     if mt_obj is None:
                         # Create a basic media type referencing Problem schema when appropriate
                         if mt == "application/problem+json":
-                            mt_obj = {"schema": {"$ref": "#/components/schemas/Problem"}}
+                            mt_obj = {
+                                "schema": {"$ref": "#/components/schemas/Problem"}
+                            }
                             content[mt] = mt_obj
                         else:
                             continue
@@ -1481,8 +1495,12 @@ def attach_header_params_mutator():
                 if 200 <= ic < 300:
                     hdrs = resp.setdefault("headers", {})
                     hdrs.setdefault("ETag", {"$ref": "#/components/headers/ETag"})
-                    hdrs.setdefault("Last-Modified", {"$ref": "#/components/headers/LastModified"})
-                    hdrs.setdefault("X-Request-Id", {"$ref": "#/components/headers/XRequestId"})
+                    hdrs.setdefault(
+                        "Last-Modified", {"$ref": "#/components/headers/LastModified"}
+                    )
+                    hdrs.setdefault(
+                        "X-Request-Id", {"$ref": "#/components/headers/XRequestId"}
+                    )
                     hdrs.setdefault(
                         "X-RateLimit-Limit",
                         {"$ref": "#/components/headers/XRateLimitLimit"},

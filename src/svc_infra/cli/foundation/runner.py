@@ -25,7 +25,9 @@ def candidate_cmds(root: Path, prog: str, argv: List[str]) -> List[List[str]]:
         cmds.append([prog, *argv])
 
     py = shutil.which("python3") or shutil.which("python") or "python"
-    module = prog.replace("-", "_") + ".cli_shim"  # e.g., svc-infra -> svc_infra.cli_shim
+    module = (
+        prog.replace("-", "_") + ".cli_shim"
+    )  # e.g., svc-infra -> svc_infra.cli_shim
     cmds.append([py, "-m", module, *argv])
 
     return cmds
@@ -54,4 +56,6 @@ async def run_from_root(root: Path, prog: str, argv: List[str]) -> str:
         except Exception as e:
             last_exc = e
             continue
-    raise RuntimeError(f"All runners failed in {root} for: {prog} {' '.join(argv)}") from last_exc
+    raise RuntimeError(
+        f"All runners failed in {root} for: {prog} {' '.join(argv)}"
+    ) from last_exc

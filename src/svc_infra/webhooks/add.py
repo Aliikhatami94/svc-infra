@@ -96,13 +96,19 @@ class RedisOutboxStore(OutboxStore):
         }
         self._client.hset(self._msg_key(msg_id), mapping=record)
         self._client.rpush(self._queue_key, msg_id)
-        return OutboxMessage(id=msg_id, topic=topic, payload=payload, created_at=created_at)
+        return OutboxMessage(
+            id=msg_id, topic=topic, payload=payload, created_at=created_at
+        )
 
     def fetch_next(self, topics: Iterable[str] | None = None) -> OutboxMessage | None:
         allowed = set(topics) if topics else None
         ids = cast(list[Any], self._client.lrange(self._queue_key, 0, -1))
         for raw_id in ids:
-            raw_id_str = raw_id.decode() if isinstance(raw_id, (bytes, bytearray)) else str(raw_id)
+            raw_id_str = (
+                raw_id.decode()
+                if isinstance(raw_id, (bytes, bytearray))
+                else str(raw_id)
+            )
             msg_id = int(raw_id_str)
             msg = cast(dict[Any, Any], self._client.hgetall(self._msg_key(msg_id)))
             if not msg:
@@ -110,7 +116,9 @@ class RedisOutboxStore(OutboxStore):
             topic = msg.get(b"topic")
             if topic is None:
                 continue
-            topic_str = topic.decode() if isinstance(topic, (bytes, bytearray)) else str(topic)
+            topic_str = (
+                topic.decode() if isinstance(topic, (bytes, bytearray)) else str(topic)
+            )
             if allowed is not None and topic_str not in allowed:
                 continue
             attempts = int(msg.get(b"attempts", 0))
@@ -183,7 +191,9 @@ def _is_factory(obj: Any) -> TypeGuard[Callable[[], Any]]:
     return callable(obj) and not isinstance(obj, (str, bytes, bytearray))
 
 
-def _resolve_value(value: T_co | _Factory[T_co] | None, default_factory: _Factory[T_co]) -> T_co:
+def _resolve_value(
+    value: T_co | _Factory[T_co] | None, default_factory: _Factory[T_co]
+) -> T_co:
     if value is None:
         return default_factory()
     if _is_factory(value):
@@ -321,7 +331,9 @@ def add_webhooks(
         )
         app.state.webhooks_delivery_handler = handler
     elif scheduler is not None and schedule_tick:
-        logger.warning("Scheduler provided without queue; skipping outbox tick registration")
+        logger.warning(
+            "Scheduler provided without queue; skipping outbox tick registration"
+        )
 
 
 __all__ = ["add_webhooks"]

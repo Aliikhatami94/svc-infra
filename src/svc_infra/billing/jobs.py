@@ -105,7 +105,9 @@ def make_daily_aggregate_tick(
     async def _tick():
         ts = (when or datetime.now(timezone.utc)).astimezone(timezone.utc)
         day_start = ts.replace(hour=0, minute=0, second=0, microsecond=0)
-        enqueue_aggregate_daily(queue, tenant_id=tenant_id, metric=metric, day_start=day_start)
+        enqueue_aggregate_daily(
+            queue, tenant_id=tenant_id, metric=metric, day_start=day_start
+        )
 
     return _tick
 
@@ -164,7 +166,12 @@ def make_billing_job_handler(
             period_start_raw = data.get("period_start")
             period_end_raw = data.get("period_end")
             currency = str(data.get("currency"))
-            if not tenant_id or not period_start_raw or not period_end_raw or not currency:
+            if (
+                not tenant_id
+                or not period_start_raw
+                or not period_end_raw
+                or not currency
+            ):
                 return
             period_start = datetime.fromisoformat(str(period_start_raw))
             period_end = datetime.fromisoformat(str(period_end_raw))
@@ -213,9 +220,13 @@ def add_billing_jobs(
                 # Enqueue for the current UTC day
                 now = datetime.now(timezone.utc)
                 day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                enqueue_aggregate_daily(queue, tenant_id=tid, metric=m, day_start=day_start)
+                enqueue_aggregate_daily(
+                    queue, tenant_id=tid, metric=m, day_start=day_start
+                )
 
-            scheduler.add_task(f"billing.aggregate.{tenant_id}.{metric}", interval, _tick_fn)
+            scheduler.add_task(
+                f"billing.aggregate.{tenant_id}.{metric}", interval, _tick_fn
+            )
         elif name == "invoice":
             tenant_id = j["tenant_id"]
             currency = j["currency"]

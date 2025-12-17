@@ -97,7 +97,9 @@ class URLLoader(BaseLoader):
         # Validate URLs
         for url in self.urls:
             if not url.startswith(("http://", "https://")):
-                raise ValueError(f"Invalid URL: {url!r}. URLs must start with http:// or https://")
+                raise ValueError(
+                    f"Invalid URL: {url!r}. URLs must start with http:// or https://"
+                )
 
     async def load(self) -> list[LoadedContent]:
         """Load content from all URLs.
@@ -130,7 +132,9 @@ class URLLoader(BaseLoader):
                         content = raw_content
 
                     # Parse content type (remove charset etc.)
-                    mime_type = content_type.split(";")[0].strip() if content_type else None
+                    mime_type = (
+                        content_type.split(";")[0].strip() if content_type else None
+                    )
 
                     loaded = LoadedContent(
                         content=content,
@@ -179,7 +183,9 @@ class URLLoader(BaseLoader):
             soup = BeautifulSoup(html, "html.parser")
 
             # Remove non-content elements
-            for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+            for tag in soup(
+                ["script", "style", "nav", "footer", "header", "aside", "noscript"]
+            ):
                 tag.decompose()
 
             # Get text with newlines preserved

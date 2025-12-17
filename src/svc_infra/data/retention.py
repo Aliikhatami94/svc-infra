@@ -34,7 +34,11 @@ async def purge_policy(session: SqlSession, policy: RetentionPolicy) -> int:
         where.append(created_col <= cutoff)
 
     # Soft-delete path when available and requested
-    if not policy.hard_delete and policy.soft_delete_field and hasattr(m, policy.soft_delete_field):
+    if (
+        not policy.hard_delete
+        and policy.soft_delete_field
+        and hasattr(m, policy.soft_delete_field)
+    ):
         stmt = m.update().where(*where).values({policy.soft_delete_field: cutoff})
         res = await session.execute(stmt)
         return getattr(res, "rowcount", 0)
@@ -45,7 +49,9 @@ async def purge_policy(session: SqlSession, policy: RetentionPolicy) -> int:
     return getattr(res, "rowcount", 0)
 
 
-async def run_retention_purge(session: SqlSession, policies: Iterable[RetentionPolicy]) -> int:
+async def run_retention_purge(
+    session: SqlSession, policies: Iterable[RetentionPolicy]
+) -> int:
     total = 0
     for p in policies:
         total += await purge_policy(session, p)

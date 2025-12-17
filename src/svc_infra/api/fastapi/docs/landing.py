@@ -50,7 +50,9 @@ def _card(spec: CardSpec) -> str:
     """.strip()
 
 
-def render_index_html(*, service_name: str, release: str, cards: Iterable[CardSpec]) -> str:
+def render_index_html(
+    *, service_name: str, release: str, cards: Iterable[CardSpec]
+) -> str:
     grid = "\n".join(_card(c) for c in cards)
     return f"""
 <!doctype html>

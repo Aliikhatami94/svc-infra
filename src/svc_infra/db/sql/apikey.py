@@ -7,7 +7,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Type
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
@@ -42,7 +51,9 @@ _ApiKeyModel: Optional[type] = None
 def get_apikey_model() -> type:
     """Return the bound ApiKey model (or raise if not enabled)."""
     if _ApiKeyModel is None:
-        raise RuntimeError("ApiKey model is not enabled. Call bind_apikey_model(...) first.")
+        raise RuntimeError(
+            "ApiKey model is not enabled. Call bind_apikey_model(...) first."
+        )
     return _ApiKeyModel
 
 
@@ -55,7 +66,9 @@ def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type
     class ApiKey(ModelBase):
         __tablename__ = table_name
 
-        id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+        id: Mapped[uuid.UUID] = mapped_column(
+            GUID(), primary_key=True, default=uuid.uuid4
+        )
 
         @declared_attr
         def user_id(cls) -> Mapped[uuid.UUID | None]:  # noqa: N805
@@ -76,7 +89,9 @@ def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type
         key_prefix: Mapped[str] = mapped_column(String(12), index=True, nullable=False)
         key_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # hex sha256
 
-        scopes: Mapped[list[str]] = mapped_column(MutableList.as_mutable(JSON), default=list)
+        scopes: Mapped[list[str]] = mapped_column(
+            MutableList.as_mutable(JSON), default=list
+        )
         active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
         expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
         last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -110,7 +125,9 @@ def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type
             import secrets
 
             prefix = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:8]
-            rand = base64.urlsafe_b64encode(secrets.token_bytes(24)).decode().rstrip("=")
+            rand = (
+                base64.urlsafe_b64encode(secrets.token_bytes(24)).decode().rstrip("=")
+            )
             plaintext = f"ak_{prefix}_{rand}"
             return plaintext, prefix, _hmac_sha256(plaintext)
 

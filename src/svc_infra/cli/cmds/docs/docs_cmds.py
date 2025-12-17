@@ -122,7 +122,9 @@ def register(app: typer.Typer) -> None:
         # No group-level options; dynamic commands and 'show' handle topics.
         return None
 
-    @docs_app.command("show", help="Show docs for a topic (alternative to dynamic subcommand)")
+    @docs_app.command(
+        "show", help="Show docs for a topic (alternative to dynamic subcommand)"
+    )
     def show(topic: str) -> None:
         key = _norm(topic)
         ctx = click.get_current_context()

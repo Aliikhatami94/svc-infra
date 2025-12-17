@@ -25,7 +25,9 @@ class OrderParams(BaseModel):
 
 
 def dep_order(
-    order_by: Optional[str] = Query(None, description="Comma-separated fields; '-' for DESC"),
+    order_by: Optional[str] = Query(
+        None, description="Comma-separated fields; '-' for DESC"
+    ),
 ) -> OrderParams:
     return OrderParams(order_by=order_by)
 
