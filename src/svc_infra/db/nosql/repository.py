@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, cast
 
-from bson import ObjectId
+try:
+    from bson import ObjectId
+
+    _HAS_BSON = True
+except ModuleNotFoundError:
+    # `bson` is provided by the optional `pymongo` dependency.
+    # Keep imports working for non-mongo users/tests; runtime Mongo usage still
+    # requires installing pymongo.
+    _HAS_BSON = False
+
+    class ObjectId:  # type: ignore[no-redef]
+        pass
 
 
 class NoSqlRepository:
@@ -83,6 +94,8 @@ class NoSqlRepository:
 
     def _normalize_id_value(self, val: Any) -> Any:
         """If we use Mongo’s _id and a string is passed, coerce to ObjectId when possible."""
+        if not _HAS_BSON:
+            return val
         if self.id_field == "_id" and isinstance(val, str):
             try:
                 return ObjectId(val)
@@ -95,7 +108,10 @@ class NoSqlRepository:
         d = dict(doc)
         if "_id" in d and "id" not in d:
             _id = d.pop("_id", None)
-            d["id"] = str(_id) if isinstance(_id, ObjectId) else _id
+            if _HAS_BSON and isinstance(_id, ObjectId):
+                d["id"] = str(_id)
+            else:
+                d["id"] = _id
         return d
 
     async def list(
