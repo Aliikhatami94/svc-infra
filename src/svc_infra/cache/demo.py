@@ -83,10 +83,10 @@ async def main():
     # Try to fetch deleted user - should hit DB and get KeyError
     try:
         p4 = await get_user_profile(user_id=uid)
-        print("❌ ERROR: Fetched profile after delete:", p4)
+        print("[ERROR] Fetched profile after delete:", p4)
         print("This shouldn't happen - user should be deleted!")
     except KeyError as e:
-        print(f"✅ User successfully deleted - {e}")
+        print(f"[OK] User successfully deleted - {e}")
         print("Cache invalidation and deletion worked perfectly!")
 
 
