@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
+from .add import add_webhooks
 from .encryption import decrypt_secret, encrypt_secret, is_encrypted
-
-if TYPE_CHECKING:  # pragma: no cover - for type checkers only
-    from .add import add_webhooks
 
 __all__ = [
     "add_webhooks",
@@ -69,11 +67,3 @@ async def trigger_webhook(
     except Exception as e:
         _logger.error(f"Failed to trigger webhook event '{event}': {e}")
         return None
-
-
-def __getattr__(name: str):
-    if name == "add_webhooks":
-        from .add import add_webhooks
-
-        return add_webhooks
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

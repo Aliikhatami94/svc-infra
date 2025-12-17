@@ -1,7 +1,14 @@
 from typing import Annotated, Any, Optional, Sequence, Type, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from motor.motor_asyncio import AsyncIOMotorDatabase
+
+try:
+    from motor.motor_asyncio import AsyncIOMotorDatabase
+
+    HAS_MOTOR = True
+except ImportError:  # pragma: no cover
+    HAS_MOTOR = False
+    AsyncIOMotorDatabase = Any  # type: ignore[assignment, misc]
 
 from svc_infra.api.fastapi.db.http import (
     LimitOffsetParams,

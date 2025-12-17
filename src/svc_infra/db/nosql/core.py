@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from pymongo import IndexModel
+try:
+    from motor.motor_asyncio import AsyncIOMotorDatabase
+    from pymongo import IndexModel
+
+    HAS_MOTOR = True
+except ImportError:  # pragma: no cover
+    HAS_MOTOR = False
+    AsyncIOMotorDatabase = Any  # type: ignore[assignment, misc]
+    IndexModel = Any  # type: ignore[assignment, misc]
 
 from svc_infra.db.nosql.indexes import normalize_indexes
 from svc_infra.db.nosql.mongo.client import (

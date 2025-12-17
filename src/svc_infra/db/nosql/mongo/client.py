@@ -1,13 +1,29 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+try:
+    from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+
+    HAS_MOTOR = True
+except ImportError:  # pragma: no cover
+    HAS_MOTOR = False
+    AsyncIOMotorClient = Any  # type: ignore[assignment, misc]
+    AsyncIOMotorDatabase = Any  # type: ignore[assignment, misc]
 
 from .settings import MongoSettings
 
 _client: Optional[AsyncIOMotorClient] = None
 _db: Optional[AsyncIOMotorDatabase] = None
+
+
+def _require_motor() -> None:
+    """Raise ImportError if motor is not installed."""
+    if not HAS_MOTOR:
+        raise ImportError(
+            "MongoDB support requires the 'motor' package. "
+            "Install with: pip install svc-infra[mongodb]"
+        )
 
 
 def _client_opts(cfg: MongoSettings) -> dict:
@@ -20,6 +36,7 @@ def _client_opts(cfg: MongoSettings) -> dict:
 
 
 async def init_mongo(cfg: MongoSettings | None = None) -> AsyncIOMotorDatabase:
+    _require_motor()
     global _client, _db
     cfg = cfg or MongoSettings()
     if _client is None:

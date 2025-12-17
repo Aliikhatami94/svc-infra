@@ -1,0 +1,61 @@
+"""svc-infra API module.
+
+Re-exports key API utilities from svc_infra.api.fastapi for convenient imports.
+"""
+
+from __future__ import annotations
+
+# Re-export from fastapi submodule
+from svc_infra.api.fastapi import (
+    # Dual routers
+    DualAPIRouter,
+    dualize_protected,
+    dualize_public,
+    dualize_user,
+    # Service setup
+    ServiceInfo,
+    APIVersionSpec,
+    setup_service_api,
+    easy_service_api,
+    easy_service_app,
+    setup_caching,
+    # Health checks
+    add_startup_probe,
+    add_health_routes,
+    add_dependency_health,
+    check_database,
+    check_redis,
+    check_url,
+    # Pagination
+    use_pagination,
+    text_filter,
+    sort_by,
+    cursor_window,
+)
+
+__all__ = [
+    # Dual routers
+    "DualAPIRouter",
+    "dualize_protected",
+    "dualize_public",
+    "dualize_user",
+    # Service setup
+    "ServiceInfo",
+    "APIVersionSpec",
+    "setup_service_api",
+    "easy_service_api",
+    "easy_service_app",
+    "setup_caching",
+    # Health checks
+    "add_startup_probe",
+    "add_health_routes",
+    "add_dependency_health",
+    "check_database",
+    "check_redis",
+    "check_url",
+    # Pagination
+    "use_pagination",
+    "text_filter",
+    "sort_by",
+    "cursor_window",
+]

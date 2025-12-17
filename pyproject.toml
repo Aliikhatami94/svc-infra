@@ -25,15 +25,17 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Framework :: FastAPI",
     "Typing :: Typed"
 ]
 
 [tool.poetry.urls]
-Homepage = "https://github.com/your-org/svc-infra"
-Repository = "https://github.com/your-org/svc-infra"
-Issues = "https://github.com/your-org/svc-infra/issues"
-Documentation = "https://github.com/your-org/svc-infra#readme"
+Homepage = "https://github.com/nfraxlab/svc-infra"
+Repository = "https://github.com/nfraxlab/svc-infra"
+Issues = "https://github.com/nfraxlab/svc-infra/issues"
+Documentation = "https://nfrax.com/svc-infra"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
@@ -81,23 +83,31 @@ opentelemetry-instrumentation-httpx = ">=0.41b0"
 opentelemetry-exporter-otlp = ">=1.20.0"
 opentelemetry-propagator-b3 = ">=1.20.0"
 prometheus-client = ">=0.18.0"
-psycopg2-binary = ">=2.9.0"
-motor = ">=3.0.0"
 redis = ">=5.0.0"
 cashews = {extras = ["redis"], version = ">=7.0"}
 itsdangerous = ">=2.0.0"
 pyotp = ">=2.9.0"
-stripe = ">=7.0.0"
-adyen = ">=10.0.0"
 websockets = ">=12.0"
 
+# Optional dependencies (install via extras)
+motor = { version = ">=3.0.0", optional = true }
+stripe = { version = ">=7.0.0", optional = true }
+adyen = { version = ">=10.0.0", optional = true }
+psycopg2-binary = { version = ">=2.9.0", optional = true }
+
 [tool.poetry.extras]
-# Postgres v3
+# Postgres v3 (recommended)
 pg = ["psycopg", "asyncpg"]
-# Postgres v2 (choose either psycopg2 or psycopg2-binary—here we pick binary)
+# Postgres v2 (legacy compatibility)
 pg2 = ["psycopg2-binary"]
 sqlite = ["aiosqlite"]
 mysql = ["pymysql", "mysqlclient"]
+# Payment providers
+payments = ["stripe", "adyen"]
+stripe = ["stripe"]
+adyen = ["adyen"]
+# MongoDB
+mongodb = ["motor"]
 mssql = ["pyodbc"]
 snowflake = ["snowflake-connector-python"]
 redshift = ["redshift-connector"]
