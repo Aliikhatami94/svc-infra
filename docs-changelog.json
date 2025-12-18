@@ -143,9 +143,69 @@
       "lastUpdated": "2025-11-29",
       "updateCount": 1,
       "title": "WebSocket Infrastructure"
+    },
+    "error-handling.md": {
+      "created": "2025-12-18",
+      "lastUpdated": "2025-12-18",
+      "updateCount": 1,
+      "title": "Error Handling Guide"
+    },
+    "getting-started.md": {
+      "created": "2025-12-18",
+      "lastUpdated": "2025-12-18",
+      "updateCount": 1,
+      "title": "Getting Started"
+    },
+    "index.md": {
+      "created": "2025-12-18",
+      "lastUpdated": "2025-12-18",
+      "updateCount": 1,
+      "title": "svc-infra"
+    },
+    "migration.md": {
+      "created": "2025-12-18",
+      "lastUpdated": "2025-12-18",
+      "updateCount": 1,
+      "title": "Migration Guide"
+    },
+    "reference/api.md": {
+      "created": "2025-12-18",
+      "lastUpdated": "2025-12-18",
+      "updateCount": 1,
+      "title": "API Reference"
     }
   },
   "history": [
+    {
+      "date": "2025-12-18",
+      "file": "reference/api.md",
+      "type": "new",
+      "title": "API Reference"
+    },
+    {
+      "date": "2025-12-18",
+      "file": "migration.md",
+      "type": "new",
+      "title": "Migration Guide"
+    },
+    {
+      "date": "2025-12-18",
+      "file": "index.md",
+      "type": "new",
+      "title": "svc-infra"
+    },
+    {
+      "date": "2025-12-18",
+      "file": "getting-started.md",
+      "type": "new",
+      "title": "Getting Started"
+    },
+    {
+      "date": "2025-12-18",
+      "file": "error-handling.md",
+      "type": "new",
+      "title": "Error Handling Guide"
+    },
     {
       "date": "2025-12-13",
       "file": "webhooks.md",
