@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Sequence
 
 from dotenv import load_dotenv
 
@@ -27,7 +27,7 @@ def prepare_process_env(project_root: Path | str) -> Path:
     return root
 
 
-def _read_secret_from_file(path: str) -> Optional[str]:
+def _read_secret_from_file(path: str) -> str | None:
     try:
         p = Path(path)
         if p.exists():
@@ -40,7 +40,7 @@ def _read_secret_from_file(path: str) -> Optional[str]:
 def get_mongo_url_from_env(
     required: bool = True,
     env_vars: Sequence[str] = DEFAULT_MONGO_ENV_VARS,
-) -> Optional[str]:
+) -> str | None:
     """
     Resolve the Mongo connection string with support for:
       - Primary env vars (DEFAULT_MONGO_ENV_VARS).
@@ -99,7 +99,7 @@ def get_mongo_dbname_from_env(
     required: bool = False,
     env_vars: Sequence[str] = DEFAULT_MONGO_DB_ENV_VARS,
     default: str = "app",
-) -> Optional[str]:
+) -> str | None:
     """Return a database name from env; optional (Motor can connect without it)."""
     load_dotenv(override=False)
     for key in env_vars:

@@ -27,7 +27,7 @@ Quick Start:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from svc_infra.storage.base import StorageBackend
@@ -79,8 +79,8 @@ class DocumentManager:
         user_id: str,
         file: bytes,
         filename: str,
-        metadata: Optional[Dict] = None,
-        content_type: Optional[str] = None,
+        metadata: dict | None = None,
+        content_type: str | None = None,
     ) -> "Document":
         """
         Upload a document.
@@ -133,7 +133,7 @@ class DocumentManager:
 
         return await download_document(self.storage, document_id)
 
-    def get(self, document_id: str) -> Optional["Document"]:
+    def get(self, document_id: str) -> "Document" | None:
         """
         Get document metadata by ID.
 
@@ -174,7 +174,7 @@ class DocumentManager:
         user_id: str,
         limit: int = 100,
         offset: int = 0,
-    ) -> List["Document"]:
+    ) -> list["Document"]:
         """
         List user's documents.
 
@@ -198,7 +198,7 @@ class DocumentManager:
         return list_documents(user_id, limit, offset)
 
 
-def easy_documents(storage: Optional["StorageBackend"] = None) -> DocumentManager:
+def easy_documents(storage: "StorageBackend" | None = None) -> DocumentManager:
     """
     Create a document manager with auto-configured storage.
 

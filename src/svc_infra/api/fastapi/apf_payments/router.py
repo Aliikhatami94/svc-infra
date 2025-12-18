@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Callable, Literal, Optional, cast
+from typing import Callable, Literal, cast
 
 from fastapi import Body, Depends, Header, HTTPException, Request, Response, status
 from starlette.responses import JSONResponse
@@ -302,7 +302,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         provider: str,
         request: Request,
         svc: PaymentsService = Depends(get_service),
-        signature: Optional[str] = Header(None, alias="Stripe-Signature"),
+        signature: str | None = Header(None, alias="Stripe-Signature"),
     ):
         payload = await request.body()
         out = await svc.handle_webhook(provider.lower(), signature, payload)
@@ -580,8 +580,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Payment Intents"],
     )
     async def list_intents_endpoint(
-        customer_provider_id: Optional[str] = None,
-        status: Optional[str] = None,
+        customer_provider_id: str | None = None,
+        status: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -621,8 +621,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Invoices"],
     )
     async def list_invoices_endpoint(
-        customer_provider_id: Optional[str] = None,
-        status: Optional[str] = None,
+        customer_provider_id: str | None = None,
+        status: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -656,7 +656,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
     )
     async def preview_invoice_endpoint(
         customer_provider_id: str,
-        subscription_id: Optional[str] = None,
+        subscription_id: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         return await svc.preview_invoice(customer_provider_id, subscription_id)
@@ -744,7 +744,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Disputes"],
     )
     async def list_disputes(
-        status: Optional[str] = None,
+        status: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -824,8 +824,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Webhooks"],
     )
     async def replay_webhooks(
-        since: Optional[str] = None,
-        until: Optional[str] = None,
+        since: str | None = None,
+        until: str | None = None,
         data: WebhookReplayIn = Body(default=WebhookReplayIn()),
         svc: PaymentsService = Depends(get_service),
     ):
@@ -842,8 +842,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Customers"],
     )
     async def list_customers_endpoint(
-        provider: Optional[str] = None,
-        user_id: Optional[str] = None,
+        provider: str | None = None,
+        user_id: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -913,7 +913,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Products"],
     )
     async def list_products_endpoint(
-        active: Optional[bool] = None,
+        active: bool | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -958,8 +958,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Prices"],
     )
     async def list_prices_endpoint(
-        provider_product_id: Optional[str] = None,
-        active: Optional[bool] = None,
+        provider_product_id: str | None = None,
+        active: bool | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -1007,8 +1007,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Subscriptions"],
     )
     async def list_subscriptions_endpoint(
-        customer_provider_id: Optional[str] = None,
-        status: Optional[str] = None,
+        customer_provider_id: str | None = None,
+        status: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -1047,7 +1047,7 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Refunds"],
     )
     async def list_refunds_endpoint(
-        provider_payment_intent_id: Optional[str] = None,
+        provider_payment_intent_id: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()
@@ -1078,8 +1078,8 @@ def build_payments_routers(prefix: str = "/payments") -> list[DualAPIRouter]:
         tags=["Usage Records"],
     )
     async def list_usage_records_endpoint(
-        subscription_item: Optional[str] = None,
-        provider_price_id: Optional[str] = None,
+        subscription_item: str | None = None,
+        provider_price_id: str | None = None,
         svc: PaymentsService = Depends(get_service),
     ):
         ctx = use_pagination()

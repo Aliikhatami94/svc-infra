@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated, Any, Callable, Optional, cast
+from typing import Annotated, Any, Callable, cast
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import APIKeyCookie, APIKeyHeader, OAuth2PasswordBearer
@@ -47,7 +47,7 @@ class Principal:
 async def resolve_api_key(
     request: Request,
     session: SqlSessionDep,
-) -> Optional[Principal]:
+) -> Principal | None:
     raw = (request.headers.get("x-api-key") or "").strip()
     if not raw:
         return None
@@ -89,7 +89,7 @@ async def resolve_api_key(
 
 async def resolve_bearer_or_cookie_principal(
     request: Request, session: SqlSessionDep
-) -> Optional[Principal]:
+) -> Principal | None:
     st = get_auth_settings()
     raw_auth = (request.headers.get("authorization") or "").strip()
     token = (
@@ -142,8 +142,8 @@ async def resolve_bearer_or_cookie_principal(
 async def _current_principal(
     request: Request,
     session: SqlSessionDep,
-    jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
-    ak: Optional[Principal] = Depends(resolve_api_key),
+    jwt_or_cookie: Principal | None = Depends(resolve_bearer_or_cookie_principal),
+    ak: Principal | None = Depends(resolve_api_key),
 ) -> Principal:
     if jwt_or_cookie:
         return jwt_or_cookie
@@ -155,9 +155,9 @@ async def _current_principal(
 async def _optional_principal(
     request: Request,
     session: SqlSessionDep,
-    jwt_or_cookie: Optional[Principal] = Depends(resolve_bearer_or_cookie_principal),
-    ak: Optional[Principal] = Depends(resolve_api_key),
-) -> Optional[Principal]:
+    jwt_or_cookie: Principal | None = Depends(resolve_bearer_or_cookie_principal),
+    ak: Principal | None = Depends(resolve_api_key),
+) -> Principal | None:
     return jwt_or_cookie or ak or None
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Generic, Iterable, List, Optional, Sequence, TypeVar
+from typing import Any, Generic, Iterable, Sequence, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel
@@ -21,11 +21,11 @@ def dep_limit_offset(
 
 
 class OrderParams(BaseModel):
-    order_by: Optional[str] = None
+    order_by: str | None = None
 
 
 def dep_order(
-    order_by: Optional[str] = Query(
+    order_by: str | None = Query(
         None, description="Comma-separated fields; '-' for DESC"
     ),
 ) -> OrderParams:
@@ -33,20 +33,20 @@ def dep_order(
 
 
 class SearchParams(BaseModel):
-    q: Optional[str] = None
-    fields: Optional[str] = None
+    q: str | None = None
+    fields: str | None = None
 
 
 def dep_search(
-    q: Optional[str] = Query(None, description="Search query"),
-    fields: Optional[str] = Query(None, description="Comma-separated list of fields"),
+    q: str | None = Query(None, description="Search query"),
+    fields: str | None = Query(None, description="Comma-separated list of fields"),
 ) -> SearchParams:
     return SearchParams(q=q, fields=fields)
 
 
 class Page(BaseModel, Generic[T]):
     total: int
-    items: List[T]
+    items: list[T]
     limit: int
     offset: int
 

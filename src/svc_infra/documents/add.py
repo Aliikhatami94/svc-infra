@@ -20,7 +20,7 @@ Quick Start:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 from fastapi import HTTPException, Request, Response
 
@@ -56,9 +56,9 @@ def get_documents_manager(app: "FastAPI") -> "DocumentManager":
 
 def add_documents(
     app: "FastAPI",
-    storage_backend: Optional["StorageBackend"] = None,
+    storage_backend: "StorageBackend" | None = None,
     prefix: str = "/documents",
-    tags: Optional[list[str]] = None,
+    tags: list[str] | None = None,
 ) -> "DocumentManager":
     """
     Add document management endpoints to FastAPI app.

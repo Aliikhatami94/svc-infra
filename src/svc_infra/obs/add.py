@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Optional, Protocol
+from typing import Any, Callable, Iterable, Protocol
 
 from svc_infra.obs.settings import ObservabilitySettings
 
@@ -19,9 +19,9 @@ class RouteClassifier(Protocol):
 def add_observability(
     app: Any | None = None,
     *,
-    db_engines: Optional[Iterable[Any]] = None,
+    db_engines: Iterable[Any] | None = None,
     metrics_path: str | None = None,
-    skip_metric_paths: Optional[Iterable[str]] = None,
+    skip_metric_paths: Iterable[str] | None = None,
     route_classifier: RouteClassifier | None = None,
 ) -> Callable[[], None]:
     """

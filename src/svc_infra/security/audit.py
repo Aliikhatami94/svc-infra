@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Protocol, Sequence
 
 try:  # SQLAlchemy may not be present in minimal test context
     from sqlalchemy import select
@@ -104,12 +104,12 @@ async def append_audit_event(
     db: Any,
     *,
     actor_id=None,
-    tenant_id: Optional[str] = None,
+    tenant_id: str | None = None,
     event_type: str,
-    resource_ref: Optional[str] = None,
+    resource_ref: str | None = None,
     metadata: dict | None = None,
-    ts: Optional[datetime] = None,
-    prev_event: Optional[AuditLog] = None,
+    ts: datetime | None = None,
+    prev_event: AuditLog | None = None,
 ) -> AuditLog:
     """Append an audit event returning the persisted row.
 
@@ -119,7 +119,7 @@ async def append_audit_event(
     metadata = metadata or {}
     ts = ts or datetime.now(timezone.utc)
 
-    prev_hash: Optional[str] = None
+    prev_hash: str | None = None
     if prev_event is not None:
         prev_hash = prev_event.hash
     elif select is not None and hasattr(
@@ -172,14 +172,14 @@ async def append_audit_event(
     return row
 
 
-def verify_audit_chain(events: Sequence[AuditLog]) -> Tuple[bool, List[int]]:
+def verify_audit_chain(events: Sequence[AuditLog]) -> tuple[bool, list[int]]:
     """Verify a sequence of audit events.
 
     Returns (ok, broken_indices). If any event's hash doesn't match the recomputed
     expected hash (based on previous event), its index is recorded. All events are
     checked so callers can analyze extent of tampering.
     """
-    broken: List[int] = []
+    broken: list[int] = []
     prev_hash = "0" * 64
     for idx, ev in enumerate(events):
         expected = compute_audit_hash(

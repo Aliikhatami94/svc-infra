@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Awaitable, Callable, Iterable, Optional, Union
+from typing import Any, Awaitable, Callable, Iterable
 
 from cashews import cache as _cache
 
@@ -64,11 +64,11 @@ async def init_cache_async(
 
 def cache_read(
     *,
-    key: Union[str, tuple[str, ...]],
-    ttl: Optional[int] = None,
-    tags: Optional[Union[Iterable[str], Callable[..., Iterable[str]]]] = None,
-    early_ttl: Optional[int] = None,
-    refresh: Optional[bool] = None,
+    key: str | tuple[str, ...],
+    ttl: int | None = None,
+    tags: Iterable[str] | Callable[..., Iterable[str]] | None = None,
+    early_ttl: int | None = None,
+    refresh: bool | None = None,
 ):
     """
     Cache decorator for read operations with version-resilient key handling.
@@ -219,8 +219,8 @@ cached = cache_read
 
 def cache_write(
     *,
-    tags: Union[Iterable[str], Callable[..., Iterable[str]]],
-    recache: Optional[Iterable[RecacheSpec]] = None,
+    tags: Iterable[str] | Callable[..., Iterable[str]],
+    recache: Iterable[RecacheSpec] | None = None,
     recache_max_concurrency: int = 5,
 ):
     """

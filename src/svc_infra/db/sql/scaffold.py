@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 from svc_infra.db.utils import normalize_dir, pascal, plural_snake, snake
 from svc_infra.utils import ensure_init_py, render_template, write
@@ -15,7 +15,7 @@ _INIT_CONTENT_PAIRED = (
 _INIT_CONTENT_MINIMAL = "# package marker; add explicit exports here if desired\n"
 
 
-def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> Dict[str, Any]:
+def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> dict[str, Any]:
     """Create __init__.py; paired=True writes models/schemas re-exports, otherwise minimal."""
     content = _INIT_CONTENT_PAIRED if paired else _INIT_CONTENT_MINIMAL
     return ensure_init_py(dir_path, overwrite, paired, content)
@@ -33,14 +33,14 @@ def scaffold_core(
     schemas_dir: Path | str,
     kind: Kind = "entity",
     entity_name: str = "Item",
-    table_name: Optional[str] = None,
+    table_name: str | None = None,
     include_tenant: bool = True,
     include_soft_delete: bool = False,
     overwrite: bool = False,
     same_dir: bool = False,
-    models_filename: Optional[str] = None,
-    schemas_filename: Optional[str] = None,
-) -> Dict[str, Any]:
+    models_filename: str | None = None,
+    schemas_filename: str | None = None,
+) -> dict[str, Any]:
     """
     Create starter model + schema files.
 
@@ -154,12 +154,12 @@ def scaffold_models_core(
     dest_dir: Path | str,
     kind: Kind = "entity",
     entity_name: str = "Item",
-    table_name: Optional[str] = None,
+    table_name: str | None = None,
     include_tenant: bool = True,
     include_soft_delete: bool = False,
     overwrite: bool = False,
-    models_filename: Optional[str] = None,  # <--- NEW
-) -> Dict[str, Any]:
+    models_filename: str | None = None,  # <--- NEW
+) -> dict[str, Any]:
     """Create only a model file (defaults to <snake(entity)>.py unless models_filename is provided)."""
     dest = normalize_dir(dest_dir)
 
@@ -220,8 +220,8 @@ def scaffold_schemas_core(
     entity_name: str = "Item",
     include_tenant: bool = True,
     overwrite: bool = False,
-    schemas_filename: Optional[str] = None,  # <--- NEW
-) -> Dict[str, Any]:
+    schemas_filename: str | None = None,  # <--- NEW
+) -> dict[str, Any]:
     """Create only a schema file (defaults to <snake(entity)>.py unless schemas_filename is provided)."""
     dest = normalize_dir(dest_dir)
 

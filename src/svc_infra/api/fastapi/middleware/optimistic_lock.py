@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Callable, Optional
+from typing import Annotated, Any, Callable
 
 from fastapi import Header, HTTPException
 
 
 async def require_if_match(
-    version: Annotated[Optional[str], Header(alias="If-Match")] = None,
+    version: Annotated[str | None, Header(alias="If-Match")] = None,
 ) -> str:
     """Require If-Match header for optimistic locking on mutating operations.
 

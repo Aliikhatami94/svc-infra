@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from pydantic import BaseModel, SecretStr
 
@@ -23,23 +22,23 @@ AIYDAN_WH = os.getenv("AIYDAN_WH_SECRET")
 
 class StripeConfig(BaseModel):
     secret_key: SecretStr
-    webhook_secret: Optional[SecretStr] = None
+    webhook_secret: SecretStr | None = None
 
 
 class AiydanConfig(BaseModel):
     api_key: SecretStr
-    client_key: Optional[SecretStr] = None
-    merchant_account: Optional[str] = None
-    hmac_key: Optional[SecretStr] = None
-    base_url: Optional[str] = None
-    webhook_secret: Optional[SecretStr] = None
+    client_key: SecretStr | None = None
+    merchant_account: str | None = None
+    hmac_key: SecretStr | None = None
+    base_url: str | None = None
+    webhook_secret: SecretStr | None = None
 
 
 class PaymentsSettings(BaseModel):
     default_provider: str = PROVIDER
 
     # optional multi-tenant/provider map hook can be added later
-    stripe: Optional[StripeConfig] = (
+    stripe: StripeConfig | None = (
         StripeConfig(
             secret_key=SecretStr(STRIPE_KEY),
             webhook_secret=SecretStr(STRIPE_WH) if STRIPE_WH else None,
@@ -47,7 +46,7 @@ class PaymentsSettings(BaseModel):
         if STRIPE_KEY
         else None
     )
-    aiydan: Optional[AiydanConfig] = (
+    aiydan: AiydanConfig | None = (
         AiydanConfig(
             api_key=SecretStr(AIYDAN_KEY),
             client_key=SecretStr(AIYDAN_CLIENT_KEY) if AIYDAN_CLIENT_KEY else None,
@@ -61,7 +60,7 @@ class PaymentsSettings(BaseModel):
     )
 
 
-_SETTINGS: Optional[PaymentsSettings] = None
+_SETTINGS: PaymentsSettings | None = None
 
 
 def get_payments_settings() -> PaymentsSettings:

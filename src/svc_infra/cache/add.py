@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from svc_infra.cache.backend import DEFAULT_READINESS_TIMEOUT
 from svc_infra.cache.backend import get_cache as _get_cache
@@ -35,7 +35,7 @@ def _instance() -> Any:
 
 
 def _derive_settings(
-    url: Optional[str], prefix: Optional[str], version: Optional[str]
+    url: str | None, prefix: str | None, version: str | None
 ) -> tuple[str, str, str]:
     """Derive cache settings from parameters or environment variables.
 

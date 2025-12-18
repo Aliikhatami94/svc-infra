@@ -4,7 +4,7 @@ import base64
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Literal, cast
+from typing import Any, Literal, cast
 from urllib.parse import urlencode, urlparse
 
 import jwt
@@ -102,7 +102,7 @@ def _cookie_domain(st):
 
 
 def _register_oauth_providers(
-    oauth: OAuth, providers: Dict[str, Dict[str, Any]]
+    oauth: OAuth, providers: dict[str, dict[str, Any]]
 ) -> None:
     """Register all OAuth providers with the OAuth client."""
     for name, cfg in providers.items():
@@ -594,7 +594,7 @@ async def _handle_mfa_redirect(
 def oauth_router_with_backend(
     user_model: type,
     auth_backend: AuthenticationBackend,
-    providers: Dict[str, Dict[str, Any]],
+    providers: dict[str, dict[str, Any]],
     post_login_redirect: str = "/",
     provider_account_model: type | None = None,
     auth_policy: AuthPolicy | None = None,
@@ -612,7 +612,7 @@ def oauth_router_with_backend(
 def _create_oauth_router(
     user_model: type,
     auth_backend: AuthenticationBackend,
-    providers: Dict[str, Dict[str, Any]],
+    providers: dict[str, dict[str, Any]],
     post_login_redirect: str = "/",
     provider_account_model: type | None = None,
     auth_policy: AuthPolicy | None = None,

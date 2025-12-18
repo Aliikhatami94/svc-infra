@@ -5,11 +5,8 @@ from typing import (
     Any,
     Callable,
     Iterable,
-    Optional,
     Sequence,
     TYPE_CHECKING,
-    Type,
-    Union,
 )
 
 if TYPE_CHECKING:
@@ -56,36 +53,36 @@ class NoSqlResource:
     """
 
     # API mounting
-    collection: Optional[str] = None
+    collection: str | None = None
     prefix: str = ""
-    document_model: Optional[Type[Any]] = None
+    document_model: type[Any] | None = None
 
     # optional Pydantic schemas (auto-derived if omitted)
-    read_schema: Optional[Type[Any]] = None
-    create_schema: Optional[Type[Any]] = None
-    update_schema: Optional[Type[Any]] = None
+    read_schema: type[Any] | None = None
+    create_schema: type[Any] | None = None
+    update_schema: type[Any] | None = None
 
     # behavior
-    search_fields: Optional[Sequence[str]] = None
-    tags: Optional[list[str]] = None
+    search_fields: Sequence[str] | None = None
+    tags: list[str] | None = None
     id_field: str = "_id"
     soft_delete: bool = False
     soft_delete_field: str = "deleted_at"
-    soft_delete_flag_field: Optional[str] = None
+    soft_delete_flag_field: str | None = None
 
     # custom wiring
-    service_factory: Optional[Callable[[Any], Any]] = None
+    service_factory: Callable[[Any], Any] | None = None
 
     # generated schema naming and exclusions
-    read_name: Optional[str] = None
-    create_name: Optional[str] = None
-    update_name: Optional[str] = None
+    read_name: str | None = None
+    create_name: str | None = None
+    update_name: str | None = None
     create_exclude: tuple[str, ...] = ("_id",)
     read_exclude: tuple[str, ...] = ()
     update_exclude: tuple[str, ...] = ()
 
     # NEW: indexes defined per collection (normalized to IndexModel at prepare time)
-    indexes: Optional[Iterable[Union[IndexModel, IndexAlias]]] = None
+    indexes: Iterable[IndexModel | IndexAlias] | None = None
 
     def __post_init__(self):
         if not self.collection and self.document_model:

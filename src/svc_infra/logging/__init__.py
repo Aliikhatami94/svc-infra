@@ -33,7 +33,7 @@ import os
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator
 
 # Context variables for structured logging
 _log_context: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
@@ -166,8 +166,8 @@ class TextFormatter(logging.Formatter):
 
 
 def configure_for_container(
-    level: Optional[str] = None,
-    json_format: Optional[bool] = None,
+    level: str | None = None,
+    json_format: bool | None = None,
     stream: Any = None,
 ) -> None:
     """

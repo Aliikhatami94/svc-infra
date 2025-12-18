@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from fastapi import FastAPI, Request
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -18,7 +18,7 @@ def add_docs(
     redoc_url: str = "/redoc",
     swagger_url: str = "/docs",
     openapi_url: str = "/openapi.json",
-    export_openapi_to: Optional[str] = None,
+    export_openapi_to: str | None = None,
     # Landing page options
     landing_url: str = "/",
     include_landing: bool = True,
@@ -147,7 +147,7 @@ a { color: #62aef7; }
 def add_sdk_generation_stub(
     app: FastAPI,
     *,
-    on_generate: Optional[Callable[[], None]] = None,
+    on_generate: Callable[[], None] | None = None,
     openapi_path: str = "/openapi.json",
 ) -> None:
     """Hook to add an SDK generation stub.

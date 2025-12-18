@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 import typer
 
@@ -17,7 +16,7 @@ def run(
     poll_interval: float = typer.Option(
         0.5, help="Sleep seconds between loops when idle"
     ),
-    max_loops: Optional[int] = typer.Option(
+    max_loops: int | None = typer.Option(
         None, help="Max loops before exit (for tests)"
     ),
 ):

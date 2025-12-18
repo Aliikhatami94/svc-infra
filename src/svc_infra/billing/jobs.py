@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -94,7 +94,7 @@ def make_daily_aggregate_tick(
     *,
     tenant_id: str,
     metric: str,
-    when: Optional[datetime] = None,
+    when: datetime | None = None,
 ):
     """Return an async function that enqueues a daily aggregate job.
 
@@ -139,7 +139,7 @@ def make_billing_job_handler(
 
     async def _handler(job: Job) -> None:
         name = job.name
-        data: Dict[str, Any] = job.payload or {}
+        data: dict[str, Any] = job.payload or {}
         if name == BILLING_AGGREGATE_JOB:
             tenant_id = str(data.get("tenant_id"))
             metric = str(data.get("metric"))

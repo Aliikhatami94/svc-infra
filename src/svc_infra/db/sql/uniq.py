@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, List, Optional, Tuple, Type
+from typing import Any, Iterable
 
 from sqlalchemy import Index, func
 
@@ -9,13 +9,13 @@ from svc_infra.db.utils import as_tuple as _as_tuple
 
 
 def make_unique_sql_indexes(
-    model: Type[Any],
+    model: type[Any],
     *,
     unique_cs: Iterable[KeySpec] = (),
     unique_ci: Iterable[KeySpec] = (),
-    tenant_field: Optional[str] = None,
+    tenant_field: str | None = None,
     name_prefix: str = "uq",
-) -> List[Index]:
+) -> list[Index]:
     """Return SQLAlchemy Index objects that enforce uniqueness.
 
     - unique_cs: case-sensitive unique specs
@@ -26,12 +26,12 @@ def make_unique_sql_indexes(
 
     Declare right after your model class; Alembic or metadata.create_all will pick them up.
     """
-    idxs: List[Index] = []
+    idxs: list[Index] = []
 
     def _col(name: str):
         return getattr(model, name)
 
-    def _to_sa_cols(spec: Tuple[str, ...], *, ci: bool):
+    def _to_sa_cols(spec: tuple[str, ...], *, ci: bool):
         cols = []
         for cname in spec:
             c = _col(cname)
@@ -40,7 +40,7 @@ def make_unique_sql_indexes(
 
     tenant_col = _col(tenant_field) if tenant_field else None
 
-    def _name(ci: bool, spec: Tuple[str, ...], null_bucket: Optional[str] = None):
+    def _name(ci: bool, spec: tuple[str, ...], null_bucket: str | None = None):
         parts = [name_prefix, model.__tablename__]
         if tenant_field:
             parts.append(tenant_field)

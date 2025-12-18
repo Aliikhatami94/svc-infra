@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
 
 from sqlalchemy import ForeignKeyConstraint
 from sqlalchemy.sql.type_api import TypeEngine
@@ -9,7 +8,7 @@ from svc_infra.db.sql.base import ModelBase
 from svc_infra.db.sql.types import GUID
 
 
-def _find_auth_mapper() -> Optional[Tuple[str, TypeEngine, str]]:
+def _find_auth_mapper() -> tuple[str, TypeEngine, str] | None:
     """
     Returns (table_name, pk_sqlatype, pk_name) for the auth user model.
     Looks for any mapped class with __svc_infra_auth_user__ = True that
@@ -36,7 +35,7 @@ def _find_auth_mapper() -> Optional[Tuple[str, TypeEngine, str]]:
     return None
 
 
-def resolve_auth_table_pk() -> Tuple[str, TypeEngine, str]:
+def resolve_auth_table_pk() -> tuple[str, TypeEngine, str]:
     """
     Single source of truth for the auth table and PK.
     Falls back to ('users', GUID(), 'id') if nothing is marked.

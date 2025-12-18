@@ -4,7 +4,7 @@ import importlib
 import logging
 import pkgutil
 from types import ModuleType
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
@@ -67,7 +67,7 @@ def _validate_base_package(base_package: str) -> ModuleType:
     return package_module
 
 
-def _normalize_environment(environment: Optional[Environment | str]) -> Environment:
+def _normalize_environment(environment: Environment | str | None) -> Environment:
     """Normalize the environment parameter."""
     return (
         CURRENT_ENVIRONMENT
@@ -81,7 +81,7 @@ def _normalize_environment(environment: Optional[Environment | str]) -> Environm
 
 
 def _should_force_include_in_schema(
-    environment: Environment, force_include_in_schema: Optional[bool]
+    environment: Environment, force_include_in_schema: bool | None
 ) -> bool:
     """Determine if routers should be forced to include in schema."""
     if force_include_in_schema is None:
@@ -225,10 +225,10 @@ def _process_router_module(
 def register_all_routers(
     app: FastAPI,
     *,
-    base_package: Optional[str] = None,
+    base_package: str | None = None,
     prefix: str = "",
-    environment: Optional[Environment | str] = None,
-    force_include_in_schema: Optional[bool] = None,
+    environment: Environment | str | None = None,
+    force_include_in_schema: bool | None = None,
 ) -> None:
     """
     Recursively discover and register all FastAPI routers under a routers package.

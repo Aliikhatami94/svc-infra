@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Sequence
+from typing import Any, Sequence
 
 try:
     from sqlalchemy import or_, select
@@ -27,7 +27,7 @@ class LockoutConfig:
 @dataclass
 class LockoutStatus:
     locked: bool
-    next_allowed_at: Optional[datetime]
+    next_allowed_at: datetime | None
     failure_count: int
 
 
@@ -35,7 +35,7 @@ class LockoutStatus:
 
 
 def compute_lockout(
-    fail_count: int, *, cfg: LockoutConfig, now: Optional[datetime] = None
+    fail_count: int, *, cfg: LockoutConfig, now: datetime | None = None
 ) -> LockoutStatus:
     now = now or datetime.now(timezone.utc)
     if fail_count < cfg.threshold:
@@ -54,8 +54,8 @@ def compute_lockout(
 async def record_attempt(
     session: AsyncSession,
     *,
-    user_id: Optional[uuid.UUID],
-    ip_hash: Optional[str],
+    user_id: uuid.UUID | None,
+    ip_hash: str | None,
     success: bool,
 ) -> None:
     attempt = FailedAuthAttempt(user_id=user_id, ip_hash=ip_hash, success=success)
@@ -66,9 +66,9 @@ async def record_attempt(
 async def get_lockout_status(
     session: AsyncSession,
     *,
-    user_id: Optional[uuid.UUID],
-    ip_hash: Optional[str],
-    cfg: Optional[LockoutConfig] = None,
+    user_id: uuid.UUID | None,
+    ip_hash: str | None,
+    cfg: LockoutConfig | None = None,
 ) -> LockoutStatus:
     cfg = cfg or LockoutConfig()
     now = datetime.now(timezone.utc)

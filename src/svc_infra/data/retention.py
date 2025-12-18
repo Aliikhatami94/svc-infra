@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Optional, Protocol, Sequence
+from typing import Any, Iterable, Protocol, Sequence
 
 
 class SqlSession(Protocol):  # minimal protocol for tests/integration
@@ -15,8 +15,8 @@ class RetentionPolicy:
     name: str
     model: Any  # SQLAlchemy model or test double exposing columns
     older_than_days: int
-    soft_delete_field: Optional[str] = "deleted_at"
-    extra_where: Optional[Sequence[Any]] = None
+    soft_delete_field: str | None = "deleted_at"
+    extra_where: Sequence[Any] | None = None
     hard_delete: bool = False
 
 

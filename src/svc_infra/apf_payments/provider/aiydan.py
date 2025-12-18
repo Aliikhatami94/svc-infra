@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import date, datetime, timezone
-from typing import Any, Literal, Optional, Sequence, Tuple, cast
+from typing import Any, Literal, Sequence, cast
 
 from svc_infra.apf_payments.schemas import (
     BalanceAmount,
@@ -346,7 +346,7 @@ def _ensure_sequence(result: Any) -> Sequence[dict[str, Any]]:
 
 def _ensure_list_response(
     result: Any,
-) -> Tuple[Sequence[dict[str, Any]], Optional[str]]:
+) -> tuple[Sequence[dict[str, Any]], str | None]:
     if isinstance(result, tuple) and len(result) == 2:
         items, cursor = result
         if isinstance(items, Sequence) or items is None:
@@ -364,7 +364,7 @@ def _ensure_list_response(
 class AiydanAdapter(ProviderAdapter):
     name = "aiydan"
 
-    def __init__(self, *, client: Optional[Any] = None):
+    def __init__(self, *, client: Any | None = None):
         settings = get_payments_settings()
         cfg = settings.aiydan
         if client is not None:
@@ -864,7 +864,7 @@ class AiydanAdapter(ProviderAdapter):
         items, next_cursor = _ensure_list_response(result)
         return [_customer_to_out(item) for item in items], next_cursor
 
-    async def get_customer(self, provider_customer_id: str) -> Optional[CustomerOut]:
+    async def get_customer(self, provider_customer_id: str) -> CustomerOut | None:
         result = await _maybe_await(self._client.get_customer(provider_customer_id))
         if result is None:
             return None

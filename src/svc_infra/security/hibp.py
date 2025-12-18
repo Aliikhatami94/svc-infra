@@ -4,7 +4,6 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 from svc_infra.http import new_httpx_client
 
@@ -41,14 +40,14 @@ class HIBPClient:
         self.ttl_seconds = ttl_seconds
         self.timeout = timeout
         self.user_agent = user_agent
-        self._cache: Dict[str, CacheEntry] = {}
+        self._cache: dict[str, CacheEntry] = {}
         # Use central factory for consistent defaults; retain explicit timeout override
         self._http = new_httpx_client(
             timeout_seconds=self.timeout,
             headers={"User-Agent": self.user_agent},
         )
 
-    def _get_cached(self, prefix: str) -> Optional[str]:
+    def _get_cached(self, prefix: str) -> str | None:
         now = time.time()
         ent = self._cache.get(prefix)
         if ent and ent.expires_at > now:

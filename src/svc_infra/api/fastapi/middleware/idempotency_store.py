@@ -4,7 +4,7 @@ import base64
 import json
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Protocol
+from typing import Protocol
 
 
 @dataclass
@@ -12,14 +12,14 @@ class IdempotencyEntry:
     req_hash: str
     exp: float
     # Optional response fields when available
-    status: Optional[int] = None
-    body_b64: Optional[str] = None
-    headers: Optional[Dict[str, str]] = None
-    media_type: Optional[str] = None
+    status: int | None = None
+    body_b64: str | None = None
+    headers: dict[str, str] | None = None
+    media_type: str | None = None
 
 
 class IdempotencyStore(Protocol):
-    def get(self, key: str) -> Optional[IdempotencyEntry]:
+    def get(self, key: str) -> IdempotencyEntry | None:
         pass
 
     def set_initial(self, key: str, req_hash: str, exp: float) -> bool:
@@ -32,8 +32,8 @@ class IdempotencyStore(Protocol):
         *,
         status: int,
         body: bytes,
-        headers: Dict[str, str],
-        media_type: Optional[str],
+        headers: dict[str, str],
+        media_type: str | None,
     ) -> None:
         pass
 
@@ -45,7 +45,7 @@ class InMemoryIdempotencyStore:
     def __init__(self):
         self._store: dict[str, IdempotencyEntry] = {}
 
-    def get(self, key: str) -> Optional[IdempotencyEntry]:
+    def get(self, key: str) -> IdempotencyEntry | None:
         entry = self._store.get(key)
         if not entry:
             return None
@@ -69,8 +69,8 @@ class InMemoryIdempotencyStore:
         *,
         status: int,
         body: bytes,
-        headers: Dict[str, str],
-        media_type: Optional[str],
+        headers: dict[str, str],
+        media_type: str | None,
     ) -> None:
         entry = self._store.get(key)
         if not entry:
@@ -102,7 +102,7 @@ class RedisIdempotencyStore:
     def _k(self, key: str) -> str:
         return f"{self.prefix}:{key}"
 
-    def get(self, key: str) -> Optional[IdempotencyEntry]:
+    def get(self, key: str) -> IdempotencyEntry | None:
         raw = self.r.get(self._k(key))
         if not raw:
             return None
@@ -156,8 +156,8 @@ class RedisIdempotencyStore:
         *,
         status: int,
         body: bytes,
-        headers: Dict[str, str],
-        media_type: Optional[str],
+        headers: dict[str, str],
+        media_type: str | None,
     ) -> None:
         entry = self.get(key)
         if not entry:

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
-_UserModel: Optional[type] = None
-_GetStrategy: Optional[Callable[[], Any]] = None
+_UserModel: type | None = None
+_GetStrategy: Callable[[], Any] | None = None
 _AuthPrefix: str = "/auth"
-_UserScopeResolver: Optional[Callable[[Any], list[str]]] = None
+_UserScopeResolver: Callable[[Any], list[str]] | None = None
 
 
 def set_auth_state(

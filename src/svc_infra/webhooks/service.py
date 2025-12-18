@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List
 from uuid import uuid4
 
 from svc_infra.db.outbox import OutboxStore
@@ -19,7 +18,7 @@ class WebhookSubscription:
 
 class InMemoryWebhookSubscriptions:
     def __init__(self):
-        self._subs: Dict[str, List[WebhookSubscription]] = {}
+        self._subs: dict[str, list[WebhookSubscription]] = {}
 
     def add(self, topic: str, url: str, secret: str) -> None:
         # Upsert semantics per (topic, url): if a subscription already exists
@@ -33,7 +32,7 @@ class InMemoryWebhookSubscriptions:
                 return
         lst.append(WebhookSubscription(topic, url, secret))
 
-    def get_for_topic(self, topic: str) -> List[WebhookSubscription]:
+    def get_for_topic(self, topic: str) -> list[WebhookSubscription]:
         return list(self._subs.get(topic, []))
 
 
@@ -42,7 +41,7 @@ class WebhookService:
         self._outbox = outbox
         self._subs = subs
 
-    def publish(self, topic: str, payload: Dict, *, version: int = 1) -> int:
+    def publish(self, topic: str, payload: dict, *, version: int = 1) -> int:
         created_at = datetime.now(timezone.utc).isoformat()
         base_event = {
             "topic": topic,

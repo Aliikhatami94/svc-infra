@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from typing import Iterable
 
 from svc_infra.db.outbox import OutboxStore
 from svc_infra.jobs.queue import JobQueue
@@ -10,7 +10,7 @@ def make_outbox_tick(
     outbox: OutboxStore,
     queue: JobQueue,
     *,
-    topics: Optional[Iterable[str]] = None,
+    topics: Iterable[str] | None = None,
     job_name_prefix: str = "outbox",
 ):
     """Return an async task function to move one outbox message into the job queue.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Type
+from typing import Any, Callable
 
 from fastapi import APIRouter
 from fastapi.params import Depends
@@ -116,7 +116,7 @@ class DualAPIRouter(APIRouter):
         self,
         path: str,
         *,
-        model: Type[BaseModel],
+        model: type[BaseModel],
         envelope: bool = False,
         cursor: bool = True,
         page: bool = True,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable, Dict, Iterable, Iterator, Tuple
+from typing import Callable, Iterable, Iterator
 
 from ..auth.security import auth_login_path
 from .models import APIVersionSpec, ServiceInfo, VersionInfo
@@ -9,7 +9,7 @@ from .models import APIVersionSpec, ServiceInfo, VersionInfo
 _HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "trace")
 
 
-def _iter_ops(schema: dict) -> Iterator[Tuple[str, str, dict]]:
+def _iter_ops(schema: dict) -> Iterator[tuple[str, str, dict]]:
     """Yield (path, method, op) for each operation object."""
     paths = schema.get("paths") or {}
     for path, methods in paths.items():
@@ -481,7 +481,7 @@ def ensure_global_tags_mutator(default_desc: str = "Operations related to {tag}.
 
         # map existing tags by name and preserve their fields
         existing_list = schema.get("tags") or []
-        existing_map: Dict[str, dict] = {}
+        existing_map: dict[str, dict] = {}
         for item in existing_list:
             if isinstance(item, dict) and "name" in item:
                 existing_map[item["name"]] = dict(item)
@@ -508,8 +508,8 @@ def ensure_global_tags_mutator(default_desc: str = "Operations related to {tag}.
 
 
 def attach_standard_responses_mutator(
-    codes: Dict[int, str] | None = None,
-    per_method: Dict[str, Iterable[int]] | None = None,
+    codes: dict[int, str] | None = None,
+    per_method: dict[str, Iterable[int]] | None = None,
     exclude_tags: set[str] | None = None,
     op_flag_disable: str = "x_disable_standard_responses",
 ):

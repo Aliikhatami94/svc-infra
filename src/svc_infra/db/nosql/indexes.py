@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Tuple, Union
 
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from pymongo.collation import Collation
@@ -21,8 +21,8 @@ Alias = Dict[str, Any]
 KeySpec = Union[str, Tuple[str, int]]
 
 
-def _normalize_keys(keys: Iterable[KeySpec]) -> List[Tuple[str, int]]:
-    out: List[Tuple[str, int]] = []
+def _normalize_keys(keys: Iterable[KeySpec]) -> list[tuple[str, int]]:
+    out: list[tuple[str, int]] = []
     for k in keys:
         if isinstance(k, tuple):
             field, dir_val = k
@@ -36,20 +36,20 @@ def _normalize_keys(keys: Iterable[KeySpec]) -> List[Tuple[str, int]]:
     return out
 
 
-def _normalize_collation(c: Optional[Dict[str, Any]]) -> Optional[Collation]:
+def _normalize_collation(c: dict[str, Any] | None) -> Collation | None:
     if not c:
         return None
     # common short form e.g. {"locale":"en","strength":2}
     return Collation(**c)
 
 
-def normalize_index(idx: Union[IndexModel, Alias]) -> IndexModel:
+def normalize_index(idx: IndexModel | Alias) -> IndexModel:
     if isinstance(idx, IndexModel):
         return idx
     keys = _normalize_keys(idx.get("keys", []))
     if not keys:
         raise ValueError("Index alias requires 'keys'.")
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     for k in (
         "name",
         "unique",
@@ -67,8 +67,8 @@ def normalize_index(idx: Union[IndexModel, Alias]) -> IndexModel:
 
 
 def normalize_indexes(
-    indexes: Optional[Iterable[Union[IndexModel, Alias]]],
-) -> List[IndexModel]:
+    indexes: Iterable[IndexModel | Alias] | None,
+) -> list[IndexModel]:
     if not indexes:
         return []
     return [normalize_index(i) for i in indexes]

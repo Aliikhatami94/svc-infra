@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 try:  # optional SQLAlchemy import for environments without SA
     from sqlalchemy import select
@@ -15,11 +15,11 @@ async def append_event(
     db: Any,
     *,
     actor_id=None,
-    tenant_id: Optional[str] = None,
+    tenant_id: str | None = None,
     event_type: str,
-    resource_ref: Optional[str] = None,
+    resource_ref: str | None = None,
     metadata: dict | None = None,
-    prev_event: Optional[AuditLog] = None,
+    prev_event: AuditLog | None = None,
 ) -> AuditLog:
     """Append an AuditLog event using the shared append utility.
 
@@ -37,8 +37,8 @@ async def append_event(
 
 
 async def verify_chain_for_tenant(
-    db: Any, *, tenant_id: Optional[str] = None
-) -> Tuple[bool, List[int]]:
+    db: Any, *, tenant_id: str | None = None
+) -> tuple[bool, list[int]]:
     """Fetch all AuditLog events for a tenant and verify hash-chain integrity.
 
     Falls back to inspecting an in-memory 'added' list when SQLAlchemy is not available,

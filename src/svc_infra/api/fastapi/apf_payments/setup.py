@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Iterable, Optional, cast
+from typing import TYPE_CHECKING, Iterable, cast
 
 from fastapi import FastAPI
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _maybe_register_default_providers(
-    register_defaults: bool, adapters: Optional[Iterable[object]]
+    register_defaults: bool, adapters: Iterable[object] | None
 ):
     reg = get_provider_registry()
     if register_defaults:
@@ -44,7 +44,7 @@ def add_payments(
     *,
     prefix: str = "/payments",
     register_default_providers: bool = True,
-    adapters: Optional[Iterable[object]] = None,
+    adapters: Iterable[object] | None = None,
     include_in_docs: bool
     | None = None,  # None = keep your env-based default visibility
 ) -> None:

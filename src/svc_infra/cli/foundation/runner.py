@@ -3,21 +3,20 @@ from __future__ import annotations
 import asyncio
 import shutil
 from pathlib import Path
-from typing import List, Optional
 
 
 def _has_poetry(root: Path) -> bool:
     return (root / "pyproject.toml").exists() and bool(shutil.which("poetry"))
 
 
-def candidate_cmds(root: Path, prog: str, argv: List[str]) -> List[List[str]]:
+def candidate_cmds(root: Path, prog: str, argv: list[str]) -> list[list[str]]:
     """
     Return argv lists to try in order:
       1) poetry run <prog> ...
       2) <prog> ...
       3) python -m <module> ...
     """
-    cmds: List[List[str]] = []
+    cmds: list[list[str]] = []
     if _has_poetry(root):
         cmds.append(["poetry", "run", prog, *argv])
 
@@ -33,12 +32,12 @@ def candidate_cmds(root: Path, prog: str, argv: List[str]) -> List[List[str]]:
     return cmds
 
 
-async def run_from_root(root: Path, prog: str, argv: List[str]) -> str:
+async def run_from_root(root: Path, prog: str, argv: list[str]) -> str:
     """
     cd to project root and run the first working candidate command.
     Returns captured stdout+stderr text; raises on total failure.
     """
-    last_exc: Optional[BaseException] = None
+    last_exc: BaseException | None = None
     for cmd in candidate_cmds(root, prog, argv):
         try:
             proc = await asyncio.create_subprocess_exec(

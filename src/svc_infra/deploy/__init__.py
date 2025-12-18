@@ -33,7 +33,6 @@ from __future__ import annotations
 import os
 from enum import StrEnum
 from functools import cache
-from typing import Optional
 
 
 class Platform(StrEnum):
@@ -292,7 +291,7 @@ def get_database_url(
     *,
     prefer_private: bool = True,
     normalize: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """
     Get database URL with platform-aware resolution.
 
@@ -336,7 +335,7 @@ def get_database_url(
     return None
 
 
-def get_redis_url(*, prefer_private: bool = True) -> Optional[str]:
+def get_redis_url(*, prefer_private: bool = True) -> str | None:
     """
     Get Redis URL with platform-aware resolution.
 
@@ -388,7 +387,7 @@ def get_service_url(
     *,
     default_port: int = 8000,
     scheme: str = "http",
-) -> Optional[str]:
+) -> str | None:
     """
     Get URL for an internal service by name.
 
@@ -426,7 +425,7 @@ def get_service_url(
     return None
 
 
-def get_public_url() -> Optional[str]:
+def get_public_url() -> str | None:
     """
     Get the public URL of this service.
 

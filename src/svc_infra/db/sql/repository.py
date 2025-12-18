@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Iterable, Optional, Sequence, Set, cast
+from typing import Any, Iterable, Sequence, cast
 
 from sqlalchemy import Select, String, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,14 +33,14 @@ class SqlRepository:
         soft_delete: bool = False,
         soft_delete_field: str = "deleted_at",
         soft_delete_flag_field: str | None = None,
-        immutable_fields: Optional[Set[str]] = None,
+        immutable_fields: set[str] | None = None,
     ):
         self.model = model
         self.id_attr = id_attr
         self.soft_delete = soft_delete
         self.soft_delete_field = soft_delete_field
         self.soft_delete_flag_field = soft_delete_flag_field
-        self.immutable_fields: Set[str] = set(
+        self.immutable_fields: set[str] = set(
             immutable_fields or {"id", "created_at", "updated_at"}
         )
 
@@ -72,8 +72,8 @@ class SqlRepository:
         *,
         limit: int,
         offset: int,
-        order_by: Optional[Sequence[Any]] = None,
-        where: Optional[Sequence[Any]] = None,
+        order_by: Sequence[Any] | None = None,
+        where: Sequence[Any] | None = None,
     ) -> Sequence[Any]:
         stmt = self._base_select()
         if where:
@@ -85,7 +85,7 @@ class SqlRepository:
         return list(result)
 
     async def count(
-        self, session: AsyncSession, *, where: Optional[Sequence[Any]] = None
+        self, session: AsyncSession, *, where: Sequence[Any] | None = None
     ) -> int:
         base = self._base_select()
         if where:
@@ -98,7 +98,7 @@ class SqlRepository:
         session: AsyncSession,
         id_value: Any,
         *,
-        where: Optional[Sequence[Any]] = None,
+        where: Sequence[Any] | None = None,
     ) -> Any | None:
         # honors soft-delete if configured
         stmt = self._base_select().where(self._id_column() == id_value)
@@ -121,7 +121,7 @@ class SqlRepository:
         id_value: Any,
         data: dict[str, Any],
         *,
-        where: Optional[Sequence[Any]] = None,
+        where: Sequence[Any] | None = None,
     ) -> Any | None:
         obj = await self.get(session, id_value, where=where)
         if not obj:
@@ -139,7 +139,7 @@ class SqlRepository:
         session: AsyncSession,
         id_value: Any,
         *,
-        where: Optional[Sequence[Any]] = None,
+        where: Sequence[Any] | None = None,
     ) -> bool:
         # Fast path: when no extra filters provided, use session.get for simplicity (matches tests)
         if not where:
@@ -176,8 +176,8 @@ class SqlRepository:
         fields: Sequence[str],
         limit: int,
         offset: int,
-        order_by: Optional[Sequence[Any]] = None,
-        where: Optional[Sequence[Any]] = None,
+        order_by: Sequence[Any] | None = None,
+        where: Sequence[Any] | None = None,
     ) -> Sequence[Any]:
         ilike = f"%{_escape_ilike(q)}%"
         conditions = []
@@ -206,7 +206,7 @@ class SqlRepository:
         *,
         q: str,
         fields: Sequence[str],
-        where: Optional[Sequence[Any]] = None,
+        where: Sequence[Any] | None = None,
     ) -> int:
         ilike = f"%{_escape_ilike(q)}%"
         conditions = []

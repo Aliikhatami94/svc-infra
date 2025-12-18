@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,7 +77,7 @@ class PaymentsService:
         session: AsyncSession,
         *,
         tenant_id: str,
-        provider_name: Optional[str] = None,
+        provider_name: str | None = None,
     ):
         if not tenant_id:
             raise ValueError("tenant_id is required for PaymentsService")
@@ -145,7 +144,7 @@ class PaymentsService:
     # --- Intents --------------------------------------------------------------
 
     async def create_intent(
-        self, user_id: Optional[str], data: IntentCreateIn
+        self, user_id: str | None, data: IntentCreateIn
     ) -> IntentOut:
         adapter = self._get_adapter()
         out = await adapter.create_intent(data, user_id=user_id)
@@ -647,8 +646,8 @@ class PaymentsService:
 
     # --- Disputes -------------------------------------------------------------
     async def list_disputes(
-        self, *, status: Optional[str], limit: int, cursor: Optional[str]
-    ) -> tuple[list[DisputeOut], Optional[str]]:
+        self, *, status: str | None, limit: int, cursor: str | None
+    ) -> tuple[list[DisputeOut], str | None]:
         return await self._get_adapter().list_disputes(
             status=status, limit=limit, cursor=cursor
         )
@@ -702,8 +701,8 @@ class PaymentsService:
 
     # --- Payouts --------------------------------------------------------------
     async def list_payouts(
-        self, *, limit: int, cursor: Optional[str]
-    ) -> tuple[list[PayoutOut], Optional[str]]:
+        self, *, limit: int, cursor: str | None
+    ) -> tuple[list[PayoutOut], str | None]:
         return await self._get_adapter().list_payouts(limit=limit, cursor=cursor)
 
     async def get_payout(self, provider_payout_id: str) -> PayoutOut:
@@ -733,7 +732,7 @@ class PaymentsService:
 
     # --- Webhook replay -------------------------------------------------------
     async def replay_webhooks(
-        self, since: Optional[str], until: Optional[str], event_ids: list[str]
+        self, since: str | None, until: str | None, event_ids: list[str]
     ) -> int:
         from datetime import datetime
 

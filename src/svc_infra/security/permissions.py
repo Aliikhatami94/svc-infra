@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import threading
-from typing import Any, Awaitable, Callable, Dict, Iterable, Set
+from typing import Any, Awaitable, Callable, Iterable
 
 from fastapi import Depends, HTTPException
 
@@ -12,7 +12,7 @@ from svc_infra.api.fastapi.auth.security import Identity
 _PERMISSION_LOCK = threading.Lock()
 
 # Central role -> permissions mapping. Projects can extend at startup.
-PERMISSION_REGISTRY: Dict[str, Set[str]] = {
+PERMISSION_REGISTRY: dict[str, set[str]] = {
     "admin": {
         "user.read",
         "user.write",
@@ -27,13 +27,13 @@ PERMISSION_REGISTRY: Dict[str, Set[str]] = {
 }
 
 
-def register_role(role: str, permissions: Set[str]) -> None:
+def register_role(role: str, permissions: set[str]) -> None:
     """Thread-safe registration of a role and its permissions."""
     with _PERMISSION_LOCK:
         PERMISSION_REGISTRY[role] = permissions
 
 
-def extend_role(role: str, permissions: Set[str]) -> None:
+def extend_role(role: str, permissions: set[str]) -> None:
     """Thread-safe extension of an existing role's permissions."""
     with _PERMISSION_LOCK:
         if role in PERMISSION_REGISTRY:
@@ -42,15 +42,15 @@ def extend_role(role: str, permissions: Set[str]) -> None:
             PERMISSION_REGISTRY[role] = permissions
 
 
-def get_permissions_for_roles(roles: Iterable[str]) -> Set[str]:
-    perms: Set[str] = set()
+def get_permissions_for_roles(roles: Iterable[str]) -> set[str]:
+    perms: set[str] = set()
     with _PERMISSION_LOCK:
         for r in roles:
             perms |= PERMISSION_REGISTRY.get(r, set())
     return perms
 
 
-def principal_permissions(principal: Identity) -> Set[str]:
+def principal_permissions(principal: Identity) -> set[str]:
     roles = getattr(principal.user, "roles", []) or []
     return get_permissions_for_roles(roles)
 

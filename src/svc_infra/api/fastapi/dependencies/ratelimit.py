@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable, Optional
+from typing import Callable
 
 from fastapi import HTTPException
 from starlette.requests import Request
@@ -30,9 +30,7 @@ class RateLimiter:
         limit: int,
         window: int = 60,
         key_fn: Callable = lambda r: "global",
-        limit_resolver: Optional[
-            Callable[[Request, Optional[str]], Optional[int]]
-        ] = None,
+        limit_resolver: Callable[[Request, str | None], int | None] | None = None,
         scope_by_tenant: bool = False,
         store: RateLimitStore | None = None,
     ):
@@ -87,7 +85,7 @@ def rate_limiter(
     limit: int,
     window: int = 60,
     key_fn: Callable = lambda r: "global",
-    limit_resolver: Optional[Callable[[Request, Optional[str]], Optional[int]]] = None,
+    limit_resolver: Callable[[Request, str | None], int | None] | None = None,
     scope_by_tenant: bool = False,
     store: RateLimitStore | None = None,
 ):

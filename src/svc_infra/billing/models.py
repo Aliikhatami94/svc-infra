@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import JSON, DateTime, Index, Numeric, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -73,7 +72,7 @@ class Plan(ModelBase):
         String(64), unique=True, index=True, nullable=False
     )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -107,7 +106,7 @@ class Subscription(ModelBase):
     effective_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -126,10 +125,8 @@ class Price(ModelBase):
     unit_amount: Mapped[int] = mapped_column(
         Numeric(18, 0), nullable=False
     )  # minor units
-    metric: Mapped[Optional[str]] = mapped_column(
-        String(64)
-    )  # null for fixed recurring
-    recurring_interval: Mapped[Optional[str]] = mapped_column(String(8))  # month|year
+    metric: Mapped[str | None] = mapped_column(String(64))  # null for fixed recurring
+    recurring_interval: Mapped[str | None] = mapped_column(String(8))  # month|year
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -153,7 +150,7 @@ class Invoice(ModelBase):
     status: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
     total_amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    provider_invoice_id: Mapped[Optional[str]] = mapped_column(String(128), index=True)
+    provider_invoice_id: Mapped[str | None] = mapped_column(String(128), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -166,8 +163,8 @@ class InvoiceLine(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     invoice_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
-    price_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
-    metric: Mapped[Optional[str]] = mapped_column(String(64))
+    price_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    metric: Mapped[str | None] = mapped_column(String(64))
     quantity: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

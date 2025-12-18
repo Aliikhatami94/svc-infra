@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence, cast
+from typing import Any, Sequence, cast
 
 from pydantic import BaseModel, ConfigDict, create_model
 
@@ -35,10 +35,10 @@ def _opt(t: type[Any]) -> tuple[Any, Any]:
 def make_crud_schemas_from_specs(
     *,
     specs: Sequence[FieldSpec],
-    read_name: Optional[str],
-    create_name: Optional[str],
-    update_name: Optional[str],
-    json_encoders: Optional[dict[type[Any], Any]] = None,
+    read_name: str | None,
+    create_name: str | None,
+    update_name: str | None,
+    json_encoders: dict[type[Any], Any] | None = None,
 ) -> tuple[type[BaseModel], type[BaseModel], type[BaseModel]]:
     ann_read: dict[str, tuple[Any, Any]] = {}
     ann_create: dict[str, tuple[Any, Any]] = {}

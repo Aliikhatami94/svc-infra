@@ -9,8 +9,6 @@ from typing import (
     Callable,
     Generic,
     Iterable,
-    List,
-    Optional,
     Sequence,
     TypeVar,
     cast,
@@ -26,7 +24,7 @@ T = TypeVar("T")
 
 # ---------- Core query models ----------
 class CursorParams(BaseModel):
-    cursor: Optional[str] = None
+    cursor: str | None = None
     limit: int = 50
 
 
@@ -36,19 +34,19 @@ class PageParams(BaseModel):
 
 
 class FilterParams(BaseModel):
-    q: Optional[str] = None
-    sort: Optional[str] = None
-    created_after: Optional[str] = None
-    created_before: Optional[str] = None
-    updated_after: Optional[str] = None
-    updated_before: Optional[str] = None
+    q: str | None = None
+    sort: str | None = None
+    created_after: str | None = None
+    created_before: str | None = None
+    updated_after: str | None = None
+    updated_before: str | None = None
 
 
 # ---------- Envelope model ----------
 class Paginated(BaseModel, Generic[T]):
-    items: List[T]
-    next_cursor: Optional[str] = Field(None, description="Opaque cursor for next page")
-    total: Optional[int] = Field(None, description="Total items (optional)")
+    items: list[T]
+    next_cursor: str | None = Field(None, description="Opaque cursor for next page")
+    total: int | None = Field(None, description="Total items (optional)")
 
 
 # ---------- Cursor helpers ----------
@@ -57,7 +55,7 @@ def _encode_cursor(payload: dict) -> str:
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
-def decode_cursor(token: Optional[str]) -> dict[Any, Any]:
+def decode_cursor(token: str | None) -> dict[Any, Any]:
     """Public: decode an incoming cursor token for debugging/ops."""
     if not token:
         return {}
@@ -97,7 +95,7 @@ class PaginationContext(Generic[T]):
         self.limit_override = limit_override
 
     @property
-    def cursor(self) -> Optional[str]:
+    def cursor(self) -> str | None:
         return (
             (self.cursor_params or CursorParams()).cursor if self.allow_cursor else None
         )
@@ -113,11 +111,11 @@ class PaginationContext(Generic[T]):
         return 50
 
     @property
-    def page(self) -> Optional[int]:
+    def page(self) -> int | None:
         return self.page_params.page if (self.allow_page and self.page_params) else None
 
     @property
-    def page_size(self) -> Optional[int]:
+    def page_size(self) -> int | None:
         return (
             self.page_params.page_size
             if (self.allow_page and self.page_params)
@@ -134,8 +132,8 @@ class PaginationContext(Generic[T]):
         self,
         items: list[T],
         *,
-        next_cursor: Optional[str] = None,
-        total: Optional[int] = None,
+        next_cursor: str | None = None,
+        total: int | None = None,
     ):
         if self.envelope:
             return Paginated[T](items=items, next_cursor=next_cursor, total=total)
@@ -143,7 +141,7 @@ class PaginationContext(Generic[T]):
 
     def next_cursor_from_last(
         self, items: Sequence[T], *, key: Callable[[T], str | int]
-    ) -> Optional[str]:
+    ) -> str | None:
         if not items:
             return None
         last_key = key(items[-1])
@@ -172,7 +170,7 @@ def use_pagination() -> PaginationContext:
 
 # ---------- Utilities ----------
 def text_filter(
-    items: Iterable[T], q: Optional[str], *getters: Callable[[T], str]
+    items: Iterable[T], q: str | None, *getters: Callable[[T], str]
 ) -> list[T]:
     if not q:
         return list(items)

@@ -1,32 +1,30 @@
 from __future__ import annotations
 
-from typing import Dict
-
 
 def ref(name: str) -> dict:
     return {"$ref": f"#/components/responses/{name}"}
 
 
-DEFAULT_PUBLIC: Dict[int, dict] = {
+DEFAULT_PUBLIC: dict[int, dict] = {
     400: ref("BadRequest"),
     422: ref("ValidationError"),
     500: ref("ServerError"),
 }
-DEFAULT_USER: Dict[int, dict] = {
+DEFAULT_USER: dict[int, dict] = {
     400: ref("BadRequest"),
     401: ref("Unauthorized"),
     403: ref("Forbidden"),
     422: ref("ValidationError"),
     500: ref("ServerError"),
 }
-DEFAULT_SERVICE: Dict[int, dict] = {
+DEFAULT_SERVICE: dict[int, dict] = {
     400: ref("BadRequest"),
     401: ref("Unauthorized"),
     403: ref("Forbidden"),
     429: ref("TooManyRequests"),
     500: ref("ServerError"),
 }
-DEFAULT_PROTECTED: Dict[int, dict] = {
+DEFAULT_PROTECTED: dict[int, dict] = {
     400: ref("BadRequest"),
     401: ref("Unauthorized"),
     403: ref("Forbidden"),

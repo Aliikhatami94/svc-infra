@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
@@ -22,7 +21,7 @@ def build_session_router() -> APIRouter:
     )
     async def list_my_sessions(
         identity: Identity, session: SqlSessionDep
-    ) -> List[dict]:
+    ) -> list[dict]:
         stmt = select(AuthSession).where(AuthSession.user_id == identity.user.id)
         rows = (await session.execute(stmt)).scalars().all()
         return [

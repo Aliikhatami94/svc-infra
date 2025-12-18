@@ -4,7 +4,7 @@ import logging
 import os
 import time
 import warnings
-from typing import Callable, Optional, Protocol, Tuple
+from typing import Callable, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def _check_inmemory_production_warning(class_name: str) -> None:
 
 
 class RateLimitStore(Protocol):
-    def incr(self, key: str, window: int) -> Tuple[int, int, int]:
+    def incr(self, key: str, window: int) -> tuple[int, int, int]:
         """Increment and return (count, limit, resetEpoch).
 
         Implementations should manage per-window buckets. The 'limit' is stored configuration.
@@ -44,7 +44,7 @@ class InMemoryRateLimitStore:
         # Track per-key rolling windows: key -> (count, window_start_epoch)
         self._state: dict[str, tuple[int, float]] = {}
 
-    def incr(self, key: str, window: int) -> Tuple[int, int, int]:
+    def incr(self, key: str, window: int) -> tuple[int, int, int]:
         now = time.time()
         count, window_start = self._state.get(key, (0, now))
         # If outside the rolling window, reset
@@ -74,7 +74,7 @@ class RedisRateLimitStore:
         *,
         limit: int = 120,
         prefix: str = "ratelimit",
-        clock: Optional[Callable[[], float]] = None,
+        clock: Callable[[], float] | None = None,
     ):
         self.redis = redis_client
         self.limit = limit
@@ -87,7 +87,7 @@ class RedisRateLimitStore:
         redis_key = f"{self.prefix}:{key}:{win}"
         return redis_key, win, now
 
-    def incr(self, key: str, window: int) -> Tuple[int, int, int]:
+    def incr(self, key: str, window: int) -> tuple[int, int, int]:
         rkey, win, now = self._window_key(key, window)
         # Increment; if this is the first time we've seen this window key, set expiry to window end
         pipe = self.redis.pipeline()

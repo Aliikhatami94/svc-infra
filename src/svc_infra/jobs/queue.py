@@ -5,7 +5,7 @@ import os
 import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +33,21 @@ def _check_inmemory_production_warning(class_name: str) -> None:
 class Job:
     id: str
     name: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     available_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     attempts: int = 0
     max_attempts: int = 5
     backoff_seconds: int = 60  # base backoff for retry
-    last_error: Optional[str] = None
+    last_error: str | None = None
 
 
 class JobQueue(Protocol):
     def enqueue(
-        self, name: str, payload: Dict[str, Any], *, delay_seconds: int = 0
+        self, name: str, payload: dict[str, Any], *, delay_seconds: int = 0
     ) -> Job:
         pass
 
-    def reserve_next(self) -> Optional[Job]:
+    def reserve_next(self) -> Job | None:
         pass
 
     def ack(self, job_id: str) -> None:
@@ -73,7 +73,7 @@ class InMemoryJobQueue:
         return str(self._seq)
 
     def enqueue(
-        self, name: str, payload: Dict[str, Any], *, delay_seconds: int = 0
+        self, name: str, payload: dict[str, Any], *, delay_seconds: int = 0
     ) -> Job:
         when = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
         job = Job(
@@ -82,7 +82,7 @@ class InMemoryJobQueue:
         self._jobs.append(job)
         return job
 
-    def reserve_next(self) -> Optional[Job]:
+    def reserve_next(self) -> Job | None:
         now = datetime.now(timezone.utc)
         for job in self._jobs:
             if (

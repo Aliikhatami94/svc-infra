@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Iterable, Optional, Protocol
+from typing import Any, Awaitable, Callable, Iterable, Protocol
 
 
 class SqlSession(Protocol):  # minimal protocol for tests/integration
@@ -25,7 +25,7 @@ async def run_erasure(
     principal_id: str,
     plan: ErasurePlan,
     *,
-    on_audit: Optional[Callable[[str, dict[str, Any]], None]] = None,
+    on_audit: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> int:
     """Run an erasure plan and optionally emit an audit event.
 

@@ -9,7 +9,7 @@ import os
 import time
 from hashlib import sha256
 from types import SimpleNamespace
-from typing import Any, Callable, Optional, cast
+from typing import Any, Callable, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
@@ -54,7 +54,7 @@ def _verify(token: str, *, secret: str) -> dict:
         raise ValueError("invalid_token") from e
 
 
-def admin_router(*, dependencies: Optional[list[Any]] = None, **kwargs) -> APIRouter:
+def admin_router(*, dependencies: list[Any] | None = None, **kwargs) -> APIRouter:
     """Role-gated admin router for coarse access control.
 
     Use permission guards inside endpoints for fine-grained control.
@@ -68,10 +68,10 @@ def add_admin(
     *,
     base_path: str = "/admin",
     enable_impersonation: bool = True,
-    secret: Optional[str] = None,
+    secret: str | None = None,
     ttl_seconds: int = 15 * 60,
     cookie_name: str = "impersonation",
-    impersonation_user_getter: Optional[Callable[[Any, str], Any]] = None,
+    impersonation_user_getter: Callable[[Any, str], Any] | None = None,
 ) -> None:
     """Wire admin surfaces with sensible defaults.
 

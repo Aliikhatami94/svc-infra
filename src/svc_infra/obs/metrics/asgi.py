@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any, Callable, Iterable, Optional, cast
+from typing import Any, Callable, Iterable, cast
 
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
@@ -115,8 +115,8 @@ class PrometheusMiddleware:
         self,
         app: ASGIApp,
         *,
-        skip_paths: Optional[Iterable[str]] = None,
-        route_resolver: Optional[Callable[[Request], str]] = None,
+        skip_paths: Iterable[str] | None = None,
+        route_resolver: Callable[[Request], str] | None = None,
     ):
         self.app = app
         self.skip_paths = tuple(skip_paths or ("/metrics",))
@@ -242,7 +242,7 @@ def metrics_endpoint():
 
 
 def add_prometheus(
-    app, *, path: str = "/metrics", skip_paths: Optional[Iterable[str]] = None
+    app, *, path: str = "/metrics", skip_paths: Iterable[str] | None = None
 ):
     """Convenience for FastAPI/Starlette apps."""
     # Add middleware

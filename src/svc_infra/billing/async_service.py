@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Sequence
+from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -111,7 +111,7 @@ class AsyncBillingService:
         return total
 
     async def list_daily_aggregates(
-        self, *, metric: str, date_from: Optional[datetime], date_to: Optional[datetime]
+        self, *, metric: str, date_from: datetime | None, date_to: datetime | None
     ) -> list[UsageAggregate]:
         q = select(UsageAggregate).where(
             UsageAggregate.tenant_id == self.tenant_id,

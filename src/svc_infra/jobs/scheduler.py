@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Awaitable, Callable, Dict
+from typing import Awaitable, Callable
 
 CronFunc = Callable[[], Awaitable[None]]
 
@@ -23,7 +23,7 @@ class InMemoryScheduler:
     """
 
     def __init__(self, tick_interval: float = 60.0):
-        self._tasks: Dict[str, ScheduledTask] = {}
+        self._tasks: dict[str, ScheduledTask] = {}
         self._tick_interval = tick_interval
 
     def add_task(self, name: str, interval_seconds: int, func: CronFunc) -> None:

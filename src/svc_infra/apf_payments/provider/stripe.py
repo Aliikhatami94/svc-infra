@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Optional
+from typing import Any
 
 import anyio
 
@@ -232,7 +232,7 @@ class StripeAdapter(ProviderAdapter):
             name=c.get("name"),
         )
 
-    async def get_customer(self, provider_customer_id: str) -> Optional[CustomerOut]:
+    async def get_customer(self, provider_customer_id: str) -> CustomerOut | None:
         c = await _acall(stripe.Customer.retrieve, provider_customer_id)
         return CustomerOut(
             id=c.id,

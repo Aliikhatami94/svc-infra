@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, cast
+from typing import Any, Iterable, Sequence, cast
 
 try:
     from bson import ObjectId
@@ -35,7 +35,7 @@ class NoSqlRepository:
         soft_delete: bool = False,
         soft_delete_field: str = "deleted_at",
         soft_delete_flag_field: str | None = None,
-        immutable_fields: Optional[set[str]] = None,
+        immutable_fields: set[str] | None = None,
     ):
         self.collection_name = collection_name
         self.id_field = id_field
@@ -46,7 +46,7 @@ class NoSqlRepository:
             immutable_fields or {self.id_field, "created_at", "updated_at"}
         )
 
-    def _alive_filter(self) -> Dict[str, Any]:
+    def _alive_filter(self) -> dict[str, Any]:
         """
         Build a filter that returns 'alive' docs when soft_delete is enabled.
         - deleted_at is either null or absent
@@ -84,7 +84,7 @@ class NoSqlRepository:
 
         return clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
-    def _merge_and(self, *filters: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _merge_and(self, *filters: dict[str, Any] | None) -> dict[str, Any]:
         parts = [f for f in filters if f]
         if not parts:
             return {}
@@ -104,7 +104,7 @@ class NoSqlRepository:
         return val
 
     @staticmethod
-    def _public_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
+    def _public_doc(doc: dict[str, Any]) -> dict[str, Any]:
         d = dict(doc)
         if "_id" in d and "id" not in d:
             _id = d.pop("_id", None)
@@ -120,20 +120,20 @@ class NoSqlRepository:
         *,
         limit: int,
         offset: int,
-        sort: Optional[List[Tuple[str, int]]] = None,
-        filter: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        sort: list[tuple[str, int]] | None = None,
+        filter: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         filt = self._merge_and(self._alive_filter(), filter)
         cursor = db[self.collection_name].find(filt).skip(offset).limit(limit)
         if sort:
             cursor = cursor.sort(sort)
         return [self._public_doc(doc) async for doc in cursor]
 
-    async def count(self, db, *, filter: Optional[Dict[str, Any]] = None) -> int:
+    async def count(self, db, *, filter: dict[str, Any] | None = None) -> int:
         filt = self._merge_and(self._alive_filter(), filter)
         return cast(int, await db[self.collection_name].count_documents(filt or {}))
 
-    async def get(self, db, id_value: Any) -> Dict | None:
+    async def get(self, db, id_value: Any) -> dict | None:
         id_value = self._normalize_id_value(id_value)
         filt = self._merge_and(self._alive_filter(), {self.id_field: id_value})
         doc = await db[self.collection_name].find_one(filt)
@@ -141,7 +141,7 @@ class NoSqlRepository:
             return None
         return self._public_doc(doc)
 
-    async def create(self, db, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create(self, db, data: dict[str, Any]) -> dict[str, Any]:
         # don't let clients supply soft-delete artifacts on create
         if self.soft_delete:
             data.pop(self.soft_delete_field, None)
@@ -150,7 +150,7 @@ class NoSqlRepository:
         res = await db[self.collection_name].insert_one(data)
         return self._public_doc({**data, "_id": res.inserted_id})
 
-    async def update(self, db, id_value: Any, data: Dict[str, Any]) -> Dict | None:
+    async def update(self, db, id_value: Any, data: dict[str, Any]) -> dict | None:
         for k in list(data.keys()):
             if k in self.immutable_fields:
                 data.pop(k, None)
@@ -162,7 +162,7 @@ class NoSqlRepository:
     async def delete(self, db, id_value: Any) -> bool:
         id_value = self._normalize_id_value(id_value)
         if self.soft_delete:
-            set_ops: Dict[str, Any] = {}
+            set_ops: dict[str, Any] = {}
             if self.soft_delete_flag_field:
                 set_ops[self.soft_delete_flag_field] = False
             from datetime import datetime, timezone
@@ -184,8 +184,8 @@ class NoSqlRepository:
         fields: Sequence[str],
         limit: int,
         offset: int,
-        sort: Optional[List[Tuple[str, int]]] = None,
-    ) -> List[Dict[str, Any]]:
+        sort: list[tuple[str, int]] | None = None,
+    ) -> list[dict[str, Any]]:
         regex = {"$regex": q, "$options": "i"}
         or_filter = [{"$or": [{f: regex} for f in fields]}] if fields else []
         filt = (
@@ -204,7 +204,7 @@ class NoSqlRepository:
         filt = self._merge_and(self._alive_filter(), or_filter)
         return cast(int, await db[self.collection_name].count_documents(filt or {}))
 
-    async def exists(self, db, *, where: Iterable[Dict[str, Any]]) -> bool:
+    async def exists(self, db, *, where: Iterable[dict[str, Any]]) -> bool:
         filt = self._merge_and(self._alive_filter(), *list(where))
         doc = await db[self.collection_name].find_one(
             filt, projection={self.id_field: 1}

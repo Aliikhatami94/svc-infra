@@ -22,7 +22,7 @@ Quick Start:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -105,10 +105,10 @@ class Document(BaseModel):
     )
     storage_path: str = Field(..., description="Storage backend path/key")
     content_type: str = Field(..., description="MIME type (e.g., application/pdf)")
-    checksum: Optional[str] = Field(
+    checksum: str | None = Field(
         None, description="File checksum for integrity validation (e.g., sha256:...)"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Flexible metadata for custom fields (category, tags, dates, etc.)",
     )

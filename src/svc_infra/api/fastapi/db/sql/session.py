@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Annotated, AsyncIterator, Tuple
+from typing import Annotated, AsyncIterator
 
 from fastapi import Depends
 from sqlalchemy import text
@@ -23,7 +23,7 @@ _SessionLocal: async_sessionmaker[AsyncSession] | None = None
 
 def _init_engine_and_session(
     url: str,
-) -> Tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
+) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
     async_url = _coerce_to_async_url(url)
     if async_url != url:
         logger.info(

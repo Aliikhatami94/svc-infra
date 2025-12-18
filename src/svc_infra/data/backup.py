@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Callable
 
 
 @dataclass(frozen=True)
 class BackupHealthReport:
     ok: bool
-    last_success: Optional[datetime]
-    retention_days: Optional[int]
+    last_success: datetime | None
+    retention_days: int | None
     message: str = ""
 
 
 def verify_backups(
-    *, last_success: Optional[datetime] = None, retention_days: Optional[int] = None
+    *, last_success: datetime | None = None, retention_days: int | None = None
 ) -> BackupHealthReport:
     """Return a basic backup health report.
 
@@ -41,7 +41,7 @@ __all__ = ["BackupHealthReport", "verify_backups"]
 def make_backup_verification_job(
     checker: Callable[[], BackupHealthReport],
     *,
-    on_report: Optional[Callable[[BackupHealthReport], None]] = None,
+    on_report: Callable[[BackupHealthReport], None] | None = None,
 ):
     """Return a callable suitable for scheduling in a job runner.
 

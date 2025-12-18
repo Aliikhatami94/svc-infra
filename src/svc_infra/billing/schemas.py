@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +11,7 @@ class UsageIn(BaseModel):
     amount: Annotated[
         int, Field(ge=0, description="Non-negative amount for the metric")
     ]
-    at: Optional[datetime] = Field(
+    at: datetime | None = Field(
         default=None,
         description="Event timestamp (UTC). Defaults to server time if omitted.",
     )
@@ -33,4 +33,4 @@ class UsageAggregateRow(BaseModel):
 
 class UsageAggregatesOut(BaseModel):
     items: list[UsageAggregateRow] = Field(default_factory=list)
-    next_cursor: Optional[str] = None
+    next_cursor: str | None = None

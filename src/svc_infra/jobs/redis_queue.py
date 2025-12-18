@@ -4,7 +4,7 @@ import json
 import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, cast
+from typing import Any, cast
 
 from redis import Redis
 
@@ -63,7 +63,7 @@ class RedisJobQueue(JobQueue):
         return f"{self._p}:job:{job_id}"
 
     # Core ops
-    def enqueue(self, name: str, payload: Dict, *, delay_seconds: int = 0) -> Job:
+    def enqueue(self, name: str, payload: dict, *, delay_seconds: int = 0) -> Job:
         now = datetime.now(timezone.utc)
         job_id = str(self._r.incr(self._k("seq")))
         job = Job(id=job_id, name=name, payload=dict(payload))
@@ -113,7 +113,7 @@ class RedisJobQueue(JobQueue):
             pipe.hdel(self._job_key(jid_s), "visible_at")
         pipe.execute()
 
-    def reserve_next(self) -> Optional[Job]:
+    def reserve_next(self) -> Job | None:
         # opportunistically move due delayed jobs
         self._move_due_delayed_to_ready()
         # move timed-out processing jobs back to ready before reserving
@@ -166,7 +166,7 @@ class RedisJobQueue(JobQueue):
             return None
 
         # Decode fields
-        def _get(field: str, default: Optional[str] = None) -> Optional[str]:
+        def _get(field: str, default: str | None = None) -> str | None:
             val = (
                 data.get(field.encode())
                 if isinstance(next(iter(data.keys())), bytes)
@@ -222,7 +222,7 @@ class RedisJobQueue(JobQueue):
             self._r.lrem(self._k("processing"), 1, job_id)
             return
 
-        def _get(field: str, default: Optional[str] = None) -> Optional[str]:
+        def _get(field: str, default: str | None = None) -> str | None:
             val = (
                 data.get(field.encode())
                 if isinstance(next(iter(data.keys())), bytes)

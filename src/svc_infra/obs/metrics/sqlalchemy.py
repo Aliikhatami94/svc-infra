@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping
 
 from sqlalchemy.engine import Engine
 
@@ -31,12 +31,12 @@ _pool_checked_in_total = counter(
 )
 
 
-def _label(labels: Optional[Mapping[str, str]]) -> str:
+def _label(labels: Mapping[str, str] | None) -> str:
     return (labels or {}).get("db", "default")
 
 
 def bind_sqlalchemy_pool_metrics(
-    engine: Engine | Any, labels: Optional[Mapping[str, str]] = None
+    engine: Engine | Any, labels: Mapping[str, str] | None = None
 ) -> None:
     """Bind event listeners for pool metrics. Works for sync Engine.
     For AsyncEngine pass engine.sync_engine."""

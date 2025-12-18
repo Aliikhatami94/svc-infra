@@ -23,7 +23,7 @@ import uuid
 import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Optional
+from typing import Callable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -43,7 +43,7 @@ class BillingService:
 
     session: Session
     tenant_id: str
-    provider_sync: Optional[ProviderSyncHook] = None
+    provider_sync: ProviderSyncHook | None = None
 
     def __post_init__(self) -> None:
         warnings.warn(

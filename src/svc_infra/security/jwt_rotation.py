@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, List, Optional, Union
+from typing import Any, Iterable
 
 import jwt
 from fastapi_users.authentication.strategy.jwt import JWTStrategy
@@ -19,8 +19,8 @@ class RotatingJWTStrategy(JWTStrategy):
         *,
         secret: str,
         lifetime_seconds: int,
-        old_secrets: Optional[Iterable[str]] = None,
-        token_audience: Optional[Union[str, List[str]]] = None,
+        old_secrets: Iterable[str] | None = None,
+        token_audience: str | list[str] | None = None,
     ):
         # Normalize token_audience to list as required by parent JWTStrategy
         aud_list: list[str] = (
@@ -33,7 +33,7 @@ class RotatingJWTStrategy(JWTStrategy):
         super().__init__(
             secret=secret, lifetime_seconds=lifetime_seconds, token_audience=aud_list
         )
-        self._verify_secrets: List[str] = [secret] + list(old_secrets or [])
+        self._verify_secrets: list[str] = [secret] + list(old_secrets or [])
         self._lifetime_seconds = lifetime_seconds
 
     async def read_token(

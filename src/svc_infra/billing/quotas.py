@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
@@ -15,7 +15,7 @@ from .models import PlanEntitlement, Subscription, UsageAggregate
 
 async def _current_subscription(
     session: AsyncSession, tenant_id: str
-) -> Optional[Subscription]:
+) -> Subscription | None:
     now = datetime.now(tz=timezone.utc)
     row = (
         (

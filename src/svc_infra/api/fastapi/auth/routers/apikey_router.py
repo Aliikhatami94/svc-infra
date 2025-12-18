@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional, cast
+from typing import Any, cast
 from uuid import UUID
 
 from fastapi import HTTPException, Query
@@ -23,21 +23,21 @@ from svc_infra.db.sql.apikey import get_apikey_model
 
 class ApiKeyCreateIn(BaseModel):
     name: str
-    user_id: Optional[str] = None
-    scopes: List[str] = Field(default_factory=list)
-    ttl_hours: Optional[int] = 24 * 365  # default 1y
+    user_id: str | None = None
+    scopes: list[str] = Field(default_factory=list)
+    ttl_hours: int | None = 24 * 365  # default 1y
 
 
 class ApiKeyOut(BaseModel):
     id: str
     name: str
-    user_id: Optional[str]
-    key: Optional[str] = None
+    user_id: str | None
+    key: str | None = None
     key_prefix: str
-    scopes: List[str]
+    scopes: list[str]
     active: bool
-    expires_at: Optional[datetime]
-    last_used_at: Optional[datetime]
+    expires_at: datetime | None
+    last_used_at: datetime | None
 
 
 def _to_uuid(val):

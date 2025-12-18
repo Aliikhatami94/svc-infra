@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from typing import Any, Optional, Sequence, cast
+from typing import Any, Sequence, cast
 
 from .sql.utils import get_database_url_from_env
 
@@ -45,7 +45,7 @@ def _flush() -> None:
     sys.stderr.flush()
 
 
-def _get_connection(url: Optional[str] = None, connect_timeout: int = 10) -> Any:
+def _get_connection(url: str | None = None, connect_timeout: int = 10) -> Any:
     """
     Get a psycopg2 connection.
 
@@ -76,7 +76,7 @@ def _get_connection(url: Optional[str] = None, connect_timeout: int = 10) -> Any
 
 
 def wait_for_database(
-    url: Optional[str] = None,
+    url: str | None = None,
     timeout: float = DEFAULT_WAIT_TIMEOUT,
     interval: float = DEFAULT_WAIT_INTERVAL,
     verbose: bool = True,
@@ -139,11 +139,11 @@ def wait_for_database(
 
 def run_sync_sql(
     sql: str,
-    params: Optional[Sequence[Any]] = None,
-    url: Optional[str] = None,
+    params: Sequence[Any] | None = None,
+    url: str | None = None,
     timeout: int = DEFAULT_STATEMENT_TIMEOUT,
     fetch: bool = False,
-) -> Optional[list[tuple[Any, ...]]]:
+) -> list[tuple[Any, ...]] | None:
     """
     Execute SQL synchronously with a statement timeout.
 
@@ -198,7 +198,7 @@ def run_sync_sql(
 
 def kill_blocking_queries(
     table_name: str,
-    url: Optional[str] = None,
+    url: str | None = None,
     timeout: int = DEFAULT_STATEMENT_TIMEOUT,
     dry_run: bool = False,
 ) -> list[dict[str, Any]]:
@@ -286,7 +286,7 @@ def kill_blocking_queries(
 
 def drop_table_safe(
     table_name: str,
-    url: Optional[str] = None,
+    url: str | None = None,
     timeout: int = DEFAULT_STATEMENT_TIMEOUT,
     kill_blocking: bool = True,
     if_exists: bool = True,
@@ -353,7 +353,7 @@ def drop_table_safe(
 def get_database_url(
     required: bool = True,
     normalize: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """
     Convenience wrapper for get_database_url_from_env().
 

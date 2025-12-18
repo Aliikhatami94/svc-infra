@@ -39,7 +39,7 @@ import asyncio
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable
 
 import httpx
 
@@ -60,8 +60,8 @@ class HealthCheckResult:
     name: str
     status: HealthStatus
     latency_ms: float
-    message: Optional[str] = None
-    details: Optional[dict[str, Any]] = None
+    message: str | None = None
+    details: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -261,7 +261,7 @@ class HealthRegistry:
         *,
         timeout: float = 60.0,
         interval: float = 2.0,
-        check_names: Optional[list[str]] = None,
+        check_names: list[str] | None = None,
     ) -> bool:
         """
         Wait until all (or specified) critical checks pass.
@@ -321,7 +321,7 @@ class AggregatedHealthResult:
 
     status: HealthStatus
     checks: list[HealthCheckResult] = field(default_factory=list)
-    message: Optional[str] = None
+    message: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -339,7 +339,7 @@ class AggregatedHealthResult:
 # =============================================================================
 
 
-def check_database(url: Optional[str]) -> HealthCheckFn:
+def check_database(url: str | None) -> HealthCheckFn:
     """
     Create a health check for a PostgreSQL database.
 
@@ -417,7 +417,7 @@ def check_database(url: Optional[str]) -> HealthCheckFn:
     return _check
 
 
-def check_redis(url: Optional[str]) -> HealthCheckFn:
+def check_redis(url: str | None) -> HealthCheckFn:
     """
     Create a health check for Redis.
 
@@ -496,7 +496,7 @@ def check_url(
     method: str = "GET",
     expected_status: int = 200,
     timeout: float = 5.0,
-    headers: Optional[dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> HealthCheckFn:
     """
     Create a health check for an HTTP endpoint.

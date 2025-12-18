@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Iterable, Sequence, Union
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -14,11 +14,11 @@ from .uniq import _as_tuple
 ColumnSpec = Union[str, Sequence[str]]
 
 
-def _all_present(data: Dict[str, Any], fields: Sequence[str]) -> bool:
+def _all_present(data: dict[str, Any], fields: Sequence[str]) -> bool:
     return all(f in data for f in fields)
 
 
-def _nice_label(fields: Sequence[str], data: Dict[str, Any]) -> str:
+def _nice_label(fields: Sequence[str], data: dict[str, Any]) -> str:
     if len(fields) == 1:
         f = fields[0]
         return f"{f}={data.get(f)!r}"
@@ -30,10 +30,10 @@ def dedupe_sql_service(
     *,
     unique_cs: Iterable[ColumnSpec] = (),
     unique_ci: Iterable[ColumnSpec] = (),
-    tenant_field: Optional[str] = None,
-    messages: Optional[dict[Tuple[str, ...], str]] = None,
-    pre_create: Optional[Callable[[dict], dict]] = None,
-    pre_update: Optional[Callable[[dict], dict]] = None,
+    tenant_field: str | None = None,
+    messages: dict[tuple[str, ...], str] | None = None,
+    pre_create: Callable[[dict], dict] | None = None,
+    pre_update: Callable[[dict], dict] | None = None,
 ):
     """
     Build a Service subclass with uniqueness pre-checks:
@@ -46,9 +46,9 @@ def dedupe_sql_service(
     messages = messages or {}
 
     def _build_where(
-        spec: Tuple[str, ...], data: Dict[str, Any], *, ci: bool, exclude_id: Any | None
+        spec: tuple[str, ...], data: dict[str, Any], *, ci: bool, exclude_id: Any | None
     ):
-        clauses: List[Any] = []
+        clauses: list[Any] = []
         for col_name in spec:
             col = getattr(Model, col_name)
             val = data.get(col_name)
@@ -74,7 +74,7 @@ def dedupe_sql_service(
         return clauses
 
     async def _precheck(
-        session, data: Dict[str, Any], *, exclude_id: Any | None
+        session, data: dict[str, Any], *, exclude_id: Any | None
     ) -> None:
         # Check CI specs first to catch the broadest conflicts, then CS.
         for ci, spec_list in ((True, unique_ci), (False, unique_cs)):

@@ -2,26 +2,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Protocol
+from typing import Any, Iterable, Protocol
 
 
 @dataclass
 class OutboxMessage:
     id: int
     topic: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     attempts: int = 0
-    processed_at: Optional[datetime] = None
+    processed_at: datetime | None = None
 
 
 class OutboxStore(Protocol):
-    def enqueue(self, topic: str, payload: Dict[str, Any]) -> OutboxMessage:
+    def enqueue(self, topic: str, payload: dict[str, Any]) -> OutboxMessage:
         pass
 
     def fetch_next(
-        self, *, topics: Optional[Iterable[str]] = None
-    ) -> Optional[OutboxMessage]:
+        self, *, topics: Iterable[str] | None = None
+    ) -> OutboxMessage | None:
         """Return the next undispatched, unprocessed message (FIFO per-topic), or None.
 
         Notes:
@@ -42,17 +42,17 @@ class InMemoryOutboxStore:
 
     def __init__(self):
         self._seq = 0
-        self._messages: List[OutboxMessage] = []
+        self._messages: list[OutboxMessage] = []
 
-    def enqueue(self, topic: str, payload: Dict[str, Any]) -> OutboxMessage:
+    def enqueue(self, topic: str, payload: dict[str, Any]) -> OutboxMessage:
         self._seq += 1
         msg = OutboxMessage(id=self._seq, topic=topic, payload=dict(payload))
         self._messages.append(msg)
         return msg
 
     def fetch_next(
-        self, *, topics: Optional[Iterable[str]] = None
-    ) -> Optional[OutboxMessage]:
+        self, *, topics: Iterable[str] | None = None
+    ) -> OutboxMessage | None:
         allowed = set(topics) if topics else None
         for msg in self._messages:
             if msg.processed_at is not None:
@@ -92,13 +92,13 @@ class SqlOutboxStore:
 
     # Placeholders to outline the API; not implemented here.
     def enqueue(
-        self, topic: str, payload: Dict[str, Any]
+        self, topic: str, payload: dict[str, Any]
     ) -> OutboxMessage:  # pragma: no cover - skeleton
         raise NotImplementedError
 
     def fetch_next(
-        self, *, topics: Optional[Iterable[str]] = None
-    ) -> Optional[OutboxMessage]:  # pragma: no cover - skeleton
+        self, *, topics: Iterable[str] | None = None
+    ) -> OutboxMessage | None:  # pragma: no cover - skeleton
         raise NotImplementedError
 
     def mark_processed(self, msg_id: int) -> None:  # pragma: no cover - skeleton

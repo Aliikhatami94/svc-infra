@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 from svc_infra.db.utils import normalize_dir, pascal, plural_snake, snake
 from svc_infra.utils import ensure_init_py, render_template, write
@@ -12,7 +12,7 @@ _INIT_CONTENT_PAIRED = (
 _INIT_CONTENT_MINIMAL = "# package marker; add explicit exports here if desired\n"
 
 
-def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> Dict[str, Any]:
+def _ensure_init_py(dir_path: Path, overwrite: bool, paired: bool) -> dict[str, Any]:
     content = _INIT_CONTENT_PAIRED if paired else _INIT_CONTENT_MINIMAL
     return ensure_init_py(dir_path, overwrite, paired, content)
 
@@ -29,9 +29,9 @@ def scaffold_core(
     entity_name: str = "Item",
     overwrite: bool = False,
     same_dir: bool = False,
-    documents_filename: Optional[str] = None,
-    schemas_filename: Optional[str] = None,
-) -> Dict[str, Any]:
+    documents_filename: str | None = None,
+    schemas_filename: str | None = None,
+) -> dict[str, Any]:
     """Create starter Mongo document model + CRUD schemas."""
 
     documents_dir = normalize_dir(documents_dir)
@@ -80,8 +80,8 @@ def scaffold_documents_core(
     dest_dir: Path | str,
     entity_name: str = "Item",
     overwrite: bool = False,
-    documents_filename: Optional[str] = None,
-) -> Dict[str, Any]:
+    documents_filename: str | None = None,
+) -> dict[str, Any]:
     dest = normalize_dir(dest_dir)
     ent = pascal(entity_name)
     coll = plural_snake(ent)
@@ -102,8 +102,8 @@ def scaffold_schemas_core(
     dest_dir: Path | str,
     entity_name: str = "Item",
     overwrite: bool = False,
-    schemas_filename: Optional[str] = None,
-) -> Dict[str, Any]:
+    schemas_filename: str | None = None,
+) -> dict[str, Any]:
     dest = normalize_dir(dest_dir)
     ent = pascal(entity_name)
     txt = render_template(
@@ -121,9 +121,9 @@ def scaffold_resources_core(
     *,
     dest_dir: Path | str,
     entity_name: str = "Item",
-    filename: Optional[str] = None,  # defaults to "resources.py"
+    filename: str | None = None,  # defaults to "resources.py"
     overwrite: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a starter resources.py with:
       - empty RESOURCES list

@@ -10,11 +10,11 @@ except Exception:  # pragma: no cover - fallback for minimal builds
     OptionalIdentity = None  # type: ignore[misc,assignment]
 
 
-_tenant_resolver: Optional[Callable[..., Any]] = None
+_tenant_resolver: Callable[..., Any] | None = None
 
 
 def set_tenant_resolver(
-    fn: Optional[Callable[..., Any]],
+    fn: Callable[..., Any] | None,
 ) -> None:
     """Set or clear a global override hook for tenant resolution.
 
@@ -33,9 +33,9 @@ async def _maybe_await(x):
 
 async def resolve_tenant_id(
     request: Request,
-    tenant_header: Optional[str] = None,
+    tenant_header: str | None = None,
     identity: Any = Depends(OptionalIdentity) if OptionalIdentity else None,  # type: ignore[arg-type]
-) -> Optional[str]:
+) -> str | None:
     """Resolve tenant id from override, identity, header, or request.state.
 
     Order:
@@ -91,7 +91,7 @@ async def resolve_tenant_id(
 
 
 async def require_tenant_id(
-    tenant_id: Optional[str] = Depends(resolve_tenant_id),
+    tenant_id: str | None = Depends(resolve_tenant_id),
 ) -> str:
     if not tenant_id:
         raise HTTPException(status_code=400, detail="tenant_context_missing")

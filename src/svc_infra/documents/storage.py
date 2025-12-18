@@ -26,7 +26,7 @@ import hashlib
 import mimetypes
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from svc_infra.storage.base import StorageBackend
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 # In-memory metadata storage (production: use SQL database)
 # This is a temporary solution until SQL integration is complete
-_documents_metadata: Dict[str, "Document"] = {}
+_documents_metadata: dict[str, "Document"] = {}
 
 
 async def upload_document(
@@ -43,8 +43,8 @@ async def upload_document(
     user_id: str,
     file: bytes,
     filename: str,
-    metadata: Optional[Dict] = None,
-    content_type: Optional[str] = None,
+    metadata: dict | None = None,
+    content_type: str | None = None,
 ) -> "Document":
     """
     Upload a document with file content to storage backend.
@@ -128,7 +128,7 @@ async def upload_document(
     return doc
 
 
-def get_document(document_id: str) -> Optional["Document"]:
+def get_document(document_id: str) -> "Document" | None:
     """
     Get document metadata by ID.
 
@@ -212,7 +212,7 @@ def list_documents(
     user_id: str,
     limit: int = 100,
     offset: int = 0,
-) -> List["Document"]:
+) -> list["Document"]:
     """
     List user's documents with pagination.
 

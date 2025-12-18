@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 
 from starlette.requests import Request
 
@@ -27,7 +26,7 @@ def compute_cookie_params(request: Request, *, name: str) -> dict:
     st = get_auth_settings()
     cfg_domain = (getattr(st, "session_cookie_domain", "") or "").strip()
 
-    domain: Optional[str] = None
+    domain: str | None = None
     if cfg_domain and not _is_local_host(cfg_domain):
         domain = cfg_domain
 

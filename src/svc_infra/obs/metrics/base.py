@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import Iterable, Optional
+from typing import Iterable
 
 
 class _MissingPrometheus(Exception):
@@ -46,7 +46,7 @@ def _mk_metric(
     ctor_name: str,
     name: str,
     doc: str,
-    labels: Optional[Iterable[str]] = None,
+    labels: Iterable[str] | None = None,
     **kwargs,
 ):
     prom = _prom_mod()
@@ -67,11 +67,11 @@ def _mk_metric(
     return metric
 
 
-def counter(name: str, doc: str, labels: Optional[Iterable[str]] = None):
+def counter(name: str, doc: str, labels: Iterable[str] | None = None):
     return _mk_metric("Counter", name, doc, labels)
 
 
-def gauge(name: str, doc: str, labels: Optional[Iterable[str]] = None, **kw):
+def gauge(name: str, doc: str, labels: Iterable[str] | None = None, **kw):
     # e.g. gauge(..., multiprocess_mode="livesum")
     return _mk_metric("Gauge", name, doc, labels, **kw)
 
@@ -79,8 +79,8 @@ def gauge(name: str, doc: str, labels: Optional[Iterable[str]] = None, **kw):
 def histogram(
     name: str,
     doc: str,
-    labels: Optional[Iterable[str]] = None,
-    buckets: Optional[Iterable[float]] = None,
+    labels: Iterable[str] | None = None,
+    buckets: Iterable[float] | None = None,
 ):
     kwargs = {"buckets": list(buckets) if buckets else None}
     # Remove None so prometheus-client uses its defaults
@@ -88,5 +88,5 @@ def histogram(
     return _mk_metric("Histogram", name, doc, labels, **kwargs)
 
 
-def summary(name: str, doc: str, labels: Optional[Iterable[str]] = None):
+def summary(name: str, doc: str, labels: Iterable[str] | None = None):
     return _mk_metric("Summary", name, doc, labels)

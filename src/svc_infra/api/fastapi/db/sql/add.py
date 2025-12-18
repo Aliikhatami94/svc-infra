@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from typing import Optional, Sequence
+from typing import Sequence
 
 from fastapi import FastAPI
 
@@ -74,7 +74,7 @@ def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
 
 
 def add_sql_db(
-    app: FastAPI, *, url: Optional[str] = None, dsn_env: str = "SQL_URL"
+    app: FastAPI, *, url: str | None = None, dsn_env: str = "SQL_URL"
 ) -> None:
     """Configure DB lifecycle for the app (either explicit URL or from env).
 
@@ -134,7 +134,7 @@ def setup_sql(
     app: FastAPI,
     resources: Sequence[SqlResource],
     *,
-    url: Optional[str] = None,
+    url: str | None = None,
     dsn_env: str = "SQL_URL",
     include_health: bool = True,
     health_prefix: str = "/_sql/health",

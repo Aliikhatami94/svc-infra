@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -27,10 +26,10 @@ def cmd_scaffold(
         "--same-dir/--no-same-dir",
         help="Put documents & schemas into the same directory.",
     ),
-    documents_filename: Optional[str] = typer.Option(
+    documents_filename: str | None = typer.Option(
         None, help="Custom filename for documents (separate-dir mode)."
     ),
-    schemas_filename: Optional[str] = typer.Option(
+    schemas_filename: str | None = typer.Option(
         None, help="Custom filename for schemas (separate-dir mode)."
     ),
 ):
@@ -55,7 +54,7 @@ def cmd_scaffold_documents(
     dest_dir: Path = typer.Option(..., "--dest-dir", resolve_path=True),
     entity_name: str = typer.Option("Item", "--entity-name"),
     overwrite: bool = typer.Option(False, "--overwrite/--no-overwrite"),
-    documents_filename: Optional[str] = typer.Option(
+    documents_filename: str | None = typer.Option(
         None,
         "--documents-filename",
         help="Filename to write (e.g. product_doc.py). Defaults to <snake(entity)>.py",
@@ -75,7 +74,7 @@ def cmd_scaffold_schemas(
     dest_dir: Path = typer.Option(..., "--dest-dir", resolve_path=True),
     entity_name: str = typer.Option("Item", "--entity-name"),
     overwrite: bool = typer.Option(False, "--overwrite/--no-overwrite"),
-    schemas_filename: Optional[str] = typer.Option(
+    schemas_filename: str | None = typer.Option(
         None,
         "--schemas-filename",
         help="Filename to write (e.g. product_schemas.py). Defaults to <snake(entity)>.py",
@@ -98,7 +97,7 @@ def cmd_scaffold_resources(
         "--entity-name",
         help="Used only to prefill example placeholders.",
     ),
-    filename: Optional[str] = typer.Option(
+    filename: str | None = typer.Option(
         None,
         "--filename",
         help='Output filename (default: "resources.py")',

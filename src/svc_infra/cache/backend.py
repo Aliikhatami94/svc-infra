@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from cashews import cache as _cache
 
@@ -42,10 +41,10 @@ def _full_prefix() -> str:
 
 
 def setup_cache(
-    url: Optional[str] = None,
+    url: str | None = None,
     *,
-    prefix: Optional[str] = None,
-    version: Optional[str] = None,
+    prefix: str | None = None,
+    version: str | None = None,
 ):
     """
     Configure Cashews and set a global key prefix for namespacing.

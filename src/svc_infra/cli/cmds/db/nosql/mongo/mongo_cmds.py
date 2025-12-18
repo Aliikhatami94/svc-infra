@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
-from typing import Any, Optional, Sequence
+from typing import Any, Sequence
 
 import typer
 
@@ -17,7 +17,7 @@ from svc_infra.db.nosql.utils import prepare_process_env
 # -------------------- helpers --------------------
 
 
-def _apply_mongo_env(mongo_url: Optional[str], mongo_db: Optional[str]) -> None:
+def _apply_mongo_env(mongo_url: str | None, mongo_db: str | None) -> None:
     """If provided, set MONGO_URL / MONGO_DB for the current process."""
     if mongo_url:
         os.environ["MONGO_URL"] = mongo_url
@@ -63,13 +63,13 @@ def cmd_prepare(
         "--resources",
         help="Dotted path to NoSqlResource(s). e.g. 'app.db.mongo:RESOURCES'",
     ),
-    mongo_url: Optional[str] = typer.Option(
+    mongo_url: str | None = typer.Option(
         None, "--mongo-url", help="Overrides env MONGO_URL for this command."
     ),
-    mongo_db: Optional[str] = typer.Option(
+    mongo_db: str | None = typer.Option(
         None, "--mongo-db", help="Overrides env MONGO_DB for this command."
     ),
-    service_id: Optional[str] = typer.Option(
+    service_id: str | None = typer.Option(
         None,
         "--service-id",
         help="Stable ID for this service/app. Defaults to top-level module name.",
@@ -125,13 +125,13 @@ def cmd_setup_and_prepare(
         "--resources",
         help="Dotted path to NoSqlResource(s). e.g. 'app.db.mongo:RESOURCES'",
     ),
-    mongo_url: Optional[str] = typer.Option(
+    mongo_url: str | None = typer.Option(
         None, "--mongo-url", help="Overrides env MONGO_URL for this command."
     ),
-    mongo_db: Optional[str] = typer.Option(
+    mongo_db: str | None = typer.Option(
         None, "--mongo-db", help="Overrides env MONGO_DB for this command."
     ),
-    service_id: Optional[str] = typer.Option(
+    service_id: str | None = typer.Option(
         None,
         "--service-id",
         help="Stable ID for this service/app. Defaults to top-level module name.",
@@ -157,10 +157,10 @@ def cmd_setup_and_prepare(
 
 
 def cmd_ping(
-    mongo_url: Optional[str] = typer.Option(
+    mongo_url: str | None = typer.Option(
         None, "--mongo-url", help="Overrides env MONGO_URL for this command."
     ),
-    mongo_db: Optional[str] = typer.Option(
+    mongo_db: str | None = typer.Option(
         None, "--mongo-db", help="Overrides env MONGO_DB for this command."
     ),
 ):

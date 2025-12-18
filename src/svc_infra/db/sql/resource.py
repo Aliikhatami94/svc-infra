@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 
 from svc_infra.db.sql.repository import SqlRepository
 
@@ -14,28 +14,28 @@ if TYPE_CHECKING:
 class SqlResource:
     model: type[object]
     prefix: str
-    tags: Optional[list[str]] = None
+    tags: list[str] | None = None
 
     id_attr: str = "id"
     soft_delete: bool = False
-    search_fields: Optional[list[str]] = None
-    ordering_default: Optional[str] = None
-    allowed_order_fields: Optional[list[str]] = None
+    search_fields: list[str] | None = None
+    ordering_default: str | None = None
+    allowed_order_fields: list[str] | None = None
 
-    read_schema: Optional[type] = None
-    create_schema: Optional[type] = None
-    update_schema: Optional[type] = None
+    read_schema: type | None = None
+    create_schema: type | None = None
+    update_schema: type | None = None
 
-    read_name: Optional[str] = None
-    create_name: Optional[str] = None
-    update_name: Optional[str] = None
+    read_name: str | None = None
+    create_name: str | None = None
+    update_name: str | None = None
 
     create_exclude: tuple[str, ...] = ("id",)
 
     # Only a type reference; no runtime dependency on FastAPI layer
-    service_factory: Optional[Callable[[SqlRepository], "SqlService"]] = None
+    service_factory: Callable[[SqlRepository], "SqlService"] | None = None
 
     # Tenancy
-    tenant_field: Optional[str] = (
+    tenant_field: str | None = (
         None  # when set, CRUD router will require TenantId and scope by field
     )

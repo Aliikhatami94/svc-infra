@@ -5,7 +5,7 @@ import warnings
 from enum import StrEnum
 from functools import cache
 from pathlib import Path
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
 from dotenv import load_dotenv
 
@@ -134,7 +134,7 @@ def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
     )
 
 
-def find_env_file(start: Optional[Path] = None) -> Optional[Path]:
+def find_env_file(start: Path | None = None) -> Path | None:
     env_file = os.getenv("APP_ENV_FILE") or os.getenv("SVC_INFRA_ENV_FILE")
     if env_file:
         p = Path(env_file).expanduser()
@@ -148,7 +148,7 @@ def find_env_file(start: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
-def load_env_if_present(path: Optional[Path], *, override: bool = False) -> List[str]:
+def load_env_if_present(path: Path | None, *, override: bool = False) -> list[str]:
     if not path:
         return []
     before = dict(os.environ)

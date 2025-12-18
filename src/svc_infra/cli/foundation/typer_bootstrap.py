@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -12,7 +11,7 @@ from svc_infra.app.root import resolve_project_root
 def pre_cli(app: typer.Typer) -> None:
     @app.callback()
     def _bootstrap(
-        env_file: Optional[Path] = typer.Option(
+        env_file: Path | None = typer.Option(
             None,
             "--env-file",
             dir_okay=False,

@@ -30,7 +30,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 # Type variable for generic model creation
 T = TypeVar("T")
@@ -46,7 +46,7 @@ class CacheEntry:
     """Internal representation of a cached value."""
 
     value: Any
-    expires_at: Optional[float] = None  # Unix timestamp
+    expires_at: float | None = None  # Unix timestamp
 
     def is_expired(self) -> bool:
         """Check if this entry has expired."""
@@ -86,14 +86,14 @@ class MockCache:
             prefix: Key prefix for namespacing (default: "test")
         """
         self.prefix = prefix
-        self._store: Dict[str, CacheEntry] = {}
-        self._tags: Dict[str, set[str]] = {}  # tag -> set of keys
+        self._store: dict[str, CacheEntry] = {}
+        self._tags: dict[str, set[str]] = {}  # tag -> set of keys
 
     def _prefixed_key(self, key: str) -> str:
         """Get the full key with prefix."""
         return f"{self.prefix}:{key}"
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Get a value from the cache.
 
@@ -116,8 +116,8 @@ class MockCache:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        tags: Optional[List[str]] = None,
+        ttl: int | None = None,
+        tags: list[str] | None = None,
     ) -> None:
         """
         Set a value in the cache.
@@ -208,7 +208,7 @@ class MockCache:
         self._store.clear()
         self._tags.clear()
 
-    def keys(self, pattern: str = "*") -> List[str]:
+    def keys(self, pattern: str = "*") -> list[str]:
         """
         Get all keys matching a pattern.
 
@@ -251,14 +251,14 @@ class MockJob:
 
     id: str
     name: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     available_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     attempts: int = 0
     max_attempts: int = 5
     status: str = "pending"  # pending, processing, completed, failed
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    result: Any | None = None
+    error: str | None = None
 
 
 class MockJobQueue:
@@ -294,10 +294,10 @@ class MockJobQueue:
         """
         self.sync_mode = sync_mode
         self._seq = 0
-        self._jobs: List[MockJob] = []
-        self._handlers: Dict[str, Callable[[Dict[str, Any]], Any]] = {}
-        self._completed: List[MockJob] = []
-        self._failed: List[MockJob] = []
+        self._jobs: list[MockJob] = []
+        self._handlers: dict[str, Callable[[dict[str, Any]], Any]] = {}
+        self._completed: list[MockJob] = []
+        self._failed: list[MockJob] = []
 
     def _next_id(self) -> str:
         """Generate next job ID."""
@@ -315,14 +315,14 @@ class MockJobQueue:
             Decorator function
         """
 
-        def decorator(func: Callable[[Dict[str, Any]], Any]) -> Callable:
+        def decorator(func: Callable[[dict[str, Any]], Any]) -> Callable:
             self._handlers[name] = func
             return func
 
         return decorator
 
     def register_handler(
-        self, name: str, handler: Callable[[Dict[str, Any]], Any]
+        self, name: str, handler: Callable[[dict[str, Any]], Any]
     ) -> None:
         """
         Register a job handler function.
@@ -336,7 +336,7 @@ class MockJobQueue:
     def enqueue(
         self,
         name: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         *,
         delay_seconds: int = 0,
         max_attempts: int = 5,
@@ -403,7 +403,7 @@ class MockJobQueue:
                 job.available_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
             return False
 
-    def process_next(self) -> Optional[MockJob]:
+    def process_next(self) -> MockJob | None:
         """
         Process the next available job.
 
@@ -432,17 +432,17 @@ class MockJobQueue:
         return count
 
     @property
-    def jobs(self) -> List[MockJob]:
+    def jobs(self) -> list[MockJob]:
         """Get all pending jobs."""
         return [j for j in self._jobs if j.status == "pending"]
 
     @property
-    def completed_jobs(self) -> List[MockJob]:
+    def completed_jobs(self) -> list[MockJob]:
         """Get all completed jobs."""
         return self._completed.copy()
 
     @property
-    def failed_jobs(self) -> List[MockJob]:
+    def failed_jobs(self) -> list[MockJob]:
         """Get all failed jobs."""
         return self._failed.copy()
 
@@ -452,7 +452,7 @@ class MockJobQueue:
         self._completed.clear()
         self._failed.clear()
 
-    def get_job(self, job_id: str) -> Optional[MockJob]:
+    def get_job(self, job_id: str) -> MockJob | None:
         """
         Get a job by ID.
 
@@ -493,8 +493,8 @@ class UserFixtureData:
     is_active: bool = True
     is_verified: bool = True
     is_superuser: bool = False
-    full_name: Optional[str] = None
-    extra: Dict[str, Any] = field(default_factory=dict)
+    full_name: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -503,9 +503,9 @@ class TenantFixtureData:
 
     id: str = field(default_factory=generate_uuid)
     name: str = field(default_factory=lambda: f"Test Tenant {uuid.uuid4().hex[:6]}")
-    slug: Optional[str] = None
+    slug: str | None = None
     is_active: bool = True
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.slug is None:
@@ -629,7 +629,7 @@ async def create_test_tenant(
 # =============================================================================
 
 
-def pytest_fixtures() -> Dict[str, Callable]:
+def pytest_fixtures() -> dict[str, Callable]:
     """
     Get pytest fixture functions for use in conftest.py.
 

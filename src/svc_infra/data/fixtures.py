@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import inspect
 from pathlib import Path
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Awaitable, Callable, Iterable
 
 
 async def run_fixtures(
     loaders: Iterable[Callable[[], None | Awaitable[None]]],
     *,
-    run_once_file: Optional[str] = None,
+    run_once_file: str | None = None,
 ) -> None:
     """Run a sequence of fixture loaders (sync or async).
 
@@ -29,7 +29,7 @@ async def run_fixtures(
 
 
 def make_on_load_fixtures(
-    *loaders: Callable[[], None | Awaitable[None]], run_once_file: Optional[str] = None
+    *loaders: Callable[[], None | Awaitable[None]], run_once_file: str | None = None
 ) -> Callable[[], Awaitable[None]]:
     """Return an async callable suitable for add_data_lifecycle(on_load_fixtures=...)."""
 

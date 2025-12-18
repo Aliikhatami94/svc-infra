@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import typer
 from sqlalchemy import text
@@ -29,11 +29,11 @@ def export_tenant(
     tenant_field: str = typer.Option(
         "tenant_id", help="Column name for tenant id filter."
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None, "--output", help="Output file; defaults to stdout."
     ),
-    limit: Optional[int] = typer.Option(None, help="Max rows to export."),
-    database_url: Optional[str] = typer.Option(
+    limit: int | None = typer.Option(None, help="Max rows to export."),
+    database_url: str | None = typer.Option(
         None, "--database-url", help="Overrides env SQL_URL for this command."
     ),
 ):

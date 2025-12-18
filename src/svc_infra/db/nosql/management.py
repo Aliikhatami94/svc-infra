@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Type, Union, get_args, get_origin
+from typing import Any, Optional, Union, get_args, get_origin
 
 from bson import ObjectId
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ def _is_objectid_like(annotation: Any) -> bool:
 
 
 def make_document_crud_schemas(
-    document_model: Type[BaseModel],
+    document_model: type[BaseModel],
     *,
     create_exclude: tuple[str, ...] = ("_id",),
     read_name: str | None = None,

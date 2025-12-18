@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from contextvars import ContextVar
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 
@@ -22,7 +22,7 @@ def get_request_id() -> str | None:
     return _request_id_ctx.get()
 
 
-def _merge_request_id_header(headers: Dict[str, str] | None) -> Dict[str, str]:
+def _merge_request_id_header(headers: dict[str, str] | None) -> dict[str, str]:
     """Merge X-Request-Id header into headers dict if request ID is set."""
     result = dict(headers) if headers else {}
     request_id = get_request_id()
@@ -59,9 +59,9 @@ def make_timeout(seconds: float | None = None) -> httpx.Timeout:
 
 def new_httpx_client(
     *,
-    timeout_seconds: Optional[float] = None,
-    headers: Optional[Dict[str, str]] = None,
-    base_url: Optional[str] = None,
+    timeout_seconds: float | None = None,
+    headers: dict[str, str] | None = None,
+    base_url: str | None = None,
     propagate_request_id: bool = True,
     **kwargs: Any,
 ) -> httpx.Client:
@@ -83,9 +83,9 @@ def new_httpx_client(
 
 def new_async_httpx_client(
     *,
-    timeout_seconds: Optional[float] = None,
-    headers: Optional[Dict[str, str]] = None,
-    base_url: Optional[str] = None,
+    timeout_seconds: float | None = None,
+    headers: dict[str, str] | None = None,
+    base_url: str | None = None,
     propagate_request_id: bool = True,
     **kwargs: Any,
 ) -> httpx.AsyncClient:

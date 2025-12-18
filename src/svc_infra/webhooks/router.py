@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -30,7 +30,7 @@ def get_service(
 
 @router.post("/subscriptions")
 def add_subscription(
-    body: Dict[str, Any],
+    body: dict[str, Any],
     subs: InMemoryWebhookSubscriptions = Depends(get_subs),
 ):
     topic = body.get("topic")
@@ -44,7 +44,7 @@ def add_subscription(
 
 @router.post("/test-fire")
 def test_fire(
-    body: Dict[str, Any],
+    body: dict[str, Any],
     svc: WebhookService = Depends(get_service),
 ):
     topic = body.get("topic")

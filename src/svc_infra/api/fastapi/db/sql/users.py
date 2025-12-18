@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Callable, Tuple
+from typing import Any, AsyncIterator, Callable
 from uuid import UUID
 
 from fastapi import Depends
@@ -30,7 +30,7 @@ def get_fastapi_users(
     user_schema_update: Any,
     *,
     public_auth_prefix: str = "/auth",
-) -> Tuple[
+) -> tuple[
     FastAPIUsers,
     AuthenticationBackend,
     DualAPIRouter,

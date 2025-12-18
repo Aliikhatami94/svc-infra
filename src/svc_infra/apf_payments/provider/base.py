@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from ..schemas import (
     BalanceSnapshotOut,
@@ -208,7 +208,7 @@ class ProviderAdapter(Protocol):
         """Optional: if not implemented, the service will list from local DB."""
         pass
 
-    async def get_customer(self, provider_customer_id: str) -> Optional[CustomerOut]:
+    async def get_customer(self, provider_customer_id: str) -> CustomerOut | None:
         pass
 
     # --- Products / Prices ---

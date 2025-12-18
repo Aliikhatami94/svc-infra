@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable
 
 from .queue import JobQueue
 
@@ -22,9 +22,9 @@ class WorkerRunner:
         self._queue = queue
         self._handler = handler
         self._poll_interval = poll_interval
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._stopping = asyncio.Event()
-        self._inflight: Optional[asyncio.Task] = None
+        self._inflight: asyncio.Task | None = None
 
     async def _loop(self) -> None:
         try:

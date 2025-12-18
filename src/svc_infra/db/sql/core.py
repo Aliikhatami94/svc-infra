@@ -5,7 +5,7 @@ import io
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Sequence
 
 from alembic import command
 from alembic.config import Config
@@ -30,7 +30,7 @@ from svc_infra.db.sql.utils import (
 def init_alembic(
     *,
     script_location: str = "migrations",
-    discover_packages: Optional[Sequence[str]] = None,
+    discover_packages: Sequence[str] | None = None,
     overwrite: bool = False,
 ) -> Path:
     """
@@ -157,7 +157,7 @@ def revision(
 def upgrade(
     revision_target: str = "head",
     *,
-    database_url: Optional[str] = None,
+    database_url: str | None = None,
 ) -> dict:
     """
     Apply migrations forward.
@@ -181,7 +181,7 @@ def upgrade(
 def downgrade(
     *,
     revision_target: str = "-1",
-    database_url: Optional[str] = None,
+    database_url: str | None = None,
 ) -> dict:
     """Revert migrations down to the specified revision or relative step.
 
@@ -203,7 +203,7 @@ def downgrade(
 def current(
     verbose: bool = False,
     *,
-    database_url: Optional[str] = None,
+    database_url: str | None = None,
 ) -> dict:
     """Print the current database revision(s)."""
     root = prepare_env()
@@ -224,7 +224,7 @@ def current(
 def history(
     *,
     verbose: bool = False,
-    database_url: Optional[str] = None,
+    database_url: str | None = None,
 ) -> dict:
     """Show the migration history for this project."""
     root = prepare_env()
@@ -245,7 +245,7 @@ def history(
 def stamp(
     *,
     revision_target: str = "head",
-    database_url: Optional[str] = None,
+    database_url: str | None = None,
 ) -> dict:
     """Set the current database revision without running migrations. Useful for marking an existing database as up-to-date."""
     root = prepare_env()
@@ -262,8 +262,8 @@ def stamp(
 
 def merge_heads(
     *,
-    message: Optional[str] = None,
-    database_url: Optional[str] = None,
+    message: str | None = None,
+    database_url: str | None = None,
 ) -> dict:
     """Create a merge revision that joins multiple migration heads."""
     root = prepare_env()
@@ -309,8 +309,8 @@ def setup_and_migrate(
     create_followup_revision: bool = True,
     initial_message: str = "initial schema",
     followup_message: str = "autogen",
-    database_url: Optional[str] = None,
-    discover_packages: Optional[Sequence[str]] = None,
+    database_url: str | None = None,
+    discover_packages: Sequence[str] | None = None,
 ) -> dict:
     """
     Ensure DB + Alembic are ready and up-to-date.

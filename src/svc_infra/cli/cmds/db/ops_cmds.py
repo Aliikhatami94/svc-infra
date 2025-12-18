@@ -10,13 +10,12 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from typing import Optional
 
 import typer
 
 
 def cmd_wait(
-    database_url: Optional[str] = typer.Option(
+    database_url: str | None = typer.Option(
         None,
         "--url",
         "-u",
@@ -106,7 +105,7 @@ def cmd_kill_queries(
         ...,
         help="Table name to find blocking queries for.",
     ),
-    database_url: Optional[str] = typer.Option(
+    database_url: str | None = typer.Option(
         None,
         "--url",
         "-u",

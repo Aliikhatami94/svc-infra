@@ -4,7 +4,6 @@ import os
 from importlib.resources import as_file
 from importlib.resources import files as pkg_files
 from pathlib import Path
-from typing import Dict, List
 
 import click
 import typer
@@ -17,8 +16,8 @@ def _norm(name: str) -> str:
     return name.strip().lower().replace(" ", "-").replace("_", "-")
 
 
-def _discover_fs_topics(docs_dir: Path) -> Dict[str, Path]:
-    topics: Dict[str, Path] = {}
+def _discover_fs_topics(docs_dir: Path) -> dict[str, Path]:
+    topics: dict[str, Path] = {}
     if docs_dir.exists() and docs_dir.is_dir():
         for p in sorted(docs_dir.glob("*.md")):
             if p.is_file():
@@ -26,12 +25,12 @@ def _discover_fs_topics(docs_dir: Path) -> Dict[str, Path]:
     return topics
 
 
-def _discover_pkg_topics() -> Dict[str, Path]:
+def _discover_pkg_topics() -> dict[str, Path]:
     """
     Discover docs shipped inside the installed package at svc_infra/docs/*,
     using importlib.resources so this works for wheels, sdists, and zipped wheels.
     """
-    topics: Dict[str, Path] = {}
+    topics: dict[str, Path] = {}
     try:
         docs_root = pkg_files("svc_infra").joinpath("docs")
         # docs_root is a Traversable; it may be inside a zip. Iterate safely.
@@ -74,8 +73,8 @@ def _resolve_docs_dir(ctx: click.Context) -> Path | None:
 
 
 class DocsGroup(TyperGroup):
-    def list_commands(self, ctx: click.Context) -> List[str]:
-        names: List[str] = list(super().list_commands(ctx) or [])
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        names: list[str] = list(super().list_commands(ctx) or [])
         dir_to_use = _resolve_docs_dir(ctx)
         fs = _discover_fs_topics(dir_to_use) if dir_to_use else {}
         pkg = _discover_pkg_topics()

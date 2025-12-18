@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -44,10 +44,10 @@ class ProviderAccount(ModelBase):
     )
     provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     provider_account_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    access_token: Mapped[Optional[str]] = mapped_column(Text)
-    refresh_token: Mapped[Optional[str]] = mapped_column(Text)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    raw_claims: Mapped[Optional[dict]] = mapped_column(JSON)
+    access_token: Mapped[str | None] = mapped_column(Text)
+    refresh_token: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    raw_claims: Mapped[dict | None] = mapped_column(JSON)
 
     # Bidirectional relationship to User model
     user: Mapped["User"] = relationship(back_populates="provider_accounts")

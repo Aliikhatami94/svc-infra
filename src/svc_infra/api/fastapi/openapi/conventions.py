@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import FastAPI
 
 from .mutators import conventions_mutator
 from .pipeline import apply_mutators
 
-PROBLEM_SCHEMA: Dict[str, Any] = {
+PROBLEM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "type": {
@@ -49,7 +49,7 @@ PROBLEM_SCHEMA: Dict[str, Any] = {
 }
 
 
-def _problem_example(**kw: Any) -> Dict[str, Any]:
+def _problem_example(**kw: Any) -> dict[str, Any]:
     base = {
         "type": "about:blank",
         "title": "Internal Server Error",
@@ -63,7 +63,7 @@ def _problem_example(**kw: Any) -> Dict[str, Any]:
     return base
 
 
-STANDARD_RESPONSES: Dict[str, Dict[str, Any]] = {
+STANDARD_RESPONSES: dict[str, dict[str, Any]] = {
     "BadRequest": {
         "description": "The request is malformed or missing required fields",
         "content": {

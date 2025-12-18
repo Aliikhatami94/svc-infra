@@ -4,7 +4,6 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -71,7 +70,7 @@ async def _wait_for_drain(app: FastAPI, grace: float) -> None:
 
 
 def install_graceful_shutdown(
-    app: FastAPI, *, grace_seconds: Optional[float] = None
+    app: FastAPI, *, grace_seconds: float | None = None
 ) -> None:
     """Install inflight tracking and lifespan hooks to wait for requests to drain.
 

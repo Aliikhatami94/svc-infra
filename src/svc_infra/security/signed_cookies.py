@@ -5,7 +5,7 @@ import hmac
 import json
 import time
 from hashlib import sha256
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 def _b64e(b: bytes) -> str:
@@ -26,12 +26,12 @@ def _now() -> int:
 
 
 def sign_cookie(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     *,
     key: str,
-    expires_in: Optional[int] = None,
-    path: Optional[str] = None,
-    domain: Optional[str] = None,
+    expires_in: int | None = None,
+    path: str | None = None,
+    domain: str | None = None,
 ) -> str:
     """Produce a compact signed cookie value with optional expiry and scope binding.
 
@@ -57,10 +57,10 @@ def verify_cookie(
     value: str,
     *,
     key: str,
-    old_keys: Optional[List[str]] = None,
-    expected_path: Optional[str] = None,
-    expected_domain: Optional[str] = None,
-) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    old_keys: list[str] | None = None,
+    expected_path: str | None = None,
+    expected_domain: str | None = None,
+) -> tuple[bool, dict[str, Any] | None]:
     """Verify a signed cookie against the primary key or any old key.
 
     Returns (ok, payload). If ok is False, payload will be None.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable
 
 COMMON_PASSWORDS = {"password", "123456", "qwerty", "letmein", "admin"}
 
@@ -36,10 +36,10 @@ SYMBOL = re.compile(r"[!@#$%^&*()_+=\-{}\[\]:;,.?/]")
 BreachedChecker = Callable[[str], bool]
 
 
-_breached_checker: Optional[BreachedChecker] = None
+_breached_checker: BreachedChecker | None = None
 
 
-def configure_breached_checker(checker: Optional[BreachedChecker]) -> None:
+def configure_breached_checker(checker: BreachedChecker | None) -> None:
     global _breached_checker
     _breached_checker = checker
 

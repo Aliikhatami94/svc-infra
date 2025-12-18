@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Sequence
+from typing import Any, Sequence
 
 from ..auth.security import (
     AllowIdentity,
@@ -21,7 +21,7 @@ from ..openapi.responses import (
 from .router import DualAPIRouter
 
 
-def _merge(base: Optional[Sequence[Any]], extra: Optional[Sequence[Any]]) -> list[Any]:
+def _merge(base: Sequence[Any] | None, extra: Sequence[Any] | None) -> list[Any]:
     out: list[Any] = []
     if base:
         out.extend(base)
@@ -32,7 +32,7 @@ def _merge(base: Optional[Sequence[Any]], extra: Optional[Sequence[Any]]) -> lis
 
 # PUBLIC (but attach OptionalIdentity for convenience)
 def optional_identity_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     r = DualAPIRouter(dependencies=_merge([AllowIdentity], dependencies), **kwargs)
     apply_default_security(r, default_security=[])  # public looking in docs
@@ -42,7 +42,7 @@ def optional_identity_router(
 
 # PROTECTED: any auth (JWT/cookie OR API key)
 def protected_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     r = DualAPIRouter(dependencies=_merge([RequireIdentity], dependencies), **kwargs)
     apply_default_security(
@@ -59,7 +59,7 @@ def protected_router(
 
 # USER-ONLY (no API-key-only access)
 def user_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     r = DualAPIRouter(dependencies=_merge([RequireUser()], dependencies), **kwargs)
     apply_default_security(
@@ -71,7 +71,7 @@ def user_router(
 
 # SERVICE-ONLY (API key required)
 def service_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     r = DualAPIRouter(dependencies=_merge([RequireService()], dependencies), **kwargs)
     apply_default_security(r, default_security=[{"APIKeyHeader": []}])
@@ -111,7 +111,7 @@ def roles_router(*roles: str, role_resolver=None, **kwargs):
 
 
 def ws_protected_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     """
     Protected WebSocket router - requires valid JWT token.
@@ -141,7 +141,7 @@ def ws_protected_router(
 
 
 def ws_optional_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     """
     Optional auth WebSocket router - allows anonymous connections.
@@ -164,7 +164,7 @@ def ws_optional_router(
 
 
 def ws_user_router(
-    *, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     """
     User-only WebSocket router - requires valid user JWT (no API key).
@@ -189,7 +189,7 @@ def ws_user_router(
 
 
 def ws_scopes_router(
-    *scopes: str, dependencies: Optional[Sequence[Any]] = None, **kwargs: Any
+    *scopes: str, dependencies: Sequence[Any] | None = None, **kwargs: Any
 ) -> DualAPIRouter:
     """
     Scope-gated WebSocket router - requires valid JWT with specific scopes.

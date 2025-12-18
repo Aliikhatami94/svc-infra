@@ -7,7 +7,7 @@ functions.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable
 
 # Function variables so applications/tests can replace them at runtime.
 on_rate_limit_exceeded: Callable[[str, int, int], None] | None = None
@@ -19,7 +19,7 @@ Args:
     retry_after: seconds until next allowed attempt
 """
 
-on_suspect_payload: Callable[[Optional[str], int], None] | None = None
+on_suspect_payload: Callable[[str | None, int], None] | None = None
 """
 Called when a request exceeds the configured size limit.
 Args:
@@ -37,7 +37,7 @@ def emit_rate_limited(key: str, limit: int, retry_after: int) -> None:
             pass
 
 
-def emit_suspect_payload(path: Optional[str], size: int) -> None:
+def emit_suspect_payload(path: str | None, size: int) -> None:
     if on_suspect_payload:
         try:
             on_suspect_payload(path, size)

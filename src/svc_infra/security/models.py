@@ -4,7 +4,6 @@ import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from sqlalchemy import (
     JSON,
@@ -32,12 +31,12 @@ class AuthSession(ModelBase):
     user_id: Mapped[uuid.UUID] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
-    user_agent: Mapped[Optional[str]] = mapped_column(String(512))
-    ip_hash: Mapped[Optional[str]] = mapped_column(String(64), index=True)
-    last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    revoke_reason: Mapped[Optional[str]] = mapped_column(Text)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    user_agent: Mapped[str | None] = mapped_column(String(512))
+    ip_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoke_reason: Mapped[str | None] = mapped_column(Text)
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="session", cascade="all, delete-orphan", lazy="selectin"
@@ -60,10 +59,10 @@ class RefreshToken(ModelBase):
     session: Mapped[AuthSession] = relationship(back_populates="refresh_tokens")
 
     token_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
-    rotated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    revoke_reason: Mapped[Optional[str]] = mapped_column(Text)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoke_reason: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
     )
 
@@ -84,17 +83,17 @@ class RefreshTokenRevocation(ModelBase):
     revoked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    reason: Mapped[Optional[str]] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
 
 
 class FailedAuthAttempt(ModelBase):
     __tablename__ = "failed_auth_attempts"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
     )
-    ip_hash: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    ip_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -122,14 +121,14 @@ class AuditLog(ModelBase):
         default=lambda: datetime.now(timezone.utc),
         index=True,
     )
-    actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
     event_type: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    resource_ref: Mapped[Optional[str]] = mapped_column(String(255), index=True)
+    resource_ref: Mapped[str | None] = mapped_column(String(255), index=True)
     event_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
-    prev_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    prev_hash: Mapped[str | None] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     __table_args__ = (Index("ix_audit_chain", "tenant_id", "id"),)
@@ -143,8 +142,8 @@ class Organization(ModelBase):
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    slug: Mapped[Optional[str]] = mapped_column(String(64), index=True)
-    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    slug: Mapped[str | None] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
     created_at = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -183,7 +182,7 @@ class OrganizationMembership(ModelBase):
         server_default=text("CURRENT_TIMESTAMP"),
         nullable=False,
     )
-    deactivated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         UniqueConstraint("org_id", "user_id", name="uq_org_user_membership"),
@@ -200,10 +199,10 @@ class OrganizationInvitation(ModelBase):
     email: Mapped[str] = mapped_column(String(255), index=True)
     role: Mapped[str] = mapped_column(String(64), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), index=True)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
+    expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
     )
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     created_at = mapped_column(
@@ -211,10 +210,10 @@ class OrganizationInvitation(ModelBase):
         server_default=text("CURRENT_TIMESTAMP"),
         nullable=False,
     )
-    last_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resend_count: Mapped[int] = mapped_column(default=0)
-    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # ------------------------ OAuth Provider Accounts -----------------------------
@@ -235,13 +234,13 @@ def hash_refresh_token(raw: str) -> str:
 
 
 def compute_audit_hash(
-    prev_hash: Optional[str],
+    prev_hash: str | None,
     *,
     ts: datetime,
-    actor_id: Optional[uuid.UUID],
-    tenant_id: Optional[str],
+    actor_id: uuid.UUID | None,
+    tenant_id: str | None,
     event_type: str,
-    resource_ref: Optional[str],
+    resource_ref: str | None,
     metadata: dict,
 ) -> str:
     """Compute SHA256 hash chaining previous hash + canonical event payload."""

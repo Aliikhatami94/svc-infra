@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Iterable
 
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -10,15 +10,15 @@ from fastapi.responses import HTMLResponse
 from svc_infra.app.env import CURRENT_ENVIRONMENT, DEV_ENV, LOCAL_ENV, Environment
 
 # (prefix, swagger_path, redoc_path, openapi_path, title)
-DOC_SCOPES: List[Tuple[str, str, str, str, str]] = []
+DOC_SCOPES: list[tuple[str, str, str, str, str]] = []
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "patch", "options", "head", "trace"}
 
 
 def _path_included(
     path: str,
-    include_prefixes: Optional[Iterable[str]] = None,
-    exclude_prefixes: Optional[Iterable[str]] = None,
+    include_prefixes: Iterable[str] | None = None,
+    exclude_prefixes: Iterable[str] | None = None,
 ) -> bool:
     def _match(pfx: str) -> bool:
         pfx = pfx.rstrip("/") or "/"
@@ -31,7 +31,7 @@ def _path_included(
     return True
 
 
-def _collect_refs(obj, refset: Set[Tuple[str, str]]):
+def _collect_refs(obj, refset: set[tuple[str, str]]):
     if isinstance(obj, dict):
         for k, v in obj.items():
             if k == "$ref" and isinstance(v, str) and v.startswith("#/components/"):
@@ -46,8 +46,8 @@ def _collect_refs(obj, refset: Set[Tuple[str, str]]):
 
 
 def _close_over_component_refs(
-    full_components: Dict, initial: Set[Tuple[str, str]]
-) -> Set[Tuple[str, str]]:
+    full_components: dict, initial: set[tuple[str, str]]
+) -> set[tuple[str, str]]:
     to_visit = list(initial)
     seen = set(initial)
     while to_visit:
@@ -55,7 +55,7 @@ def _close_over_component_refs(
         comp = (full_components or {}).get(section, {}).get(name)
         if not isinstance(comp, dict):
             continue
-        nested: Set[Tuple[str, str]] = set()
+        nested: set[tuple[str, str]] = set()
         _collect_refs(comp, nested)
         for ref in nested:
             if ref not in seen:
@@ -65,11 +65,11 @@ def _close_over_component_refs(
 
 
 def _prune_to_paths(
-    full_schema: Dict,
-    keep_paths: Dict[str, dict],
-    title_suffix: Optional[str],
-    server_prefix: Optional[str] = None,
-) -> Dict:
+    full_schema: dict,
+    keep_paths: dict[str, dict],
+    title_suffix: str | None,
+    server_prefix: str | None = None,
+) -> dict:
     schema = copy.deepcopy(full_schema)
     schema["paths"] = keep_paths
 
@@ -77,9 +77,9 @@ def _prune_to_paths(
     if server_prefix is not None:
         schema["servers"] = [{"url": server_prefix}]
 
-    used_tags: Set[str] = set()
-    direct_refs: Set[Tuple[str, str]] = set()
-    used_security_schemes: Set[str] = set()
+    used_tags: set[str] = set()
+    direct_refs: set[tuple[str, str]] = set()
+    used_security_schemes: set[str] = set()
 
     for path_item in keep_paths.values():
         for method, op in path_item.items():
@@ -95,7 +95,7 @@ def _prune_to_paths(
     comps = schema.get("components") or {}
     all_refs = _close_over_component_refs(comps, direct_refs)
 
-    pruned_components: Dict[str, Dict] = {}
+    pruned_components: dict[str, dict] = {}
     if isinstance(comps, dict):
         for section, items in comps.items():
             keep_names = {name for (sec, name) in all_refs if sec == section}
@@ -123,12 +123,12 @@ def _prune_to_paths(
 
 
 def _build_filtered_schema(
-    full_schema: Dict,
+    full_schema: dict,
     *,
-    include_prefixes: Optional[List[str]] = None,
-    exclude_prefixes: Optional[List[str]] = None,
-    title_suffix: Optional[str] = None,
-) -> Dict:
+    include_prefixes: list[str] | None = None,
+    exclude_prefixes: list[str] | None = None,
+    title_suffix: str | None = None,
+) -> dict:
     paths = full_schema.get("paths", {}) or {}
     keep_paths = {
         p: v
@@ -164,12 +164,12 @@ def _ensure_original_openapi_saved(app: FastAPI) -> None:
         app.state._scoped_original_openapi = app.openapi
 
 
-def _get_full_schema_from_original(app: FastAPI) -> Dict:
+def _get_full_schema_from_original(app: FastAPI) -> dict:
     _ensure_original_openapi_saved(app)
     return copy.deepcopy(app.state._scoped_original_openapi())
 
 
-def _install_root_filter(app: FastAPI, exclude_prefixes: List[str]) -> None:
+def _install_root_filter(app: FastAPI, exclude_prefixes: list[str]) -> None:
     _ensure_original_openapi_saved(app)
     app.state._scoped_root_exclusions = sorted(set(exclude_prefixes))
 
@@ -182,7 +182,7 @@ def _install_root_filter(app: FastAPI, exclude_prefixes: List[str]) -> None:
     setattr(app, "openapi", root_filtered_openapi)
 
 
-def _current_registered_scopes() -> List[str]:
+def _current_registered_scopes() -> list[str]:
     return [scope for (scope, *_rest) in DOC_SCOPES]
 
 
@@ -193,8 +193,8 @@ def _ensure_root_excludes_registered_scopes(app: FastAPI) -> None:
 
 
 def _normalize_envs(
-    envs: Optional[Iterable[Environment | str]],
-) -> Optional[set[Environment]]:
+    envs: Iterable[Environment | str] | None,
+) -> set[Environment] | None:
     if envs is None:
         return None
     out: set[Environment] = set()
@@ -209,7 +209,7 @@ def add_prefixed_docs(
     prefix: str,
     title: str,
     auto_exclude_from_root: bool = True,
-    visible_envs: Optional[Iterable[Environment | str]] = (LOCAL_ENV, DEV_ENV),
+    visible_envs: Iterable[Environment | str] | None = (LOCAL_ENV, DEV_ENV),
 ) -> None:
     scope = prefix.rstrip("/") or "/"
 
@@ -233,7 +233,7 @@ def add_prefixed_docs(
     redoc_path = f"{scope}/redoc"
 
     _ensure_original_openapi_saved(app)
-    _scope_cache: Dict | None = None
+    _scope_cache: dict | None = None
 
     def _scoped_schema():
         nonlocal _scope_cache
@@ -261,6 +261,6 @@ def add_prefixed_docs(
 
 
 def replace_root_openapi_with_exclusions(
-    app: FastAPI, *, exclude_prefixes: List[str]
+    app: FastAPI, *, exclude_prefixes: list[str]
 ) -> None:
     _install_root_filter(app, exclude_prefixes)

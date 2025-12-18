@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional
+from typing import Iterable
 
 FAVICON_DATA_URI = (
     "data:image/svg+xml,"
@@ -14,9 +14,9 @@ FAVICON_DATA_URI = (
 
 @dataclass(frozen=True)
 class DocTargets:
-    swagger: Optional[str] = None
-    redoc: Optional[str] = None
-    openapi_json: Optional[str] = None
+    swagger: str | None = None
+    redoc: str | None = None
+    openapi_json: str | None = None
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ def _btn(label: str, href: str) -> str:
 
 def _card(spec: CardSpec) -> str:
     tag = "/" if spec.tag.strip("/") == "" else f"/{spec.tag.strip('/')}"
-    links: List[str] = []
+    links: list[str] = []
     if spec.docs.swagger:
         links.append(_btn("Swagger", spec.docs.swagger))
     if spec.docs.redoc:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable
 
 from fastapi import FastAPI
 
@@ -13,11 +13,11 @@ def add_data_lifecycle(
     *,
     auto_migrate: bool = True,
     database_url: str | None = None,
-    discover_packages: Optional[list[str]] = None,
+    discover_packages: list[str] | None = None,
     with_payments: bool | None = None,
-    on_load_fixtures: Optional[Callable[[], None]] = None,
-    retention_jobs: Optional[Iterable[Callable[[], None]]] = None,
-    erasure_job: Optional[Callable[[str], None]] = None,
+    on_load_fixtures: Callable[[], None] | None = None,
+    retention_jobs: Iterable[Callable[[], None]] | None = None,
+    erasure_job: Callable[[str], None] | None = None,
 ) -> None:
     """
     Wire data lifecycle conveniences:

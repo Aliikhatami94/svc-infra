@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable
 
 DEFAULT_SENTRIES: tuple[str, ...] = (
     ".git",
@@ -36,7 +36,7 @@ def _is_root_marker(dir_: Path, sentries: Iterable[str]) -> bool:
     return any((dir_ / name).exists() for name in sentries)
 
 
-def _git_toplevel(start: Path) -> Optional[Path]:
+def _git_toplevel(start: Path) -> Path | None:
     try:
         out = subprocess.check_output(
             ["git", "rev-parse", "--show-toplevel"],
@@ -50,7 +50,7 @@ def _git_toplevel(start: Path) -> Optional[Path]:
 
 
 def resolve_project_root(
-    start: Optional[Path] = None,
+    start: Path | None = None,
     *,
     env_var: str = ENV_VAR,
     extra_sentries: Iterable[str] = (),

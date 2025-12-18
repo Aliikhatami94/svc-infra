@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -10,23 +10,23 @@ AmountMinor = Annotated[int, Field(ge=0)]  # minor units (cents)
 
 
 class CustomerUpsertIn(BaseModel):
-    user_id: Optional[str] = None
-    email: Optional[str] = None
-    name: Optional[str] = None
+    user_id: str | None = None
+    email: str | None = None
+    name: str | None = None
 
 
 class CustomerOut(BaseModel):
     id: str
     provider: str
     provider_customer_id: str
-    email: Optional[str] = None
-    name: Optional[str] = None
+    email: str | None = None
+    name: str | None = None
 
 
 class IntentCreateIn(BaseModel):
     amount: AmountMinor = Field(..., description="Minor units (e.g., cents)")
     currency: Currency = Field(..., json_schema_extra={"example": "USD"})
-    description: Optional[str] = None
+    description: str | None = None
     capture_method: Literal["automatic", "manual"] = "automatic"
     payment_method_types: list[str] = Field(
         default_factory=list
@@ -34,8 +34,8 @@ class IntentCreateIn(BaseModel):
 
 
 class NextAction(BaseModel):
-    type: Optional[str] = None
-    data: Optional[dict[str, Any]] = None
+    type: str | None = None
+    data: dict[str, Any] | None = None
 
 
 class IntentOut(BaseModel):
@@ -45,13 +45,13 @@ class IntentOut(BaseModel):
     status: str
     amount: AmountMinor
     currency: Currency
-    client_secret: Optional[str] = None
-    next_action: Optional[NextAction] = None
+    client_secret: str | None = None
+    next_action: NextAction | None = None
 
 
 class RefundIn(BaseModel):
-    amount: Optional[AmountMinor] = None
-    reason: Optional[str] = None
+    amount: AmountMinor | None = None
+    reason: str | None = None
 
 
 class TransactionRow(BaseModel):
@@ -63,9 +63,9 @@ class TransactionRow(BaseModel):
     status: str
     provider: str
     provider_ref: str
-    user_id: Optional[str] = None
-    net: Optional[int] = None
-    fee: Optional[int] = None
+    user_id: str | None = None
+    net: int | None = None
+    fee: int | None = None
 
 
 class StatementRow(BaseModel):
@@ -90,10 +90,10 @@ class PaymentMethodOut(BaseModel):
     provider: str
     provider_customer_id: str
     provider_method_id: str
-    brand: Optional[str] = None
-    last4: Optional[str] = None
-    exp_month: Optional[int] = None
-    exp_year: Optional[int] = None
+    brand: str | None = None
+    last4: str | None = None
+    exp_month: int | None = None
+    exp_year: int | None = None
     is_default: bool = False
 
 
@@ -114,8 +114,8 @@ class PriceCreateIn(BaseModel):
     provider_product_id: str
     currency: Currency
     unit_amount: AmountMinor
-    interval: Optional[Literal["day", "week", "month", "year"]] = None
-    trial_days: Optional[int] = None
+    interval: Literal["day", "week", "month", "year"] | None = None
+    trial_days: int | None = None
     active: bool = True
 
 
@@ -126,8 +126,8 @@ class PriceOut(BaseModel):
     provider_product_id: str
     currency: Currency
     unit_amount: AmountMinor
-    interval: Optional[str] = None
-    trial_days: Optional[int] = None
+    interval: str | None = None
+    trial_days: int | None = None
     active: bool = True
 
 
@@ -135,16 +135,16 @@ class SubscriptionCreateIn(BaseModel):
     customer_provider_id: str
     price_provider_id: str
     quantity: int = 1
-    trial_days: Optional[int] = None
+    trial_days: int | None = None
     proration_behavior: Literal["create_prorations", "none", "always_invoice"] = (
         "create_prorations"
     )
 
 
 class SubscriptionUpdateIn(BaseModel):
-    price_provider_id: Optional[str] = None
-    quantity: Optional[int] = None
-    cancel_at_period_end: Optional[bool] = None
+    price_provider_id: str | None = None
+    quantity: int | None = None
+    cancel_at_period_end: bool | None = None
     proration_behavior: Literal["create_prorations", "none", "always_invoice"] = (
         "create_prorations"
     )
@@ -158,7 +158,7 @@ class SubscriptionOut(BaseModel):
     status: str
     quantity: int
     cancel_at_period_end: bool
-    current_period_end: Optional[str] = None
+    current_period_end: str | None = None
 
 
 class InvoiceCreateIn(BaseModel):
@@ -174,47 +174,47 @@ class InvoiceOut(BaseModel):
     status: str
     amount_due: AmountMinor
     currency: Currency
-    hosted_invoice_url: Optional[str] = None
-    pdf_url: Optional[str] = None
+    hosted_invoice_url: str | None = None
+    pdf_url: str | None = None
 
 
 class CaptureIn(BaseModel):
-    amount: Optional[AmountMinor] = None  # partial capture supported
+    amount: AmountMinor | None = None  # partial capture supported
 
 
 class IntentListFilter(BaseModel):
-    customer_provider_id: Optional[str] = None
-    status: Optional[str] = None
-    limit: Optional[int] = Field(default=50, ge=1, le=200)
-    cursor: Optional[str] = None  # opaque provider cursor when supported
+    customer_provider_id: str | None = None
+    status: str | None = None
+    limit: int | None = Field(default=50, ge=1, le=200)
+    cursor: str | None = None  # opaque provider cursor when supported
 
 
 class UsageRecordIn(BaseModel):
     # Stripe: subscription_item is the target for metered billing.
     # If provider doesn't use subscription_item, allow provider_price_id as fallback.
-    subscription_item: Optional[str] = None
-    provider_price_id: Optional[str] = None
+    subscription_item: str | None = None
+    provider_price_id: str | None = None
     quantity: Annotated[int, Field(ge=0)]
-    timestamp: Optional[int] = None  # Unix seconds; provider defaults to "now"
-    action: Optional[Literal["increment", "set"]] = "increment"
+    timestamp: int | None = None  # Unix seconds; provider defaults to "now"
+    action: Literal["increment", "set"] | None = "increment"
 
 
 class InvoiceLineItemIn(BaseModel):
     customer_provider_id: str
-    description: Optional[str] = None
+    description: str | None = None
     unit_amount: AmountMinor
     currency: Currency
-    quantity: Optional[int] = 1
-    provider_price_id: Optional[str] = (
+    quantity: int | None = 1
+    provider_price_id: str | None = (
         None  # if linked to a price, unit_amount may be ignored
     )
 
 
 class InvoicesListFilter(BaseModel):
-    customer_provider_id: Optional[str] = None
-    status: Optional[str] = None
-    limit: Optional[int] = Field(default=50, ge=1, le=200)
-    cursor: Optional[str] = None
+    customer_provider_id: str | None = None
+    status: str | None = None
+    limit: int | None = Field(default=50, ge=1, le=200)
+    cursor: str | None = None
 
 
 class SetupIntentOut(BaseModel):
@@ -222,8 +222,8 @@ class SetupIntentOut(BaseModel):
     provider: str
     provider_setup_intent_id: str
     status: str
-    client_secret: Optional[str] = None
-    next_action: Optional[NextAction] = None
+    client_secret: str | None = None
+    next_action: NextAction | None = None
 
 
 class DisputeOut(BaseModel):
@@ -232,10 +232,10 @@ class DisputeOut(BaseModel):
     provider_dispute_id: str
     amount: AmountMinor
     currency: Currency
-    reason: Optional[str] = None
+    reason: str | None = None
     status: str
-    evidence_due_by: Optional[str] = None
-    created_at: Optional[str] = None
+    evidence_due_by: str | None = None
+    created_at: str | None = None
 
 
 class PayoutOut(BaseModel):
@@ -245,8 +245,8 @@ class PayoutOut(BaseModel):
     amount: AmountMinor
     currency: Currency
     status: str
-    arrival_date: Optional[str] = None
-    type: Optional[str] = None
+    arrival_date: str | None = None
+    type: str | None = None
 
 
 class BalanceAmount(BaseModel):
@@ -264,7 +264,7 @@ class SetupIntentCreateIn(BaseModel):
 
 
 class WebhookReplayIn(BaseModel):
-    event_ids: Optional[list[str]] = None
+    event_ids: list[str] | None = None
 
 
 class WebhookReplayOut(BaseModel):
@@ -278,36 +278,36 @@ class WebhookAckOut(BaseModel):
 class UsageRecordOut(BaseModel):
     id: str
     quantity: int
-    timestamp: Optional[int] = None
-    subscription_item: Optional[str] = None
-    provider_price_id: Optional[str] = None
-    action: Optional[Literal["increment", "set"]] = None
+    timestamp: int | None = None
+    subscription_item: str | None = None
+    provider_price_id: str | None = None
+    action: Literal["increment", "set"] | None = None
 
 
 # -------- Customers list filter ----------
 class CustomersListFilter(BaseModel):
-    provider: Optional[str] = None
-    user_id: Optional[str] = None
-    limit: Optional[int] = Field(default=50, ge=1, le=200)
-    cursor: Optional[str] = None  # we’ll paginate on provider_customer_id asc
+    provider: str | None = None
+    user_id: str | None = None
+    limit: int | None = Field(default=50, ge=1, le=200)
+    cursor: str | None = None  # we’ll paginate on provider_customer_id asc
 
 
 # -------- Products / Prices updates ----------
 class ProductUpdateIn(BaseModel):
-    name: Optional[str] = None
-    active: Optional[bool] = None
+    name: str | None = None
+    active: bool | None = None
 
 
 class PriceUpdateIn(BaseModel):
-    active: Optional[bool] = None
+    active: bool | None = None
 
 
 # -------- Payment Method update ----------
 class PaymentMethodUpdateIn(BaseModel):
     # keep minimal + commonly supported card fields
-    name: Optional[str] = None
-    exp_month: Optional[int] = None
-    exp_year: Optional[int] = None
+    name: str | None = None
+    exp_month: int | None = None
+    exp_year: int | None = None
     # extend here later with address fields (line1, city, etc.)
 
 
@@ -316,27 +316,27 @@ class RefundOut(BaseModel):
     id: str
     provider: str
     provider_refund_id: str
-    provider_payment_intent_id: Optional[str] = None
+    provider_payment_intent_id: str | None = None
     amount: AmountMinor
     currency: Currency
     status: str
-    reason: Optional[str] = None
-    created_at: Optional[str] = None
+    reason: str | None = None
+    created_at: str | None = None
 
 
 # -------- Invoice line items (list) ----------
 class InvoiceLineItemOut(BaseModel):
     id: str
-    description: Optional[str] = None
+    description: str | None = None
     amount: AmountMinor
     currency: Currency
-    quantity: Optional[int] = 1
-    provider_price_id: Optional[str] = None
+    quantity: int | None = 1
+    provider_price_id: str | None = None
 
 
 # -------- Usage records list/get ----------
 class UsageRecordListFilter(BaseModel):
-    subscription_item: Optional[str] = None
-    provider_price_id: Optional[str] = None
-    limit: Optional[int] = Field(default=50, ge=1, le=200)
-    cursor: Optional[str] = None
+    subscription_item: str | None = None
+    provider_price_id: str | None = None
+    limit: int | None = Field(default=50, ge=1, le=200)
+    cursor: str | None = None

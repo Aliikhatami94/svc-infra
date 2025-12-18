@@ -5,7 +5,6 @@ import hmac
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Type
 
 from sqlalchemy import (
     JSON,
@@ -45,7 +44,7 @@ def _now() -> datetime:
 
 # -------------------- Factory & registry --------------------
 
-_ApiKeyModel: Optional[type] = None
+_ApiKeyModel: type | None = None
 
 
 def get_apikey_model() -> type:
@@ -57,7 +56,7 @@ def get_apikey_model() -> type:
     return _ApiKeyModel
 
 
-def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type:
+def bind_apikey_model(user_model: type, *, table_name: str = "api_keys") -> type:
     """
     Create and register an ApiKey model bound to the provided user_model and table name.
     Call this once during app boot (e.g., inside add_auth_users when enable_api_keys=True).
@@ -143,7 +142,7 @@ def bind_apikey_model(user_model: Type, *, table_name: str = "api_keys") -> type
     return ApiKey
 
 
-def try_autobind_apikey_model(*, require_env: bool = False) -> Optional[type]:
+def try_autobind_apikey_model(*, require_env: bool = False) -> type | None:
     """
     If API keys aren’t bound yet, try to discover the User model and bind.
     - If require_env=True, only bind when AUTH_ENABLE_API_KEYS is truthy.

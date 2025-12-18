@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     JSON,
@@ -32,7 +31,7 @@ class PayCustomer(ModelBase):
     )
 
     # Always typed to match the actual auth PK; FK is enforced at table level
-    user_id: Mapped[Optional[str]] = mapped_column(
+    user_id: Mapped[str | None] = mapped_column(
         user_id_type(), index=True, nullable=True
     )
 
@@ -63,7 +62,7 @@ class PayIntent(ModelBase):
         String(TENANT_ID_LEN), index=True, nullable=False
     )
 
-    user_id: Mapped[Optional[str]] = mapped_column(
+    user_id: Mapped[str | None] = mapped_column(
         user_id_type(), index=True, nullable=True
     )
 
@@ -74,13 +73,13 @@ class PayIntent(ModelBase):
     amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)  # minor units
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     status: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
-    client_secret: Mapped[Optional[str]] = mapped_column(String(255))
+    client_secret: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
         nullable=False,
     )
-    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     captured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     __table_args__ = (
@@ -131,8 +130,8 @@ class LedgerEntry(ModelBase):
     )
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
-    provider_ref: Mapped[Optional[str]] = mapped_column(String(128), index=True)
-    user_id: Mapped[Optional[str]] = mapped_column(
+    provider_ref: Mapped[str | None] = mapped_column(String(128), index=True)
+    user_id: Mapped[str | None] = mapped_column(
         user_id_type(), index=True, nullable=True
     )
     amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
@@ -167,7 +166,7 @@ class PayPaymentMethod(ModelBase):
         String(TENANT_ID_LEN), index=True, nullable=False
     )
 
-    user_id: Mapped[Optional[str]] = mapped_column(
+    user_id: Mapped[str | None] = mapped_column(
         user_id_type(), index=True, nullable=True
     )
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
@@ -177,10 +176,10 @@ class PayPaymentMethod(ModelBase):
     provider_method_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
     )
-    brand: Mapped[Optional[str]] = mapped_column(String(32))
-    last4: Mapped[Optional[str]] = mapped_column(String(8))
-    exp_month: Mapped[Optional[int]] = mapped_column(Numeric(2, 0))
-    exp_year: Mapped[Optional[int]] = mapped_column(Numeric(4, 0))
+    brand: Mapped[str | None] = mapped_column(String(32))
+    last4: Mapped[str | None] = mapped_column(String(8))
+    exp_month: Mapped[int | None] = mapped_column(Numeric(2, 0))
+    exp_year: Mapped[int | None] = mapped_column(Numeric(4, 0))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -241,8 +240,8 @@ class PayPrice(ModelBase):
     unit_amount: Mapped[int] = mapped_column(
         Numeric(18, 0), nullable=False
     )  # minor units
-    interval: Mapped[Optional[str]] = mapped_column(String(16))  # month|year|week|day
-    trial_days: Mapped[Optional[int]] = mapped_column(Numeric(5, 0))
+    interval: Mapped[str | None] = mapped_column(String(16))  # month|year|week|day
+    trial_days: Mapped[int | None] = mapped_column(Numeric(5, 0))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -260,7 +259,7 @@ class PaySubscription(ModelBase):
         String(TENANT_ID_LEN), index=True, nullable=False
     )
 
-    user_id: Mapped[Optional[str]] = mapped_column(
+    user_id: Mapped[str | None] = mapped_column(
         user_id_type(), index=True, nullable=True
     )
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
@@ -280,9 +279,7 @@ class PaySubscription(ModelBase):
     cancel_at_period_end: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
-    current_period_end: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
+    current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -309,7 +306,7 @@ class PayInvoice(ModelBase):
         String(TENANT_ID_LEN), index=True, nullable=False
     )
 
-    user_id: Mapped[Optional[str]] = mapped_column(
+    user_id: Mapped[str | None] = mapped_column(
         user_id_type(), index=True, nullable=True
     )
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
@@ -324,8 +321,8 @@ class PayInvoice(ModelBase):
     )  # draft|open|paid|void|uncollectible
     amount_due: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    hosted_invoice_url: Mapped[Optional[str]] = mapped_column(String(255))
-    pdf_url: Mapped[Optional[str]] = mapped_column(String(255))
+    hosted_invoice_url: Mapped[str | None] = mapped_column(String(255))
+    pdf_url: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -352,7 +349,7 @@ class PaySetupIntent(ModelBase):
         String(TENANT_ID_LEN), index=True, nullable=False
     )
 
-    user_id: Mapped[Optional[str]] = mapped_column(
+    user_id: Mapped[str | None] = mapped_column(
         user_id_type(), index=True, nullable=True
     )
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
@@ -362,7 +359,7 @@ class PaySetupIntent(ModelBase):
     status: Mapped[str] = mapped_column(
         String(32), index=True, nullable=False
     )  # requires_action|succeeded|canceled|processing
-    client_secret: Mapped[Optional[str]] = mapped_column(String(255))
+    client_secret: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -388,14 +385,14 @@ class PayDispute(ModelBase):
     provider_dispute_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
     )
-    provider_charge_id: Mapped[Optional[str]] = mapped_column(String(128), index=True)
+    provider_charge_id: Mapped[str | None] = mapped_column(String(128), index=True)
     amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    reason: Mapped[Optional[str]] = mapped_column(String(64))
+    reason: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(
         String(32), index=True, nullable=False
     )  # needs_response|under_review|won|lost|warning_closed
-    evidence_due_by: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    evidence_due_by: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
@@ -421,8 +418,8 @@ class PayPayout(ModelBase):
     status: Mapped[str] = mapped_column(
         String(32), index=True, nullable=False
     )  # pending|in_transit|paid|canceled|failed
-    arrival_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    type: Mapped[Optional[str]] = mapped_column(String(32))  # bank_account|card|...
+    arrival_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    type: Mapped[str | None] = mapped_column(String(32))  # bank_account|card|...
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Set, Union, cast
+from typing import TYPE_CHECKING, Any, Sequence, cast
 
 from alembic.config import Config
 from dotenv import load_dotenv
@@ -34,7 +34,7 @@ except Exception:  # pragma: no cover - optional env
 
 def prepare_process_env(
     project_root: Path | str,
-    discover_packages: Optional[Sequence[str]] = None,
+    discover_packages: Sequence[str] | None = None,
 ) -> None:
     """
     Prepare process environment so Alembic can import the project cleanly.
@@ -60,7 +60,7 @@ def prepare_process_env(
         os.environ["ALEMBIC_DISCOVER_PACKAGES"] = ",".join(discover_packages)
 
 
-def _read_secret_from_file(path: str) -> Optional[str]:
+def _read_secret_from_file(path: str) -> str | None:
     """Return file contents if path exists, else None."""
     try:
         p = Path(path)
@@ -71,7 +71,7 @@ def _read_secret_from_file(path: str) -> Optional[str]:
     return None
 
 
-def _compose_url_from_parts() -> Optional[str]:
+def _compose_url_from_parts() -> str | None:
     """
     Compose a SQLAlchemy URL from component env vars.
     Supports private DNS hostnames and Unix sockets.
@@ -151,7 +151,7 @@ def get_database_url_from_env(
     required: bool = True,
     env_vars: Sequence[str] = DEFAULT_DB_ENV_VARS,
     normalize: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """
     Resolve the database connection string, with support for:
       - Primary env vars (in order): DEFAULT_DB_ENV_VARS
@@ -263,7 +263,7 @@ def is_async_url(url: URL | str) -> bool:
     return bool(ASYNC_DRIVER_HINT.search(dn))
 
 
-def with_database(url: URL | str, database: Optional[str]) -> URL:
+def with_database(url: URL | str, database: str | None) -> URL:
     """Return a copy of URL with the database name replaced.
 
     Works for most dialects. For SQLite/DuckDB file URLs, `database` is the file path.
@@ -420,9 +420,7 @@ def _certifi_ca() -> str | None:
         return None
 
 
-def build_engine(
-    url: URL | str, echo: bool = False
-) -> Union[SyncEngine, AsyncEngineType]:
+def build_engine(url: URL | str, echo: bool = False) -> SyncEngine | AsyncEngineType:
     u = make_url(url) if isinstance(url, str) else url
 
     # Keep your existing PG helpers
@@ -894,7 +892,7 @@ def repair_alembic_state_if_needed(cfg: Config) -> None:
         return
     script_location = Path(script_location_str)
     versions_dir = script_location / "versions"
-    local_ids: Set[str] = set()
+    local_ids: set[str] = set()
     if versions_dir.exists():
         for p in versions_dir.glob("*.py"):
             try:

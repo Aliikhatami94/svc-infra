@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from .service import NoSqlService
 
@@ -11,8 +11,8 @@ class NoSqlServiceWithHooks(NoSqlService):
     def __init__(
         self,
         repo,
-        pre_create: Optional[PreHook] = None,
-        pre_update: Optional[PreHook] = None,
+        pre_create: PreHook | None = None,
+        pre_update: PreHook | None = None,
     ):
         super().__init__(repo)
         self._pre_create = pre_create

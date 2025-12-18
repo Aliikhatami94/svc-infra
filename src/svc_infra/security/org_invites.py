@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
 try:
     from sqlalchemy import select
@@ -29,7 +29,7 @@ async def issue_invitation(
     org_id: uuid.UUID,
     email: str,
     role: str,
-    created_by: Optional[uuid.UUID] = None,
+    created_by: uuid.UUID | None = None,
     ttl_hours: int = 72,
 ) -> tuple[str, OrganizationInvitation]:
     """Create a new invitation; revoke any existing active invites for the same email+org."""

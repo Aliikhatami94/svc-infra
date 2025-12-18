@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
 
 from ..settings import get_payments_settings
 from .base import ProviderAdapter
@@ -8,12 +7,12 @@ from .base import ProviderAdapter
 
 class ProviderRegistry:
     def __init__(self):
-        self._adapters: Dict[str, ProviderAdapter] = {}
+        self._adapters: dict[str, ProviderAdapter] = {}
 
     def register(self, adapter: ProviderAdapter):
         self._adapters[adapter.name] = adapter
 
-    def get(self, name: Optional[str] = None) -> ProviderAdapter:
+    def get(self, name: str | None = None) -> ProviderAdapter:
         settings = get_payments_settings()
         key = (name or settings.default_provider).lower()
         if key not in self._adapters:
@@ -21,7 +20,7 @@ class ProviderRegistry:
         return self._adapters[key]
 
 
-_REGISTRY: Optional[ProviderRegistry] = None
+_REGISTRY: ProviderRegistry | None = None
 
 
 def get_provider_registry() -> ProviderRegistry:

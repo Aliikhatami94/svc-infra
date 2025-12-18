@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 try:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,9 +24,9 @@ async def issue_session_and_refresh(
     db: AsyncSession,
     *,
     user_id: uuid.UUID,
-    tenant_id: Optional[str] = None,
-    user_agent: Optional[str] = None,
-    ip_hash: Optional[str] = None,
+    tenant_id: str | None = None,
+    user_agent: str | None = None,
+    ip_hash: str | None = None,
     ttl_minutes: int = DEFAULT_REFRESH_TTL_MINUTES,
 ) -> tuple[str, RefreshToken]:
     """Persist a new AuthSession + initial RefreshToken and return raw refresh token.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import List, Optional
 
 from pydantic import AnyHttpUrl, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,7 +18,7 @@ class JWTSettings(BaseModel):
     secret: SecretStr
     lifetime_seconds: int = 60 * 60 * 24 * 7
     # Optional older secrets accepted for verification during rotation window
-    old_secrets: List[SecretStr] = Field(default_factory=list)
+    old_secrets: list[SecretStr] = Field(default_factory=list)
 
 
 class PasswordClient(BaseModel):
@@ -29,10 +28,10 @@ class PasswordClient(BaseModel):
 
 class AuthSettings(BaseSettings):
     # ---- JWT ----
-    jwt: Optional[JWTSettings] = None
+    jwt: JWTSettings | None = None
 
     # ---- Password login ----
-    password_clients: List[PasswordClient] = Field(default_factory=list)
+    password_clients: list[PasswordClient] = Field(default_factory=list)
     require_client_secret_on_password_login: bool = False
 
     # ---- MFA / TOTP ----
@@ -50,26 +49,26 @@ class AuthSettings(BaseSettings):
     email_otp_attempts: int = 5
 
     # ---- Email/SMTP (verification, reset, etc.) ----
-    smtp_host: Optional[str] = None
+    smtp_host: str | None = None
     smtp_port: int = 587
-    smtp_username: Optional[str] = None
-    smtp_password: Optional[SecretStr] = None
-    smtp_from: Optional[str] = None
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str | None = None
 
     # Dev convenience: auto-verify users without sending email
     auto_verify_in_dev: bool = True
 
     # ---- Built-in provider creds (optional) ----
-    google_client_id: Optional[str] = None
-    google_client_secret: Optional[SecretStr] = None
-    github_client_id: Optional[str] = None
-    github_client_secret: Optional[SecretStr] = None
-    ms_client_id: Optional[str] = None
-    ms_client_secret: Optional[SecretStr] = None
-    ms_tenant: Optional[str] = None
-    li_client_id: Optional[str] = None
-    li_client_secret: Optional[SecretStr] = None
-    oidc_providers: List[OIDCProvider] = Field(default_factory=list)
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    github_client_id: str | None = None
+    github_client_secret: SecretStr | None = None
+    ms_client_id: str | None = None
+    ms_client_secret: SecretStr | None = None
+    ms_tenant: str | None = None
+    li_client_id: str | None = None
+    li_client_secret: SecretStr | None = None
+    oidc_providers: list[OIDCProvider] = Field(default_factory=list)
 
     # ---- Redirect + cookie settings ----
     post_login_redirect: AnyHttpUrl | str = "http://localhost:3000/app"
@@ -79,7 +78,7 @@ class AuthSettings(BaseSettings):
     auth_cookie_name: str = "svc_auth"
     session_cookie_secure: bool = False
     session_cookie_samesite: str = "lax"
-    session_cookie_domain: Optional[str] = None
+    session_cookie_domain: str | None = None
     session_cookie_max_age_seconds: int = 60 * 60 * 4
 
     model_config = SettingsConfigDict(
