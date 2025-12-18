@@ -47,7 +47,7 @@ def test_circuit_breaker_dependency():
     app = FastAPI()
 
     @app.get("/ok", dependencies=[Depends(circuit_breaker_dependency())])
-    async def ok():  # noqa: D401, ANN201
+    async def ok():
         return {"ok": True}
 
     with TestClient(app) as client:

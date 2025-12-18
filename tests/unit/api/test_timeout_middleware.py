@@ -56,7 +56,7 @@ async def test_body_read_timeout_returns_408_problem():
     app.add_middleware(BodyReadTimeoutMiddleware, timeout_seconds=0.05)
 
     @app.post("/echo")
-    async def _accept(payload: dict):  # noqa: ANN001
+    async def _accept(payload: dict):
         return {"ok": True, "payload": payload}
 
     # Create an async client backed by ASGITransport so we can stream request body slowly
@@ -70,9 +70,7 @@ async def test_body_read_timeout_returns_408_problem():
             await asyncio.sleep(0.2)
             yield b"1}"
 
-        r = await client.post(
-            "/echo", content=gen(), headers={"content-type": "application/json"}
-        )
+        r = await client.post("/echo", content=gen(), headers={"content-type": "application/json"})
         assert r.status_code == 408
         body = r.json()
         assert body.get("title") == "Request Timeout"

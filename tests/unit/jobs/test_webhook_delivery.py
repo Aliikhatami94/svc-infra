@@ -68,7 +68,7 @@ async def test_webhook_delivery_success(monkeypatch):
     assert ok is True
     # delivered
     assert len(fake.calls) == 1
-    url, body, headers = fake.calls[0]
+    _url, _body, headers = fake.calls[0]
     assert headers.get("X-Event-Id") == str(msg.id)
     assert headers.get("X-Topic") == msg.topic
     assert headers.get("X-Attempt") == "1"

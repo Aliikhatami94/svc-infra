@@ -118,7 +118,7 @@ async def test_webhooks_e2e_publish_to_delivery_retry(monkeypatch):
     assert ok2 is True
 
     # Verify outbox processed
-    msg = [m for m in outbox._messages if m.id == outbox_id][0]
+    msg = next(m for m in outbox._messages if m.id == outbox_id)
     assert msg.processed_at is not None
     # Verify we had exactly two HTTP calls
     assert flaky.calls == 2

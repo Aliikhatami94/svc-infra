@@ -10,7 +10,7 @@ os.environ.setdefault("APP_SECRET", "acceptance-test-only-app-secret")
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from urllib.parse import urlparse
 
@@ -97,9 +97,7 @@ from svc_infra.webhooks.signing import verify_any
 # Minimal acceptance app wiring the library's routers and defaults
 os.environ.setdefault("PAYMENTS_PROVIDER", "fake")
 
-payments_settings._SETTINGS = payments_settings.PaymentsSettings(
-    default_provider="fake"
-)
+payments_settings._SETTINGS = payments_settings.PaymentsSettings(default_provider="fake")
 # Provide a tiny SQLite engine so db_pool_* metrics are bound during acceptance
 _engine = create_engine("sqlite:///:memory:")
 # Trigger a connection once so pool metrics initialize label series
@@ -212,9 +210,7 @@ async def _slow_body(request: Request):
     """
     # Heuristic: generators in the test client are sent with Transfer-Encoding: chunked
     is_chunked = request.headers.get("transfer-encoding", "").lower() == "chunked"
-    missing_length = "content-length" not in {
-        k.lower(): v for k, v in request.headers.items()
-    }
+    missing_length = "content-length" not in {k.lower(): v for k, v in request.headers.items()}
     if is_chunked or missing_length:
         trace_id = None
         for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
@@ -318,9 +314,7 @@ class FakeAdapter(ProviderAdapter):
         self._methods.setdefault(cid, [])
         return out
 
-    async def attach_payment_method(
-        self, data: PaymentMethodAttachIn
-    ) -> PaymentMethodOut:  # type: ignore[override]
+    async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:  # type: ignore[override]
         mid = f"pm_{len(self._methods.get(data.customer_provider_id, [])) + 1}"
         out = PaymentMethodOut(
             id=mid,
@@ -341,14 +335,10 @@ class FakeAdapter(ProviderAdapter):
         lst.append(out)
         return out
 
-    async def list_payment_methods(
-        self, provider_customer_id: str
-    ) -> list[PaymentMethodOut]:  # type: ignore[override]
+    async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:  # type: ignore[override]
         return list(self._methods.get(provider_customer_id, []))
 
-    async def create_intent(
-        self, data: IntentCreateIn, *, user_id: str | None
-    ) -> IntentOut:  # type: ignore[override]
+    async def create_intent(self, data: IntentCreateIn, *, user_id: str | None) -> IntentOut:  # type: ignore[override]
         iid = f"pi_{len(self._intents) + 1}"
         out = IntentOut(
             id=iid,
@@ -376,16 +366,12 @@ class FakeAdapter(ProviderAdapter):
         m = await self.get_payment_method(provider_method_id)
         return m
 
-    async def get_intent(
-        self, provider_intent_id: str
-    ) -> IntentOut:  # non-protocol helper
+    async def get_intent(self, provider_intent_id: str) -> IntentOut:  # non-protocol helper
         return await self.hydrate_intent(provider_intent_id)
 
 
 # Install payments under /payments using the fake adapter (skip default provider registration).
-add_payments(
-    app, prefix="/payments", register_default_providers=False, adapters=[FakeAdapter()]
-)
+add_payments(app, prefix="/payments", register_default_providers=False, adapters=[FakeAdapter()])
 
 # Mount internal billing router under /_billing for acceptance smoke tests
 _add_billing(app)
@@ -738,7 +724,7 @@ async def _dl_reset():
 
 @_dl_router.post("/fixtures/run-once")
 async def run_fixtures_once():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     # Simulate fixture loader that inserts a default user only once
     # Defensive: ensure tables exist (idempotent)
@@ -753,7 +739,7 @@ async def run_fixtures_once():
                 _users.insert().values(
                     id="u1",
                     email="alpha@example.com",
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                     deleted_at=None,
                 )
             )
@@ -763,9 +749,7 @@ async def run_fixtures_once():
 
     # Return all users for visibility
     with _dl_engine.begin() as conn:
-        rows = conn.execute(
-            select(_users.c.id, _users.c.email, _users.c.deleted_at)
-        ).all()
+        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
         return {"users": [dict(r._mapping) for r in rows]}
 
 
@@ -797,7 +781,7 @@ async def run_erasure_endpoint(principal_id: str = Body(..., embed=True)):
 async def run_retention_purge_endpoint(
     days: int = Body(30, embed=True), hard: bool = Body(False, embed=True)
 ):
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from svc_infra.data.retention import RetentionPolicy, run_retention_purge
 
@@ -808,7 +792,7 @@ async def run_retention_purge_endpoint(
         pass
 
     # Seed: ensure we have a mix of old/new rows
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with _dl_engine.begin() as conn:
         # Insert two users if table is empty
         count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0
@@ -858,9 +842,7 @@ async def run_retention_purge_endpoint(
     affected = await run_retention_purge(_SyncToAsyncSession(_dl_engine), [policy])
     # Return current table state for visibility
     with _dl_engine.begin() as conn:
-        rows = conn.execute(
-            select(_users.c.id, _users.c.email, _users.c.deleted_at)
-        ).all()
+        rows = conn.execute(select(_users.c.id, _users.c.email, _users.c.deleted_at)).all()
         return {"affected": affected, "users": [dict(r._mapping) for r in rows]}
 
 
@@ -1092,7 +1074,7 @@ async def _accept_mfa_confirm(payload: dict = Body(...), request: Request = None
     codes = [_gen_code() for _ in range(8)]
     user.mfa_recovery = [_hash_val(c) for c in codes]
     user.mfa_enabled = True
-    user.mfa_confirmed_at = datetime.now(timezone.utc)
+    user.mfa_confirmed_at = datetime.now(UTC)
     return {"codes": codes}
 
 
@@ -1146,7 +1128,7 @@ async def _accept_login(request: Request):
         raise HTTPException(400, "LOGIN_BAD_CREDENTIALS")
     user = _users_by_id.get(uid)
     # Pre-check lockout by IP and user
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ip_hash = _hash_ip(request.client.host if request.client else None)
     u_list = _failures_by_user.setdefault(uid, [])
     i_list = _failures_by_ip.setdefault(ip_hash, [])
@@ -1254,19 +1236,13 @@ def _require_current_user(request: Request) -> _AUser:
 @_auth_router.post("/keys", status_code=201)
 async def _accept_apikey_create(request: Request, payload: dict = Body(...)):
     user = _require_current_user(request)
-    owner_id = (
-        uuid.UUID(str(payload.get("user_id"))) if payload.get("user_id") else user.id
-    )
+    owner_id = uuid.UUID(str(payload.get("user_id"))) if payload.get("user_id") else user.id
     if owner_id != user.id and not user.is_superuser:
         raise HTTPException(403, "forbidden")
     name = (payload.get("name") or "").strip() or "Key"
     scopes = list(payload.get("scopes") or [])
     ttl_hours = payload.get("ttl_hours", 24 * 365)
-    expires = (
-        (datetime.now(timezone.utc) + timedelta(hours=int(ttl_hours)))
-        if ttl_hours
-        else None
-    )
+    expires = (datetime.now(UTC) + timedelta(hours=int(ttl_hours))) if ttl_hours else None
     row = _AApiKey(user_id=owner_id, name=name, scopes=scopes, expires_at=expires)
     _keys_by_id[row.id] = row
     _keys_by_user.setdefault(owner_id, []).append(row.id)
@@ -1414,9 +1390,7 @@ _rate_limit_events: list[dict] = []
 
 
 def _record_rate_limit_event(key: str, limit: int, retry_after: int) -> None:
-    _rate_limit_events.append(
-        {"key": key, "limit": int(limit), "retry_after": int(retry_after)}
-    )
+    _rate_limit_events.append({"key": key, "limit": int(limit), "retry_after": int(retry_after)})
 
 
 @_abuse.post("/hooks/rate-limit/enable")
@@ -1549,7 +1523,7 @@ def _accept_jobs_reset():
     try:
         # Clear any pending jobs in the in-memory queue
         if hasattr(_queue, "_jobs"):
-            getattr(_queue, "_jobs").clear()
+            _queue._jobs.clear()
     except Exception:
         pass
 
@@ -1667,7 +1641,7 @@ async def jobs_make_due(payload: dict = Body(...)):
     target_id = payload.get("id")
     count = 0
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for j in getattr(_queue, "_jobs", []):
             if not target_id or j.id == str(target_id):
                 j.available_at = now  # type: ignore[assignment]
@@ -1760,9 +1734,7 @@ def _should_use_asgi_transport(url: str) -> bool:
 async def _local_post(url: str, json_body: dict, headers: dict) -> httpx.Response:
     # Use ASGITransport to avoid real network when targeting testserver
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://testserver"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         # Strip scheme+host if present to avoid double host
         path = urlparse(url).path or "/"
         return await client.post(path, json=json_body, headers=headers)
@@ -1812,10 +1784,7 @@ async def _accept_webhook_delivery(job: Job) -> None:
     }
     if subscription_id:
         headers["X-Webhook-Subscription"] = str(subscription_id)
-    if (
-        isinstance(delivery_payload, dict)
-        and delivery_payload.get("version") is not None
-    ):
+    if isinstance(delivery_payload, dict) and delivery_payload.get("version") is not None:
         headers["X-Payload-Version"] = str(delivery_payload.get("version"))
     # Post using ASGI when targeting testserver, else real HTTP
     if _should_use_asgi_transport(url):
@@ -1824,9 +1793,7 @@ async def _accept_webhook_delivery(job: Job) -> None:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(url, json=delivery_payload, headers=headers)
     if 200 <= resp.status_code < 300:
-        app.state.webhooks_inbox.mark_if_new(
-            f"webhook:{outbox_id}", ttl_seconds=24 * 3600
-        )
+        app.state.webhooks_inbox.mark_if_new(f"webhook:{outbox_id}", ttl_seconds=24 * 3600)
         app.state.webhooks_outbox.mark_processed(int(outbox_id))
         return
     raise RuntimeError(f"webhook delivery failed: {resp.status_code}")
@@ -1863,8 +1830,8 @@ async def webhook_receiver(payload: dict = Body(...), request: Request = None):
     _wh_deliveries.append(
         {
             "payload": dict(payload),
-            "headers": {k: v for k, v in request.headers.items()},
-            "at": datetime.now(timezone.utc).isoformat(),
+            "headers": dict(request.headers.items()),
+            "at": datetime.now(UTC).isoformat(),
         }
     )
     return {"ok": True}

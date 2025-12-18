@@ -7,7 +7,7 @@ from svc_infra.cli.__init__ import app
 called = {"seed": 0}
 
 
-def my_seed():  # noqa: D401, ANN201
+def my_seed():
     called["seed"] += 1
 
 

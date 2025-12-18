@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -50,9 +50,7 @@ async def test_billing_aggregate_job_emits_webhook(monkeypatch):
 
     outbox = InMemoryOutboxStore()
     subs = InMemoryWebhookSubscriptions()
-    subs.add(
-        "billing.usage_aggregated", url="https://example.test/hook", secret="sekrit"
-    )
+    subs.add("billing.usage_aggregated", url="https://example.test/hook", secret="sekrit")
     webhooks = WebhookService(outbox=outbox, subs=subs)
 
     # Spy on publish
@@ -65,15 +63,13 @@ async def test_billing_aggregate_job_emits_webhook(monkeypatch):
 
     webhooks.publish = _spy_publish  # type: ignore[method-assign]
 
-    handler = make_billing_job_handler(
-        session_factory=_dummy_session_factory, webhooks=webhooks
-    )
+    handler = make_billing_job_handler(session_factory=_dummy_session_factory, webhooks=webhooks)
 
     queue = InMemoryJobQueue()
     payload = {
         "tenant_id": "t1",
         "metric": "tokens",
-        "day_start": datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat(),
+        "day_start": datetime(2025, 1, 1, tzinfo=UTC).isoformat(),
     }
     queue.enqueue(BILLING_AGGREGATE_JOB, payload)
 
@@ -120,15 +116,13 @@ async def test_billing_invoice_job_emits_webhook(monkeypatch):
 
     webhooks.publish = _spy_publish  # type: ignore[method-assign]
 
-    handler = make_billing_job_handler(
-        session_factory=_dummy_session_factory, webhooks=webhooks
-    )
+    handler = make_billing_job_handler(session_factory=_dummy_session_factory, webhooks=webhooks)
 
     queue = InMemoryJobQueue()
     payload = {
         "tenant_id": "t1",
-        "period_start": datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat(),
-        "period_end": datetime(2025, 2, 1, tzinfo=timezone.utc).isoformat(),
+        "period_start": datetime(2025, 1, 1, tzinfo=UTC).isoformat(),
+        "period_end": datetime(2025, 2, 1, tzinfo=UTC).isoformat(),
         "currency": "usd",
     }
     queue.enqueue(BILLING_INVOICE_JOB, payload)

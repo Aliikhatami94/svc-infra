@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -221,7 +221,7 @@ class TestMockJobQueue:
         """Delayed jobs are not immediately available."""
         queue = MockJobQueue()
         job = queue.enqueue("delayed", {}, delay_seconds=3600)
-        assert job.available_at > datetime.now(timezone.utc)
+        assert job.available_at > datetime.now(UTC)
 
     def test_handler_decorator(self):
         """Handler decorator registers function."""

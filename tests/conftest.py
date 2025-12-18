@@ -15,14 +15,13 @@ Fixtures are organized by category:
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-
 
 # =============================================================================
 # PYTEST CONFIGURATION
@@ -92,7 +91,7 @@ class MockDatabaseSession:
     """
 
     def __init__(self):
-        self._data: Dict[str, Any] = {}
+        self._data: dict[str, Any] = {}
         self._queries: list = []
 
     async def execute(self, query):
@@ -357,9 +356,7 @@ def setup_auth_mocks(app: FastAPI, mocker, user=None, api_key=None, principal=No
     app.dependency_overrides[_current_principal] = _mock_principal
     app.dependency_overrides[_optional_principal] = _mock_optional_principal
     app.dependency_overrides[resolve_api_key] = _mock_resolve_api_key
-    app.dependency_overrides[resolve_bearer_or_cookie_principal] = (
-        _mock_resolve_bearer_or_cookie
-    )
+    app.dependency_overrides[resolve_bearer_or_cookie_principal] = _mock_resolve_bearer_or_cookie
 
     return user, api_key, principal
 
@@ -472,9 +469,7 @@ def local_env(monkeypatch):
     """
     from svc_infra.app import env as env_mod
 
-    monkeypatch.setattr(
-        env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False
-    )
+    monkeypatch.setattr(env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False)
 
 
 # =============================================================================
@@ -483,7 +478,7 @@ def local_env(monkeypatch):
 
 
 @pytest.fixture
-def sample_user_data() -> Dict[str, Any]:
+def sample_user_data() -> dict[str, Any]:
     """Provide sample user data for testing."""
     return {
         "id": "user_123",
@@ -494,7 +489,7 @@ def sample_user_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_tenant_data() -> Dict[str, Any]:
+def sample_tenant_data() -> dict[str, Any]:
     """Provide sample tenant data for testing."""
     return {
         "id": "tenant_123",
@@ -505,7 +500,7 @@ def sample_tenant_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_api_response_data() -> Dict[str, Any]:
+def sample_api_response_data() -> dict[str, Any]:
     """Provide sample API response data for testing."""
     return {
         "user": {

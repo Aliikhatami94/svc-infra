@@ -27,7 +27,7 @@ def test_add_docs_landing_falls_back_when_root_taken():
     app = FastAPI(title="Demo", version="0.1.0")
 
     @app.get("/")
-    def hello():  # noqa: D401, ANN202
+    def hello():
         return {"ok": True}
 
     add_docs(app, swagger_url="/swagger", redoc_url="/redocx", openapi_url="/spec.json")

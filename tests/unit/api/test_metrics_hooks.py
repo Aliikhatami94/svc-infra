@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from fastapi import FastAPI
 from starlette.testclient import TestClient
@@ -14,15 +14,13 @@ from svc_infra.api.fastapi.middleware.request_size_limit import (
 
 def test_emit_rate_limited_hook_called(monkeypatch):
     app = FastAPI()
-    app.add_middleware(
-        SimpleRateLimitMiddleware, limit=1, window=5, key_fn=lambda r: "k"
-    )
+    app.add_middleware(SimpleRateLimitMiddleware, limit=1, window=5, key_fn=lambda r: "k")
 
     @app.get("/ping")
     def ping():
         return {"ok": True}
 
-    captured: List[Tuple[str, int, int]] = []
+    captured: list[tuple[str, int, int]] = []
 
     def capture(key: str, limit: int, retry_after: int) -> None:
         captured.append((key, limit, retry_after))
@@ -50,7 +48,7 @@ def test_emit_suspect_payload_hook_called(monkeypatch):
     def echo(body: dict):
         return body
 
-    captured2: List[Tuple[Optional[str], int]] = []
+    captured2: list[tuple[Optional[str], int]] = []
 
     def capture2(path: Optional[str], size: int) -> None:
         captured2.append((path, size))

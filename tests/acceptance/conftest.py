@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 import httpx
 import pytest
@@ -119,7 +120,7 @@ def client() -> Generator[httpx.Client, None, None]:
                             timeout=2.0,
                         )
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # Tasks didn't complete in time, force close
             # Stop the loop to clear any lingering callbacks
             loop.stop()
@@ -193,11 +194,9 @@ def _acceptance_app_ready():
             # Use wait_for with timeout to prevent infinite hang
             try:
                 loop.run_until_complete(
-                    asyncio.wait_for(
-                        asyncio.gather(*pending, return_exceptions=True), timeout=2.0
-                    )
+                    asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True), timeout=2.0)
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # Tasks didn't complete in time, force close
         # Stop the loop to clear any lingering callbacks
         loop.stop()

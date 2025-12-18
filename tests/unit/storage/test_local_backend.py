@@ -73,7 +73,7 @@ class TestLocalBackend:
         meta_path = backend._get_metadata_path("test/file.txt")
         assert meta_path.exists()
 
-        with open(meta_path, "r") as f:
+        with open(meta_path) as f:
             metadata = json.load(f)
 
         assert metadata["user_id"] == "user_123"

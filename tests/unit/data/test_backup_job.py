@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -14,7 +14,7 @@ pytestmark = pytest.mark.data_lifecycle
 
 
 def test_make_backup_verification_job_calls_on_report():
-    last = datetime.now(timezone.utc) - timedelta(hours=2)
+    last = datetime.now(UTC) - timedelta(hours=2)
 
     def checker():
         return verify_backups(last_success=last, retention_days=1)

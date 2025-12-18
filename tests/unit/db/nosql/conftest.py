@@ -4,8 +4,8 @@ NoSQL database test fixtures and configuration.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -22,10 +22,10 @@ class UserDocumentModel:
         self.email = kwargs.get("email")
         self.name = kwargs.get("name")
         self.is_active = kwargs.get("is_active", True)
-        self.created_at = kwargs.get("created_at", datetime.now(timezone.utc))
-        self.updated_at = kwargs.get("updated_at", datetime.now(timezone.utc))
+        self.created_at = kwargs.get("created_at", datetime.now(UTC))
+        self.updated_at = kwargs.get("updated_at", datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert document to dictionary."""
         return {
             "id": self.id,
@@ -37,7 +37,7 @@ class UserDocumentModel:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UserDocumentModel":
+    def from_dict(cls, data: dict[str, Any]) -> UserDocumentModel:
         """Create document from dictionary."""
         return cls(**data)
 
@@ -52,10 +52,10 @@ class ProductDocumentModel:
         self.price = kwargs.get("price")
         self.category_id = kwargs.get("category_id")
         self.active = kwargs.get("active", True)
-        self.created_at = kwargs.get("created_at", datetime.now(timezone.utc))
-        self.updated_at = kwargs.get("updated_at", datetime.now(timezone.utc))
+        self.created_at = kwargs.get("created_at", datetime.now(UTC))
+        self.updated_at = kwargs.get("updated_at", datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert document to dictionary."""
         return {
             "id": self.id,
@@ -69,7 +69,7 @@ class ProductDocumentModel:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ProductDocumentModel":
+    def from_dict(cls, data: dict[str, Any]) -> ProductDocumentModel:
         """Create document from dictionary."""
         return cls(**data)
 
@@ -138,8 +138,8 @@ def sample_user_document_data():
         "email": "test@example.com",
         "name": "Test User",
         "is_active": True,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
 
 
@@ -153,8 +153,8 @@ def sample_product_document_data():
         "price": 1999,
         "category_id": "category_789",
         "active": True,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
 
 

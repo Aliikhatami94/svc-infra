@@ -29,10 +29,7 @@ except ImportError:
 SKIP_NO_S3_CREDS = pytest.mark.skipif(
     not (
         os.environ.get("STORAGE_S3_BUCKET")
-        and (
-            os.environ.get("AWS_ACCESS_KEY_ID")
-            or os.environ.get("STORAGE_S3_ACCESS_KEY")
-        )
+        and (os.environ.get("AWS_ACCESS_KEY_ID") or os.environ.get("STORAGE_S3_ACCESS_KEY"))
     ),
     reason="S3 credentials not configured",
 )
@@ -377,6 +374,7 @@ class TestAddStorageHelper:
     def test_add_storage_to_app(self, tmp_path):
         """Test adding storage to FastAPI app."""
         from fastapi import FastAPI
+
         from svc_infra.storage import add_storage
 
         app = FastAPI()
@@ -395,9 +393,10 @@ class TestAddStorageHelper:
     @pytest.mark.asyncio
     async def test_storage_dependency_injection(self, tmp_path):
         """Test storage dependency injection in routes."""
-        from fastapi import FastAPI, Depends
+        from fastapi import Depends, FastAPI
         from fastapi.testclient import TestClient
-        from svc_infra.storage import add_storage, get_storage, StorageBackend
+
+        from svc_infra.storage import StorageBackend, add_storage, get_storage
 
         app = FastAPI()
 

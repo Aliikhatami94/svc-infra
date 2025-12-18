@@ -9,7 +9,7 @@ Run with: pytest tests/integration/test_billing_stripe.py -v
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -56,7 +56,7 @@ class TestBillingServiceLocal:
         event_id = service.record_usage(
             metric="api_calls",
             amount=100,
-            at=datetime.now(timezone.utc),
+            at=datetime.now(UTC),
             idempotency_key="unique_key_1",
             metadata={"endpoint": "/api/v1/data"},
         )
@@ -69,7 +69,7 @@ class TestBillingServiceLocal:
         from svc_infra.billing import BillingService
 
         service = BillingService(session=db_session, tenant_id="tenant_123")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Record first event
         event_id_1 = service.record_usage(
@@ -100,7 +100,7 @@ class TestBillingServiceLocal:
         from svc_infra.billing import BillingService
 
         service = BillingService(session=db_session, tenant_id="tenant_123")
-        day_start = datetime(2024, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
+        day_start = datetime(2024, 1, 15, 0, 0, 0, tzinfo=UTC)
 
         # Record multiple events on the same day
         for i in range(5):
@@ -120,6 +120,7 @@ class TestBillingServiceLocal:
 
         # Verify aggregate was created
         from sqlalchemy import select
+
         from svc_infra.billing.models import UsageAggregate
 
         agg = db_session.execute(
@@ -133,12 +134,13 @@ class TestBillingServiceLocal:
 
     def test_generate_monthly_invoice(self, db_session):
         """Test monthly invoice generation."""
-        from svc_infra.billing import BillingService
         from datetime import timedelta
 
+        from svc_infra.billing import BillingService
+
         service = BillingService(session=db_session, tenant_id="tenant_123")
-        period_start = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        period_end = datetime(2024, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
+        period_start = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
+        period_end = datetime(2024, 2, 1, 0, 0, 0, tzinfo=UTC)
 
         # Record events across the month
         current = period_start
@@ -171,11 +173,10 @@ class TestBillingServiceLocal:
 
         # Verify invoice
         from sqlalchemy import select
+
         from svc_infra.billing.models import Invoice
 
-        invoice = db_session.execute(
-            select(Invoice).where(Invoice.id == invoice_id)
-        ).scalar_one()
+        invoice = db_session.execute(select(Invoice).where(Invoice.id == invoice_id)).scalar_one()
 
         assert invoice.tenant_id == "tenant_123"
         assert invoice.status == "created"
@@ -202,9 +203,7 @@ class TestStripeIntegration:
         """Get Stripe client with test API key."""
         import stripe
 
-        api_key = os.environ.get("STRIPE_API_KEY") or os.environ.get(
-            "STRIPE_SECRET_KEY"
-        )
+        api_key = os.environ.get("STRIPE_API_KEY") or os.environ.get("STRIPE_SECRET_KEY")
         stripe.api_key = api_key
 
         # Verify it's a test key
@@ -263,10 +262,11 @@ class TestStripeIntegration:
 
     def test_webhook_signature_verification(self, stripe_client):
         """Test Stripe webhook signature verification."""
-        from stripe import WebhookSignature
-        import time
-        import hmac
         import hashlib
+        import hmac
+        import time
+
+        from stripe import WebhookSignature
 
         payload = '{"type": "customer.created"}'
         secret = "whsec_test_secret"
@@ -313,7 +313,7 @@ class TestBillingModels:
             tenant_id="tenant_123",
             metric="api_calls",
             amount=100,
-            at_ts=datetime.now(timezone.utc),
+            at_ts=datetime.now(UTC),
             idempotency_key="unique",
             metadata_json={"key": "value"},
         )
@@ -328,8 +328,8 @@ class TestBillingModels:
         invoice = Invoice(
             id="inv_test",
             tenant_id="tenant_123",
-            period_start=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            period_end=datetime(2024, 2, 1, tzinfo=timezone.utc),
+            period_start=datetime(2024, 1, 1, tzinfo=UTC),
+            period_end=datetime(2024, 2, 1, tzinfo=UTC),
             status="created",
             total_amount=1000,
             currency="USD",

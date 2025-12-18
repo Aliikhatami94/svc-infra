@@ -174,7 +174,6 @@ select = [
     "C4",     # flake8-comprehensions
     "UP",     # pyupgrade
     "SIM",    # flake8-simplify
-    "TC",     # flake8-type-checking
     "RUF",    # Ruff-specific rules
 ]
 
@@ -196,9 +195,6 @@ ignore = [
     "SIM115",  # context manager for files (not always applicable)
     "SIM117",  # single with statement (sometimes clearer separate)
     "SIM118",  # key in dict vs dict.keys() (minor)
-    "TC001",   # move application import to type-checking (breaks runtime)
-    "TC002",   # move third-party import to type-checking (breaks runtime)
-    "TC003",   # move stdlib import to type-checking (breaks runtime)
     "UP028",   # yield from (sometimes clearer with explicit yield)
     "UP038",   # isinstance(x, (A, B)) is valid Python and often clearer
     "UP045",   # X | None (runtime Optional needed for Pydantic create_model)

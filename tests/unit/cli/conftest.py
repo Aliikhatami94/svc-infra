@@ -5,7 +5,6 @@ Disables Rich console styling to ensure consistent output across environments.
 
 from __future__ import annotations
 
-
 import pytest
 
 

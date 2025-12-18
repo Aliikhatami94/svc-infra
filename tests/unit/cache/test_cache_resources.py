@@ -4,7 +4,7 @@ Tests for cache resources functionality.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from svc_infra.cache.resources import Resource, resource
 
@@ -35,7 +35,7 @@ class TestResourceClass:
         res = Resource("user", "user_id")
 
         @res.cache_write()
-        async def update_user(*, user_id: int, data: Dict[str, Any]):
+        async def update_user(*, user_id: int, data: dict[str, Any]):
             return {"id": user_id, **data}
 
         # Verify the decorator was applied
@@ -98,9 +98,7 @@ class TestResourceCacheRead:
         """Test Resource cache_read with custom key template."""
         res = resource("user", "user_id")
 
-        @res.cache_read(
-            suffix="profile", ttl=300, key_template="custom:user:{user_id}:profile"
-        )
+        @res.cache_read(suffix="profile", ttl=300, key_template="custom:user:{user_id}:profile")
         async def get_user_profile(*, user_id: int):
             return {"id": user_id, "name": "Database User"}
 
@@ -131,7 +129,7 @@ class TestResourceCacheWrite:
         res = resource("user", "user_id")
 
         @res.cache_write()
-        async def update_user(*, user_id: int, data: Dict[str, Any]):
+        async def update_user(*, user_id: int, data: dict[str, Any]):
             return {"id": user_id, **data}
 
         # Verify the function was decorated
@@ -142,7 +140,7 @@ class TestResourceCacheWrite:
         res = resource("user", "user_id")
 
         @res.cache_write(recache=[], recache_max_concurrency=3)
-        async def update_user(*, user_id: int, data: Dict[str, Any]):
+        async def update_user(*, user_id: int, data: dict[str, Any]):
             return {"id": user_id, **data}
 
         # Verify the function was decorated
@@ -168,7 +166,7 @@ class TestResourceCacheWriteVariations:
         res = resource("user", "user_id")
 
         @res.cache_write(recache=[], recache_max_concurrency=3)
-        async def update_user(*, user_id: int, data: Dict[str, Any]):
+        async def update_user(*, user_id: int, data: dict[str, Any]):
             return {"id": user_id, **data}
 
         # Verify the function was decorated
@@ -192,11 +190,11 @@ class TestResourceIntegration:
             return {"id": product_id, "name": "Product Details"}
 
         @user_res.cache_write()
-        async def update_user(*, user_id: int, data: Dict[str, Any]):
+        async def update_user(*, user_id: int, data: dict[str, Any]):
             return {"id": user_id, **data}
 
         @product_res.cache_write()
-        async def update_product(*, product_id: int, data: Dict[str, Any]):
+        async def update_product(*, product_id: int, data: dict[str, Any]):
             return {"id": product_id, **data}
 
         # Verify all functions were decorated

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from svc_infra.security.models import (
     compute_audit_hash,
@@ -20,13 +20,13 @@ def test_refresh_token_generation_and_hash():
     new_raw, new_hash, expires_at = rotate_refresh_token(h)
     assert new_raw != raw
     assert new_hash != h
-    assert expires_at > datetime.now(timezone.utc)
+    assert expires_at > datetime.now(UTC)
 
 
 def test_audit_hash_chain_continuity():
     actor = uuid.uuid4()
     tenant = "tenantA"
-    ts1 = datetime.now(timezone.utc)
+    ts1 = datetime.now(UTC)
 
     h1 = compute_audit_hash(
         None,
@@ -37,7 +37,7 @@ def test_audit_hash_chain_continuity():
         resource_ref=None,
         metadata={"ip": "1.1.1.1"},
     )
-    ts2 = datetime.now(timezone.utc)
+    ts2 = datetime.now(UTC)
     h2 = compute_audit_hash(
         h1,
         ts=ts2,
@@ -47,7 +47,7 @@ def test_audit_hash_chain_continuity():
         resource_ref=None,
         metadata={"count": 1},
     )
-    ts3 = datetime.now(timezone.utc)
+    ts3 = datetime.now(UTC)
     h3 = compute_audit_hash(
         h2,
         ts=ts3,

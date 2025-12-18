@@ -13,9 +13,7 @@ from svc_infra.security.session import issue_session_and_refresh
 class FakeUser:
     def __init__(self):
         self.id = uuid.uuid4()
-        self.roles = [
-            "admin"
-        ]  # maps to permissions including security.session.list/revoke
+        self.roles = ["admin"]  # maps to permissions including security.session.list/revoke
 
 
 class FakeDB:
@@ -56,14 +54,12 @@ class FakeDB:
 async def test_list_and_revoke_session():
     db = FakeDB()
     user = FakeUser()
-    raw, rt = await issue_session_and_refresh(db, user_id=user.id)
+    _raw, _rt = await issue_session_and_refresh(db, user_id=user.id)
     # Build router and call list
     router = build_session_router()
     # Directly invoke underlying function (not full FastAPI app for brevity)
     list_fn = next(
-        r.endpoint
-        for r in router.routes
-        if r.path == "/sessions/me" and r.methods == {"GET"}
+        r.endpoint for r in router.routes if r.path == "/sessions/me" and r.methods == {"GET"}
     )
     revoke_fn = next(
         r.endpoint
@@ -92,7 +88,7 @@ async def test_cannot_revoke_other_users_session():
     db = FakeDB()
     owner = FakeUser()
     other = FakeUser()  # attacker / different principal
-    raw, rt = await issue_session_and_refresh(db, user_id=owner.id)
+    _raw, rt = await issue_session_and_refresh(db, user_id=owner.id)
     router = build_session_router()
     revoke_fn = next(
         r.endpoint
@@ -114,7 +110,7 @@ async def test_cannot_revoke_other_users_session():
 
     # Reset state for negative test (issue fresh session)
     db.objects = []
-    raw2, rt2 = await issue_session_and_refresh(db, user_id=owner.id)
+    _raw2, rt2 = await issue_session_and_refresh(db, user_id=owner.id)
     # Attempt revoke by other user -> 403
     with pytest.raises(HTTPException) as exc:
         await revoke_fn(session_id=str(rt2.session.id), identity=other_identity, db=db)

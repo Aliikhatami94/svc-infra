@@ -6,7 +6,6 @@ and that the search functionality is not vulnerable to SQL injection.
 
 from __future__ import annotations
 
-
 from svc_infra.db.sql.repository import _escape_ilike
 
 

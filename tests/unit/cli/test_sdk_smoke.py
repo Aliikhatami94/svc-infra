@@ -16,12 +16,10 @@ runner = CliRunner()
 def test_sdk_smoke_py_import(monkeypatch, tmp_path: Path):
     openapi = tmp_path / "openapi.json"
     openapi.write_text(
-        json.dumps(
-            {"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}}
-        )
+        json.dumps({"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}})
     )
 
-    def fake_check_call(cmd):  # noqa: ANN001
+    def fake_check_call(cmd):
         # emulate generation by creating a minimal package that can be imported
         # find output directory after '-o'
         if "-o" in cmd:
@@ -62,12 +60,10 @@ def test_sdk_smoke_py_import(monkeypatch, tmp_path: Path):
 def test_sdk_smoke_ts_directory(monkeypatch, tmp_path: Path):
     openapi = tmp_path / "openapi.json"
     openapi.write_text(
-        json.dumps(
-            {"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}}
-        )
+        json.dumps({"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}})
     )
 
-    def fake_check_call(cmd):  # noqa: ANN001
+    def fake_check_call(cmd):
         if "--output" in cmd:
             outdir = Path(cmd[cmd.index("--output") + 1])
         else:
@@ -93,12 +89,10 @@ def test_sdk_smoke_postman_collection(monkeypatch, tmp_path: Path):
     openapi = tmp_path / "openapi.json"
     out = tmp_path / "postman.json"
     openapi.write_text(
-        json.dumps(
-            {"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}}
-        )
+        json.dumps({"openapi": "3.0.3", "info": {"title": "x", "version": "1"}, "paths": {}})
     )
 
-    def fake_check_call(cmd):  # noqa: ANN001
+    def fake_check_call(cmd):
         # emulate conversion creating output file
         if "-o" in cmd:
             outfile = Path(cmd[cmd.index("-o") + 1])

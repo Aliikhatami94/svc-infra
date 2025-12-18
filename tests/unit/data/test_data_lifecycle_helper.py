@@ -13,12 +13,12 @@ def test_add_data_lifecycle_invokes_fixture_loader(monkeypatch):
     # Avoid executing real migrations in unit test; stub out cmd_setup_and_migrate
     import svc_infra.data.add as data_add
 
-    def fake_setup_and_migrate(**kwargs):  # noqa: D401, ANN001
+    def fake_setup_and_migrate(**kwargs):
         return None
 
     monkeypatch.setattr(data_add, "cmd_setup_and_migrate", fake_setup_and_migrate)
 
-    def _fixtures():  # noqa: D401, ANN201
+    def _fixtures():
         called["fixtures"] += 1
 
     add_data_lifecycle(app, auto_migrate=True, on_load_fixtures=_fixtures)

@@ -14,13 +14,13 @@ class FakeRedis:
 
     # Pipeline ops
     def incr(self, key: str):
-        v, exp = self.store.get(key, (0, None))
+        v, _exp = self.store.get(key, (0, None))
         self._last_key = key
         self._incr_result = v + 1
         return self
 
     def ttl(self, key: str):
-        v, exp = self.store.get(key, (0, None))
+        _v, exp = self.store.get(key, (0, None))
         now = time.time()
         if exp is None:
             self._ttl_result = -1

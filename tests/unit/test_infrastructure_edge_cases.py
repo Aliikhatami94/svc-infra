@@ -220,10 +220,10 @@ class TestWebhookSignatureTimingAttacks:
 
     def test_compare_digest_is_used(self):
         """Verify hmac.compare_digest is used (constant-time comparison)."""
-        from svc_infra.webhooks import signing
-
         # Verify the function uses hmac.compare_digest
         import inspect
+
+        from svc_infra.webhooks import signing
 
         source = inspect.getsource(signing.verify)
         assert "hmac.compare_digest" in source
@@ -469,7 +469,7 @@ class TestGracefulShutdownUnderLoad:
             await asyncio.sleep(0.3)
             app.state._inflight_requests = 0
 
-        asyncio.create_task(complete_request())
+        asyncio.create_task(complete_request())  # noqa: RUF006
 
         start = time.time()
         await _wait_for_drain(app, grace=5.0)  # type: ignore
@@ -566,9 +566,7 @@ class TestInMemoryIdempotencyStore:
         store = InMemoryIdempotencyStore()
 
         # Manually insert expired entry
-        store._store["expired_key"] = IdempotencyEntry(
-            req_hash="hash", exp=time.time() - 1
-        )
+        store._store["expired_key"] = IdempotencyEntry(req_hash="hash", exp=time.time() - 1)
 
         result = store.get("expired_key")
         assert result is None

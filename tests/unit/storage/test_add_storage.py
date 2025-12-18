@@ -260,7 +260,7 @@ class TestFileServing:
 
     def test_serve_file_valid_signature(self, app_with_local, tmp_path):
         """Test serving file with valid signature."""
-        app, backend = app_with_local
+        app, _backend = app_with_local
 
         # Create file
         test_file = tmp_path / "test.txt"

@@ -118,7 +118,7 @@ class TestTokenExtraction:
         ws.query_params = {"token": ""}
         ws.headers = {}
 
-        token, source = _extract_token(ws)
+        token, _source = _extract_token(ws)
 
         # Empty string should fall through
         assert token is None or token == ""

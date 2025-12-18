@@ -29,9 +29,7 @@ class TestNoSqlService:
         return db
 
     @pytest.mark.asyncio
-    async def test_create_success(
-        self, nosql_service, mock_db, sample_user_document_data
-    ):
+    async def test_create_success(self, nosql_service, mock_db, sample_user_document_data):
         """Test successful document creation."""
         # Mock the repository create method
         expected_result = {**sample_user_document_data, "id": "user_123"}
@@ -40,24 +38,18 @@ class TestNoSqlService:
         result = await nosql_service.create(mock_db, sample_user_document_data)
 
         assert result == expected_result
-        nosql_service.repo.create.assert_called_once_with(
-            mock_db, sample_user_document_data
-        )
+        nosql_service.repo.create.assert_called_once_with(mock_db, sample_user_document_data)
 
     @pytest.mark.asyncio
-    async def test_create_with_exception(
-        self, nosql_service, mock_db, sample_user_document_data
-    ):
+    async def test_create_with_exception(self, nosql_service, mock_db, sample_user_document_data):
         """Test document creation with exception."""
         # Mock the repository create method to raise an exception
         nosql_service.repo.create = AsyncMock(side_effect=Exception("Database error"))
 
-        with pytest.raises(Exception):
+        with pytest.raises(Exception, match="Database error"):
             await nosql_service.create(mock_db, sample_user_document_data)
 
-        nosql_service.repo.create.assert_called_once_with(
-            mock_db, sample_user_document_data
-        )
+        nosql_service.repo.create.assert_called_once_with(mock_db, sample_user_document_data)
 
     @pytest.mark.asyncio
     async def test_get_success(self, nosql_service, mock_db, sample_user_document_data):
@@ -97,9 +89,7 @@ class TestNoSqlService:
         assert result[1]["email"] == "user2@example.com"
         assert result[2]["email"] == "user3@example.com"
 
-        nosql_service.repo.list.assert_called_once_with(
-            mock_db, limit=10, offset=0, sort=None
-        )
+        nosql_service.repo.list.assert_called_once_with(mock_db, limit=10, offset=0, sort=None)
 
     @pytest.mark.asyncio
     async def test_list_with_sort(self, nosql_service, mock_db, sample_user_documents):
@@ -114,14 +104,10 @@ class TestNoSqlService:
         result = await nosql_service.list(mock_db, limit=10, offset=0, sort=sort)
 
         assert len(result) == 3
-        nosql_service.repo.list.assert_called_once_with(
-            mock_db, limit=10, offset=0, sort=sort
-        )
+        nosql_service.repo.list.assert_called_once_with(mock_db, limit=10, offset=0, sort=sort)
 
     @pytest.mark.asyncio
-    async def test_update_success(
-        self, nosql_service, mock_db, sample_user_document_data
-    ):
+    async def test_update_success(self, nosql_service, mock_db, sample_user_document_data):
         """Test successful document update."""
         # Mock the repository update method
         updated_data = {**sample_user_document_data, "name": "Updated Name"}
@@ -131,9 +117,7 @@ class TestNoSqlService:
         result = await nosql_service.update(mock_db, "user_123", update_data)
 
         assert result == updated_data
-        nosql_service.repo.update.assert_called_once_with(
-            mock_db, "user_123", update_data
-        )
+        nosql_service.repo.update.assert_called_once_with(mock_db, "user_123", update_data)
 
     @pytest.mark.asyncio
     async def test_update_not_found(self, nosql_service, mock_db):
@@ -145,9 +129,7 @@ class TestNoSqlService:
         result = await nosql_service.update(mock_db, "nonexistent_id", update_data)
 
         assert result is None
-        nosql_service.repo.update.assert_called_once_with(
-            mock_db, "nonexistent_id", update_data
-        )
+        nosql_service.repo.update.assert_called_once_with(mock_db, "nonexistent_id", update_data)
 
     @pytest.mark.asyncio
     async def test_delete_success(self, nosql_service, mock_db):
@@ -177,9 +159,7 @@ class TestNoSqlService:
         # Mock the repository exists method
         nosql_service.repo.exists = AsyncMock(return_value=True)
 
-        result = await nosql_service.exists(
-            mock_db, where=[{"email": "test@example.com"}]
-        )
+        result = await nosql_service.exists(mock_db, where=[{"email": "test@example.com"}])
 
         assert result is True
         nosql_service.repo.exists.assert_called_once_with(
@@ -192,9 +172,7 @@ class TestNoSqlService:
         # Mock the repository exists method
         nosql_service.repo.exists = AsyncMock(return_value=False)
 
-        result = await nosql_service.exists(
-            mock_db, where=[{"email": "nonexistent@example.com"}]
-        )
+        result = await nosql_service.exists(mock_db, where=[{"email": "nonexistent@example.com"}])
 
         assert result is False
         nosql_service.repo.exists.assert_called_once_with(
@@ -236,9 +214,7 @@ class TestNoSqlService:
         # Mock the repository count_filtered method
         nosql_service.repo.count_filtered = AsyncMock(return_value=3)
 
-        result = await nosql_service.count_filtered(
-            mock_db, q="test", fields=["email", "name"]
-        )
+        result = await nosql_service.count_filtered(mock_db, q="test", fields=["email", "name"])
 
         assert result == 3
         nosql_service.repo.count_filtered.assert_called_once_with(
@@ -246,9 +222,7 @@ class TestNoSqlService:
         )
 
     @pytest.mark.asyncio
-    async def test_pre_create_hook(
-        self, nosql_service, mock_db, sample_user_document_data
-    ):
+    async def test_pre_create_hook(self, nosql_service, mock_db, sample_user_document_data):
         """Test pre-create hook functionality."""
         # Override the pre_create method to add a timestamp
         original_pre_create = nosql_service.pre_create
@@ -272,9 +246,7 @@ class TestNoSqlService:
             nosql_service.pre_create = original_pre_create
 
     @pytest.mark.asyncio
-    async def test_pre_update_hook(
-        self, nosql_service, mock_db, sample_user_document_data
-    ):
+    async def test_pre_update_hook(self, nosql_service, mock_db, sample_user_document_data):
         """Test pre-update hook functionality."""
         # Override the pre_update method to add a timestamp
         original_pre_update = nosql_service.pre_update

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import Mock
 
 import pytest
@@ -48,12 +48,10 @@ def test_record_and_aggregate_and_invoice(sync_session: Session):
     # Arrange
     tenant = "t_123"
     bs = BillingService(session=sync_session, tenant_id=tenant)
-    now = datetime(2025, 1, 1, 10, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 1, 10, tzinfo=UTC)
 
     # Act: record usage
-    evt_id = bs.record_usage(
-        metric="tokens", amount=5, at=now, idempotency_key="k1", metadata=None
-    )
+    evt_id = bs.record_usage(metric="tokens", amount=5, at=now, idempotency_key="k1", metadata=None)
     assert evt_id
 
     # Aggregate
@@ -63,8 +61,8 @@ def test_record_and_aggregate_and_invoice(sync_session: Session):
     )
 
     # Generate invoice for month
-    period_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    period_end = datetime(2025, 2, 1, tzinfo=timezone.utc)
+    period_start = datetime(2025, 1, 1, tzinfo=UTC)
+    period_end = datetime(2025, 2, 1, tzinfo=UTC)
     inv_id = bs.generate_monthly_invoice(
         period_start=period_start, period_end=period_end, currency="usd"
     )
@@ -87,15 +85,15 @@ def test_provider_sync_called(sync_session: Session):
     tenant = "t_sync"
     hook = Mock()
     bs = BillingService(session=sync_session, tenant_id=tenant, provider_sync=hook)
-    now = datetime(2025, 1, 5, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 5, tzinfo=UTC)
 
     bs.record_usage(metric="req", amount=2, at=now, idempotency_key="x", metadata=None)
     bs.aggregate_daily(
         metric="req", day_start=now.replace(hour=0, minute=0, second=0, microsecond=0)
     )
     bs.generate_monthly_invoice(
-        period_start=datetime(2025, 1, 1, tzinfo=timezone.utc),
-        period_end=datetime(2025, 2, 1, tzinfo=timezone.utc),
+        period_start=datetime(2025, 1, 1, tzinfo=UTC),
+        period_end=datetime(2025, 2, 1, tzinfo=UTC),
         currency="usd",
     )
     hook.assert_called_once()
@@ -104,11 +102,9 @@ def test_provider_sync_called(sync_session: Session):
 def test_idempotency_unique(sync_session: Session):
     tenant = "t_idem"
     bs = BillingService(session=sync_session, tenant_id=tenant)
-    now = datetime(2025, 1, 7, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 7, tzinfo=UTC)
     bs.record_usage(metric="x", amount=1, at=now, idempotency_key="dup", metadata=None)
     with pytest.raises(IntegrityError):
         # second with same idempotency should violate unique constraint on flush
-        bs.record_usage(
-            metric="x", amount=1, at=now, idempotency_key="dup", metadata=None
-        )
+        bs.record_usage(metric="x", amount=1, at=now, idempotency_key="dup", metadata=None)
         sync_session.commit()

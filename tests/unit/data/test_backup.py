@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -15,6 +15,6 @@ def test_verify_backups_no_last_success():
 
 
 def test_verify_backups_ok_within_retention():
-    last = datetime.now(timezone.utc) - timedelta(hours=6)
+    last = datetime.now(UTC) - timedelta(hours=6)
     rep = verify_backups(last_success=last, retention_days=1)
     assert rep.ok is True and rep.last_success == last
