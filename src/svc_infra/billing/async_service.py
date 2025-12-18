@@ -1,3 +1,26 @@
+"""Async Billing Service - Primary billing API.
+
+This is the recommended billing service for all new code. It provides
+full async/await support for usage tracking, aggregation, and invoicing.
+
+Usage:
+    from svc_infra.billing import AsyncBillingService
+
+    async with async_session_maker() as session:
+        service = AsyncBillingService(session, tenant_id="tenant_123")
+        await service.record_usage(
+            metric="api_calls",
+            amount=1,
+            at=datetime.now(timezone.utc),
+            idempotency_key="unique-key",
+            metadata={"endpoint": "/api/v1/users"},
+        )
+
+See also:
+    - BillingService: Deprecated sync version (use this instead)
+    - models: Invoice, UsageEvent, UsageAggregate, etc.
+"""
+
 from __future__ import annotations
 
 import uuid

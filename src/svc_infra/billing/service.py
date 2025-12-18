@@ -1,6 +1,26 @@
+"""DEPRECATED: Synchronous BillingService.
+
+This module is deprecated in favor of AsyncBillingService.
+Use `from svc_infra.billing import AsyncBillingService` instead.
+
+Migration:
+    # Old (deprecated)
+    from svc_infra.billing import BillingService
+    service = BillingService(session, tenant_id)
+    service.record_usage(...)
+
+    # New (recommended)
+    from svc_infra.billing import AsyncBillingService
+    service = AsyncBillingService(async_session, tenant_id)
+    await service.record_usage(...)
+
+This module will be removed in a future version.
+"""
+
 from __future__ import annotations
 
 import uuid
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
@@ -15,9 +35,23 @@ ProviderSyncHook = Callable[[Invoice, list[InvoiceLine]], None]
 
 @dataclass
 class BillingService:
+    """DEPRECATED: Use AsyncBillingService instead.
+
+    This synchronous billing service is deprecated. Prefer AsyncBillingService
+    for new code, which provides the same functionality with async/await support.
+    """
+
     session: Session
     tenant_id: str
     provider_sync: Optional[ProviderSyncHook] = None
+
+    def __post_init__(self) -> None:
+        warnings.warn(
+            "BillingService is deprecated. Use AsyncBillingService instead. "
+            "This class will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def record_usage(
         self,
