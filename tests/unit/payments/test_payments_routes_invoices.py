@@ -108,9 +108,7 @@ async def test_list_invoices_with_filters(client, fake_adapter, mocker):
     """Test invoice listing with filters"""
     fake_adapter.list_invoices.return_value = ([], None)
 
-    res = await client.get(
-        "/payments/invoices?customer_provider_id=cus_123&status=open"
-    )
+    res = await client.get("/payments/invoices?customer_provider_id=cus_123&status=open")
     assert res.status_code == 200
 
     # Verify the adapter was called with correct filters

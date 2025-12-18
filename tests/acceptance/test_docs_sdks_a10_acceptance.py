@@ -12,9 +12,7 @@ import pytest
 pytestmark = pytest.mark.acceptance
 
 
-def _py(
-    cmd: list[str], env: dict[str, str] | None = None
-) -> subprocess.CompletedProcess:
+def _py(cmd: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     merged = os.environ.copy()
     if env:
         merged.update(env)

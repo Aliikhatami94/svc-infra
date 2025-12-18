@@ -180,9 +180,7 @@ async def test_create_api_key_returns_plaintext_and_persists(mocker):
 async def test_list_api_keys_returns_sanitized_rows(mocker):
     owner_id = uuid4()
     keys = [
-        FakeApiKey(
-            id=uuid4(), user_id=owner_id, name="Key A", scopes=["read"], active=True
-        ),
+        FakeApiKey(id=uuid4(), user_id=owner_id, name="Key A", scopes=["read"], active=True),
         FakeApiKey(id=uuid4(), user_id=owner_id, name="Key B", scopes=[], active=False),
     ]
 
@@ -228,9 +226,7 @@ async def test_delete_api_key_requires_force_for_active_keys(mocker):
     session.commit = AsyncMock()
     session.delete = AsyncMock()
 
-    app = _setup_apikey_app(
-        session, Principal(user=SimpleNamespace(id=api_key.user_id)), mocker
-    )
+    app = _setup_apikey_app(session, Principal(user=SimpleNamespace(id=api_key.user_id)), mocker)
 
     response = await _call(app, "DELETE", f"/auth/keys/{api_key.id}")
 

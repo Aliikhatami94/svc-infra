@@ -39,9 +39,7 @@ def make_webhook_handler(
             outbox.mark_processed(int(outbox_id))
             return
         event = payload.get("event") if isinstance(payload, dict) else None
-        subscription = (
-            payload.get("subscription") if isinstance(payload, dict) else None
-        )
+        subscription = payload.get("subscription") if isinstance(payload, dict) else None
         if event is not None and subscription is not None:
             delivery_payload = event
             url = subscription.get("url") or get_webhook_url_for_topic(topic)

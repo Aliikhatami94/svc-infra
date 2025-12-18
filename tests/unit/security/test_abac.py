@@ -40,9 +40,7 @@ def test_enforce_abac_sync_ok_and_forbidden():
 
     # forbidden path
     with pytest.raises(Exception) as exc:
-        enforce_abac(
-            p, permission="doc.read", resource=d_bad, predicate=owns_resource()
-        )
+        enforce_abac(p, permission="doc.read", resource=d_bad, predicate=owns_resource())
     assert "forbidden" in str(exc.value)
 
 

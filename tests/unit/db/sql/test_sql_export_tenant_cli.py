@@ -17,9 +17,7 @@ def test_sql_export_tenant_cli_json(tmp_path: Path):
     db_path = tmp_path / "test.db"
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute(
-        "CREATE TABLE items (id INTEGER PRIMARY KEY, tenant_id TEXT, name TEXT)"
-    )
+    cur.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, tenant_id TEXT, name TEXT)")
     cur.execute("INSERT INTO items (tenant_id, name) VALUES (?, ?)", ("t1", "a"))
     cur.execute("INSERT INTO items (tenant_id, name) VALUES (?, ?)", ("t2", "b"))
     cur.execute("INSERT INTO items (tenant_id, name) VALUES (?, ?)", ("t1", "c"))

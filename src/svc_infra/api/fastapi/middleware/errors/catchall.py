@@ -31,9 +31,7 @@ class CatchAllExceptionMiddleware:
 
             if response_started:
                 try:
-                    await send(
-                        {"type": "http.response.body", "body": b"", "more_body": False}
-                    )
+                    await send({"type": "http.response.body", "body": b"", "more_body": False})
                 except Exception:
                     pass
             else:
@@ -54,6 +52,4 @@ class CatchAllExceptionMiddleware:
                         "headers": [(b"content-type", PROBLEM_MT.encode("ascii"))],
                     }
                 )
-                await send(
-                    {"type": "http.response.body", "body": body, "more_body": False}
-                )
+                await send({"type": "http.response.body", "body": body, "more_body": False})

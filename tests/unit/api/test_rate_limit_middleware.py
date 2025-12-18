@@ -12,9 +12,7 @@ from svc_infra.api.fastapi.middleware.ratelimit import SimpleRateLimitMiddleware
 @pytest.fixture
 def app():
     app = FastAPI()
-    app.add_middleware(
-        SimpleRateLimitMiddleware, limit=3, window=1, key_fn=lambda r: "k"
-    )
+    app.add_middleware(SimpleRateLimitMiddleware, limit=3, window=1, key_fn=lambda r: "k")
 
     @app.get("/ping")
     def ping():

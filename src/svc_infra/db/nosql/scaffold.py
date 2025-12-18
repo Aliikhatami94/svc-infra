@@ -6,9 +6,7 @@ from typing import Any, Literal
 from svc_infra.db.utils import normalize_dir, pascal, plural_snake, snake
 from svc_infra.utils import ensure_init_py, render_template, write
 
-_INIT_CONTENT_PAIRED = (
-    'from . import documents, schemas\n\n__all__ = ["documents", "schemas"]\n'
-)
+_INIT_CONTENT_PAIRED = 'from . import documents, schemas\n\n__all__ = ["documents", "schemas"]\n'
 _INIT_CONTENT_MINIMAL = "# package marker; add explicit exports here if desired\n"
 
 
@@ -48,9 +46,7 @@ def scaffold_core(
     schemas_txt = render_template(
         tmpl_dir="svc_infra.db.nosql.mongo.templates",
         name="schemas.py.tmpl",
-        subs={
-            "Entity": ent
-        },  # (only if your schemas.tmpl doesn't need collection_name)
+        subs={"Entity": ent},  # (only if your schemas.tmpl doesn't need collection_name)
     )
 
     if same_dir:

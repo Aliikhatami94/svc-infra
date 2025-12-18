@@ -55,9 +55,7 @@ class HIBPClient:
         return None
 
     def _set_cache(self, prefix: str, body: str) -> None:
-        self._cache[prefix] = CacheEntry(
-            body=body, expires_at=time.time() + self.ttl_seconds
-        )
+        self._cache[prefix] = CacheEntry(body=body, expires_at=time.time() + self.ttl_seconds)
 
     def range_query(self, prefix: str) -> str:
         cached = self._get_cached(prefix)

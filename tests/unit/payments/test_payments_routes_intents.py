@@ -63,9 +63,7 @@ async def test_confirm_cancel_capture_flow(client, fake_adapter, mocker):
     assert res.status_code == 200
     assert res.json()["status"] == "requires_capture"
 
-    res = await client.post(
-        "/payments/intents/pi_1/capture", json={"amount": 1234}, headers=IDEMP
-    )
+    res = await client.post("/payments/intents/pi_1/capture", json={"amount": 1234}, headers=IDEMP)
     assert res.status_code == 200
     assert res.json()["status"] == "succeeded"
 

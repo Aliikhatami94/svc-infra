@@ -27,20 +27,14 @@ class WebSocketConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="WS_")
 
     # Connection settings
-    open_timeout: float = Field(
-        default=10.0, description="Connection timeout in seconds"
-    )
-    close_timeout: float = Field(
-        default=10.0, description="Close handshake timeout in seconds"
-    )
+    open_timeout: float = Field(default=10.0, description="Connection timeout in seconds")
+    close_timeout: float = Field(default=10.0, description="Close handshake timeout in seconds")
 
     # Keepalive (ping/pong)
     ping_interval: float | None = Field(
         default=20.0, description="Ping interval in seconds (None to disable)"
     )
-    ping_timeout: float | None = Field(
-        default=20.0, description="Pong response timeout in seconds"
-    )
+    ping_timeout: float | None = Field(default=20.0, description="Pong response timeout in seconds")
 
     # Message limits
     max_message_size: int = Field(
@@ -49,18 +43,12 @@ class WebSocketConfig(BaseSettings):
     max_queue_size: int = Field(default=16, description="Max queued messages")
 
     # Reconnection policy
-    reconnect_enabled: bool = Field(
-        default=True, description="Enable auto-reconnection"
-    )
+    reconnect_enabled: bool = Field(default=True, description="Enable auto-reconnection")
     reconnect_max_attempts: int = Field(
         default=5, description="Max reconnect attempts (0=infinite)"
     )
-    reconnect_backoff_base: float = Field(
-        default=1.0, description="Base backoff in seconds"
-    )
-    reconnect_backoff_max: float = Field(
-        default=60.0, description="Max backoff in seconds"
-    )
+    reconnect_backoff_base: float = Field(default=1.0, description="Base backoff in seconds")
+    reconnect_backoff_max: float = Field(default=60.0, description="Max backoff in seconds")
     reconnect_jitter: float = Field(default=0.1, description="Jitter factor (0-1)")
 
 

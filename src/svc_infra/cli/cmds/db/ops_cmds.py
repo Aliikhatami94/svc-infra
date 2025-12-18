@@ -243,9 +243,7 @@ def cmd_kill_queries(
                             typer.secho(f"  {action} PID {pid}", fg=typer.colors.GREEN)
                     else:
                         if not quiet:
-                            typer.echo(
-                                f"  PID {pid}: already finished or permission denied"
-                            )
+                            typer.echo(f"  PID {pid}: already finished or permission denied")
                 except Exception as e:
                     if not quiet:
                         typer.secho(f"  PID {pid}: Error - {e}", fg=typer.colors.YELLOW)

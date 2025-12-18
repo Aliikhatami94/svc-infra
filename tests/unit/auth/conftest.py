@@ -80,9 +80,7 @@ def _auth_env(monkeypatch):
     # Force LOCAL env for permissive auth in tests
     from svc_infra.app import env as env_mod
 
-    monkeypatch.setattr(
-        env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False
-    )
+    monkeypatch.setattr(env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False)
 
     # Mock auth settings
 

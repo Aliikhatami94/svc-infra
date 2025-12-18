@@ -82,9 +82,7 @@ def test_add_observability_with_route_classifier_uses_resolver(mocker):
     )
 
     # Patch the internal route template to return a stable base
-    mocker.patch(
-        "svc_infra.obs.metrics.asgi._route_template", return_value="/items/{id}"
-    )
+    mocker.patch("svc_infra.obs.metrics.asgi._route_template", return_value="/items/{id}")
 
     # Capture the resolver passed to middleware
     captured = {}
@@ -101,9 +99,7 @@ def test_add_observability_with_route_classifier_uses_resolver(mocker):
         def add_api_route(self, *_args, **_kwargs):
             return None
 
-    mocker.patch(
-        "svc_infra.api.fastapi.dual.public.public_router", return_value=_Router()
-    )
+    mocker.patch("svc_infra.api.fastapi.dual.public.public_router", return_value=_Router())
     mocker.patch.object(app, "include_router", return_value=None)
 
     # Route classifier returns a class based on input
@@ -118,9 +114,7 @@ def test_add_observability_with_route_classifier_uses_resolver(mocker):
     assert captured.get("mw_cls") is not None, "PrometheusMiddleware should be added"
     assert "/metrics" in captured.get("skip_paths", ()), "metrics path must be skipped"
     resolver = captured.get("resolver")
-    assert callable(
-        resolver
-    ), "route_resolver must be installed when a classifier is provided"
+    assert callable(resolver), "route_resolver must be installed when a classifier is provided"
 
     # The resolver should append the |class suffix
     req = Mock(method="GET")

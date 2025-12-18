@@ -79,9 +79,7 @@ async def test_cache_write_invalidates_tags_and_executes_recache(mocker):
         new_callable=AsyncMock,
         return_value=1,
     )
-    execute = mocker.patch(
-        "svc_infra.cache.decorators.execute_recache", new_callable=AsyncMock
-    )
+    execute = mocker.patch("svc_infra.cache.decorators.execute_recache", new_callable=AsyncMock)
 
     recache_specs = [Mock(name="recache-spec")]
 
@@ -109,9 +107,7 @@ async def test_cache_write_runs_recache_even_if_invalidation_fails(mocker):
         new_callable=AsyncMock,
         side_effect=RuntimeError("cache error"),
     )
-    execute = mocker.patch(
-        "svc_infra.cache.decorators.execute_recache", new_callable=AsyncMock
-    )
+    execute = mocker.patch("svc_infra.cache.decorators.execute_recache", new_callable=AsyncMock)
 
     @cache_write(tags=["user:{user_id}"], recache=[Mock()])
     async def update_user(user_id: int):
@@ -166,9 +162,7 @@ async def test_mutates_alias_behaves_like_cache_write(mocker):
     from svc_infra.cache.decorators import mutates
 
     mocker.patch("svc_infra.cache.decorators.resolve_tags", return_value=["user:1"])
-    invalidate = mocker.patch(
-        "svc_infra.cache.decorators.invalidate_tags", new_callable=AsyncMock
-    )
+    invalidate = mocker.patch("svc_infra.cache.decorators.invalidate_tags", new_callable=AsyncMock)
 
     @mutates(tags=["user:{user_id}"])
     async def update(user_id: int):

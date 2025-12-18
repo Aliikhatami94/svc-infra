@@ -92,9 +92,7 @@ class TestConvenienceFunctions:
     async def test_load_github_creates_loader(self):
         """Test that load_github creates GitHubLoader and calls load."""
         with patch.object(GitHubLoader, "load", new_callable=AsyncMock) as mock_load:
-            mock_load.return_value = [
-                LoadedContent(content="test", source="github://test")
-            ]
+            mock_load.return_value = [LoadedContent(content="test", source="github://test")]
 
             contents = await load_github("owner/repo", path="docs", pattern="*.md")
 
@@ -105,9 +103,7 @@ class TestConvenienceFunctions:
     async def test_load_url_creates_loader(self):
         """Test that load_url creates URLLoader and calls load."""
         with patch.object(URLLoader, "load", new_callable=AsyncMock) as mock_load:
-            mock_load.return_value = [
-                LoadedContent(content="test", source="https://example.com")
-            ]
+            mock_load.return_value = [LoadedContent(content="test", source="https://example.com")]
 
             contents = await load_url("https://example.com")
 
@@ -117,9 +113,7 @@ class TestConvenienceFunctions:
     def test_load_github_sync_creates_loader(self):
         """Test that load_github_sync creates GitHubLoader and calls load_sync."""
         with patch.object(GitHubLoader, "load_sync") as mock_load:
-            mock_load.return_value = [
-                LoadedContent(content="test", source="github://test")
-            ]
+            mock_load.return_value = [LoadedContent(content="test", source="github://test")]
 
             contents = load_github_sync("owner/repo", path="docs")
 
@@ -129,9 +123,7 @@ class TestConvenienceFunctions:
     def test_load_url_sync_creates_loader(self):
         """Test that load_url_sync creates URLLoader and calls load_sync."""
         with patch.object(URLLoader, "load_sync") as mock_load:
-            mock_load.return_value = [
-                LoadedContent(content="test", source="https://example.com")
-            ]
+            mock_load.return_value = [LoadedContent(content="test", source="https://example.com")]
 
             contents = load_url_sync("https://example.com")
 
@@ -142,9 +134,7 @@ class TestConvenienceFunctions:
     async def test_load_github_passes_kwargs(self):
         """Test that load_github passes extra kwargs to loader."""
         with patch.object(GitHubLoader, "__init__", return_value=None) as mock_init:
-            with patch.object(
-                GitHubLoader, "load", new_callable=AsyncMock
-            ) as mock_load:
+            with patch.object(GitHubLoader, "load", new_callable=AsyncMock) as mock_load:
                 mock_load.return_value = []
 
                 await load_github(

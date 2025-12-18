@@ -60,9 +60,7 @@ async def test_get_setup_intent(client, fake_adapter, mocker):
         provider_setup_intent_id="seti_123",
         status="requires_action",
         client_secret="seti_123_secret_abc",
-        next_action=mocker.Mock(
-            type="use_stripe_sdk", data={"type": "three_d_secure_redirect"}
-        ),
+        next_action=mocker.Mock(type="use_stripe_sdk", data={"type": "three_d_secure_redirect"}),
     )
 
     res = await client.get("/payments/setup_intents/seti_123")

@@ -122,9 +122,7 @@ async def app(fake_adapter, mocker) -> FastAPI:
     app.dependency_overrides[_current_principal] = _mock_principal
     app.dependency_overrides[_optional_principal] = _mock_optional_principal
     app.dependency_overrides[resolve_api_key] = _mock_resolve_api_key
-    app.dependency_overrides[resolve_bearer_or_cookie_principal] = (
-        _mock_resolve_bearer_or_cookie
-    )
+    app.dependency_overrides[resolve_bearer_or_cookie_principal] = _mock_resolve_bearer_or_cookie
 
     return app
 
@@ -242,9 +240,7 @@ def _payments_env(monkeypatch):
     # (1) LOCAL env = permissive auth posture for user/protected routers
     from svc_infra.app import env as env_mod
 
-    monkeypatch.setattr(
-        env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False
-    )
+    monkeypatch.setattr(env_mod, "CURRENT_ENVIRONMENT", env_mod.LOCAL_ENV, raising=False)
 
     # (2) Stripe settings shim
     from svc_infra.apf_payments.provider import stripe as stripe_mod

@@ -7,9 +7,7 @@ from pydantic import BaseModel, SecretStr
 STRIPE_KEY = os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY")
 STRIPE_WH = os.getenv("STRIPE_WH_SECRET")
 PROVIDER = (
-    os.getenv("APF_PAYMENTS_PROVIDER")
-    or os.getenv("PAYMENTS_PROVIDER", "stripe")
-    or "stripe"
+    os.getenv("APF_PAYMENTS_PROVIDER") or os.getenv("PAYMENTS_PROVIDER", "stripe") or "stripe"
 ).lower()
 
 AIYDAN_KEY = os.getenv("AIYDAN_API_KEY")

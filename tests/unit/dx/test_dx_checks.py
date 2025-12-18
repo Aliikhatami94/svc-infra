@@ -45,9 +45,7 @@ def test_check_openapi_problem_schema_passes(tmp_path: Path):
 
 def test_check_openapi_problem_schema_fails_on_missing(tmp_path: Path):
     p = tmp_path / "openapi.json"
-    p.write_text(
-        json.dumps({"openapi": "3.1.0", "info": {"title": "x", "version": "1"}})
-    )
+    p.write_text(json.dumps({"openapi": "3.1.0", "info": {"title": "x", "version": "1"}}))
     with pytest.raises(ValueError):
         check_openapi_problem_schema(path=p)
 
@@ -73,9 +71,7 @@ def test_generate_release_section_groups_commits():
         Commit(sha="112233", subject="refactor: cleanup"),
         Commit(sha="445566", subject="docs: update readme"),
     ]
-    out = generate_release_section(
-        version="0.1.604", commits=commits, release_date="2025-10-16"
-    )
+    out = generate_release_section(version="0.1.604", commits=commits, release_date="2025-10-16")
     assert "## v0.1.604 - 2025-10-16" in out
     assert "### Features" in out and "new endpoint" in out
     assert "### Bug Fixes" in out and "500 on /foo" in out

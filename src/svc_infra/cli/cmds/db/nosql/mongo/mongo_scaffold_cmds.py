@@ -16,9 +16,7 @@ def cmd_scaffold(
     entity_name: str = typer.Option(
         "Item", help="Entity class name (e.g., User, Member, Product)."
     ),
-    documents_dir: Path = typer.Option(
-        ..., help="Directory for Mongo document models."
-    ),
+    documents_dir: Path = typer.Option(..., help="Directory for Mongo document models."),
     schemas_dir: Path = typer.Option(..., help="Directory for Pydantic CRUD schemas."),
     overwrite: bool = typer.Option(False, help="Overwrite existing files."),
     same_dir: bool = typer.Option(

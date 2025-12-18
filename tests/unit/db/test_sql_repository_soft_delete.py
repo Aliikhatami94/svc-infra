@@ -92,10 +92,7 @@ def _class_mapper_stub(model):
             (),
             {
                 "__iter__": lambda self: iter(
-                    [
-                        type("K", (), {"key": k})()
-                        for k in ["id", "name", "deleted_at", "is_active"]
-                    ]
+                    [type("K", (), {"key": k})() for k in ["id", "name", "deleted_at", "is_active"]]
                 )
             },
         )()

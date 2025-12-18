@@ -84,8 +84,7 @@ class TestGitHubLoaderInit:
         """Test string representation."""
         loader = GitHubLoader("owner/repo", path="docs", pattern="*.py")
         assert (
-            repr(loader)
-            == "GitHubLoader('owner/repo', path='docs', branch='main', pattern='*.py')"
+            repr(loader) == "GitHubLoader('owner/repo', path='docs', branch='main', pattern='*.py')"
         )
 
 
@@ -221,9 +220,7 @@ class TestGitHubLoaderLoad:
 
             # Should only load docs/*.md files (2 files)
             assert len(contents) == 2
-            assert all(
-                c.source.startswith("github://owner/repo/docs/") for c in contents
-            )
+            assert all(c.source.startswith("github://owner/repo/docs/") for c in contents)
 
     @pytest.mark.asyncio
     async def test_load_skips_pycache(self, mock_tree_response):
@@ -266,9 +263,7 @@ class TestGitHubLoaderLoad:
 
             response = MagicMock()
             response.status_code = 404
-            error = httpx.HTTPStatusError(
-                "Not Found", request=MagicMock(), response=response
-            )
+            error = httpx.HTTPStatusError("Not Found", request=MagicMock(), response=response)
             mock_client.get.side_effect = error
 
             with pytest.raises(ValueError, match="Repository or branch not found"):
@@ -286,9 +281,7 @@ class TestGitHubLoaderLoad:
             response = MagicMock()
             response.status_code = 403
             response.headers = {"X-RateLimit-Remaining": "0"}
-            error = httpx.HTTPStatusError(
-                "Forbidden", request=MagicMock(), response=response
-            )
+            error = httpx.HTTPStatusError("Forbidden", request=MagicMock(), response=response)
             mock_client.get.side_effect = error
 
             with pytest.raises(ValueError, match="rate limit"):

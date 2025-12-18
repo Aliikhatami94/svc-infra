@@ -100,13 +100,9 @@ def make_crud_schemas(
                 name=name,
                 typ=T,
                 required_for_create=bool(
-                    is_required
-                    and name not in explicit_excludes
-                    and not _exclude_from_create(col)
+                    is_required and name not in explicit_excludes and not _exclude_from_create(col)
                 ),
-                exclude_from_create=bool(
-                    name in explicit_excludes or _exclude_from_create(col)
-                ),
+                exclude_from_create=bool(name in explicit_excludes or _exclude_from_create(col)),
                 exclude_from_read=bool(name in read_ex),
                 exclude_from_update=bool(name in update_ex),
             )

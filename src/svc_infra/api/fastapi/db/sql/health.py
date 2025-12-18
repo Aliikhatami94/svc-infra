@@ -14,9 +14,7 @@ def _make_db_health_router(
     include_in_schema: bool = False,
 ) -> APIRouter:
     """Internal factory for the DB health router."""
-    router = public_router(
-        prefix=prefix, tags=["health"], include_in_schema=include_in_schema
-    )
+    router = public_router(prefix=prefix, tags=["health"], include_in_schema=include_in_schema)
 
     @router.get("", status_code=status.HTTP_200_OK)
     async def db_health(session: SqlSessionDep) -> Response:

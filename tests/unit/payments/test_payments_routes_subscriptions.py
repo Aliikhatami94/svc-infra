@@ -108,9 +108,7 @@ async def test_list_subscriptions_with_filters(client, fake_adapter, mocker):
     """Test subscription listing with filters"""
     fake_adapter.list_subscriptions.return_value = ([], None)
 
-    res = await client.get(
-        "/payments/subscriptions?customer_provider_id=cus_123&status=active"
-    )
+    res = await client.get("/payments/subscriptions?customer_provider_id=cus_123&status=active")
     assert res.status_code == 200
 
     fake_adapter.list_subscriptions.assert_awaited_once_with(

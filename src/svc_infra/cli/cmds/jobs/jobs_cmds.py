@@ -13,12 +13,8 @@ app = typer.Typer(help="Background jobs and scheduler commands")
 
 @app.command("run")
 def run(
-    poll_interval: float = typer.Option(
-        0.5, help="Sleep seconds between loops when idle"
-    ),
-    max_loops: int | None = typer.Option(
-        None, help="Max loops before exit (for tests)"
-    ),
+    poll_interval: float = typer.Option(0.5, help="Sleep seconds between loops when idle"),
+    max_loops: int | None = typer.Option(None, help="Max loops before exit (for tests)"),
 ):
     """Run scheduler ticks and process jobs in a simple loop."""
 

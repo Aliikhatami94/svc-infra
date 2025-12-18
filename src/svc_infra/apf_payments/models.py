@@ -26,14 +26,10 @@ class PayCustomer(ModelBase):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
     # Tenant scoping
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
     # Always typed to match the actual auth PK; FK is enforced at table level
-    user_id: Mapped[str | None] = mapped_column(
-        user_id_type(), index=True, nullable=True
-    )
+    user_id: Mapped[str | None] = mapped_column(user_id_type(), index=True, nullable=True)
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_customer_id: Mapped[str] = mapped_column(
@@ -58,13 +54,9 @@ class PayIntent(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
-    user_id: Mapped[str | None] = mapped_column(
-        user_id_type(), index=True, nullable=True
-    )
+    user_id: Mapped[str | None] = mapped_column(user_id_type(), index=True, nullable=True)
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_intent_id: Mapped[str] = mapped_column(
@@ -94,9 +86,7 @@ class PayEvent(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_event_id: Mapped[str] = mapped_column(
@@ -108,9 +98,7 @@ class PayEvent(ModelBase):
         server_default=text("CURRENT_TIMESTAMP"),
         nullable=False,
     )
-    payload_json: Mapped[dict] = mapped_column(
-        JSON, nullable=False
-    )  # compact JSON string
+    payload_json: Mapped[dict] = mapped_column(JSON, nullable=False)  # compact JSON string
 
 
 class LedgerEntry(ModelBase):
@@ -118,9 +106,7 @@ class LedgerEntry(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -131,17 +117,11 @@ class LedgerEntry(ModelBase):
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_ref: Mapped[str | None] = mapped_column(String(128), index=True)
-    user_id: Mapped[str | None] = mapped_column(
-        user_id_type(), index=True, nullable=True
-    )
+    user_id: Mapped[str | None] = mapped_column(user_id_type(), index=True, nullable=True)
     amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    kind: Mapped[str] = mapped_column(
-        String(24), nullable=False
-    )  # payment|refund|fee|payout...
-    status: Mapped[str] = mapped_column(
-        String(24), nullable=False
-    )  # pending|posted|void
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)  # payment|refund|fee|payout...
+    status: Mapped[str] = mapped_column(String(24), nullable=False)  # pending|posted|void
 
     __table_args__ = (
         user_fk_constraint("user_id", ondelete="SET NULL"),
@@ -162,17 +142,11 @@ class PayPaymentMethod(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
-    user_id: Mapped[str | None] = mapped_column(
-        user_id_type(), index=True, nullable=True
-    )
+    user_id: Mapped[str | None] = mapped_column(user_id_type(), index=True, nullable=True)
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
-    provider_customer_id: Mapped[str] = mapped_column(
-        String(128), index=True, nullable=False
-    )
+    provider_customer_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     provider_method_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
     )
@@ -203,9 +177,7 @@ class PayProduct(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_product_id: Mapped[str] = mapped_column(
@@ -225,21 +197,15 @@ class PayPrice(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_price_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
     )
-    provider_product_id: Mapped[str] = mapped_column(
-        String(128), index=True, nullable=False
-    )
+    provider_product_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    unit_amount: Mapped[int] = mapped_column(
-        Numeric(18, 0), nullable=False
-    )  # minor units
+    unit_amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)  # minor units
     interval: Mapped[str | None] = mapped_column(String(16))  # month|year|week|day
     trial_days: Mapped[int | None] = mapped_column(Numeric(5, 0))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -255,30 +221,20 @@ class PaySubscription(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
-    user_id: Mapped[str | None] = mapped_column(
-        user_id_type(), index=True, nullable=True
-    )
+    user_id: Mapped[str | None] = mapped_column(user_id_type(), index=True, nullable=True)
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
-    provider_customer_id: Mapped[str] = mapped_column(
-        String(128), index=True, nullable=False
-    )
+    provider_customer_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     provider_subscription_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
     )
-    provider_price_id: Mapped[str] = mapped_column(
-        String(128), index=True, nullable=False
-    )
+    provider_price_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     status: Mapped[str] = mapped_column(
         String(32), index=True, nullable=False
     )  # active|trialing|canceled|past_due|incomplete
     quantity: Mapped[int] = mapped_column(Numeric(10, 0), default=1, nullable=False)
-    cancel_at_period_end: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -302,20 +258,14 @@ class PayInvoice(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
-    user_id: Mapped[str | None] = mapped_column(
-        user_id_type(), index=True, nullable=True
-    )
+    user_id: Mapped[str | None] = mapped_column(user_id_type(), index=True, nullable=True)
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_invoice_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
     )
-    provider_customer_id: Mapped[str] = mapped_column(
-        String(128), index=True, nullable=False
-    )
+    provider_customer_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     status: Mapped[str] = mapped_column(
         String(24), index=True, nullable=False
     )  # draft|open|paid|void|uncollectible
@@ -345,13 +295,9 @@ class PaySetupIntent(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
-    user_id: Mapped[str | None] = mapped_column(
-        user_id_type(), index=True, nullable=True
-    )
+    user_id: Mapped[str | None] = mapped_column(user_id_type(), index=True, nullable=True)
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_setup_intent_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
@@ -377,9 +323,7 @@ class PayDispute(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_dispute_id: Mapped[str] = mapped_column(
@@ -405,9 +349,7 @@ class PayPayout(ModelBase):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
 
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
 
     provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     provider_payout_id: Mapped[str] = mapped_column(

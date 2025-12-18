@@ -246,6 +246,4 @@ async def test_missing_idempotency_key(client, fake_adapter):
         },
     )  # Missing Idempotency-Key header
 
-    assert (
-        res.status_code == 422
-    )  # Validation error due to missing idempotency key header
+    assert res.status_code == 422  # Validation error due to missing idempotency key header

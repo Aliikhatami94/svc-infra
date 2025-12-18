@@ -56,9 +56,7 @@ async def test_replay_webhooks_since_only(client, fake_adapter, mocker):
     body = res.json()
     assert body["replayed"] == 2
 
-    fake_adapter.replay_webhooks.assert_awaited_once_with(
-        "2024-01-01T00:00:00Z", None, []
-    )
+    fake_adapter.replay_webhooks.assert_awaited_once_with("2024-01-01T00:00:00Z", None, [])
 
 
 @pytest.mark.asyncio
@@ -74,9 +72,7 @@ async def test_replay_webhooks_until_only(client, fake_adapter, mocker):
     body = res.json()
     assert body["replayed"] == 1
 
-    fake_adapter.replay_webhooks.assert_awaited_once_with(
-        None, "2024-01-31T23:59:59Z", []
-    )
+    fake_adapter.replay_webhooks.assert_awaited_once_with(None, "2024-01-31T23:59:59Z", [])
 
 
 @pytest.mark.asyncio

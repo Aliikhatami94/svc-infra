@@ -42,9 +42,7 @@ async def test_attach_and_list_methods(client, fake_adapter, mocker):
     assert res.status_code == 201
     assert res.json()["provider_method_id"] == "pm_1"
 
-    res = await client.get(
-        "/payments/methods", params={"customer_provider_id": "cus_1"}
-    )
+    res = await client.get("/payments/methods", params={"customer_provider_id": "cus_1"})
     assert res.status_code == 200
     data = res.json()
     assert data["items"][0]["is_default"] is True

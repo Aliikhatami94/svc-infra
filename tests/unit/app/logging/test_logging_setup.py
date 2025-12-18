@@ -76,9 +76,7 @@ def test_parse_paths_csv(raw, expected):
 
 
 def test_env_name_list_to_enum_values_normalizes():
-    vals = _env_name_list_to_enum_values(
-        ["prod", "Production", "DEV", "staging", "local"]
-    )
+    vals = _env_name_list_to_enum_values(["prod", "Production", "DEV", "staging", "local"])
     assert vals == {"prod", "dev", "test", "local"}
 
 
@@ -113,9 +111,7 @@ def test_setup_logging_applies_format_and_filters(monkeypatch):
     monkeypatch.setenv("LOG_DROP_PATHS", "/metrics, /health")
 
     # Ensure filter is enabled for the current test environment
-    setup_logging(
-        level=LogLevelOptions.INFO, fmt="json", filter_envs=["local"]
-    )  # default env
+    setup_logging(level=LogLevelOptions.INFO, fmt="json", filter_envs=["local"])  # default env
 
     # Root logger configured
     root = logging.getLogger()
@@ -139,8 +135,7 @@ def test_setup_logging_applies_format_and_filters(monkeypatch):
 def _root_has_plain_formatter() -> bool:
     root = logging.getLogger()
     return any(
-        isinstance(h.formatter, logging.Formatter)
-        and not isinstance(h.formatter, JsonFormatter)
+        isinstance(h.formatter, logging.Formatter) and not isinstance(h.formatter, JsonFormatter)
         for h in root.handlers
     )
 
@@ -230,9 +225,7 @@ def test_default_drops_metrics_when_enabled(monkeypatch):
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.delenv("LOG_DROP_PATHS", raising=False)
     # No drop_paths provided -> defaults to ["/metrics"] when filter is enabled for env
-    setup_logging(
-        level=LogLevelOptions.INFO, fmt="plain", filter_envs=["local"]
-    )  # enabled
+    setup_logging(level=LogLevelOptions.INFO, fmt="plain", filter_envs=["local"])  # enabled
 
     acc = logging.getLogger("uvicorn.access")
     rec_metrics = logging.LogRecord(

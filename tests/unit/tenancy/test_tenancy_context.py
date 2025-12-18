@@ -38,9 +38,7 @@ async def test_resolve_tenant_from_identity_user():
 async def test_override_hook_takes_precedence():
     calls: list[tuple[Request, object | None, str | None]] = []
 
-    async def _override(
-        request: Request, identity: object | None, header: str | None
-    ) -> str:
+    async def _override(request: Request, identity: object | None, header: str | None) -> str:
         calls.append((request, identity, header))
         return "tenant_override"
 
@@ -58,9 +56,7 @@ async def test_override_hook_takes_precedence():
 async def test_override_can_defer_to_default_flow():
     calls: list[tuple[Request, object | None, str | None]] = []
 
-    def _override(
-        request: Request, identity: object | None, header: str | None
-    ) -> None:
+    def _override(request: Request, identity: object | None, header: str | None) -> None:
         calls.append((request, identity, header))
         return None
 

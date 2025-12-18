@@ -9,9 +9,7 @@ from svc_infra.utils import ensure_init_py, render_template, write
 
 # ---------------- helpers ----------------
 
-_INIT_CONTENT_PAIRED = (
-    'from . import models, schemas\n\n__all__ = ["models", "schemas"]\n'
-)
+_INIT_CONTENT_PAIRED = 'from . import models, schemas\n\n__all__ = ["models", "schemas"]\n'
 _INIT_CONTENT_MINIMAL = "# package marker; add explicit exports here if desired\n"
 
 
@@ -104,9 +102,7 @@ def scaffold_core(
             },
         )
 
-        tenant_schema_field = (
-            "    tenant_id: Optional[str] = None\n" if include_tenant else ""
-        )
+        tenant_schema_field = "    tenant_id: Optional[str] = None\n" if include_tenant else ""
         schemas_txt = render_template(
             tmpl_dir="svc_infra.db.sql.templates.models_schemas.entity",
             name="schemas.py.tmpl",

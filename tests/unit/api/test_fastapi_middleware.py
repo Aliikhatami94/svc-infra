@@ -31,9 +31,7 @@ class TestCatchAllExceptionMiddleware:
         app.add_middleware(CatchAllExceptionMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test")
 
             # Verify exception was handled with 500 status
@@ -52,9 +50,7 @@ class TestCatchAllExceptionMiddleware:
         app.add_middleware(CatchAllExceptionMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test")
 
             # Verify normal request passes through
@@ -73,9 +69,7 @@ class TestCatchAllExceptionMiddleware:
         app.add_middleware(CatchAllExceptionMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test")
 
             # Verify exception was handled with 500 status
@@ -99,9 +93,7 @@ class TestIdempotencyMiddleware:
         app.add_middleware(IdempotencyMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.post(
                 "/test",
                 json={"data": "test"},
@@ -124,9 +116,7 @@ class TestIdempotencyMiddleware:
         app.add_middleware(IdempotencyMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test")
 
             # Verify GET request is processed normally
@@ -145,9 +135,7 @@ class TestIdempotencyMiddleware:
         app.add_middleware(IdempotencyMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             # First request
             response1 = await client.post(
                 "/test",
@@ -179,9 +167,7 @@ class TestIdempotencyMiddleware:
         app.add_middleware(IdempotencyMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             # First request
             r1 = await client.post(
                 "/test",
@@ -209,9 +195,7 @@ class TestOptimisticLocking:
             return {"ok": True}
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             res = await client.patch("/resource", json={})
             assert res.status_code == 428
 
@@ -254,9 +238,7 @@ class TestOptimisticLocking:
         app.add_middleware(IdempotencyMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.post("/test", json={"data": "test"})
 
             # Verify request is processed normally without idempotency key
@@ -286,9 +268,7 @@ class TestCORSMiddleware:
         )
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.options(
                 "/test",
                 headers={
@@ -321,12 +301,8 @@ class TestCORSMiddleware:
         )
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
-            response = await client.get(
-                "/test", headers={"Origin": "http://localhost:3000"}
-            )
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/test", headers={"Origin": "http://localhost:3000"})
 
             # Verify CORS headers are present
             assert response.status_code == 200
@@ -352,12 +328,8 @@ class TestCORSMiddleware:
         )
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
-            response = await client.get(
-                "/test", headers={"Origin": "http://unauthorized.com"}
-            )
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/test", headers={"Origin": "http://unauthorized.com"})
 
             # Verify request is processed but CORS headers may be restricted
             assert response.status_code == 200
@@ -378,14 +350,10 @@ class TestSecurityMiddleware:
         async def test_endpoint():
             return {"message": "success"}
 
-        app.add_middleware(
-            TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"]
-        )
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"])
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test", headers={"Host": "localhost"})
 
             # Verify request is processed normally
@@ -403,14 +371,10 @@ class TestSecurityMiddleware:
         async def test_endpoint():
             return {"message": "success"}
 
-        app.add_middleware(
-            TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"]
-        )
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"])
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test", headers={"Host": "evil.com"})
 
             # Verify request is rejected
@@ -440,9 +404,7 @@ class TestCustomMiddleware:
         app.add_middleware(CustomHeaderMiddleware)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test")
 
             # Verify custom header is applied
@@ -477,9 +439,7 @@ class TestCustomMiddleware:
         app.add_middleware(HeaderMiddleware2)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test")
 
             # Verify both headers are applied
@@ -524,9 +484,7 @@ class TestMiddlewareOrder:
         app.add_middleware(OrderMiddleware2)
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             response = await client.get("/test")
 
             # Verify execution order (middleware is executed in reverse order of addition)

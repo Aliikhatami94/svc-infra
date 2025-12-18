@@ -37,9 +37,7 @@ def test_create_customer_attach_method_and_list(client):
     assert method["is_default"] is True
 
     # List methods with pagination params present; should honor limit=1
-    r = client.get(
-        "/payments/methods", params={"customer_provider_id": cust_id, "limit": 1}
-    )
+    r = client.get("/payments/methods", params={"customer_provider_id": cust_id, "limit": 1})
     assert r.status_code == 200, r.text
     body = r.json()
     assert isinstance(body.get("items"), list)

@@ -45,9 +45,7 @@ async def test_resolve_tenant_from_principal_user():
 async def test_override_hook_takes_precedence():
     override_calls: list[tuple[Request, Principal | None, str | None]] = []
 
-    async def _override(
-        request: Request, identity: Principal | None, header: str | None
-    ) -> str:
+    async def _override(request: Request, identity: Principal | None, header: str | None) -> str:
         override_calls.append((request, identity, header))
         return "tenant_override"
 
@@ -68,9 +66,7 @@ async def test_override_hook_takes_precedence():
 async def test_async_override_hook_supported():
     calls: list[tuple[Request, Principal | None, str | None]] = []
 
-    async def _override(
-        request: Request, identity: Principal | None, header: str | None
-    ) -> str:
+    async def _override(request: Request, identity: Principal | None, header: str | None) -> str:
         calls.append((request, identity, header))
         return "tenant_async"
 
@@ -91,17 +87,13 @@ async def test_async_override_hook_supported():
 async def test_override_can_defer_to_default_flow():
     override_calls: list[tuple[Request, Principal | None, str | None]] = []
 
-    def _override(
-        request: Request, identity: Principal | None, header: str | None
-    ) -> None:
+    def _override(request: Request, identity: Principal | None, header: str | None) -> None:
         override_calls.append((request, identity, header))
         return None
 
     set_payments_tenant_resolver(_override)
     try:
-        tenant_id = await resolve_payments_tenant_id(
-            _request(), tenant_header="tenant_header"
-        )
+        tenant_id = await resolve_payments_tenant_id(_request(), tenant_header="tenant_header")
     finally:
         set_payments_tenant_resolver(None)
 
@@ -121,9 +113,7 @@ async def test_resolve_tenant_from_principal_api_key():
 
 @pytest.mark.asyncio
 async def test_resolve_tenant_from_header():
-    tenant_id = await resolve_payments_tenant_id(
-        _request(), tenant_header="tenant_header"
-    )
+    tenant_id = await resolve_payments_tenant_id(_request(), tenant_header="tenant_header")
 
     assert tenant_id == "tenant_header"
 

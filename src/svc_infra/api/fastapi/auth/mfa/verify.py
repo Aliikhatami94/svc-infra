@@ -73,18 +73,11 @@ async def verify_mfa_for_user(
             now = _now_utc_ts()
             if rec:
                 attempts_left = rec.get("attempts_left")
-                if (
-                    now <= rec["exp"]
-                    and attempts_left
-                    and attempts_left > 0
-                    and rec["hash"] == dig
-                ):
+                if now <= rec["exp"] and attempts_left and attempts_left > 0 and rec["hash"] == dig:
                     EMAIL_OTP_STORE.pop(uid, None)  # burn on success
                     return MFAResult(ok=True, method="email", attempts_left=None)
                 # decrement on failure
                 rec["attempts_left"] = max(0, (attempts_left or 0) - 1)
-                return MFAResult(
-                    ok=False, method="email", attempts_left=rec["attempts_left"]
-                )
+                return MFAResult(ok=False, method="email", attempts_left=rec["attempts_left"])
 
     return MFAResult(ok=False, method="none", attempts_left=None)

@@ -35,9 +35,7 @@ class TestHealthCheck:
 
         with patch("svc_infra.health.check_url") as mock_check:
             mock_check.return_value = AsyncMock(return_value=mock_result)
-            result = runner.invoke(
-                cli_app, ["health", "check", "http://localhost:8000/health"]
-            )
+            result = runner.invoke(cli_app, ["health", "check", "http://localhost:8000/health"])
 
         assert result.exit_code == 0
         assert "✓" in result.stdout
@@ -55,9 +53,7 @@ class TestHealthCheck:
 
         with patch("svc_infra.health.check_url") as mock_check:
             mock_check.return_value = AsyncMock(return_value=mock_result)
-            result = runner.invoke(
-                cli_app, ["health", "check", "http://localhost:8000/health"]
-            )
+            result = runner.invoke(cli_app, ["health", "check", "http://localhost:8000/health"])
 
         assert result.exit_code == 1
         assert "✗" in result.stdout

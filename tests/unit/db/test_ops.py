@@ -59,9 +59,7 @@ class TestGetDatabaseUrlFromEnv:
         monkeypatch.delenv("SQL_URL", raising=False)
         monkeypatch.delenv("DB_URL", raising=False)
         monkeypatch.delenv("DATABASE_URL", raising=False)
-        monkeypatch.setenv(
-            "DATABASE_URL_PRIVATE", "postgres://user:pass@private.railway/db"
-        )
+        monkeypatch.setenv("DATABASE_URL_PRIVATE", "postgres://user:pass@private.railway/db")
 
         url = get_database_url_from_env(required=True)
         assert url == "postgresql://user:pass@private.railway/db"
@@ -112,9 +110,7 @@ class TestWaitForDatabase:
 
         mock_conn = MagicMock()
         with patch("svc_infra.db.ops._get_connection", return_value=mock_conn):
-            result = wait_for_database(
-                url="postgresql://test/db", timeout=5, verbose=False
-            )
+            result = wait_for_database(url="postgresql://test/db", timeout=5, verbose=False)
 
         assert result is True
         mock_conn.close.assert_called_once()
@@ -150,9 +146,7 @@ class TestWaitForDatabase:
                 raise Exception("Not ready yet")
             return mock_conn
 
-        with patch(
-            "svc_infra.db.ops._get_connection", side_effect=failing_then_success
-        ):
+        with patch("svc_infra.db.ops._get_connection", side_effect=failing_then_success):
             result = wait_for_database(
                 url="postgresql://test/db",
                 timeout=5,
@@ -194,9 +188,7 @@ class TestRunSyncSql:
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
         with patch("svc_infra.db.ops._get_connection", return_value=mock_conn):
-            result = run_sync_sql(
-                "SELECT * FROM test", url="postgresql://test/db", fetch=True
-            )
+            result = run_sync_sql("SELECT * FROM test", url="postgresql://test/db", fetch=True)
 
         assert result == [(1, "a"), (2, "b")]
 
@@ -264,9 +256,7 @@ class TestDropTableSafe:
         from svc_infra.db.ops import drop_table_safe
 
         with patch("svc_infra.db.ops.kill_blocking_queries", return_value=[]):
-            with patch(
-                "svc_infra.db.ops.run_sync_sql", side_effect=Exception("Lock timeout")
-            ):
+            with patch("svc_infra.db.ops.run_sync_sql", side_effect=Exception("Lock timeout")):
                 result = drop_table_safe("test_table", url="postgresql://test/db")
 
         assert result is False

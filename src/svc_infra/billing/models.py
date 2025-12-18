@@ -14,9 +14,7 @@ class UsageEvent(ModelBase):
     __tablename__ = "billing_usage_events"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
     metric: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     at_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -29,9 +27,7 @@ class UsageEvent(ModelBase):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "tenant_id", "metric", "idempotency_key", name="uq_usage_idem"
-        ),
+        UniqueConstraint("tenant_id", "metric", "idempotency_key", name="uq_usage_idem"),
         Index("ix_usage_tenant_metric_ts", "tenant_id", "metric", "at_ts"),
     )
 
@@ -40,16 +36,10 @@ class UsageAggregate(ModelBase):
     __tablename__ = "billing_usage_aggregates"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
     metric: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
-    period_start: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    granularity: Mapped[str] = mapped_column(
-        String(8), nullable=False
-    )  # hour|day|month
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    granularity: Mapped[str] = mapped_column(String(8), nullable=False)  # hour|day|month
     total: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -58,9 +48,7 @@ class UsageAggregate(ModelBase):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "tenant_id", "metric", "period_start", "granularity", name="uq_usage_agg"
-        ),
+        UniqueConstraint("tenant_id", "metric", "period_start", "granularity", name="uq_usage_agg"),
     )
 
 
@@ -68,9 +56,7 @@ class Plan(ModelBase):
     __tablename__ = "billing_plans"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    key: Mapped[str] = mapped_column(
-        String(64), unique=True, index=True, nullable=False
-    )
+    key: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
@@ -99,13 +85,9 @@ class Subscription(ModelBase):
     __tablename__ = "billing_subscriptions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
     plan_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
-    effective_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -118,13 +100,9 @@ class Price(ModelBase):
     __tablename__ = "billing_prices"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    key: Mapped[str] = mapped_column(
-        String(64), unique=True, index=True, nullable=False
-    )
+    key: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    unit_amount: Mapped[int] = mapped_column(
-        Numeric(18, 0), nullable=False
-    )  # minor units
+    unit_amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)  # minor units
     metric: Mapped[str | None] = mapped_column(String(64))  # null for fixed recurring
     recurring_interval: Mapped[str | None] = mapped_column(String(8))  # month|year
     created_at: Mapped[datetime] = mapped_column(
@@ -138,15 +116,9 @@ class Invoice(ModelBase):
     __tablename__ = "billing_invoices"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    tenant_id: Mapped[str] = mapped_column(
-        String(TENANT_ID_LEN), index=True, nullable=False
-    )
-    period_start: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    period_end: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(TENANT_ID_LEN), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
     total_amount: Mapped[int] = mapped_column(Numeric(18, 0), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)

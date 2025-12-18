@@ -108,9 +108,7 @@ async def test_get_payout(client, fake_adapter, mocker):
 @pytest.mark.asyncio
 async def test_get_balance_empty(client, fake_adapter, mocker):
     """Test getting balance when no funds available"""
-    fake_adapter.get_balance_snapshot.return_value = mocker.Mock(
-        available=[], pending=[]
-    )
+    fake_adapter.get_balance_snapshot.return_value = mocker.Mock(available=[], pending=[])
 
     res = await client.get("/payments/balance")
     assert res.status_code == 200
