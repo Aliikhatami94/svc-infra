@@ -87,7 +87,7 @@ services:
         # Install the project to ensure FastAPI/Starlette and all runtime deps are present
         python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary /workspace
         # Test-only deps + optional driver used by acceptance (sqlite+aiosqlite URL)
-        python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary pytest httpx pyjwt aiosqlite
+        python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary pytest pytest-asyncio httpx pyjwt aiosqlite
         if [ "${BACKEND:-}" = "pg" ] || [ "${BACKEND:-}" = "pg-redis" ]; then python -m pip install --root-user-action=ignore --no-cache-dir --prefer-binary asyncpg; fi
         cat >/tmp/wait_api.py <<'PY'
         import sys, time, urllib.request
