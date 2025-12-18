@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from svc_infra.db.outbox import OutboxStore
@@ -42,7 +42,7 @@ class WebhookService:
         self._subs = subs
 
     def publish(self, topic: str, payload: dict, *, version: int = 1) -> int:
-        created_at = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(UTC).isoformat()
         base_event = {
             "topic": topic,
             "payload": payload,

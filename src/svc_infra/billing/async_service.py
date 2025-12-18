@@ -24,8 +24,8 @@ See also:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +48,7 @@ class AsyncBillingService:
         metadata: dict | None,
     ) -> str:
         if at.tzinfo is None:
-            at = at.replace(tzinfo=timezone.utc)
+            at = at.replace(tzinfo=UTC)
         evt = UsageEvent(
             id=str(uuid.uuid4()),
             tenant_id=self.tenant_id,
@@ -63,9 +63,7 @@ class AsyncBillingService:
         return evt.id
 
     async def aggregate_daily(self, *, metric: str, day_start: datetime) -> int:
-        day_start = day_start.replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
-        )
+        day_start = day_start.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
         next_day = day_start + timedelta(days=1)
         total = 0
         rows: Sequence[UsageEvent] = (

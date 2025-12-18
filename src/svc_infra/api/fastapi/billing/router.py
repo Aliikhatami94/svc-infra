@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
@@ -35,7 +35,7 @@ async def record_usage(
     svc: Annotated[AsyncBillingService, Depends(get_service)],
     response: Response,
 ):
-    at = data.at or datetime.now(tz=timezone.utc)
+    at = data.at or datetime.now(tz=UTC)
     evt_id = await svc.record_usage(
         metric=data.metric,
         amount=int(data.amount),
@@ -58,9 +58,7 @@ async def list_aggregates(
     date_to: datetime | None = None,
     svc: Annotated[AsyncBillingService, Depends(get_service)] = None,  # type: ignore[assignment]
 ):
-    rows = await svc.list_daily_aggregates(
-        metric=metric, date_from=date_from, date_to=date_to
-    )
+    rows = await svc.list_daily_aggregates(metric=metric, date_from=date_from, date_to=date_to)
     items = [
         UsageAggregateRow(
             period_start=r.period_start,

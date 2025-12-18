@@ -6,7 +6,7 @@ with version-resilient handling and namespace support.
 """
 
 import logging
-from typing import Callable, Union
+from collections.abc import Callable
 
 from svc_infra.cache.backend import alias as _alias
 
@@ -15,7 +15,7 @@ from .utils import validate_cache_key
 logger = logging.getLogger(__name__)
 
 
-def build_key_template(key: Union[str, tuple[str, ...]]) -> str:
+def build_key_template(key: str | tuple[str, ...]) -> str:
     """Convert key to template string."""
     if isinstance(key, tuple):
         parts = [part for part in key if part]

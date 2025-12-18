@@ -8,7 +8,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, AsyncIterator, Literal
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from .models import LoadedContent
@@ -57,7 +58,7 @@ class BaseLoader(ABC):
         self.on_error = on_error
 
     @abstractmethod
-    async def load(self) -> list["LoadedContent"]:
+    async def load(self) -> list[LoadedContent]:
         """Load all content from the source.
 
         This is the main method that subclasses must implement.
@@ -70,7 +71,7 @@ class BaseLoader(ABC):
         """
         ...
 
-    async def aiter(self) -> AsyncIterator["LoadedContent"]:
+    async def aiter(self) -> AsyncIterator[LoadedContent]:
         """Iterate over loaded content asynchronously.
 
         This is useful for progress tracking or streaming large datasets.
@@ -88,7 +89,7 @@ class BaseLoader(ABC):
         for content in await self.load():
             yield content
 
-    def load_sync(self) -> list["LoadedContent"]:
+    def load_sync(self) -> list[LoadedContent]:
         """Synchronous wrapper for load().
 
         Creates a new event loop if needed. Prefer the async version

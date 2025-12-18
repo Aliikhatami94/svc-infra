@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, Sequence, cast
+import builtins
+from collections.abc import Iterable, Sequence
+from datetime import UTC
+from typing import Any, cast
 
 try:
     from bson import ObjectId
@@ -120,9 +123,9 @@ class NoSqlRepository:
         *,
         limit: int,
         offset: int,
-        sort: list[tuple[str, int]] | None = None,
+        sort: builtins.list[tuple[str, int]] | None = None,
         filter: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> builtins.list[dict[str, Any]]:
         filt = self._merge_and(self._alive_filter(), filter)
         cursor = db[self.collection_name].find(filt).skip(offset).limit(limit)
         if sort:
@@ -131,7 +134,7 @@ class NoSqlRepository:
 
     async def count(self, db, *, filter: dict[str, Any] | None = None) -> int:
         filt = self._merge_and(self._alive_filter(), filter)
-        return cast(int, await db[self.collection_name].count_documents(filt or {}))
+        return cast("int", await db[self.collection_name].count_documents(filt or {}))
 
     async def get(self, db, id_value: Any) -> dict | None:
         id_value = self._normalize_id_value(id_value)
@@ -165,16 +168,16 @@ class NoSqlRepository:
             set_ops: dict[str, Any] = {}
             if self.soft_delete_flag_field:
                 set_ops[self.soft_delete_flag_field] = False
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            set_ops[self.soft_delete_field] = datetime.now(timezone.utc)
+            set_ops[self.soft_delete_field] = datetime.now(UTC)
             res = await db[self.collection_name].update_one(
                 {self.id_field: id_value}, {"$set": set_ops}
             )
-            return cast(int, res.modified_count) > 0
+            return cast("int", res.modified_count) > 0
 
         res = await db[self.collection_name].delete_one({self.id_field: id_value})
-        return cast(int, res.deleted_count) > 0
+        return cast("int", res.deleted_count) > 0
 
     async def search(
         self,
@@ -184,14 +187,12 @@ class NoSqlRepository:
         fields: Sequence[str],
         limit: int,
         offset: int,
-        sort: list[tuple[str, int]] | None = None,
-    ) -> list[dict[str, Any]]:
+        sort: builtins.list[tuple[str, int]] | None = None,
+    ) -> builtins.list[dict[str, Any]]:
         regex = {"$regex": q, "$options": "i"}
         or_filter = [{"$or": [{f: regex} for f in fields]}] if fields else []
         filt = (
-            self._merge_and(self._alive_filter(), *or_filter)
-            if or_filter
-            else self._alive_filter()
+            self._merge_and(self._alive_filter(), *or_filter) if or_filter else self._alive_filter()
         )
         cursor = db[self.collection_name].find(filt).skip(offset).limit(limit)
         if sort:
@@ -202,11 +203,9 @@ class NoSqlRepository:
         regex = {"$regex": q, "$options": "i"}
         or_filter = {"$or": [{f: regex} for f in fields]} if fields else {}
         filt = self._merge_and(self._alive_filter(), or_filter)
-        return cast(int, await db[self.collection_name].count_documents(filt or {}))
+        return cast("int", await db[self.collection_name].count_documents(filt or {}))
 
     async def exists(self, db, *, where: Iterable[dict[str, Any]]) -> bool:
         filt = self._merge_and(self._alive_filter(), *list(where))
-        doc = await db[self.collection_name].find_one(
-            filt, projection={self.id_field: 1}
-        )
+        doc = await db[self.collection_name].find_one(filt, projection={self.id_field: 1})
         return doc is not None

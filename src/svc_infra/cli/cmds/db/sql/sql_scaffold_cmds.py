@@ -50,7 +50,7 @@ def cmd_scaffold(
     res = scaffold_core(
         models_dir=models_dir,
         schemas_dir=schemas_dir,
-        kind=cast(Kind, kind.lower()),
+        kind=cast("Kind", kind.lower()),
         entity_name=entity_name,
         table_name=table_name,
         overwrite=overwrite,
@@ -89,7 +89,7 @@ def cmd_scaffold_models(
     """
     res = scaffold_models_core(
         dest_dir=dest_dir,
-        kind=cast(Kind, kind.lower()),
+        kind=cast("Kind", kind.lower()),
         entity_name=entity_name,
         table_name=table_name,
         include_tenant=include_tenant,
@@ -124,7 +124,7 @@ def cmd_scaffold_schemas(
     """
     res = scaffold_schemas_core(
         dest_dir=dest_dir,
-        kind=cast(Kind, kind.lower()),
+        kind=cast("Kind", kind.lower()),
         entity_name=entity_name,
         include_tenant=include_tenant,
         overwrite=overwrite,

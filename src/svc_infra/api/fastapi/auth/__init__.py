@@ -27,7 +27,7 @@ from .security import (
     RequireService,
     RequireUser,
 )
-from .settings import AuthSettings, get_auth_settings, JWTSettings, OIDCProvider
+from .settings import AuthSettings, JWTSettings, OIDCProvider, get_auth_settings
 
 if TYPE_CHECKING:
     from .add import add_auth_users as add_auth_users

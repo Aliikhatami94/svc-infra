@@ -60,9 +60,7 @@ def _pi_to_out(pi) -> IntentOut:
         amount=int(pi.amount),
         currency=str(pi.currency).upper(),
         client_secret=getattr(pi, "client_secret", None),
-        next_action=NextAction(
-            type=getattr(getattr(pi, "next_action", None), "type", None)
-        ),
+        next_action=NextAction(type=getattr(getattr(pi, "next_action", None), "type", None)),
     )
 
 
@@ -136,9 +134,7 @@ def _sub_to_out(s) -> SubscriptionOut:
         quantity=int(qty or 0),
         cancel_at_period_end=bool(s.cancel_at_period_end),
         current_period_end=(
-            str(s.current_period_end)
-            if getattr(s, "current_period_end", None)
-            else None
+            str(s.current_period_end) if getattr(s, "current_period_end", None) else None
         ),
     )
 
@@ -167,9 +163,7 @@ def _dispute_to_out(d) -> DisputeOut:
         reason=getattr(d, "reason", None),
         status=d.status,
         evidence_due_by=(
-            str(d.evidence_details.get("due_by"))
-            if getattr(d, "evidence_details", None)
-            else None
+            str(d.evidence_details.get("due_by")) if getattr(d, "evidence_details", None) else None
         ),
         created_at=str(d.created) if getattr(d, "created", None) else None,
     )
@@ -199,9 +193,7 @@ class StripeAdapter(ProviderAdapter):
             raise RuntimeError("stripe SDK is not installed. pip install stripe")
         stripe.api_key = st.stripe.secret_key.get_secret_value()
         self._wh_secret = (
-            st.stripe.webhook_secret.get_secret_value()
-            if st.stripe.webhook_secret
-            else None
+            st.stripe.webhook_secret.get_secret_value() if st.stripe.webhook_secret else None
         )
 
     # -------- Customers --------
@@ -266,15 +258,11 @@ class StripeAdapter(ProviderAdapter):
             )
             for c in res.data
         ]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     # -------- Payment Methods --------
-    async def attach_payment_method(
-        self, data: PaymentMethodAttachIn
-    ) -> PaymentMethodOut:
+    async def attach_payment_method(self, data: PaymentMethodAttachIn) -> PaymentMethodOut:
         pm = await _acall(
             stripe.PaymentMethod.attach,
             data.payment_method_token,
@@ -307,16 +295,12 @@ class StripeAdapter(ProviderAdapter):
             )
         return _pm_to_out(pm, is_default=is_default)
 
-    async def list_payment_methods(
-        self, provider_customer_id: str
-    ) -> list[PaymentMethodOut]:
+    async def list_payment_methods(self, provider_customer_id: str) -> list[PaymentMethodOut]:
         cust = await _acall(stripe.Customer.retrieve, provider_customer_id)
         default_pm = getattr(
             getattr(cust, "invoice_settings", None), "default_payment_method", None
         )
-        res = await _acall(
-            stripe.PaymentMethod.list, customer=provider_customer_id, type="card"
-        )
+        res = await _acall(stripe.PaymentMethod.list, customer=provider_customer_id, type="card")
         return [_pm_to_out(pm, is_default=(pm.id == default_pm)) for pm in res.data]
 
     async def detach_payment_method(self, provider_method_id: str) -> PaymentMethodOut:
@@ -341,9 +325,7 @@ class StripeAdapter(ProviderAdapter):
         )
         pm = await _acall(stripe.PaymentMethod.retrieve, provider_method_id)
         is_default = (
-            getattr(
-                getattr(cust, "invoice_settings", None), "default_payment_method", None
-            )
+            getattr(getattr(cust, "invoice_settings", None), "default_payment_method", None)
             == pm.id
         )
         return _pm_to_out(pm, is_default=is_default)
@@ -387,9 +369,7 @@ class StripeAdapter(ProviderAdapter):
 
     # -------- Products / Prices --------
     async def create_product(self, data: ProductCreateIn) -> ProductOut:
-        p = await _acall(
-            stripe.Product.create, name=data.name, active=bool(data.active)
-        )
+        p = await _acall(stripe.Product.create, name=data.name, active=bool(data.active))
         return _product_to_out(p)
 
     async def get_product(self, provider_product_id: str) -> ProductOut:
@@ -406,14 +386,10 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.Product.list, **params)
         items = [_product_to_out(p) for p in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
-    async def update_product(
-        self, provider_product_id: str, data: ProductUpdateIn
-    ) -> ProductOut:
+    async def update_product(self, provider_product_id: str, data: ProductUpdateIn) -> ProductOut:
         update: dict[str, Any] = {}
         if data.name is not None:
             update["name"] = data.name
@@ -427,12 +403,12 @@ class StripeAdapter(ProviderAdapter):
         return _product_to_out(p)
 
     async def create_price(self, data: PriceCreateIn) -> PriceOut:
-        kwargs: dict[str, Any] = dict(
-            product=data.provider_product_id,
-            currency=data.currency.lower(),
-            unit_amount=int(data.unit_amount),
-            active=bool(data.active),
-        )
+        kwargs: dict[str, Any] = {
+            "product": data.provider_product_id,
+            "currency": data.currency.lower(),
+            "unit_amount": int(data.unit_amount),
+            "active": bool(data.active),
+        }
         if data.interval:
             kwargs["recurring"] = {"interval": data.interval}
         if data.trial_days is not None:
@@ -461,14 +437,10 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.Price.list, **params)
         items = [_price_to_out(p) for p in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
-    async def update_price(
-        self, provider_price_id: str, data: PriceUpdateIn
-    ) -> PriceOut:
+    async def update_price(self, provider_price_id: str, data: PriceUpdateIn) -> PriceOut:
         # Stripe allows toggling `active` and updating metadata, but not amount/currency/product.
         update: dict[str, Any] = {}
         if data.active is not None:
@@ -482,11 +454,11 @@ class StripeAdapter(ProviderAdapter):
 
     # -------- Subscriptions --------
     async def create_subscription(self, data: SubscriptionCreateIn) -> SubscriptionOut:
-        kwargs: dict[str, Any] = dict(
-            customer=data.customer_provider_id,
-            items=[{"price": data.price_provider_id, "quantity": int(data.quantity)}],
-            proration_behavior=data.proration_behavior,
-        )
+        kwargs: dict[str, Any] = {
+            "customer": data.customer_provider_id,
+            "items": [{"price": data.price_provider_id, "quantity": int(data.quantity)}],
+            "proration_behavior": data.proration_behavior,
+        }
         if data.trial_days is not None:
             kwargs["trial_period_days"] = int(data.trial_days)
         s = await _acall(stripe.Subscription.create, **kwargs)
@@ -495,9 +467,7 @@ class StripeAdapter(ProviderAdapter):
     async def update_subscription(
         self, provider_subscription_id: str, data: SubscriptionUpdateIn
     ) -> SubscriptionOut:
-        s = await _acall(
-            stripe.Subscription.retrieve, provider_subscription_id, expand=["items"]
-        )
+        s = await _acall(stripe.Subscription.retrieve, provider_subscription_id, expand=["items"])
         items = s.items.data
         update_kwargs: dict[str, Any] = {"proration_behavior": data.proration_behavior}
         # update first item (simple plan model)
@@ -511,27 +481,21 @@ class StripeAdapter(ProviderAdapter):
             update_kwargs["items"] = [item_update]
         if data.cancel_at_period_end is not None:
             update_kwargs["cancel_at_period_end"] = bool(data.cancel_at_period_end)
-        s2 = await _acall(
-            stripe.Subscription.modify, provider_subscription_id, **update_kwargs
-        )
+        s2 = await _acall(stripe.Subscription.modify, provider_subscription_id, **update_kwargs)
         return _sub_to_out(s2)
 
     async def cancel_subscription(
         self, provider_subscription_id: str, at_period_end: bool = True
     ) -> SubscriptionOut:
         s = await _acall(
-            stripe.Subscription.cancel
-            if not at_period_end
-            else stripe.Subscription.modify,
+            stripe.Subscription.cancel if not at_period_end else stripe.Subscription.modify,
             provider_subscription_id,
             **({} if not at_period_end else {"cancel_at_period_end": True}),
         )
         return _sub_to_out(s)
 
     async def get_subscription(self, provider_subscription_id: str) -> SubscriptionOut:
-        s = await _acall(
-            stripe.Subscription.retrieve, provider_subscription_id, expand=["items"]
-        )
+        s = await _acall(stripe.Subscription.retrieve, provider_subscription_id, expand=["items"])
         return _sub_to_out(s)
 
     async def list_subscriptions(
@@ -551,9 +515,7 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.Subscription.list, **params)
         items = [_sub_to_out(s) for s in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     # -------- Invoices --------
@@ -581,13 +543,13 @@ class StripeAdapter(ProviderAdapter):
         self, provider_invoice_id: str, data: InvoiceLineItemIn
     ) -> InvoiceOut:
         # attach an item to a DRAFT invoice
-        kwargs: dict[str, Any] = dict(
-            invoice=provider_invoice_id,
-            customer=data.customer_provider_id,
-            quantity=int(data.quantity or 1),
-            currency=data.currency.lower(),
-            description=data.description or None,
-        )
+        kwargs: dict[str, Any] = {
+            "invoice": provider_invoice_id,
+            "customer": data.customer_provider_id,
+            "quantity": int(data.quantity or 1),
+            "currency": data.currency.lower(),
+            "description": data.description or None,
+        }
         if data.provider_price_id:
             kwargs["price"] = data.provider_price_id
         else:
@@ -616,9 +578,7 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.Invoice.list, **params)
         items = [_inv_to_out(inv) for inv in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     async def get_invoice(self, provider_invoice_id: str) -> InvoiceOut:
@@ -656,24 +616,20 @@ class StripeAdapter(ProviderAdapter):
                     provider_price_id=price_id,
                 )
             )
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     # -------- Intents --------
-    async def create_intent(
-        self, data: IntentCreateIn, *, user_id: str | None
-    ) -> IntentOut:
-        kwargs: dict[str, Any] = dict(
-            amount=int(data.amount),
-            currency=data.currency.lower(),
-            description=data.description or None,
-            capture_method="manual" if data.capture_method == "manual" else "automatic",
-            automatic_payment_methods={"enabled": True}
+    async def create_intent(self, data: IntentCreateIn, *, user_id: str | None) -> IntentOut:
+        kwargs: dict[str, Any] = {
+            "amount": int(data.amount),
+            "currency": data.currency.lower(),
+            "description": data.description or None,
+            "capture_method": "manual" if data.capture_method == "manual" else "automatic",
+            "automatic_payment_methods": {"enabled": True}
             if not data.payment_method_types
             else None,
-        )
+        }
         if data.payment_method_types:
             kwargs["payment_method_types"] = data.payment_method_types
         pi = await _acall(
@@ -709,9 +665,7 @@ class StripeAdapter(ProviderAdapter):
         pi = await _acall(stripe.PaymentIntent.retrieve, provider_intent_id)
         return _pi_to_out(pi)
 
-    async def capture_intent(
-        self, provider_intent_id: str, *, amount: int | None
-    ) -> IntentOut:
+    async def capture_intent(self, provider_intent_id: str, *, amount: int | None) -> IntentOut:
         kwargs = {}
         if amount is not None:
             kwargs["amount_to_capture"] = int(amount)
@@ -735,9 +689,7 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.PaymentIntent.list, **params)
         items = [_pi_to_out(pi) for pi in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     # ---- Setup Intents (off-session readiness) ----
@@ -752,14 +704,10 @@ class StripeAdapter(ProviderAdapter):
             provider_setup_intent_id=si.id,
             status=si.status,
             client_secret=getattr(si, "client_secret", None),
-            next_action=NextAction(
-                type=getattr(getattr(si, "next_action", None), "type", None)
-            ),
+            next_action=NextAction(type=getattr(getattr(si, "next_action", None), "type", None)),
         )
 
-    async def confirm_setup_intent(
-        self, provider_setup_intent_id: str
-    ) -> SetupIntentOut:
+    async def confirm_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
         si = await _acall(stripe.SetupIntent.confirm, provider_setup_intent_id)
         return SetupIntentOut(
             id=si.id,
@@ -767,9 +715,7 @@ class StripeAdapter(ProviderAdapter):
             provider_setup_intent_id=si.id,
             status=si.status,
             client_secret=getattr(si, "client_secret", None),
-            next_action=NextAction(
-                type=getattr(getattr(si, "next_action", None), "type", None)
-            ),
+            next_action=NextAction(type=getattr(getattr(si, "next_action", None), "type", None)),
         )
 
     async def get_setup_intent(self, provider_setup_intent_id: str) -> SetupIntentOut:
@@ -780,9 +726,7 @@ class StripeAdapter(ProviderAdapter):
             provider_setup_intent_id=si.id,
             status=si.status,
             client_secret=getattr(si, "client_secret", None),
-            next_action=NextAction(
-                type=getattr(getattr(si, "next_action", None), "type", None)
-            ),
+            next_action=NextAction(type=getattr(getattr(si, "next_action", None), "type", None)),
         )
 
     # ---- 3DS/SCA resume ----
@@ -801,18 +745,14 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.Dispute.list, **params)
         items = [_dispute_to_out(d) for d in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     async def get_dispute(self, provider_dispute_id: str) -> DisputeOut:
         d = await _acall(stripe.Dispute.retrieve, provider_dispute_id)
         return _dispute_to_out(d)
 
-    async def submit_dispute_evidence(
-        self, provider_dispute_id: str, evidence: dict
-    ) -> DisputeOut:
+    async def submit_dispute_evidence(self, provider_dispute_id: str, evidence: dict) -> DisputeOut:
         d = await _acall(stripe.Dispute.modify, provider_dispute_id, evidence=evidence)
         # Some disputes require explicit submit call:
         try:
@@ -828,9 +768,7 @@ class StripeAdapter(ProviderAdapter):
         def _bucket(entries):
             out = []
             for b in entries or []:
-                out.append(
-                    {"currency": str(b.currency).upper(), "amount": int(b.amount)}
-                )
+                out.append({"currency": str(b.currency).upper(), "amount": int(b.amount)})
             return out
 
         return BalanceSnapshotOut(
@@ -846,9 +784,7 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.Payout.list, **params)
         items = [_payout_to_out(p) for p in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     async def get_payout(self, provider_payout_id: str) -> PayoutOut:
@@ -866,9 +802,7 @@ class StripeAdapter(ProviderAdapter):
             params["starting_after"] = cursor
         res = await _acall(stripe.Refund.list, **params)
         items = [_refund_to_out(r) for r in res.data]
-        next_cursor = (
-            res.data[-1].id if getattr(res, "has_more", False) and res.data else None
-        )
+        next_cursor = res.data[-1].id if getattr(res, "has_more", False) and res.data else None
         return items, next_cursor
 
     async def get_refund(self, provider_refund_id: str) -> RefundOut:
@@ -909,9 +843,7 @@ class StripeAdapter(ProviderAdapter):
         # Stripe exposes *summaries* per period. We surface them as list results.
         sub_item = f.subscription_item
         if not sub_item and f.provider_price_id:
-            items = await _acall(
-                stripe.SubscriptionItem.list, price=f.provider_price_id, limit=1
-            )
+            items = await _acall(stripe.SubscriptionItem.list, price=f.provider_price_id, limit=1)
             sub_item = items.data[0].id if items.data else None
         if not sub_item:
             return [], None
@@ -938,9 +870,7 @@ class StripeAdapter(ProviderAdapter):
             )
         next_cursor = (
             res.data[-1].id
-            if getattr(res, "has_more", False)
-            and res.data
-            and hasattr(res.data[-1], "id")
+            if getattr(res, "has_more", False) and res.data and hasattr(res.data[-1], "id")
             else None
         )
         return usage_records, next_cursor
@@ -948,9 +878,7 @@ class StripeAdapter(ProviderAdapter):
     async def get_usage_record(self, usage_record_id: str) -> UsageRecordOut:
         # Stripe has no direct "retrieve usage record by id" API.
         # You can reconstruct via list summaries or store records locally when creating.
-        raise NotImplementedError(
-            "Stripe does not support retrieving a single usage record by id"
-        )
+        raise NotImplementedError("Stripe does not support retrieving a single usage record by id")
 
     # -------- Webhooks --------
     async def verify_and_parse_webhook(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import FastAPI, HTTPException, Request
 from starlette.responses import JSONResponse
@@ -16,21 +16,19 @@ def add_probes(
     """Mount basic liveness/readiness/startup probes under prefix."""
     from svc_infra.api.fastapi.dual.public import public_router
 
-    router = public_router(
-        prefix=prefix, tags=["ops"], include_in_schema=include_in_schema
-    )
+    router = public_router(prefix=prefix, tags=["ops"], include_in_schema=include_in_schema)
 
     @router.get("/live")
-    async def live() -> JSONResponse:  # noqa: D401, ANN201
+    async def live() -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
     @router.get("/ready")
-    async def ready() -> JSONResponse:  # noqa: D401, ANN201
+    async def ready() -> JSONResponse:
         # In the future, add checks (DB ping, cache ping) via DI hooks.
         return JSONResponse({"status": "ok"})
 
     @router.get("/startup")
-    async def startup_probe() -> JSONResponse:  # noqa: D401, ANN201
+    async def startup_probe() -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
     app.include_router(router)
@@ -48,7 +46,7 @@ def add_maintenance_mode(
     """
 
     @app.middleware("http")
-    async def _maintenance_gate(request: Request, call_next):  # noqa: ANN001, ANN202
+    async def _maintenance_gate(request: Request, call_next):
         flag = str(os.getenv(env_var, "")).lower() in {"1", "true", "yes", "on"}
         if flag and request.method not in {"GET", "HEAD", "OPTIONS"}:
             path = request.scope.get("path", "")
@@ -65,7 +63,7 @@ def circuit_breaker_dependency(limit: int = 100, window_seconds: int = 60) -> Ca
     breaker. Here, we read an env var to simulate an open breaker.
     """
 
-    async def _dep(_: Request) -> None:  # noqa: D401, ANN202
+    async def _dep(_: Request) -> None:
         if str(os.getenv("CIRCUIT_OPEN", "")).lower() in {"1", "true", "yes", "on"}:
             raise HTTPException(status_code=503, detail="circuit open")
 

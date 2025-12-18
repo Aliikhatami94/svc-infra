@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from ..settings import get_payments_settings
 from .base import ProviderAdapter
 

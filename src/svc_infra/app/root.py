@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 DEFAULT_SENTRIES: tuple[str, ...] = (
     ".git",

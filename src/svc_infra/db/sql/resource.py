@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from svc_infra.db.sql.repository import SqlRepository
 
@@ -33,7 +34,7 @@ class SqlResource:
     create_exclude: tuple[str, ...] = ("id",)
 
     # Only a type reference; no runtime dependency on FastAPI layer
-    service_factory: Callable[[SqlRepository], "SqlService"] | None = None
+    service_factory: Callable[[SqlRepository], SqlService] | None = None
 
     # Tenancy
     tenant_field: str | None = (

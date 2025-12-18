@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from svc_infra.api.fastapi.auth.settings import get_auth_settings
 from svc_infra.app.env import require_secret
@@ -29,9 +29,9 @@ def get_mfa_pre_jwt_writer():
         async def write(self, user):
             from fastapi_users.jwt import generate_jwt
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             payload = {
-                "sub": str(getattr(user, "id")),
+                "sub": str(user.id),
                 "aud": ["fastapi-users:mfa"],
                 "iat": int(now.timestamp()),
                 "exp": int(now.timestamp()) + self.lifetime,

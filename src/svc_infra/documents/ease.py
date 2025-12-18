@@ -65,7 +65,7 @@ class DocumentManager:
         >>> manager.delete(doc.id)
     """
 
-    def __init__(self, storage: "StorageBackend"):
+    def __init__(self, storage: StorageBackend):
         """
         Initialize document manager.
 
@@ -81,7 +81,7 @@ class DocumentManager:
         filename: str,
         metadata: dict | None = None,
         content_type: str | None = None,
-    ) -> "Document":
+    ) -> Document:
         """
         Upload a document.
 
@@ -133,7 +133,7 @@ class DocumentManager:
 
         return await download_document(self.storage, document_id)
 
-    def get(self, document_id: str) -> "Document" | None:
+    def get(self, document_id: str) -> Document | None:
         """
         Get document metadata by ID.
 
@@ -174,7 +174,7 @@ class DocumentManager:
         user_id: str,
         limit: int = 100,
         offset: int = 0,
-    ) -> list["Document"]:
+    ) -> list[Document]:
         """
         List user's documents.
 
@@ -198,7 +198,7 @@ class DocumentManager:
         return list_documents(user_id, limit, offset)
 
 
-def easy_documents(storage: "StorageBackend" | None = None) -> DocumentManager:
+def easy_documents(storage: StorageBackend | None = None) -> DocumentManager:
     """
     Create a document manager with auto-configured storage.
 

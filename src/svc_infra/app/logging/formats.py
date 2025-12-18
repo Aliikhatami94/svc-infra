@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Sequence
 from enum import StrEnum
-from typing import Sequence, cast
+from typing import cast
 
 from pydantic import BaseModel
 
@@ -108,7 +109,7 @@ def _read_level() -> str:
     from svc_infra.app.env import pick
 
     return cast(
-        str,
+        "str",
         pick(prod="INFO", nonprod="DEBUG", dev="DEBUG", test="DEBUG", local="DEBUG"),
     ).upper()
 

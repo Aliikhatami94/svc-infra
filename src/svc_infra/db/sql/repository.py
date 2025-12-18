@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Iterable, Sequence, cast
+from collections.abc import Iterable, Sequence
+from typing import Any, cast
 
 from sqlalchemy import Select, String, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +49,7 @@ class SqlRepository:
         return {c.key for c in class_mapper(self.model).columns}
 
     def _id_column(self) -> InstrumentedAttribute[Any]:
-        return cast(InstrumentedAttribute[Any], getattr(self.model, self.id_attr))
+        return cast("InstrumentedAttribute[Any]", getattr(self.model, self.id_attr))
 
     def _base_select(self) -> Select:
         stmt = select(self.model)
@@ -56,12 +57,8 @@ class SqlRepository:
             # Filter out soft-deleted rows by timestamp and/or active flag
             if hasattr(self.model, self.soft_delete_field):
                 stmt = stmt.where(getattr(self.model, self.soft_delete_field).is_(None))
-            if self.soft_delete_flag_field and hasattr(
-                self.model, self.soft_delete_flag_field
-            ):
-                stmt = stmt.where(
-                    getattr(self.model, self.soft_delete_flag_field).is_(True)
-                )
+            if self.soft_delete_flag_field and hasattr(self.model, self.soft_delete_flag_field):
+                stmt = stmt.where(getattr(self.model, self.soft_delete_flag_field).is_(True))
         return stmt
 
     # basic ops
@@ -84,9 +81,7 @@ class SqlRepository:
         result = (await session.execute(stmt)).scalars().all()
         return list(result)
 
-    async def count(
-        self, session: AsyncSession, *, where: Sequence[Any] | None = None
-    ) -> int:
+    async def count(self, session: AsyncSession, *, where: Sequence[Any] | None = None) -> int:
         base = self._base_select()
         if where:
             base = base.where(and_(*where))
@@ -156,9 +151,7 @@ class SqlRepository:
             # Check attributes on the instance to support test doubles without class-level fields
             if hasattr(obj, self.soft_delete_field):
                 setattr(obj, self.soft_delete_field, func.now())
-            if self.soft_delete_flag_field and hasattr(
-                obj, self.soft_delete_flag_field
-            ):
+            if self.soft_delete_flag_field and hasattr(obj, self.soft_delete_flag_field):
                 setattr(obj, self.soft_delete_flag_field, False)
             await session.flush()
             return True

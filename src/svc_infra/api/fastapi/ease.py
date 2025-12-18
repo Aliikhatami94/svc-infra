@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -64,7 +64,7 @@ class EasyAppOptions(BaseModel):
     observability: ObservabilityOptions = ObservabilityOptions()
 
     @classmethod
-    def from_env(cls) -> "EasyAppOptions":
+    def from_env(cls) -> EasyAppOptions:
         """
         Build options from environment variables:
 
@@ -88,7 +88,7 @@ class EasyAppOptions(BaseModel):
             ),
         )
 
-    def merged_with(self, override: "EasyAppOptions | None") -> "EasyAppOptions":
+    def merged_with(self, override: EasyAppOptions | None) -> EasyAppOptions:
         """
         Merge two option sets. Non-None fields in `override` win.
         (For iterables, if override provides a non-None value, it wins entirely.)
@@ -104,13 +104,9 @@ class EasyAppOptions(BaseModel):
                 else self.logging.enable
             ),
             level=(
-                override.logging.level
-                if override.logging.level is not None
-                else self.logging.level
+                override.logging.level if override.logging.level is not None else self.logging.level
             ),
-            fmt=override.logging.fmt
-            if override.logging.fmt is not None
-            else self.logging.fmt,
+            fmt=override.logging.fmt if override.logging.fmt is not None else self.logging.fmt,
         )
 
         # observability

@@ -39,7 +39,7 @@ SYNONYMS: dict[str, Environment] = {
     "production": PROD_ENV,
 }
 
-ALL_ENVIRONMENTS = {e for e in Environment}
+ALL_ENVIRONMENTS = set(Environment)
 
 
 def _normalize(raw: str | None) -> Environment | None:
@@ -129,9 +129,7 @@ def pick(*, prod, nonprod=None, dev=None, test=None, local=None):
         return local
     if nonprod is not None:
         return nonprod
-    raise ValueError(
-        "pick(): No value found for environment and 'nonprod' was not provided."
-    )
+    raise ValueError("pick(): No value found for environment and 'nonprod' was not provided.")
 
 
 def find_env_file(start: Path | None = None) -> Path | None:

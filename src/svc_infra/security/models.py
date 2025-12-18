@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import (
     JSON,
@@ -38,7 +38,7 @@ class AuthSession(ModelBase):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoke_reason: Mapped[str | None] = mapped_column(Text)
 
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         back_populates="session", cascade="all, delete-orphan", lazy="selectin"
     )
 
@@ -62,9 +62,7 @@ class RefreshToken(ModelBase):
     rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoke_reason: Mapped[str | None] = mapped_column(Text)
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), index=True
-    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
     created_at = mapped_column(
         DateTime(timezone=True),
@@ -80,9 +78,7 @@ class RefreshTokenRevocation(ModelBase):
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     token_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
-    revoked_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)
 
 
@@ -97,7 +93,7 @@ class FailedAuthAttempt(ModelBase):
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
@@ -118,7 +114,7 @@ class AuditLog(ModelBase):
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         index=True,
     )
     actor_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -184,9 +180,7 @@ class OrganizationMembership(ModelBase):
     )
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    __table_args__ = (
-        UniqueConstraint("org_id", "user_id", name="uq_org_user_membership"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "user_id", name="uq_org_user_membership"),)
 
 
 class OrganizationInvitation(ModelBase):
@@ -199,9 +193,7 @@ class OrganizationInvitation(ModelBase):
     email: Mapped[str] = mapped_column(String(255), index=True)
     role: Mapped[str] = mapped_column(String(64), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), index=True)
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), index=True
-    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
@@ -263,7 +255,7 @@ def rotate_refresh_token(
     """Rotate: returns (new_raw, new_hash, expires_at)."""
     new_raw = generate_refresh_token()
     new_hash = hash_refresh_token(new_raw)
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+    expires_at = datetime.now(UTC) + timedelta(minutes=ttl_minutes)
     return new_raw, new_hash, expires_at
 
 

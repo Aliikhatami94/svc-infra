@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Tuple, Union
+from collections.abc import Iterable
+from typing import Any, Union
 
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from pymongo.collation import Collation
@@ -17,8 +18,8 @@ from pymongo.collation import Collation
 #   "sparse": True/False,
 #   "background": True/False   # ignored by MongoDB 6+, harmless to pass
 # }
-Alias = Dict[str, Any]
-KeySpec = Union[str, Tuple[str, int]]
+Alias = dict[str, Any]
+KeySpec = Union[str, tuple[str, int]]
 
 
 def _normalize_keys(keys: Iterable[KeySpec]) -> list[tuple[str, int]]:

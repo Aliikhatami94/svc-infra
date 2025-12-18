@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 from fastapi import FastAPI
 

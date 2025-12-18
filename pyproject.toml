@@ -160,6 +160,67 @@ filterwarnings = [
     "ignore:The `route` decorator is deprecated:DeprecationWarning:starlette.*",
 ]
 
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "TC",     # flake8-type-checking
+    "RUF",    # Ruff-specific rules
+]
+
+ignore = [
+    "E501",    # line too long (handled by formatter)
+    "RUF022",  # __all__ not sorted (we use logical grouping)
+    "RUF012",  # mutable class attrs (handled by dataclass/pydantic)
+    "B007",    # unused loop variable (often intentional)
+    "B008",    # function call in default arg (typer.Option pattern)
+    "B027",    # empty method in ABC (intentional for optional callbacks)
+    "B904",    # raise from err (not always clearer)
+    "B905",    # zip strict (Python 3.10+ only, adds verbosity)
+    "SIM102",  # nested if statements (sometimes clearer)
+    "SIM103",  # return condition directly (sometimes clearer with if)
+    "SIM105",  # contextlib.suppress (explicit try/except often clearer)
+    "SIM108",  # ternary operator (readability preference)
+    "SIM110",  # use all() (sometimes clearer with explicit loop)
+    "SIM113",  # use enumerate (sometimes clearer without)
+    "SIM115",  # context manager for files (not always applicable)
+    "SIM117",  # single with statement (sometimes clearer separate)
+    "SIM118",  # key in dict vs dict.keys() (minor)
+    "TC001",   # move application import to type-checking (breaks runtime)
+    "TC002",   # move third-party import to type-checking (breaks runtime)
+    "TC003",   # move stdlib import to type-checking (breaks runtime)
+    "UP028",   # yield from (sometimes clearer with explicit yield)
+    "UP038",   # isinstance(x, (A, B)) is valid Python and often clearer
+    "UP045",   # X | None (runtime Optional needed for Pydantic create_model)
+    "UP007",   # Union[X, Y] (runtime Union needed for type aliases)
+    "RUF001",  # ambiguous unicode char in string (intentional in docs)
+    "RUF002",  # ambiguous unicode char in docstring (intentional curly quotes)
+    "RUF003",  # ambiguous unicode char in comment (intentional curly quotes)
+    "B023",    # function uses loop variable (often intentional in closures)
+    "B039",    # contextvar default mutable (handled by contextvar)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "B018",    # useless expression in tests is fine
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["svc_infra"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

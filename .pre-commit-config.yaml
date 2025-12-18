@@ -37,7 +37,7 @@ repos:
 
   # --- Ruff: Formatting + Linting (matches CI exactly) ---
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.11.0
     hooks:
       # Run the formatter (no custom args - uses ruff defaults like CI)
       - id: ruff-format

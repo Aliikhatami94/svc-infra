@@ -135,9 +135,7 @@ def setup_oauth_authentication(
     if not providers:
         return
 
-    redirect_url = (
-        post_login_redirect or getattr(settings_obj, "post_login_redirect", None) or "/"
-    )
+    redirect_url = post_login_redirect or getattr(settings_obj, "post_login_redirect", None) or "/"
     oauth_router_instance = oauth_router_with_backend(
         user_model=user_model,
         auth_backend=auth_backend,
@@ -253,7 +251,7 @@ def add_auth_users(
     (
         fapi,
         auth_backend,
-        auth_router,
+        _auth_router,
         users_router,
         get_strategy,
         register_router,
@@ -268,9 +266,7 @@ def add_auth_users(
     )
 
     # Make the boot-time strategy and model available to resolvers
-    set_auth_state(
-        user_model=user_model, get_strategy=get_strategy, auth_prefix=auth_prefix
-    )
+    set_auth_state(user_model=user_model, get_strategy=get_strategy, auth_prefix=auth_prefix)
 
     settings_obj = get_auth_settings()
     policy = auth_policy or DefaultAuthPolicy(settings_obj)
@@ -287,7 +283,7 @@ def add_auth_users(
                 dev_default="dev-only-session-jwt-secret-not-for-production",
             )
         same_site_lit = cast(
-            Literal["lax", "strict", "none"],
+            "Literal['lax', 'strict', 'none']",
             str(getattr(settings_obj, "session_cookie_samesite", "lax")).lower(),
         )
         app.add_middleware(

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from .ease import DocumentManager
 
 
-def get_documents_manager(app: "FastAPI") -> "DocumentManager":
+def get_documents_manager(app: FastAPI) -> DocumentManager:
     """
     Dependency to get document manager from app state.
 
@@ -49,17 +49,16 @@ def get_documents_manager(app: "FastAPI") -> "DocumentManager":
     """
     if not hasattr(app.state, "documents"):
         raise RuntimeError("Documents not configured. Call add_documents(app) first.")
-    from .ease import DocumentManager
 
-    return cast(DocumentManager, app.state.documents)
+    return cast("DocumentManager", app.state.documents)
 
 
 def add_documents(
-    app: "FastAPI",
-    storage_backend: "StorageBackend" | None = None,
+    app: FastAPI,
+    storage_backend: StorageBackend | None = None,
     prefix: str = "/documents",
     tags: list[str] | None = None,
-) -> "DocumentManager":
+) -> DocumentManager:
     """
     Add document management endpoints to FastAPI app.
 

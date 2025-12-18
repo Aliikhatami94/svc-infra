@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Sequence
 from logging.config import dictConfig
-from typing import TYPE_CHECKING, Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 from svc_infra.app.env import CURRENT_ENVIRONMENT
 

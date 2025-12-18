@@ -75,7 +75,7 @@ def encrypt_secret(plaintext: str) -> str:
         return plaintext
 
     encrypted = fernet.encrypt(plaintext.encode())
-    return _ENCRYPTED_PREFIX + cast(str, encrypted.decode())
+    return _ENCRYPTED_PREFIX + cast("str", encrypted.decode())
 
 
 def decrypt_secret(ciphertext: str) -> str:
@@ -107,7 +107,7 @@ def decrypt_secret(ciphertext: str) -> str:
         return ciphertext
 
     encrypted = ciphertext[len(_ENCRYPTED_PREFIX) :].encode()
-    return cast(str, fernet.decrypt(encrypted).decode())
+    return cast("str", fernet.decrypt(encrypted).decode())
 
 
 def is_encrypted(value: str) -> bool:

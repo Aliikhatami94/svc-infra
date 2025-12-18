@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 from uuid import UUID
 
 from fastapi import Depends
@@ -51,9 +52,7 @@ def get_fastapi_users(
 
         async def on_after_register(self, user: Any, request=None):
             st = get_auth_settings()
-            if CURRENT_ENVIRONMENT in (DEV_ENV, LOCAL_ENV) and bool(
-                st.auto_verify_in_dev
-            ):
+            if CURRENT_ENVIRONMENT in (DEV_ENV, LOCAL_ENV) and bool(st.auto_verify_in_dev):
                 await self.user_db.update(user, {"is_verified": True})
                 return
             await self.request_verify(user, request)
@@ -62,10 +61,10 @@ def get_fastapi_users(
             verify_url = f"{public_auth_prefix}/verify?token={token}"
             sender = get_sender()
             sender.send(
-                to=getattr(user, "email"),
+                to=user.email,
                 subject="Verify your account",
                 html_body=f"""
-                    <p>Hi {getattr(user, 'full_name', '') or 'there'},</p>
+                    <p>Hi {getattr(user, "full_name", "") or "there"},</p>
                     <p>Click to verify your account:</p>
                     <p><a href="{verify_url}">{verify_url}</a></p>
                 """,
@@ -75,7 +74,7 @@ def get_fastapi_users(
             reset_url = f"{public_auth_prefix}/reset-password?token={token}"
             sender = get_sender()
             sender.send(
-                to=getattr(user, "email"),
+                to=user.email,
                 subject="Reset your password",
                 html_body=f"""
                     <p>We received a request to reset your password.</p>
@@ -116,9 +115,7 @@ def get_fastapi_users(
                 old_secrets=old,
                 token_audience=audience,
             )
-        return JWTStrategy(
-            secret=secret, lifetime_seconds=lifetime, token_audience=audience
-        )
+        return JWTStrategy(secret=secret, lifetime_seconds=lifetime, token_audience=audience)
 
     bearer_transport = BearerTransport(tokenUrl=auth_login_path)
     auth_backend = AuthenticationBackend(

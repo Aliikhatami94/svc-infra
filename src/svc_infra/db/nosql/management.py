@@ -24,7 +24,7 @@ def _unwrap_union(annotation: Any) -> set[type]:
     """
     origin = get_origin(annotation)
     if origin is Union:
-        return {t for t in get_args(annotation) if t is not type(None)}  # noqa: E721
+        return {t for t in get_args(annotation) if t is not type(None)}
     return {annotation} if annotation is not None else set()
 
 

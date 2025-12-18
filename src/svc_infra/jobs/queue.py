@@ -4,7 +4,7 @@ import logging
 import os
 import warnings
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class Job:
     id: str
     name: str
     payload: dict[str, Any]
-    available_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    available_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     attempts: int = 0
     max_attempts: int = 5
     backoff_seconds: int = 60  # base backoff for retry
@@ -42,9 +42,7 @@ class Job:
 
 
 class JobQueue(Protocol):
-    def enqueue(
-        self, name: str, payload: dict[str, Any], *, delay_seconds: int = 0
-    ) -> Job:
+    def enqueue(self, name: str, payload: dict[str, Any], *, delay_seconds: int = 0) -> Job:
         pass
 
     def reserve_next(self) -> Job | None:
@@ -72,24 +70,16 @@ class InMemoryJobQueue:
         self._seq += 1
         return str(self._seq)
 
-    def enqueue(
-        self, name: str, payload: dict[str, Any], *, delay_seconds: int = 0
-    ) -> Job:
-        when = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
-        job = Job(
-            id=self._next_id(), name=name, payload=dict(payload), available_at=when
-        )
+    def enqueue(self, name: str, payload: dict[str, Any], *, delay_seconds: int = 0) -> Job:
+        when = datetime.now(UTC) + timedelta(seconds=delay_seconds)
+        job = Job(id=self._next_id(), name=name, payload=dict(payload), available_at=when)
         self._jobs.append(job)
         return job
 
     def reserve_next(self) -> Job | None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for job in self._jobs:
-            if (
-                job.available_at <= now
-                and job.attempts >= 0
-                and job.attempts < job.max_attempts
-            ):
+            if job.available_at <= now and job.attempts >= 0 and job.attempts < job.max_attempts:
                 job.attempts += 1
                 return job
         return None
@@ -98,7 +88,7 @@ class InMemoryJobQueue:
         self._jobs = [j for j in self._jobs if j.id != job_id]
 
     def fail(self, job_id: str, *, error: str | None = None) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for job in self._jobs:
             if job.id == job_id:
                 job.last_error = error

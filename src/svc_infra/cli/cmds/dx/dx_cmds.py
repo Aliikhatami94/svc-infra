@@ -18,7 +18,7 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 def cmd_openapi(path: str = typer.Argument(..., help="Path to OpenAPI JSON")):
     try:
         check_openapi_problem_schema(path=path)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         typer.secho(f"OpenAPI check failed: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(2)
     typer.secho("OpenAPI checks passed", fg=typer.colors.GREEN)
@@ -28,7 +28,7 @@ def cmd_openapi(path: str = typer.Argument(..., help="Path to OpenAPI JSON")):
 def cmd_migrations(project_root: str = typer.Option(".", help="Project root")):
     try:
         check_migrations_up_to_date(project_root=project_root)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         typer.secho(f"Migrations check failed: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(2)
     typer.secho("Migrations checks passed", fg=typer.colors.GREEN)
@@ -37,9 +37,7 @@ def cmd_migrations(project_root: str = typer.Option(".", help="Project root")):
 @app.command("changelog")
 def cmd_changelog(
     version: str = typer.Argument(..., help="Version (e.g., 0.1.604)"),
-    commits_file: str = typer.Option(
-        None, help="Path to JSON lines of commits (sha,subject)"
-    ),
+    commits_file: str = typer.Option(None, help="Path to JSON lines of commits (sha,subject)"),
 ):
     """Generate a changelog section from commit messages.
 
@@ -56,9 +54,7 @@ def cmd_changelog(
         )
         raise typer.Exit(2)
     rows = [
-        json.loads(line)
-        for line in Path(commits_file).read_text().splitlines()
-        if line.strip()
+        json.loads(line) for line in Path(commits_file).read_text().splitlines() if line.strip()
     ]
     commits = [Commit(sha=r["sha"], subject=r["subject"]) for r in rows]
     out = generate_release_section(version=version, commits=commits)
@@ -67,9 +63,7 @@ def cmd_changelog(
 
 @app.command("ci")
 def cmd_ci(
-    run: bool = typer.Option(
-        False, help="Execute the steps; default just prints a plan"
-    ),
+    run: bool = typer.Option(False, help="Execute the steps; default just prints a plan"),
     openapi: str | None = typer.Option(None, help="Path to OpenAPI JSON to lint"),
     project_root: str = typer.Option(".", help="Project root for migrations check"),
 ):

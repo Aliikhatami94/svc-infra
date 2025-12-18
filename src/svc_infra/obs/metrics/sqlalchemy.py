@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from sqlalchemy.engine import Engine
 
@@ -23,12 +24,8 @@ _pool_available = gauge(
     labels=["db"],
     multiprocess_mode="livesum",
 )
-_pool_checked_out_total = counter(
-    "db_pool_checkedout_total", "Total checkouts", labels=["db"]
-)
-_pool_checked_in_total = counter(
-    "db_pool_checkedin_total", "Total checkins", labels=["db"]
-)
+_pool_checked_out_total = counter("db_pool_checkedout_total", "Total checkouts", labels=["db"])
+_pool_checked_in_total = counter("db_pool_checkedin_total", "Total checkins", labels=["db"])
 
 
 def _label(labels: Mapping[str, str] | None) -> str:
@@ -46,7 +43,7 @@ def bind_sqlalchemy_pool_metrics(
     from sqlalchemy import event
 
     @event.listens_for(sync_engine, "engine_connect")
-    def _(conn, branch):  # noqa
+    def _(conn, branch):
         # Update gauges on engine_connect as a cheap heartbeat
         pool = sync_engine.pool
         try:
@@ -56,7 +53,7 @@ def bind_sqlalchemy_pool_metrics(
             pass
 
     @event.listens_for(sync_engine, "checkout")
-    def _checkout(dbapi_con, con_record, con_proxy):  # noqa
+    def _checkout(dbapi_con, con_record, con_proxy):
         _pool_checked_out_total.labels(label).inc()
         try:
             pool = sync_engine.pool
@@ -66,7 +63,7 @@ def bind_sqlalchemy_pool_metrics(
             pass
 
     @event.listens_for(sync_engine, "checkin")
-    def _checkin(dbapi_con, con_record):  # noqa
+    def _checkin(dbapi_con, con_record):
         _pool_checked_in_total.labels(label).inc()
         try:
             pool = sync_engine.pool

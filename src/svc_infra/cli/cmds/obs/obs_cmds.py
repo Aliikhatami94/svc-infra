@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 import socket
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 import typer
@@ -29,9 +30,7 @@ def _run(cmd: list[str], *, env: dict | None = None):
 def _emit_local_stack(root: Path, metrics_url: str):
     write(
         root / "docker-compose.yml",
-        render_template(
-            "svc_infra.obs.providers.grafana.templates", "docker-compose.yml.tmpl", {}
-        ),
+        render_template("svc_infra.obs.providers.grafana.templates", "docker-compose.yml.tmpl", {}),
     )
     p = urlparse(metrics_url)
     prom_yml = render_template(
@@ -116,9 +115,7 @@ def up():
 
     root = Path(".obs")
     root.mkdir(exist_ok=True)
-    metrics_url = os.getenv(
-        "SVC_INFRA_METRICS_URL", "http://host.docker.internal:8000/metrics"
-    )
+    metrics_url = os.getenv("SVC_INFRA_METRICS_URL", "http://host.docker.internal:8000/metrics")
 
     cloud_url = os.getenv("GRAFANA_CLOUD_URL", "").strip()
     cloud_token = os.getenv("GRAFANA_CLOUD_TOKEN", "").strip()

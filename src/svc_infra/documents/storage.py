@@ -35,17 +35,17 @@ if TYPE_CHECKING:
 
 # In-memory metadata storage (production: use SQL database)
 # This is a temporary solution until SQL integration is complete
-_documents_metadata: dict[str, "Document"] = {}
+_documents_metadata: dict[str, Document] = {}
 
 
 async def upload_document(
-    storage: "StorageBackend",
+    storage: StorageBackend,
     user_id: str,
     file: bytes,
     filename: str,
     metadata: dict | None = None,
     content_type: str | None = None,
-) -> "Document":
+) -> Document:
     """
     Upload a document with file content to storage backend.
 
@@ -105,9 +105,7 @@ async def upload_document(
     checksum = f"sha256:{hashlib.sha256(file).hexdigest()}"
 
     # Upload file to storage backend
-    await storage.put(
-        storage_path, file, content_type=content_type, metadata=metadata or {}
-    )
+    await storage.put(storage_path, file, content_type=content_type, metadata=metadata or {})
 
     # Create document metadata
     doc = Document(
@@ -128,7 +126,7 @@ async def upload_document(
     return doc
 
 
-def get_document(document_id: str) -> "Document" | None:
+def get_document(document_id: str) -> Document | None:
     """
     Get document metadata by ID.
 
@@ -146,7 +144,7 @@ def get_document(document_id: str) -> "Document" | None:
     return _documents_metadata.get(document_id)
 
 
-async def download_document(storage: "StorageBackend", document_id: str) -> bytes:
+async def download_document(storage: StorageBackend, document_id: str) -> bytes:
     """
     Download document file content from storage.
 
@@ -176,7 +174,7 @@ async def download_document(storage: "StorageBackend", document_id: str) -> byte
     return await storage.get(doc.storage_path)
 
 
-async def delete_document(storage: "StorageBackend", document_id: str) -> bool:
+async def delete_document(storage: StorageBackend, document_id: str) -> bool:
     """
     Delete document and its file content.
 
@@ -212,7 +210,7 @@ def list_documents(
     user_id: str,
     limit: int = 100,
     offset: int = 0,
-) -> list["Document"]:
+) -> list[Document]:
     """
     List user's documents with pagination.
 

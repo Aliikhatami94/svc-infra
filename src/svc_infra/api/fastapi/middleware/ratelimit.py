@@ -70,8 +70,7 @@ class SimpleRateLimitMiddleware:
 
         # Default key function
         key_fn = self.key_fn or (
-            lambda r: r.headers.get("X-API-Key")
-            or (r.client.host if r.client else "unknown")
+            lambda r: r.headers.get("X-API-Key") or (r.client.host if r.client else "unknown")
         )
 
         # Resolve tenant when possible
@@ -85,9 +84,7 @@ class SimpleRateLimitMiddleware:
             # Fallback header behavior - ONLY if explicitly allowed
             # Never trust untrusted headers by default to prevent rate limit evasion
             if not tenant_id and self._allow_untrusted_tenant_header:
-                tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get(
-                    "X-Tenant-ID"
-                )
+                tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get("X-Tenant-ID")
 
         key = key_fn(request)
         if self.scope_by_tenant and tenant_id:
@@ -103,7 +100,7 @@ class SimpleRateLimitMiddleware:
                 eff_limit = self.limit
 
         now = int(time.time())
-        count, store_limit, reset = self.store.incr(str(key), self.window)
+        count, _store_limit, reset = self.store.incr(str(key), self.window)
         limit = eff_limit
         remaining = max(0, limit - count)
 

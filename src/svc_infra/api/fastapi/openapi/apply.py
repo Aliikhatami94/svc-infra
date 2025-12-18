@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import APIRouter
 
 
-def apply_default_security(
-    router: APIRouter, *, default_security: list[dict] | None
-) -> None:
+def apply_default_security(router: APIRouter, *, default_security: list[dict] | None) -> None:
     if default_security is None:
         return
     original_add = router.add_api_route
@@ -19,7 +18,7 @@ def apply_default_security(
             kwargs["openapi_extra"] = ox
         return original_add(path, endpoint, **kwargs)
 
-    setattr(router, "add_api_route", _wrapped_add_api_route)
+    router.add_api_route = _wrapped_add_api_route
 
 
 def apply_default_responses(router: APIRouter, defaults: dict[int, dict]) -> None:
@@ -40,4 +39,4 @@ def apply_default_responses(router: APIRouter, defaults: dict[int, dict]) -> Non
         kwargs["responses"] = responses
         return original_add(path, endpoint, **kwargs)
 
-    setattr(router, "add_api_route", _wrapped_add_api_route)
+    router.add_api_route = _wrapped_add_api_route

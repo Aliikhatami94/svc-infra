@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import inspect
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -23,7 +24,7 @@ async def job_aggregate_daily(
     """
     svc = AsyncBillingService(session=session, tenant_id=tenant_id)
     if day_start.tzinfo is None:
-        day_start = day_start.replace(tzinfo=timezone.utc)
+        day_start = day_start.replace(tzinfo=UTC)
     await svc.aggregate_daily(metric=metric, day_start=day_start)
 
 
@@ -41,9 +42,9 @@ async def job_generate_monthly_invoice(
     """
     svc = AsyncBillingService(session=session, tenant_id=tenant_id)
     if period_start.tzinfo is None:
-        period_start = period_start.replace(tzinfo=timezone.utc)
+        period_start = period_start.replace(tzinfo=UTC)
     if period_end.tzinfo is None:
-        period_end = period_end.replace(tzinfo=timezone.utc)
+        period_end = period_end.replace(tzinfo=UTC)
     return await svc.generate_monthly_invoice(
         period_start=period_start, period_end=period_end, currency=currency
     )
@@ -66,7 +67,7 @@ def enqueue_aggregate_daily(
     payload = {
         "tenant_id": tenant_id,
         "metric": metric,
-        "day_start": day_start.astimezone(timezone.utc).isoformat(),
+        "day_start": day_start.astimezone(UTC).isoformat(),
     }
     queue.enqueue(BILLING_AGGREGATE_JOB, payload, delay_seconds=delay_seconds)
 
@@ -82,8 +83,8 @@ def enqueue_generate_monthly_invoice(
 ) -> None:
     payload = {
         "tenant_id": tenant_id,
-        "period_start": period_start.astimezone(timezone.utc).isoformat(),
-        "period_end": period_end.astimezone(timezone.utc).isoformat(),
+        "period_start": period_start.astimezone(UTC).isoformat(),
+        "period_end": period_end.astimezone(UTC).isoformat(),
         "currency": currency,
     }
     queue.enqueue(BILLING_INVOICE_JOB, payload, delay_seconds=delay_seconds)
@@ -103,18 +104,16 @@ def make_daily_aggregate_tick(
     """
 
     async def _tick():
-        ts = (when or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        ts = (when or datetime.now(UTC)).astimezone(UTC)
         day_start = ts.replace(hour=0, minute=0, second=0, microsecond=0)
-        enqueue_aggregate_daily(
-            queue, tenant_id=tenant_id, metric=metric, day_start=day_start
-        )
+        enqueue_aggregate_daily(queue, tenant_id=tenant_id, metric=metric, day_start=day_start)
 
     return _tick
 
 
 def make_billing_job_handler(
     *,
-    session_factory: "async_sessionmaker[AsyncSession]",
+    session_factory: async_sessionmaker[AsyncSession],
     webhooks: WebhookService,
 ) -> Callable[[Job], Awaitable[None]]:
     """Create a worker handler that processes billing jobs and emits webhooks.
@@ -156,7 +155,7 @@ def make_billing_job_handler(
                 {
                     "tenant_id": tenant_id,
                     "metric": metric,
-                    "day_start": day_start.astimezone(timezone.utc).isoformat(),
+                    "day_start": day_start.astimezone(UTC).isoformat(),
                     "total": int(total),
                 },
             )
@@ -166,12 +165,7 @@ def make_billing_job_handler(
             period_start_raw = data.get("period_start")
             period_end_raw = data.get("period_end")
             currency = str(data.get("currency"))
-            if (
-                not tenant_id
-                or not period_start_raw
-                or not period_end_raw
-                or not currency
-            ):
+            if not tenant_id or not period_start_raw or not period_end_raw or not currency:
                 return
             period_start = datetime.fromisoformat(str(period_start_raw))
             period_end = datetime.fromisoformat(str(period_end_raw))
@@ -186,8 +180,8 @@ def make_billing_job_handler(
                 {
                     "tenant_id": tenant_id,
                     "invoice_id": invoice_id,
-                    "period_start": period_start.astimezone(timezone.utc).isoformat(),
-                    "period_end": period_end.astimezone(timezone.utc).isoformat(),
+                    "period_start": period_start.astimezone(UTC).isoformat(),
+                    "period_end": period_end.astimezone(UTC).isoformat(),
                     "currency": currency,
                 },
             )
@@ -218,20 +212,16 @@ def add_billing_jobs(
 
             async def _tick_fn(tid=tenant_id, m=metric):
                 # Enqueue for the current UTC day
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                enqueue_aggregate_daily(
-                    queue, tenant_id=tid, metric=m, day_start=day_start
-                )
+                enqueue_aggregate_daily(queue, tenant_id=tid, metric=m, day_start=day_start)
 
-            scheduler.add_task(
-                f"billing.aggregate.{tenant_id}.{metric}", interval, _tick_fn
-            )
+            scheduler.add_task(f"billing.aggregate.{tenant_id}.{metric}", interval, _tick_fn)
         elif name == "invoice":
             tenant_id = j["tenant_id"]
             currency = j["currency"]
-            pstart = datetime.fromisoformat(j["period_start"]).astimezone(timezone.utc)
-            pend = datetime.fromisoformat(j["period_end"]).astimezone(timezone.utc)
+            pstart = datetime.fromisoformat(j["period_start"]).astimezone(UTC)
+            pend = datetime.fromisoformat(j["period_end"]).astimezone(UTC)
 
             async def _tick_inv(tid=tenant_id, cs=currency, ps=pstart, pe=pend):
                 enqueue_generate_monthly_invoice(

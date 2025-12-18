@@ -61,7 +61,7 @@ async def trigger_webhook(
         return None
 
     try:
-        msg_id = cast(int, webhook_service.publish(event, data))
+        msg_id = cast("int", webhook_service.publish(event, data))
         _logger.info(f"Triggered webhook event '{event}' with message ID {msg_id}")
         return msg_id
     except Exception as e:

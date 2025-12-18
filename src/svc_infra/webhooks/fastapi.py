@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 from fastapi import HTTPException, Request, status
 
@@ -21,9 +21,7 @@ def require_signature(
         try:
             body = await request.json()
         except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="invalid JSON body"
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid JSON body")
         secrets = secrets_provider()
         ok = False
         if isinstance(secrets, str):

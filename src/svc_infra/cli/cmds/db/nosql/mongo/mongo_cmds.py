@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import importlib
 import os
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import typer
 

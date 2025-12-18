@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
-from typing import Sequence
 
 from bson import ObjectId
 from fastapi import FastAPI
@@ -30,9 +30,7 @@ def add_mongo_db_with_url(app: FastAPI, url: str, db_name: str) -> None:
             expected = get_mongo_dbname_from_env(required=False)
             db = await acquire_db()
             if expected and db.name != expected:
-                raise RuntimeError(
-                    f"Connected to Mongo DB '{db.name}', expected '{expected}'."
-                )
+                raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
             yield
         finally:
             await close_mongo()
@@ -49,9 +47,7 @@ def add_mongo_db(app: FastAPI, *, dsn_env: str = "MONGO_URL") -> None:
         expected = get_mongo_dbname_from_env(required=False)
         db = await acquire_db()
         if expected and db.name != expected:
-            raise RuntimeError(
-                f"Connected to Mongo DB '{db.name}', expected '{expected}'."
-            )
+            raise RuntimeError(f"Connected to Mongo DB '{db.name}', expected '{expected}'.")
         try:
             yield
         finally:
@@ -65,9 +61,7 @@ def add_mongo_health(
 ) -> None:
     if include_in_schema is None:
         include_in_schema = CURRENT_ENVIRONMENT == LOCAL_ENV
-    app.include_router(
-        make_mongo_health_router(prefix=prefix, include_in_schema=include_in_schema)
-    )
+    app.include_router(make_mongo_health_router(prefix=prefix, include_in_schema=include_in_schema))
 
 
 def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> None:
@@ -79,11 +73,7 @@ def add_mongo_resources(app: FastAPI, resources: Sequence[NoSqlResource]) -> Non
             soft_delete_field=resource.soft_delete_field,
             soft_delete_flag_field=resource.soft_delete_flag_field,
         )
-        svc = (
-            resource.service_factory(repo)
-            if resource.service_factory
-            else NoSqlService(repo)
-        )
+        svc = resource.service_factory(repo) if resource.service_factory else NoSqlService(repo)
 
         if resource.read_schema and resource.create_schema and resource.update_schema:
             Read, Create, Update = (

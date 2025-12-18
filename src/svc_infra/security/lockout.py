@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 try:
     from sqlalchemy import or_, select
@@ -37,7 +38,7 @@ class LockoutStatus:
 def compute_lockout(
     fail_count: int, *, cfg: LockoutConfig, now: datetime | None = None
 ) -> LockoutStatus:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if fail_count < cfg.threshold:
         return LockoutStatus(False, None, fail_count)
     # cooldown factor exponent = fail_count - threshold
@@ -71,7 +72,7 @@ async def get_lockout_status(
     cfg: LockoutConfig | None = None,
 ) -> LockoutStatus:
     cfg = cfg or LockoutConfig()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     window_start = now - timedelta(minutes=cfg.window_minutes)
 
     q = select(FailedAuthAttempt).where(

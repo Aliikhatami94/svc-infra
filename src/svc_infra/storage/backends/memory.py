@@ -5,7 +5,7 @@ WARNING: Data is not persisted across restarts. Use only for testing or developm
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from ..base import FileNotFoundError, InvalidKeyError, QuotaExceededError
@@ -57,9 +57,7 @@ class MemoryBackend:
             raise InvalidKeyError("Key cannot exceed 1024 characters")
 
         # Check for safe characters
-        safe_chars = set(
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/"
-        )
+        safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/")
         if not all(c in safe_chars for c in key):
             raise InvalidKeyError(
                 "Key can only contain alphanumeric, dot, dash, underscore, and slash"
@@ -101,7 +99,7 @@ class MemoryBackend:
             self._metadata[key] = {
                 "size": len(data),
                 "content_type": content_type,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 **(metadata or {}),
             }
 

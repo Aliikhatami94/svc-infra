@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date as _date
-from typing import Sequence
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ def generate_release_section(
         buckets.setdefault(typ, []).append(_format_item(c))
 
     lines: list[str] = [f"## v{version} - {release_date}", ""]
-    for key, title in _SECTION_ORDER + [("other", "Other")]:
+    for key, title in [*_SECTION_ORDER, ("other", "Other")]:
         items = buckets.get(key) or []
         if not items:
             continue

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Generic, Iterable, Sequence, TypeVar
+from collections.abc import Iterable, Sequence
+from typing import Any, Generic, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel
@@ -25,9 +26,7 @@ class OrderParams(BaseModel):
 
 
 def dep_order(
-    order_by: str | None = Query(
-        None, description="Comma-separated fields; '-' for DESC"
-    ),
+    order_by: str | None = Query(None, description="Comma-separated fields; '-' for DESC"),
 ) -> OrderParams:
     return OrderParams(order_by=order_by)
 
@@ -53,7 +52,7 @@ class Page(BaseModel, Generic[T]):
     @classmethod
     def from_items(
         cls, *, total: int, items: Sequence[T] | Iterable[T], limit: int, offset: int
-    ) -> "Page[T]":
+    ) -> Page[T]:
         return cls(total=total, items=list(items), limit=limit, offset=offset)
 
 

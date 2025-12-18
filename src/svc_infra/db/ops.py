@@ -25,7 +25,8 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from typing import Any, Sequence, cast
+from collections.abc import Sequence
+from typing import Any, cast
 
 from .sql.utils import get_database_url_from_env
 
@@ -64,8 +65,7 @@ def _get_connection(url: str | None = None, connect_timeout: int = 10) -> Any:
         import psycopg2
     except ImportError as e:
         raise ImportError(
-            "psycopg2 is required for db.ops utilities. "
-            "Install with: pip install psycopg2-binary"
+            "psycopg2 is required for db.ops utilities. Install with: pip install psycopg2-binary"
         ) from e
 
     if url is None:
@@ -114,9 +114,7 @@ def wait_for_database(
 
         if elapsed >= timeout:
             if verbose:
-                logger.error(
-                    f"Database not ready after {timeout}s ({attempt} attempts)"
-                )
+                logger.error(f"Database not ready after {timeout}s ({attempt} attempts)")
                 _flush()
             return False
 
@@ -130,9 +128,7 @@ def wait_for_database(
         except Exception as e:
             if verbose:
                 remaining = timeout - elapsed
-                logger.debug(
-                    f"Database not ready ({e}), retrying... ({remaining:.0f}s remaining)"
-                )
+                logger.debug(f"Database not ready ({e}), retrying... ({remaining:.0f}s remaining)")
                 _flush()
             time.sleep(interval)
 
@@ -188,7 +184,7 @@ def run_sync_sql(
                 cur.execute(sql)
 
             if fetch:
-                return cast(list[tuple[Any, ...]], cur.fetchall())
+                return cast("list[tuple[Any, ...]]", cur.fetchall())
 
             conn.commit()
             return None

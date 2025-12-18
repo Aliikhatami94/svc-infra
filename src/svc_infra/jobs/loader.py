@@ -5,7 +5,8 @@ import importlib
 import json
 import logging
 import os
-from typing import Awaitable, Callable, cast
+from collections.abc import Awaitable, Callable
+from typing import cast
 
 from .scheduler import InMemoryScheduler
 
@@ -17,7 +18,7 @@ def _resolve_target(path: str) -> Callable[[], Awaitable[None]]:
     mod = importlib.import_module(mod_name)
     fn = getattr(mod, func_name)
     if asyncio.iscoroutinefunction(fn):
-        return cast(Callable[[], Awaitable[None]], fn)
+        return cast("Callable[[], Awaitable[None]]", fn)
 
     # wrap sync into async
     async def _wrapped():
@@ -26,9 +27,7 @@ def _resolve_target(path: str) -> Callable[[], Awaitable[None]]:
     return _wrapped
 
 
-def schedule_from_env(
-    scheduler: InMemoryScheduler, env_var: str = "JOBS_SCHEDULE_JSON"
-) -> None:
+def schedule_from_env(scheduler: InMemoryScheduler, env_var: str = "JOBS_SCHEDULE_JSON") -> None:
     data = os.getenv(env_var)
     if not data:
         return

@@ -1,4 +1,5 @@
-from typing import Annotated, Any, Callable, Optional, Sequence, Type, TypeVar, cast
+from collections.abc import Callable, Sequence
+from typing import Annotated, Any, Optional, TypeVar, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
@@ -29,9 +30,9 @@ def make_crud_router_plus_sql(
     *,
     model: type[Any],
     service: SqlService,
-    read_schema: Type[ReadModel],
-    create_schema: Type[CreateModel],
-    update_schema: Type[UpdateModel],
+    read_schema: type[ReadModel],
+    create_schema: type[CreateModel],
+    update_schema: type[UpdateModel],
     prefix: str,
     tags: list[str] | None = None,
     search_fields: Optional[Sequence[str]] = None,
@@ -102,13 +103,9 @@ def make_crud_router_plus_sql(
             )
             total = await service.count_filtered(session, q=sp.q, fields=fields)
         else:
-            items = await service.list(
-                session, limit=lp.limit, offset=lp.offset, order_by=order_by
-            )
+            items = await service.list(session, limit=lp.limit, offset=lp.offset, order_by=order_by)
             total = await service.count(session)
-        return Page[Any].from_items(
-            total=total, items=items, limit=lp.limit, offset=lp.offset
-        )
+        return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
     # -------- GET by id --------
     @router.get(
@@ -134,7 +131,7 @@ def make_crud_router_plus_sql(
         payload: create_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
-            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
+            data = cast("BaseModel", payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -153,7 +150,7 @@ def make_crud_router_plus_sql(
         payload: update_schema = Body(...),  # type: ignore[valid-type]
     ):
         if isinstance(payload, BaseModel):
-            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
+            data = cast("BaseModel", payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -181,12 +178,10 @@ def make_crud_router_plus_sql(
 def make_tenant_crud_router_plus_sql(
     *,
     model: type[Any],
-    service_factory: Callable[
-        [], Any
-    ],  # factory that returns a SqlService (will be wrapped)
-    read_schema: Type[ReadModel],
-    create_schema: Type[CreateModel],
-    update_schema: Type[UpdateModel],
+    service_factory: Callable[[], Any],  # factory that returns a SqlService (will be wrapped)
+    read_schema: type[ReadModel],
+    create_schema: type[CreateModel],
+    update_schema: type[UpdateModel],
     prefix: str,
     tenant_field: str = "tenant_id",
     tags: list[str] | None = None,
@@ -206,9 +201,7 @@ def make_tenant_crud_router_plus_sql(
     # Evaluate the base service once to preserve in-memory state across requests in tests/local.
     # Consumers may pass either an instance or a zero-arg factory function.
     try:
-        _base_instance = (
-            service_factory() if callable(service_factory) else service_factory
-        )
+        _base_instance = service_factory() if callable(service_factory) else service_factory
     except TypeError:
         # If the callable requires args, assume it's already an instance
         _base_instance = service_factory
@@ -239,9 +232,7 @@ def make_tenant_crud_router_plus_sql(
     # create per-request service with tenant scoping
     async def _svc(session: SqlSessionDep, tenant_id: TenantId):
         repo_or_service = getattr(_base_instance, "repo", _base_instance)
-        svc: Any = TenantSqlService(
-            repo_or_service, tenant_id=tenant_id, tenant_field=tenant_field
-        )
+        svc: Any = TenantSqlService(repo_or_service, tenant_id=tenant_id, tenant_field=tenant_field)
         return svc
 
     @router.get("", response_model=Page[read_schema])  # type: ignore[valid-type]
@@ -272,13 +263,9 @@ def make_tenant_crud_router_plus_sql(
             )
             total = await svc.count_filtered(session, q=sp.q, fields=fields)
         else:
-            items = await svc.list(
-                session, limit=lp.limit, offset=lp.offset, order_by=order_by
-            )
+            items = await svc.list(session, limit=lp.limit, offset=lp.offset, order_by=order_by)
             total = await svc.count(session)
-        return Page[Any].from_items(
-            total=total, items=items, limit=lp.limit, offset=lp.offset
-        )
+        return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
     @router.get("/{item_id}", response_model=read_schema)
     async def get_item(item_id: Any, session: SqlSessionDep, tenant_id: TenantId):
@@ -296,7 +283,7 @@ def make_tenant_crud_router_plus_sql(
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
-            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
+            data = cast("BaseModel", payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:
@@ -312,7 +299,7 @@ def make_tenant_crud_router_plus_sql(
     ):
         svc = await _svc(session, tenant_id)
         if isinstance(payload, BaseModel):
-            data = cast(BaseModel, payload).model_dump(exclude_unset=True)
+            data = cast("BaseModel", payload).model_dump(exclude_unset=True)
         elif isinstance(payload, dict):
             data = payload
         else:

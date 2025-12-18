@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 _UserModel: type | None = None
 _GetStrategy: Callable[[], Any] | None = None
@@ -19,9 +20,7 @@ def set_auth_state(
 
 def get_auth_state() -> tuple[type, Callable[[], Any], str]:
     if _UserModel is None or _GetStrategy is None:
-        raise RuntimeError(
-            "Auth state not initialized; call set_auth_state() in add_auth_users()."
-        )
+        raise RuntimeError("Auth state not initialized; call set_auth_state() in add_auth_users().")
     return _UserModel, _GetStrategy, _AuthPrefix
 
 

@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
@@ -39,7 +39,7 @@ def _hmac_sha256(s: str) -> str:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # -------------------- Factory & registry --------------------
@@ -50,13 +50,11 @@ _ApiKeyModel: type | None = None
 def get_apikey_model() -> type:
     """Return the bound ApiKey model (or raise if not enabled)."""
     if _ApiKeyModel is None:
-        raise RuntimeError(
-            "ApiKey model is not enabled. Call bind_apikey_model(...) first."
-        )
+        raise RuntimeError("ApiKey model is not enabled. Call bind_apikey_model(...) first.")
     return _ApiKeyModel
 
 
-def bind_apikey_model(user_model: type, *, table_name: str = "api_keys") -> type:
+def bind_apikey_model(user_model: type[ModelBase], *, table_name: str = "api_keys") -> type:
     """
     Create and register an ApiKey model bound to the provided user_model and table name.
     Call this once during app boot (e.g., inside add_auth_users when enable_api_keys=True).
@@ -65,12 +63,10 @@ def bind_apikey_model(user_model: type, *, table_name: str = "api_keys") -> type
     class ApiKey(ModelBase):
         __tablename__ = table_name
 
-        id: Mapped[uuid.UUID] = mapped_column(
-            GUID(), primary_key=True, default=uuid.uuid4
-        )
+        id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
 
         @declared_attr
-        def user_id(cls) -> Mapped[uuid.UUID | None]:  # noqa: N805
+        def user_id(cls) -> Mapped[uuid.UUID | None]:
             return mapped_column(
                 GUID(),
                 ForeignKey(f"{user_model.__tablename__}.id", ondelete="SET NULL"),
@@ -79,7 +75,7 @@ def bind_apikey_model(user_model: type, *, table_name: str = "api_keys") -> type
             )
 
         @declared_attr
-        def user(cls):  # noqa: N805
+        def user(cls):
             return relationship(user_model.__name__, lazy="selectin")
 
         name: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -88,9 +84,7 @@ def bind_apikey_model(user_model: type, *, table_name: str = "api_keys") -> type
         key_prefix: Mapped[str] = mapped_column(String(12), index=True, nullable=False)
         key_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # hex sha256
 
-        scopes: Mapped[list[str]] = mapped_column(
-            MutableList.as_mutable(JSON), default=list
-        )
+        scopes: Mapped[list[str]] = mapped_column(MutableList.as_mutable(JSON), default=list)
         active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
         expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
         last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -124,9 +118,7 @@ def bind_apikey_model(user_model: type, *, table_name: str = "api_keys") -> type
             import secrets
 
             prefix = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:8]
-            rand = (
-                base64.urlsafe_b64encode(secrets.token_bytes(24)).decode().rstrip("=")
-            )
+            rand = base64.urlsafe_b64encode(secrets.token_bytes(24)).decode().rstrip("=")
             plaintext = f"ak_{prefix}_{rand}"
             return plaintext, prefix, _hmac_sha256(plaintext)
 
@@ -160,7 +152,7 @@ def try_autobind_apikey_model(*, require_env: bool = False) -> type | None:
         from svc_infra.db.sql.base import ModelBase
 
         # SQLAlchemy 2.x: iterate registry mappers to get mapped classes
-        for mapper in list(getattr(ModelBase, "registry").mappers):
+        for mapper in list(ModelBase.registry.mappers):
             cls = mapper.class_
             if getattr(cls, "__svc_infra_auth_user__", False):
                 return bind_apikey_model(cls)  # binds and returns ApiKey

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Awaitable, Callable, Iterable
 from pathlib import Path
-from typing import Awaitable, Callable, Iterable
 
 
 async def run_fixtures(

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import format_datetime, parsedate_to_datetime
 from hashlib import sha256
 
@@ -16,13 +16,11 @@ def set_conditional_headers(
         resp.headers["ETag"] = etag
     if last_modified:
         if last_modified.tzinfo is None:
-            last_modified = last_modified.replace(tzinfo=timezone.utc)
+            last_modified = last_modified.replace(tzinfo=UTC)
         resp.headers["Last-Modified"] = format_datetime(last_modified)
 
 
-def maybe_not_modified(
-    request: Request, etag: str | None, last_modified: datetime | None
-) -> bool:
+def maybe_not_modified(request: Request, etag: str | None, last_modified: datetime | None) -> bool:
     inm = request.headers.get("If-None-Match")
     ims = request.headers.get("If-Modified-Since")
     etag_ok = etag and inm and etag in [t.strip() for t in inm.split(",")]

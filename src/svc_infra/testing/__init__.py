@@ -28,9 +28,10 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, TypeVar
+from datetime import UTC, datetime, timedelta
+from typing import Any, TypeVar
 
 # Type variable for generic model creation
 T = TypeVar("T")
@@ -233,9 +234,7 @@ class MockCache:
         # Clean up expired entries
         now = time.time()
         self._store = {
-            k: v
-            for k, v in self._store.items()
-            if v.expires_at is None or v.expires_at > now
+            k: v for k, v in self._store.items() if v.expires_at is None or v.expires_at > now
         }
         return len(self._store)
 
@@ -252,8 +251,8 @@ class MockJob:
     id: str
     name: str
     payload: dict[str, Any]
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    available_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    available_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     attempts: int = 0
     max_attempts: int = 5
     status: str = "pending"  # pending, processing, completed, failed
@@ -321,9 +320,7 @@ class MockJobQueue:
 
         return decorator
 
-    def register_handler(
-        self, name: str, handler: Callable[[dict[str, Any]], Any]
-    ) -> None:
+    def register_handler(self, name: str, handler: Callable[[dict[str, Any]], Any]) -> None:
         """
         Register a job handler function.
 
@@ -353,7 +350,7 @@ class MockJobQueue:
         Returns:
             The created MockJob
         """
-        available_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+        available_at = datetime.now(UTC) + timedelta(seconds=delay_seconds)
         job = MockJob(
             id=self._next_id(),
             name=name,
@@ -400,7 +397,7 @@ class MockJobQueue:
                 job.status = "pending"
                 # Exponential backoff
                 delay = 60 * job.attempts
-                job.available_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
+                job.available_at = datetime.now(UTC) + timedelta(seconds=delay)
             return False
 
     def process_next(self) -> MockJob | None:
@@ -410,7 +407,7 @@ class MockJobQueue:
         Returns:
             The processed job, or None if no jobs available
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for job in self._jobs:
             if job.status == "pending" and job.available_at <= now:
                 self._process_job(job)

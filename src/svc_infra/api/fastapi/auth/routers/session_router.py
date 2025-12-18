@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
@@ -19,9 +19,7 @@ def build_session_router() -> APIRouter:
         response_model=list[dict],
         dependencies=[RequirePermission("security.session.list")],
     )
-    async def list_my_sessions(
-        identity: Identity, session: SqlSessionDep
-    ) -> list[dict]:
+    async def list_my_sessions(identity: Identity, session: SqlSessionDep) -> list[dict]:
         stmt = select(AuthSession).where(AuthSession.user_id == identity.user.id)
         rows = (await session.execute(stmt)).scalars().all()
         return [
@@ -51,7 +49,7 @@ def build_session_router() -> APIRouter:
             raise HTTPException(403, "forbidden")
         if s.revoked_at:
             return  # already revoked
-        s.revoked_at = datetime.now(timezone.utc)
+        s.revoked_at = datetime.now(UTC)
         s.revoke_reason = "user_revoked"
         # Revoke all refresh tokens for this session
         for rt in s.refresh_tokens:

@@ -8,7 +8,7 @@ import hashlib
 import hmac
 import json
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional, cast
 from urllib.parse import urlencode
@@ -71,9 +71,7 @@ class LocalBackend:
             raise InvalidKeyError("Key cannot exceed 1024 characters")
 
         # Check for safe characters
-        safe_chars = set(
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/"
-        )
+        safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-/")
         if not all(c in safe_chars for c in key):
             raise InvalidKeyError(
                 "Key can only contain alphanumeric, dot, dash, underscore, and slash"
@@ -97,9 +95,7 @@ class LocalBackend:
         ).hexdigest()
         return signature
 
-    def _verify_signature(
-        self, key: str, expires_at: int, download: bool, signature: str
-    ) -> bool:
+    def _verify_signature(self, key: str, expires_at: int, download: bool, signature: str) -> bool:
         """Verify HMAC signature."""
         expected = self._sign_url(key, expires_at, download)
         return hmac.compare_digest(expected, signature)
@@ -133,7 +129,7 @@ class LocalBackend:
             meta_data = {
                 "size": len(data),
                 "content_type": content_type,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 **(metadata or {}),
             }
 
@@ -224,7 +220,7 @@ class LocalBackend:
             raise StorageFileNotFoundError(f"File not found: {key}")
 
         # Calculate expiration timestamp
-        expires_at = int(datetime.now(timezone.utc).timestamp()) + expires_in
+        expires_at = int(datetime.now(UTC).timestamp()) + expires_in
 
         # Generate signature
         signature = self._sign_url(key, expires_at, download)
@@ -240,9 +236,7 @@ class LocalBackend:
         url = f"{self.base_url}/{key}?{urlencode(params)}"
         return url
 
-    def verify_url(
-        self, key: str, expires: str, signature: str, download: bool = False
-    ) -> bool:
+    def verify_url(self, key: str, expires: str, signature: str, download: bool = False) -> bool:
         """
         Verify a signed URL (for use in file serving endpoint).
 
@@ -266,7 +260,7 @@ class LocalBackend:
             return False
 
         # Check expiration
-        now = int(datetime.now(timezone.utc).timestamp())
+        now = int(datetime.now(UTC).timestamp())
         if now > expires_at:
             return False
 
@@ -323,15 +317,13 @@ class LocalBackend:
             return {
                 "size": stat.st_size,
                 "content_type": "application/octet-stream",
-                "created_at": datetime.fromtimestamp(
-                    stat.st_ctime, tz=timezone.utc
-                ).isoformat(),
+                "created_at": datetime.fromtimestamp(stat.st_ctime, tz=UTC).isoformat(),
             }
 
         try:
-            async with aiofiles.open(meta_path, "r") as f:
+            async with aiofiles.open(meta_path) as f:
                 content = await f.read()
-                return cast(dict[Any, Any], json.loads(content))
+                return cast("dict[Any, Any]", json.loads(content))
         except (OSError, json.JSONDecodeError) as e:
             raise StorageError(f"Failed to read metadata for {key}: {e}")
 

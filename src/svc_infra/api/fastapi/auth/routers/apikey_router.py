@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
@@ -56,7 +56,7 @@ def apikey_router():
         description="Create a new API key. The plaintext key is shown only once, at creation time.",
     )
     async def create_key(sess: SqlSessionDep, payload: ApiKeyCreateIn, p: Identity):
-        caller_id: UUID = getattr(p.user, "id")
+        caller_id: UUID = p.user.id
         owner_id: UUID = _to_uuid(payload.user_id) if payload.user_id else caller_id
 
         if owner_id != caller_id and not getattr(p.user, "is_superuser", False):
@@ -64,9 +64,7 @@ def apikey_router():
 
         plaintext, prefix, hashed = ApiKey.make_secret()  # type: ignore[attr-defined]
         expires = (
-            (datetime.now(timezone.utc) + timedelta(hours=payload.ttl_hours))
-            if payload.ttl_hours
-            else None
+            (datetime.now(UTC) + timedelta(hours=payload.ttl_hours)) if payload.ttl_hours else None
         )
 
         row = ApiKey(
@@ -124,11 +122,11 @@ def apikey_router():
         description="Revoke an API key",
     )
     async def revoke_key(key_id: str, sess: SqlSessionDep, p: Identity):
-        row = await cast(Any, sess).get(ApiKey, key_id)
+        row = await cast("Any", sess).get(ApiKey, key_id)
         if not row:
             raise HTTPException(404, "not_found")
 
-        caller_id: UUID = getattr(p.user, "id")
+        caller_id: UUID = p.user.id
         if not (getattr(p.user, "is_superuser", False) or row.user_id == caller_id):
             raise HTTPException(403, "forbidden")
 
@@ -148,11 +146,11 @@ def apikey_router():
         p: Identity,
         force: bool = Query(False, description="Allow deleting an active key if True"),
     ):
-        row = await cast(Any, sess).get(ApiKey, key_id)
+        row = await cast("Any", sess).get(ApiKey, key_id)
         if not row:
             return  # 204
 
-        caller_id: UUID = getattr(p.user, "id")
+        caller_id: UUID = p.user.id
         if not (getattr(p.user, "is_superuser", False) or row.user_id == caller_id):
             raise HTTPException(403, "forbidden")
 

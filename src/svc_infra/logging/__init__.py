@@ -31,9 +31,10 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Any, Iterator
+from datetime import UTC, datetime
+from typing import Any
 
 # Context variables for structured logging
 _log_context: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
@@ -89,7 +90,7 @@ class JsonFormatter(logging.Formatter):
         """Format a log record as JSON."""
         # Base log structure
         log_dict: dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -149,7 +150,7 @@ class TextFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format a log record as human-readable text."""
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
         base = f"{timestamp} [{record.levelname}] {record.name}: {record.getMessage()}"
 
         # Add context if present

@@ -7,9 +7,10 @@ import json
 import logging
 import os
 import time
+from collections.abc import Callable
 from hashlib import sha256
 from types import SimpleNamespace
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
@@ -49,7 +50,7 @@ def _verify(token: str, *, secret: str) -> dict:
         payload = json.loads(body)
         if int(payload.get("exp", 0)) < int(time.time()):
             raise ValueError("expired")
-        return cast(dict[Any, Any], payload)
+        return cast("dict[Any, Any]", payload)
     except Exception as e:
         raise ValueError("invalid_token") from e
 
@@ -60,7 +61,7 @@ def admin_router(*, dependencies: list[Any] | None = None, **kwargs) -> APIRoute
     Use permission guards inside endpoints for fine-grained control.
     """
 
-    return cast(APIRouter, roles_router("admin", **kwargs))
+    return cast("APIRouter", roles_router("admin", **kwargs))
 
 
 def add_admin(
@@ -98,15 +99,13 @@ def add_admin(
 
     r = admin_router(prefix=base_path, tags=["admin"])  # role-gated
 
-    async def _default_user_getter(
-        request: Request, user_id: str, session: SqlSessionDep
-    ):
+    async def _default_user_getter(request: Request, user_id: str, session: SqlSessionDep):
         try:
             UserModel, _, _ = get_auth_state()
         except Exception:
             # Fallback: simple shim if auth state not configured
             return SimpleNamespace(id=user_id)
-        obj = await cast(Any, session).get(UserModel, user_id)
+        obj = await cast("Any", session).get(UserModel, user_id)
         if not obj:
             raise HTTPException(404, "user_not_found")
         return obj
@@ -182,9 +181,7 @@ def add_admin(
     def _compose_override():
         existing = app.dependency_overrides.get(_current_principal)
         if existing and getattr(existing, "_is_admin_impersonation_override", False):
-            dep_provider = getattr(
-                existing, "_admin_impersonation_base", _current_principal
-            )
+            dep_provider = getattr(existing, "_admin_impersonation_base", _current_principal)
         else:
             dep_provider = existing or _current_principal
 
@@ -214,16 +211,14 @@ def add_admin(
             )
             target = await _res if inspect.isawaitable(_res) else _res
             # Swap user but keep actor for audit if needed
-            setattr(base, "actor", getattr(base, "user", None))
+            base.actor = getattr(base, "user", None)
             # If target lacks roles, inherit actor roles to maintain permission checks
             try:
                 if not getattr(target, "roles", None):
-                    setattr(target, "roles", actor_roles)
+                    target.roles = actor_roles
             except Exception:
                 # Best-effort; if target object is immutable, fallback by wrapping
-                target = SimpleNamespace(
-                    id=getattr(target, "id", target_id), roles=actor_roles
-                )
+                target = SimpleNamespace(id=getattr(target, "id", target_id), roles=actor_roles)
             base.user = target
             base.via = "impersonated"
             return base

@@ -37,9 +37,10 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import httpx
 
@@ -193,7 +194,7 @@ class HealthRegistry:
             # Update latency from our timing
             result.latency_ms = (time.perf_counter() - start) * 1000
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return HealthCheckResult(
                 name=name,
                 status=HealthStatus.UNHEALTHY,
@@ -208,7 +209,7 @@ class HealthRegistry:
                 message=str(e),
             )
 
-    async def check_all(self) -> "AggregatedHealthResult":
+    async def check_all(self) -> AggregatedHealthResult:
         """
         Run all registered health checks concurrently.
 
@@ -391,7 +392,7 @@ def check_database(url: str | None) -> HealthCheckFn:
                 status=HealthStatus.HEALTHY,
                 latency_ms=(time.perf_counter() - start) * 1000,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return HealthCheckResult(
                 name="database",
                 status=HealthStatus.UNHEALTHY,
@@ -465,7 +466,7 @@ def check_redis(url: str | None) -> HealthCheckFn:
                     )
             finally:
                 await client.aclose()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return HealthCheckResult(
                 name="redis",
                 status=HealthStatus.UNHEALTHY,
@@ -622,7 +623,7 @@ def check_tcp(
                 status=HealthStatus.HEALTHY,
                 latency_ms=(time.perf_counter() - start) * 1000,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return HealthCheckResult(
                 name=name,
                 status=HealthStatus.UNHEALTHY,
@@ -795,9 +796,7 @@ def add_startup_probe(
         else:
             # Log which checks failed
             result = await registry.check_all()
-            failed = [
-                c.name for c in result.checks if c.status == HealthStatus.UNHEALTHY
-            ]
+            failed = [c.name for c in result.checks if c.status == HealthStatus.UNHEALTHY]
             error_msg = f"Dependencies not ready after {timeout}s: {failed}"
             logger.error(error_msg)
             raise RuntimeError(error_msg)

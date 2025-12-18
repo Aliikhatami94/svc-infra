@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any, Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Any
 
 from cashews import cache as _cache
 
@@ -126,9 +127,7 @@ def cache_read(
         # Attempt 1: With prefix parameter (preferred)
         if namespace:
             try:
-                wrapped = _cache.cache(
-                    ttl_val, template, prefix=namespace, **cache_kwargs
-                )(func)
+                wrapped = _cache.cache(ttl_val, template, prefix=namespace, **cache_kwargs)(func)
             except TypeError as e:
                 error_msgs.append(f"prefix parameter: {e}")
 
@@ -140,28 +139,22 @@ def cache_read(
                     if namespace and not template.startswith(f"{namespace}:")
                     else template
                 )
-                wrapped = _cache.cache(ttl_val, key_with_namespace, **cache_kwargs)(
-                    func
-                )
+                wrapped = _cache.cache(ttl_val, key_with_namespace, **cache_kwargs)(func)
             except TypeError as e:
                 error_msgs.append(f"embedded namespace: {e}")
 
         # Attempt 3: Minimal fallback
         if wrapped is None:
             try:
-                key_with_namespace = (
-                    f"{namespace}:{template}" if namespace else template
-                )
+                key_with_namespace = f"{namespace}:{template}" if namespace else template
                 wrapped = _cache.cache(ttl_val, key_with_namespace)(func)
             except Exception as e:
                 error_msgs.append(f"minimal fallback: {e}")
                 logger.error(f"All cache decorator attempts failed: {error_msgs}")
-                raise RuntimeError(
-                    f"Failed to apply cache decorator: {error_msgs[-1]}"
-                ) from e
+                raise RuntimeError(f"Failed to apply cache decorator: {error_msgs[-1]}") from e
 
         # Attach key variants renderer for cache writers
-        setattr(wrapped, "__svc_key_variants__", build_key_variants_renderer(template))
+        wrapped.__svc_key_variants__ = build_key_variants_renderer(template)
 
         # If tags were provided as a callable, populate cashews tag sets manually.
         # This is best-effort and only affects invalidation-by-tag behavior.
@@ -191,19 +184,15 @@ def cache_read(
                         except Exception:
                             pass
                     if tag_val:
-                        await _cache.set_add(
-                            tag_key_prefix + tag_val, full_key, expire=ttl_val
-                        )
+                        await _cache.set_add(tag_key_prefix + tag_val, full_key, expire=ttl_val)
             except Exception:
                 # Don't let best-effort tag mapping break cache reads.
                 pass
 
             return result
 
-        setattr(
-            _wrapped_with_dynamic_tags,
-            "__svc_key_variants__",
-            getattr(wrapped, "__svc_key_variants__", None),
+        _wrapped_with_dynamic_tags.__svc_key_variants__ = getattr(
+            wrapped, "__svc_key_variants__", None
         )
         return _wrapped_with_dynamic_tags
 

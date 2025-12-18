@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Callable
+from collections.abc import Callable
+from typing import Annotated, Any
 
 from fastapi import Header, HTTPException
 
@@ -31,12 +32,8 @@ def check_version_or_409(get_current_version: Callable[[], Any], provided: str) 
         try:
             p = int(provided)
         except Exception:
-            raise HTTPException(
-                status_code=400, detail="Invalid If-Match value; expected integer."
-            )
+            raise HTTPException(status_code=400, detail="Invalid If-Match value; expected integer.")
     else:
         p = provided
     if p != current:
-        raise HTTPException(
-            status_code=409, detail="Version mismatch (optimistic locking)."
-        )
+        raise HTTPException(status_code=409, detail="Version mismatch (optimistic locking).")

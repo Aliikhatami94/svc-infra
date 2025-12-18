@@ -76,12 +76,8 @@ def cmd_revision(
     database_url: str | None = typer.Option(
         None, help="Database URL; overrides env for this command."
     ),
-    autogenerate: bool = typer.Option(
-        False, help="Autogenerate migrations by comparing metadata."
-    ),
-    head: str | None = typer.Option(
-        "head", help="Set the head to base this revision on."
-    ),
+    autogenerate: bool = typer.Option(False, help="Autogenerate migrations by comparing metadata."),
+    head: str | None = typer.Option("head", help="Set the head to base this revision on."),
     branch_label: str | None = typer.Option(None, help="Branch label."),
     version_path: str | None = typer.Option(None, help="Alternative versions/ path."),
     sql: bool = typer.Option(False, help="Don't generate Python; dump SQL to stdout."),
@@ -99,9 +95,7 @@ def cmd_revision(
 
 
 def cmd_upgrade(
-    revision_target: str = typer.Argument(
-        "head", help="Target revision (default head)."
-    ),
+    revision_target: str = typer.Argument("head", help="Target revision (default head)."),
     database_url: str | None = typer.Option(
         None, help="Database URL; overrides env for this command."
     ),
@@ -163,9 +157,7 @@ def cmd_merge_heads(
     database_url: str | None = typer.Option(
         None, help="Database URL; overrides env for this command."
     ),
-    message: str | None = typer.Option(
-        None, "-m", "--message", help="Merge revision message."
-    ),
+    message: str | None = typer.Option(None, "-m", "--message", help="Merge revision message."),
 ):
     """Create a merge revision for multiple heads."""
     apply_database_url(database_url)
@@ -177,12 +169,8 @@ def cmd_setup_and_migrate(
         None,
         help="Overrides env for this command. Async vs sync is auto-detected from the URL.",
     ),
-    overwrite_scaffold: bool = typer.Option(
-        False, help="Overwrite alembic scaffold if present."
-    ),
-    create_db_if_missing: bool = typer.Option(
-        True, help="Create the database/schema if missing."
-    ),
+    overwrite_scaffold: bool = typer.Option(False, help="Overwrite alembic scaffold if present."),
+    create_db_if_missing: bool = typer.Option(True, help="Create the database/schema if missing."),
     create_followup_revision: bool = typer.Option(
         True, help="Create an autogen follow-up revision if revisions already exist."
     ),
@@ -264,7 +252,7 @@ def _import_callable(path: str):
             # Example: tests use a global `called` dict; point legacy to unit
             try:
                 if hasattr(unit_mod, "called"):
-                    setattr(mod, "called", getattr(unit_mod, "called"))
+                    mod.called = unit_mod.called
             except Exception:
                 pass
         # If legacy mod missing but unit exists, use unit
@@ -274,9 +262,7 @@ def _import_callable(path: str):
         mod = import_module(mod_name)
     fn = getattr(mod, fn_name, None)
     if not callable(fn):
-        raise typer.BadParameter(
-            f"Callable '{fn_name}' not found in module '{mod_name}'"
-        )
+        raise typer.BadParameter(f"Callable '{fn_name}' not found in module '{mod_name}'")
     return fn
 
 

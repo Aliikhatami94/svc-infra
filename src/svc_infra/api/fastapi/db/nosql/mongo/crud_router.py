@@ -1,4 +1,5 @@
-from typing import Annotated, Any, Optional, Sequence, Type, cast
+from collections.abc import Sequence
+from typing import Annotated, Any, Optional, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
@@ -43,9 +44,9 @@ def _parse_sort(
 def make_crud_router_plus_mongo(
     *,
     service: NoSqlService,
-    read_schema: Type[Any],
-    create_schema: Type[Any],
-    update_schema: Type[Any],
+    read_schema: type[Any],
+    create_schema: type[Any],
+    update_schema: type[Any],
     prefix: str,
     tags: list[str] | None = None,
     search_fields: Optional[Sequence[str]] = None,
@@ -53,8 +54,8 @@ def make_crud_router_plus_mongo(
     allowed_order_fields: Optional[list[str]] = None,
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
-    read_model = cast(Any, read_schema)
-    page_model = cast(Any, Page[read_schema])  # type: ignore[valid-type]
+    read_model = cast("Any", read_schema)
+    page_model = cast("Any", Page[read_schema])  # type: ignore[valid-type]
 
     router_prefix = ("/_mongo" + prefix) if mount_under_db_prefix else prefix
     router = public_router(
@@ -89,9 +90,7 @@ def make_crud_router_plus_mongo(
         else:
             items = await service.list(db, limit=lp.limit, offset=lp.offset, sort=sort)
             total = await service.count(db)
-        return Page[Any].from_items(
-            total=total, items=items, limit=lp.limit, offset=lp.offset
-        )
+        return Page[Any].from_items(total=total, items=items, limit=lp.limit, offset=lp.offset)
 
     # GET by id
     @router.get(
@@ -113,7 +112,7 @@ def make_crud_router_plus_mongo(
         description=f"Create item in {prefix} collection",
     )
     async def create_item(db: DBDep, payload: create_schema = Body(...)):  # type: ignore[valid-type]
-        data = cast(Any, payload).model_dump(exclude_unset=True)
+        data = cast("Any", payload).model_dump(exclude_unset=True)
         return await service.create(db, data)
 
     # UPDATE
@@ -127,7 +126,7 @@ def make_crud_router_plus_mongo(
         item_id: Any,
         payload: update_schema = Body(...),  # type: ignore[valid-type]
     ):
-        data = cast(Any, payload).model_dump(exclude_unset=True)
+        data = cast("Any", payload).model_dump(exclude_unset=True)
         row = await service.update(db, item_id, data)
         if not row:
             raise HTTPException(404, "Not found")

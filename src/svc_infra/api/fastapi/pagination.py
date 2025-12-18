@@ -4,12 +4,10 @@ import base64
 import contextvars
 import json
 import logging
+from collections.abc import Callable, Iterable, Sequence
 from typing import (
     Any,
-    Callable,
     Generic,
-    Iterable,
-    Sequence,
     TypeVar,
     cast,
 )
@@ -61,7 +59,7 @@ def decode_cursor(token: str | None) -> dict[Any, Any]:
         return {}
     s = token + "=" * (-len(token) % 4)
     raw = base64.urlsafe_b64decode(s.encode("ascii")).decode("utf-8")
-    return cast(dict[Any, Any], json.loads(raw))
+    return cast("dict[Any, Any]", json.loads(raw))
 
 
 # ---------- Context ----------
@@ -96,9 +94,7 @@ class PaginationContext(Generic[T]):
 
     @property
     def cursor(self) -> str | None:
-        return (
-            (self.cursor_params or CursorParams()).cursor if self.allow_cursor else None
-        )
+        return (self.cursor_params or CursorParams()).cursor if self.allow_cursor else None
 
     @property
     def limit(self) -> int:
@@ -116,11 +112,7 @@ class PaginationContext(Generic[T]):
 
     @property
     def page_size(self) -> int | None:
-        return (
-            self.page_params.page_size
-            if (self.allow_page and self.page_params)
-            else None
-        )
+        return self.page_params.page_size if (self.allow_page and self.page_params) else None
 
     @property
     def offset(self) -> int:
@@ -148,8 +140,8 @@ class PaginationContext(Generic[T]):
         return _encode_cursor({"after": last_key})
 
 
-_pagination_ctx: contextvars.ContextVar[PaginationContext | None] = (
-    contextvars.ContextVar("pagination_ctx", default=None)
+_pagination_ctx: contextvars.ContextVar[PaginationContext | None] = contextvars.ContextVar(
+    "pagination_ctx", default=None
 )
 
 
@@ -169,9 +161,7 @@ def use_pagination() -> PaginationContext:
 
 
 # ---------- Utilities ----------
-def text_filter(
-    items: Iterable[T], q: str | None, *getters: Callable[[T], str]
-) -> list[T]:
+def text_filter(items: Iterable[T], q: str | None, *getters: Callable[[T], str]) -> list[T]:
     if not q:
         return list(items)
     ql = q.lower()
@@ -193,7 +183,7 @@ def sort_by(
     key: Callable[[T], Any],
     desc: bool = False,
 ) -> list[T]:
-    return sorted(list(items), key=key, reverse=desc)
+    return sorted(items, key=key, reverse=desc)
 
 
 def cursor_window(items, *, cursor, limit, key, descending: bool, offset: int = 0):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import pyotp
@@ -80,7 +80,7 @@ def mfa_router(
             raise HTTPException(401, "Invalid token")
 
         # IMPORTANT: rehydrate into *your* session
-        db_user = await cast(Any, session).get(user_model, user.id)
+        db_user = await cast("Any", session).get(user_model, user.id)
         if not db_user:
             raise HTTPException(401, "Invalid token")
 
@@ -114,9 +114,7 @@ def mfa_router(
         # )).scalar_one()
         # assert fresh_secret == secret
 
-        return StartSetupOut(
-            otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri)
-        )
+        return StartSetupOut(otpauth_url=uri, secret=secret, qr_svg=_qr_svg_from_uri(uri))
 
     @u.post(
         MFA_CONFIRM_PATH,
@@ -144,7 +142,7 @@ def mfa_router(
 
         user.mfa_recovery = [_hash(c) for c in codes]
         user.mfa_enabled = True
-        user.mfa_confirmed_at = datetime.now(timezone.utc)
+        user.mfa_confirmed_at = datetime.now(UTC)
         await session.commit()
 
         return RecoveryCodesOut(codes=codes)
@@ -201,7 +199,7 @@ def mfa_router(
             raise HTTPException(401, "Invalid pre-auth token")
 
         # 2) load user
-        user = await cast(Any, session).get(user_model, uid)
+        user = await cast("Any", session).get(user_model, uid)
         if not user:
             raise HTTPException(401, "Invalid pre-auth token")
 
@@ -209,9 +207,7 @@ def mfa_router(
         if not getattr(user, "is_active", True):
             raise HTTPException(401, "account_disabled")
 
-        if (not getattr(user, "mfa_enabled", False)) or (
-            not getattr(user, "mfa_secret", None)
-        ):
+        if (not getattr(user, "mfa_enabled", False)) or (not getattr(user, "mfa_secret", None)):
             raise HTTPException(401, "MFA not enabled")
 
         # 3) verify TOTP or fallback
@@ -247,15 +243,13 @@ def mfa_router(
             raise HTTPException(400, "Invalid code")
 
         # NEW: set last_login on successful MFA
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
         await session.commit()
 
         # 4) mint normal JWT and set cookie
         token = await strategy.write_token(user)
         resp = JSONResponse({"access_token": token, "token_type": "bearer"})
-        cp = compute_cookie_params(
-            request, name=st.auth_cookie_name
-        )  # <-- pass Request here
+        cp = compute_cookie_params(request, name=st.auth_cookie_name)  # <-- pass Request here
         resp.set_cookie(**cp, value=token)
         return resp
 
@@ -278,7 +272,7 @@ def mfa_router(
             raise HTTPException(401, "Invalid pre-auth token")
 
         # 1b) Load user to get their email
-        user = await cast(Any, session).get(user_model, uid)
+        user = await cast("Any", session).get(user_model, uid)
         if not user or not getattr(user, "email", None):
             # (optionally also check user.mfa_enabled here)
             raise HTTPException(401, "Invalid pre-auth token")

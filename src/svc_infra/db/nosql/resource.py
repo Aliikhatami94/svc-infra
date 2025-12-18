@@ -1,12 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import (
-    Any,
-    Callable,
-    Iterable,
-    Sequence,
     TYPE_CHECKING,
+    Any,
 )
 
 if TYPE_CHECKING:

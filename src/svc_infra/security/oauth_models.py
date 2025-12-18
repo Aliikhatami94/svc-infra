@@ -8,7 +8,7 @@ Import this module only when enable_oauth=True is passed to add_auth_users.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -50,7 +50,7 @@ class ProviderAccount(ModelBase):
     raw_claims: Mapped[dict | None] = mapped_column(JSON)
 
     # Bidirectional relationship to User model
-    user: Mapped["User"] = relationship(back_populates="provider_accounts")
+    user: Mapped[User] = relationship(back_populates="provider_accounts")
 
     created_at = mapped_column(
         DateTime(timezone=True),
@@ -60,7 +60,7 @@ class ProviderAccount(ModelBase):
     updated_at = mapped_column(
         DateTime(timezone=True),
         server_default=text("CURRENT_TIMESTAMP"),
-        onupdate=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 # Environment variable names to look up for Mongo URL
 DEFAULT_MONGO_ENV_VARS: Sequence[str] = (

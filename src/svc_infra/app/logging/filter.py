@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def _is_metrics_like(record: logging.LogRecord, paths: Iterable[str]) -> bool:

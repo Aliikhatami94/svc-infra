@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import Iterable
+from collections.abc import Iterable
 
 
 class _MissingPrometheus(Exception):
@@ -31,8 +31,8 @@ def registry():
     import os
 
     prom = _prom_mod()
-    REGISTRY = getattr(prom, "REGISTRY")
-    CollectorRegistry = getattr(prom, "CollectorRegistry")
+    REGISTRY = prom.REGISTRY
+    CollectorRegistry = prom.CollectorRegistry
     multiprocess = getattr(prom, "multiprocess", None)
 
     if os.environ.get("PROMETHEUS_MULTIPROC_DIR") and multiprocess is not None:
@@ -50,10 +50,10 @@ def _mk_metric(
     **kwargs,
 ):
     prom = _prom_mod()
-    Counter = getattr(prom, "Counter")
-    Gauge = getattr(prom, "Gauge")
-    Histogram = getattr(prom, "Histogram")
-    Summary = getattr(prom, "Summary")
+    Counter = prom.Counter
+    Gauge = prom.Gauge
+    Histogram = prom.Histogram
+    Summary = prom.Summary
 
     ctors = {
         "Counter": Counter,

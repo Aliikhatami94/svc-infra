@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,9 +28,7 @@ class TenantSqlService(SqlService):
             return []
         return [col == self.tenant_id]
 
-    async def list(
-        self, session: AsyncSession, *, limit: int, offset: int, order_by=None
-    ):
+    async def list(self, session: AsyncSession, *, limit: int, offset: int, order_by=None):
         return await self.repo.list(
             session, limit=limit, offset=offset, order_by=order_by, where=self._where()
         )
@@ -43,10 +42,7 @@ class TenantSqlService(SqlService):
     async def create(self, session: AsyncSession, data: dict[str, Any]):
         data = await self.pre_create(data)
         # inject tenant_id if model supports it and value missing
-        if (
-            self.tenant_field in self.repo._model_columns()
-            and self.tenant_field not in data
-        ):
+        if self.tenant_field in self.repo._model_columns() and self.tenant_field not in data:
             data[self.tenant_field] = self.tenant_id
         return await self.repo.create(session, data)
 
@@ -77,12 +73,8 @@ class TenantSqlService(SqlService):
             where=self._where(),
         )
 
-    async def count_filtered(
-        self, session: AsyncSession, *, q: str, fields: Sequence[str]
-    ) -> int:
-        return await self.repo.count_filtered(
-            session, q=q, fields=fields, where=self._where()
-        )
+    async def count_filtered(self, session: AsyncSession, *, q: str, fields: Sequence[str]) -> int:
+        return await self.repo.count_filtered(session, q=q, fields=fields, where=self._where())
 
 
 __all__ = ["TenantSqlService"]

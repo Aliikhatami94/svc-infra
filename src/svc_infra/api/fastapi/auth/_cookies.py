@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from starlette.requests import Request
 
 from svc_infra.app.env import IS_PROD
@@ -15,9 +14,7 @@ def _is_local_host(host: str) -> bool:
 
 def _is_https(request: Request) -> bool:
     proto = (
-        (request.headers.get("x-forwarded-proto") or request.url.scheme or "")
-        .split(",")[0]
-        .strip()
+        (request.headers.get("x-forwarded-proto") or request.url.scheme or "").split(",")[0].strip()
     )
     return proto.lower() == "https"
 
@@ -32,9 +29,7 @@ def compute_cookie_params(request: Request, *, name: str) -> dict:
 
     explicit_secure = getattr(st, "session_cookie_secure", None)
     secure = (
-        bool(explicit_secure)
-        if explicit_secure is not None
-        else (_is_https(request) or IS_PROD)
+        bool(explicit_secure) if explicit_secure is not None else (_is_https(request) or IS_PROD)
     )
 
     samesite = str(getattr(st, "session_cookie_samesite", "lax")).lower()

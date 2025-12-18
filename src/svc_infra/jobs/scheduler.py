@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 
 CronFunc = Callable[[], Awaitable[None]]
 
@@ -27,7 +27,7 @@ class InMemoryScheduler:
         self._tick_interval = tick_interval
 
     def add_task(self, name: str, interval_seconds: int, func: CronFunc) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self._tasks[name] = ScheduledTask(
             name=name,
             interval_seconds=interval_seconds,
@@ -36,7 +36,7 @@ class InMemoryScheduler:
         )
 
     async def tick(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for task in self._tasks.values():
             if task.next_run_at <= now:
                 await task.func()

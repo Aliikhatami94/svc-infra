@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import jwt
 from fastapi_users.authentication.strategy.jwt import JWTStrategy
@@ -30,10 +31,8 @@ class RotatingJWTStrategy(JWTStrategy):
             if token_audience
             else []
         ) or ["fastapi-users:auth"]
-        super().__init__(
-            secret=secret, lifetime_seconds=lifetime_seconds, token_audience=aud_list
-        )
-        self._verify_secrets: list[str] = [secret] + list(old_secrets or [])
+        super().__init__(secret=secret, lifetime_seconds=lifetime_seconds, token_audience=aud_list)
+        self._verify_secrets: list[str] = [secret, *list(old_secrets or [])]
         self._lifetime_seconds = lifetime_seconds
 
     async def read_token(
@@ -62,9 +61,7 @@ class RotatingJWTStrategy(JWTStrategy):
             else:
                 aud_list = audience
             try:
-                return decode_jwt(
-                    token, self.decode_key, aud_list, algorithms=[self.algorithm]
-                )
+                return decode_jwt(token, self.decode_key, aud_list, algorithms=[self.algorithm])
             except jwt.PyJWTError:
                 pass
 

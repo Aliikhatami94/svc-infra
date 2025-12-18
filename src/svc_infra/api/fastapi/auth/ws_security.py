@@ -113,7 +113,7 @@ def _decode_jwt(token: str) -> dict:
 
     secret = settings.jwt.secret.get_secret_value()
     old_secrets = [s.get_secret_value() for s in (settings.jwt.old_secrets or [])]
-    all_secrets = [secret] + old_secrets
+    all_secrets = [secret, *old_secrets]
 
     last_error: Exception | None = None
 
@@ -125,7 +125,7 @@ def _decode_jwt(token: str) -> dict:
                 algorithms=["HS256"],
                 options={"require": ["sub", "exp"]},
             )
-            return cast(dict[Any, Any], payload)
+            return cast("dict[Any, Any]", payload)
         except jwt.ExpiredSignatureError:
             raise WebSocketException(
                 code=status.WS_1008_POLICY_VIOLATION,

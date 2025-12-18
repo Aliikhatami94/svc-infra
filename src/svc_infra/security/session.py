@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 try:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +42,7 @@ async def issue_session_and_refresh(
     db.add(session_row)
     raw = generate_refresh_token()
     token_hash = hash_refresh_token(raw)
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+    expires_at = datetime.now(UTC) + timedelta(minutes=ttl_minutes)
     rt = RefreshToken(
         session=session_row,
         token_hash=token_hash,
@@ -63,7 +63,7 @@ async def rotate_session_refresh(
 
     Returns: (new_raw_refresh_token, new_refresh_token_model)
     """
-    rotation_ts = datetime.now(timezone.utc)
+    rotation_ts = datetime.now(UTC)
     if current.revoked_at:
         raise ValueError("refresh token already revoked")
     if current.expires_at and current.expires_at <= rotation_ts:

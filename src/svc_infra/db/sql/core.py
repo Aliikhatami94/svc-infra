@@ -3,9 +3,9 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 from alembic import command
 from alembic.config import Config

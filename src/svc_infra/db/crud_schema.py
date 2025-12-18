@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence, cast
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, create_model
 
@@ -60,9 +61,9 @@ def make_crud_schemas_from_specs(
         if not s.exclude_from_update:
             ann_update[s.name] = _opt(s.typ)
 
-    Read = create_model(read_name or "Read", **cast(dict[str, Any], ann_read))
-    Create = create_model(create_name or "Create", **cast(dict[str, Any], ann_create))
-    Update = create_model(update_name or "Update", **cast(dict[str, Any], ann_update))
+    Read = create_model(read_name or "Read", **cast("dict[str, Any]", ann_read))
+    Create = create_model(create_name or "Create", **cast("dict[str, Any]", ann_create))
+    Update = create_model(update_name or "Update", **cast("dict[str, Any]", ann_update))
 
     cfg = ConfigDict(from_attributes=True)
     if json_encoders:

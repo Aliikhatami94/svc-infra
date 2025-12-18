@@ -8,7 +8,7 @@ def _load_json(path: str | Path) -> dict[Any, Any]:
     import json
 
     p = Path(path)
-    return cast(dict[Any, Any], json.loads(p.read_text()))
+    return cast("dict[Any, Any]", json.loads(p.read_text()))
 
 
 def check_openapi_problem_schema(

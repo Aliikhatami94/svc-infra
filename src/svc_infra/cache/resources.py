@@ -8,7 +8,8 @@ with standardized key patterns and tag management.
 import asyncio
 import inspect
 import logging
-from typing import Callable, Optional, Tuple
+from collections.abc import Callable
+from typing import Optional
 
 from cashews import cache as _cache
 
@@ -42,7 +43,7 @@ class Resource:
         suffix: str,
         ttl: int,
         key_template: Optional[str] = None,
-        tags_template: Optional[Tuple[str, ...]] = None,
+        tags_template: Optional[tuple[str, ...]] = None,
         lock: bool = True,
     ):
         """
@@ -63,9 +64,7 @@ class Resource:
 
         def _decorator(func: Callable):
             try:
-                return _cache(ttl=ttl, key=key_template, tags=tags_template, lock=lock)(
-                    func
-                )
+                return _cache(ttl=ttl, key=key_template, tags=tags_template, lock=lock)(func)
             except TypeError:
                 # Fallback for older cashews versions
                 return _cache(ttl=ttl, key=key_template, tags=tags_template)(func)
@@ -99,9 +98,7 @@ class Resource:
             """Delete all cache keys for a specific entity."""
             namespace = _alias() or ""
             namespace_prefix = (
-                f"{namespace}:"
-                if namespace and not namespace.endswith(":")
-                else namespace
+                f"{namespace}:" if namespace and not namespace.endswith(":") else namespace
             )
 
             # Generate candidate keys to delete
@@ -137,9 +134,7 @@ class Resource:
                     # Namespaced wildcard
                     if namespace_prefix:
                         await _maybe_await(
-                            delete_match(
-                                f"{namespace_prefix}{entity_name}:*:{entity_id}*"
-                            )
+                            delete_match(f"{namespace_prefix}{entity_name}:*:{entity_id}*")
                         )
                     # Non-namespaced wildcard
                     await _maybe_await(delete_match(f"{entity_name}:*:{entity_id}*"))
@@ -178,9 +173,7 @@ class Resource:
                         # Tag invalidation
                         invalidate_func = getattr(_cache, "invalidate", None)
                         if callable(invalidate_func):
-                            await _maybe_await(
-                                invalidate_func(f"{self.name}:{entity_id}")
-                            )
+                            await _maybe_await(invalidate_func(f"{self.name}:{entity_id}"))
 
                         # Precise key deletion
                         await _delete_entity_keys(self.name, str(entity_id))

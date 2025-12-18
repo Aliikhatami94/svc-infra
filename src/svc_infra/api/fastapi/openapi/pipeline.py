@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -23,4 +23,4 @@ def apply_mutators(app: FastAPI, *mutators):
         app.openapi_schema = schema
         return schema
 
-    setattr(app, "openapi", patched)
+    app.openapi = patched

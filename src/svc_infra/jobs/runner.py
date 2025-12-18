@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from .queue import JobQueue
 
@@ -16,9 +16,7 @@ class WorkerRunner:
     - stop(grace_seconds): signal stop, wait up to grace for current job to finish
     """
 
-    def __init__(
-        self, queue: JobQueue, handler: ProcessFunc, *, poll_interval: float = 0.25
-    ):
+    def __init__(self, queue: JobQueue, handler: ProcessFunc, *, poll_interval: float = 0.25):
         self._queue = queue
         self._handler = handler
         self._poll_interval = poll_interval
@@ -63,16 +61,14 @@ class WorkerRunner:
         if self._inflight is not None and not self._inflight.done():
             try:
                 await asyncio.wait_for(self._inflight, timeout=grace_seconds)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Give up; job will be retried if your queue supports visibility timeouts
                 pass
         # Finally, wait for loop to exit (should be quick since stopping is set)
         if self._task is not None:
             try:
-                await asyncio.wait_for(
-                    self._task, timeout=max(0.1, self._poll_interval + 0.1)
-                )
-            except asyncio.TimeoutError:
+                await asyncio.wait_for(self._task, timeout=max(0.1, self._poll_interval + 0.1))
+            except TimeoutError:
                 # Cancel as a last resort
                 self._task.cancel()
                 with contextlib.suppress(Exception):

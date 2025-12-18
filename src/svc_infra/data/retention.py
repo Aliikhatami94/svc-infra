@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Protocol, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol
 
 
 class SqlSession(Protocol):  # minimal protocol for tests/integration
@@ -26,7 +27,7 @@ async def purge_policy(session: SqlSession, policy: RetentionPolicy) -> int:
     If hard_delete is False and soft_delete_field exists on model, set timestamp; else DELETE.
     Returns number of affected rows (best-effort; test doubles may return an int directly).
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=policy.older_than_days)
+    cutoff = datetime.now(UTC) - timedelta(days=policy.older_than_days)
     m = policy.model
     where = list(policy.extra_where or [])
     created_col = getattr(m, "created_at", None)
@@ -34,11 +35,7 @@ async def purge_policy(session: SqlSession, policy: RetentionPolicy) -> int:
         where.append(created_col <= cutoff)
 
     # Soft-delete path when available and requested
-    if (
-        not policy.hard_delete
-        and policy.soft_delete_field
-        and hasattr(m, policy.soft_delete_field)
-    ):
+    if not policy.hard_delete and policy.soft_delete_field and hasattr(m, policy.soft_delete_field):
         stmt = m.update().where(*where).values({policy.soft_delete_field: cutoff})
         res = await session.execute(stmt)
         return getattr(res, "rowcount", 0)
@@ -49,9 +46,7 @@ async def purge_policy(session: SqlSession, policy: RetentionPolicy) -> int:
     return getattr(res, "rowcount", 0)
 
 
-async def run_retention_purge(
-    session: SqlSession, policies: Iterable[RetentionPolicy]
-) -> int:
+async def run_retention_purge(session: SqlSession, policies: Iterable[RetentionPolicy]) -> int:
     total = 0
     for p in policies:
         total += await purge_policy(session, p)

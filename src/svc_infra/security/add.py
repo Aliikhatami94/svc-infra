@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
-from typing import Iterable, Literal, cast
+from collections.abc import Iterable, Mapping
+from typing import Literal, cast
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -138,9 +138,7 @@ def _configure_session_middleware(
     )
     https_env = _parse_bool(env.get("SESSION_COOKIE_SECURE"))
     effective_https_only = (
-        https_only
-        if https_only is not None
-        else (https_env if https_env is not None else False)
+        https_only if https_only is not None else (https_env if https_env is not None else False)
     )
     same_site_env = env.get("SESSION_COOKIE_SAMESITE")
     same_site_raw = same_site_env.strip() if same_site_env else same_site
@@ -148,7 +146,7 @@ def _configure_session_middleware(
     same_site_value: Literal["lax", "strict", "none"] = (
         "lax"
         if same_site_raw not in ("lax", "strict", "none")
-        else cast(Literal["lax", "strict", "none"], same_site_raw)
+        else cast("Literal['lax', 'strict', 'none']", same_site_raw)
     )
 
     max_age_env = env.get("SESSION_COOKIE_MAX_AGE_SECONDS")
@@ -158,9 +156,7 @@ def _configure_session_middleware(
         max_age_value = max_age
 
     session_cookie_env = env.get("SESSION_COOKIE_NAME")
-    session_cookie_value = (
-        session_cookie_env.strip() if session_cookie_env else session_cookie
-    )
+    session_cookie_value = session_cookie_env.strip() if session_cookie_env else session_cookie
 
     app.add_middleware(
         SessionMiddleware,

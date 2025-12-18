@@ -87,7 +87,7 @@ def _rewrite_rate_windows(d: dict) -> dict:
     if not win:
         return d
 
-    dd = cast(dict[Any, Any], json.loads(json.dumps(d)))
+    dd = cast("dict[Any, Any]", json.loads(json.dumps(d)))
     for p in dd.get("panels", []) or []:
         targets = p.get("targets") or []
         for t in targets:

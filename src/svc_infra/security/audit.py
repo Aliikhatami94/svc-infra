@@ -13,9 +13,10 @@ Design notes:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Protocol, Sequence
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
 try:  # SQLAlchemy may not be present in minimal test context
     from sqlalchemy import select
@@ -81,7 +82,7 @@ class InMemoryAuditLogStore:
         ts: datetime | None = None,
     ) -> AuditEvent:
         event = AuditEvent(
-            ts=ts or datetime.now(timezone.utc),
+            ts=ts or datetime.now(UTC),
             actor_id=actor_id,
             tenant_id=tenant_id,
             event_type=event_type,
@@ -91,9 +92,7 @@ class InMemoryAuditLogStore:
         self._events.append(event)
         return event
 
-    def list(
-        self, *, tenant_id: str | None = None, limit: int | None = None
-    ) -> list[AuditEvent]:
+    def list(self, *, tenant_id: str | None = None, limit: int | None = None) -> list[AuditEvent]:
         out = [e for e in self._events if tenant_id is None or e.tenant_id == tenant_id]
         if limit is not None:
             return out[-int(limit) :]
@@ -117,14 +116,12 @@ async def append_audit_event(
     the tenant (or global chain when tenant_id is None).
     """
     metadata = metadata or {}
-    ts = ts or datetime.now(timezone.utc)
+    ts = ts or datetime.now(UTC)
 
     prev_hash: str | None = None
     if prev_event is not None:
         prev_hash = prev_event.hash
-    elif select is not None and hasattr(
-        db, "execute"
-    ):  # attempt DB lookup for previous event
+    elif select is not None and hasattr(db, "execute"):  # attempt DB lookup for previous event
         try:
             stmt = (
                 select(AuditLog)

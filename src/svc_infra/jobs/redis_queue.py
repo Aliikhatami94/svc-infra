@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from redis import Redis
@@ -41,9 +41,7 @@ class RedisJobQueue(JobQueue):
       - {p}:dlq (LIST)          dead-letter job ids
     """
 
-    def __init__(
-        self, client: Redis, *, prefix: str = "jobs", visibility_timeout: int = 60
-    ):
+    def __init__(self, client: Redis, *, prefix: str = "jobs", visibility_timeout: int = 60):
         self._r = client
         self._p = prefix
         self._vt = visibility_timeout
@@ -64,7 +62,7 @@ class RedisJobQueue(JobQueue):
 
     # Core ops
     def enqueue(self, name: str, payload: dict, *, delay_seconds: int = 0) -> Job:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         job_id = str(self._r.incr(self._k("seq")))
         job = Job(id=job_id, name=name, payload=dict(payload))
         # Persist job
@@ -85,8 +83,8 @@ class RedisJobQueue(JobQueue):
         return job
 
     def _move_due_delayed_to_ready(self) -> None:
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        ids = cast(list[Any], self._r.zrangebyscore(self._k("delayed"), "-inf", now_ts))
+        now_ts = int(datetime.now(UTC).timestamp())
+        ids = cast("list[Any]", self._r.zrangebyscore(self._k("delayed"), "-inf", now_ts))
         if not ids:
             return
         pipe = self._r.pipeline()
@@ -97,10 +95,8 @@ class RedisJobQueue(JobQueue):
         pipe.execute()
 
     def _requeue_timed_out_processing(self) -> None:
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        ids = cast(
-            list[Any], self._r.zrangebyscore(self._k("processing_vt"), "-inf", now_ts)
-        )
+        now_ts = int(datetime.now(UTC).timestamp())
+        ids = cast("list[Any]", self._r.zrangebyscore(self._k("processing_vt"), "-inf", now_ts))
         if not ids:
             return
         pipe = self._r.pipeline()
@@ -120,7 +116,7 @@ class RedisJobQueue(JobQueue):
         self._requeue_timed_out_processing()
 
         # Calculate visibility timeout BEFORE reserve to prevent race condition
-        visible_at = int(datetime.now(timezone.utc).timestamp()) + int(self._vt)
+        visible_at = int(datetime.now(UTC).timestamp()) + int(self._vt)
 
         # Try atomic reserve using Lua script if available
         # This prevents race condition where two workers could reserve the same job
@@ -139,26 +135,20 @@ class RedisJobQueue(JobQueue):
                 logger.warning("Lua script failed, using non-atomic reserve: %s", e)
                 jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
                 if jid:
-                    job_id_tmp = (
-                        jid.decode()
-                        if isinstance(jid, (bytes, bytearray))
-                        else str(jid)
-                    )
+                    job_id_tmp = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
                     self._r.zadd(self._k("processing_vt"), {job_id_tmp: visible_at})
         else:
             # Non-atomic fallback (for fakeredis in tests, or older Redis versions)
             jid = self._r.rpoplpush(self._k("ready"), self._k("processing"))
             if jid:
-                job_id_tmp = (
-                    jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
-                )
+                job_id_tmp = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
                 self._r.zadd(self._k("processing_vt"), {job_id_tmp: visible_at})
 
         if not jid:
             return None
         job_id = jid.decode() if isinstance(jid, (bytes, bytearray)) else str(jid)
         key = self._job_key(job_id)
-        data = cast(dict[Any, Any], self._r.hgetall(key))
+        data = cast("dict[Any, Any]", self._r.hgetall(key))
         if not data:
             # corrupted entry; ack and skip
             self._r.lrem(self._k("processing"), 1, job_id)
@@ -187,9 +177,7 @@ class RedisJobQueue(JobQueue):
             payload = {}
         available_at_str = _get("available_at")
         available_at = (
-            datetime.fromisoformat(available_at_str)
-            if available_at_str
-            else datetime.now(timezone.utc)
+            datetime.fromisoformat(available_at_str) if available_at_str else datetime.now(UTC)
         )
         # If exceeded max_attempts → DLQ and skip
         if attempts > max_attempts:
@@ -216,7 +204,7 @@ class RedisJobQueue(JobQueue):
 
     def fail(self, job_id: str, *, error: str | None = None) -> None:
         key = self._job_key(job_id)
-        data = cast(dict[Any, Any], self._r.hgetall(key))
+        data = cast("dict[Any, Any]", self._r.hgetall(key))
         if not data:
             # nothing to do
             self._r.lrem(self._k("processing"), 1, job_id)
@@ -235,7 +223,7 @@ class RedisJobQueue(JobQueue):
         attempts = int(_get("attempts", "0") or "0")
         max_attempts = int(_get("max_attempts", "5") or "5")
         backoff_seconds = int(_get("backoff_seconds", "60") or "60")
-        now_ts = int(datetime.now(timezone.utc).timestamp())
+        now_ts = int(datetime.now(UTC).timestamp())
         # DLQ if at or beyond max_attempts
         if attempts >= max_attempts:
             self._r.lrem(self._k("processing"), 1, job_id)
@@ -246,9 +234,7 @@ class RedisJobQueue(JobQueue):
         available_at_ts = now_ts + delay
         mapping: dict[str, str] = {
             "last_error": error or "",
-            "available_at": datetime.fromtimestamp(
-                available_at_ts, tz=timezone.utc
-            ).isoformat(),
+            "available_at": datetime.fromtimestamp(available_at_ts, tz=UTC).isoformat(),
         }
         self._r.hset(key, mapping=mapping)
         self._r.lrem(self._k("processing"), 1, job_id)

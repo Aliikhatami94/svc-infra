@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from svc_infra.db.outbox import OutboxStore
 from svc_infra.jobs.queue import JobQueue
@@ -30,9 +30,7 @@ def make_outbox_tick(
         if msg.id in dispatched:
             return
         job_name = f"{job_name_prefix}.{msg.topic}"
-        queue.enqueue(
-            job_name, {"outbox_id": msg.id, "topic": msg.topic, "payload": msg.payload}
-        )
+        queue.enqueue(job_name, {"outbox_id": msg.id, "topic": msg.topic, "payload": msg.payload})
         # mark as dispatched (bump attempts) so it won't be re-enqueued by fetch_next
         outbox.mark_failed(msg.id)
         dispatched.add(msg.id)

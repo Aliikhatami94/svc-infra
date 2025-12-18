@@ -20,18 +20,10 @@ except Exception:  # pragma: no cover - fallback when async extras unavailable
 
 
 def export_tenant(
-    table: str = typer.Argument(
-        ..., help="Qualified table name to export (e.g., public.items)"
-    ),
-    tenant_id: str = typer.Option(
-        ..., "--tenant-id", help="Tenant id value to filter by."
-    ),
-    tenant_field: str = typer.Option(
-        "tenant_id", help="Column name for tenant id filter."
-    ),
-    output: Path | None = typer.Option(
-        None, "--output", help="Output file; defaults to stdout."
-    ),
+    table: str = typer.Argument(..., help="Qualified table name to export (e.g., public.items)"),
+    tenant_id: str = typer.Option(..., "--tenant-id", help="Tenant id value to filter by."),
+    tenant_field: str = typer.Option("tenant_id", help="Column name for tenant id filter."),
+    output: Path | None = typer.Option(None, "--output", help="Output file; defaults to stdout."),
     limit: int | None = typer.Option(None, help="Max rows to export."),
     database_url: str | None = typer.Option(
         None, "--database-url", help="Overrides env SQL_URL for this command."
@@ -61,7 +53,7 @@ def export_tenant(
     is_async_engine = sa_async is not None and isinstance(engine, sa_async.AsyncEngine)
 
     if is_async_engine:
-        async_engine = cast(Any, engine)
+        async_engine = cast("Any", engine)
 
         async def _fetch() -> list[dict[str, Any]]:
             async with async_engine.connect() as conn:
@@ -70,7 +62,7 @@ def export_tenant(
 
         rows = asyncio.run(_fetch())
     else:
-        sync_engine = cast(Engine, engine)
+        sync_engine = cast("Engine", engine)
         with sync_engine.connect() as conn:
             result = conn.execute(stmt, params)
             rows = [dict(row) for row in result.mappings()]

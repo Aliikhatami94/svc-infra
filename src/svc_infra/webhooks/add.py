@@ -19,7 +19,7 @@ import json
 import logging
 import os
 from collections.abc import Callable, Iterable, Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol, TypeGuard, TypeVar, cast
 
 from fastapi import FastAPI
@@ -59,7 +59,7 @@ class RedisOutboxStore(OutboxStore):
     for environments where a fully fledged SQL implementation is unavailable.
     """
 
-    def __init__(self, client: "Redis", *, prefix: str = "webhooks:outbox"):
+    def __init__(self, client: Redis, *, prefix: str = "webhooks:outbox"):
         if Redis is None:  # pragma: no cover - defensive guard
             raise RuntimeError("redis-py is required for RedisOutboxStore")
         self._client = client
@@ -79,13 +79,13 @@ class RedisOutboxStore(OutboxStore):
 
     # Protocol methods --------------------------------------------------
     def enqueue(self, topic: str, payload: dict[str, Any]) -> OutboxMessage:
-        incr_result = cast(Any, self._client.incr(self._seq_key))
+        incr_result = cast("Any", self._client.incr(self._seq_key))
         # Redis incr always returns an int for the sync client. Be defensive for mocks.
         try:
             msg_id = int(incr_result)
         except (TypeError, ValueError):
             msg_id = 0
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
         record: dict[str, str] = {
             "id": str(msg_id),
             "topic": topic,
@@ -96,29 +96,21 @@ class RedisOutboxStore(OutboxStore):
         }
         self._client.hset(self._msg_key(msg_id), mapping=record)
         self._client.rpush(self._queue_key, msg_id)
-        return OutboxMessage(
-            id=msg_id, topic=topic, payload=payload, created_at=created_at
-        )
+        return OutboxMessage(id=msg_id, topic=topic, payload=payload, created_at=created_at)
 
     def fetch_next(self, topics: Iterable[str] | None = None) -> OutboxMessage | None:
         allowed = set(topics) if topics else None
-        ids = cast(list[Any], self._client.lrange(self._queue_key, 0, -1))
+        ids = cast("list[Any]", self._client.lrange(self._queue_key, 0, -1))
         for raw_id in ids:
-            raw_id_str = (
-                raw_id.decode()
-                if isinstance(raw_id, (bytes, bytearray))
-                else str(raw_id)
-            )
+            raw_id_str = raw_id.decode() if isinstance(raw_id, (bytes, bytearray)) else str(raw_id)
             msg_id = int(raw_id_str)
-            msg = cast(dict[Any, Any], self._client.hgetall(self._msg_key(msg_id)))
+            msg = cast("dict[Any, Any]", self._client.hgetall(self._msg_key(msg_id)))
             if not msg:
                 continue
             topic = msg.get(b"topic")
             if topic is None:
                 continue
-            topic_str = (
-                topic.decode() if isinstance(topic, (bytes, bytearray)) else str(topic)
-            )
+            topic_str = topic.decode() if isinstance(topic, (bytes, bytearray)) else str(topic)
             if allowed is not None and topic_str not in allowed:
                 continue
             attempts = int(msg.get(b"attempts", 0))
@@ -142,7 +134,7 @@ class RedisOutboxStore(OutboxStore):
                     else str(created_raw)
                 )
                 if created_raw
-                else datetime.now(timezone.utc)
+                else datetime.now(UTC)
             )
             return OutboxMessage(
                 id=msg_id,
@@ -157,7 +149,7 @@ class RedisOutboxStore(OutboxStore):
         key = self._msg_key(msg_id)
         if not self._client.exists(key):
             return
-        self._client.hset(key, "processed_at", datetime.now(timezone.utc).isoformat())
+        self._client.hset(key, "processed_at", datetime.now(UTC).isoformat())
 
     def mark_failed(self, msg_id: int) -> None:
         key = self._msg_key(msg_id)
@@ -167,7 +159,7 @@ class RedisOutboxStore(OutboxStore):
 class RedisInboxStore(InboxStore):
     """Lightweight Redis dedupe store for webhook deliveries."""
 
-    def __init__(self, client: "Redis", *, prefix: str = "webhooks:inbox"):
+    def __init__(self, client: Redis, *, prefix: str = "webhooks:inbox"):
         if Redis is None:  # pragma: no cover - defensive guard
             raise RuntimeError("redis-py is required for RedisInboxStore")
         self._client = client
@@ -191,17 +183,15 @@ def _is_factory(obj: Any) -> TypeGuard[Callable[[], Any]]:
     return callable(obj) and not isinstance(obj, (str, bytes, bytearray))
 
 
-def _resolve_value(
-    value: T_co | _Factory[T_co] | None, default_factory: _Factory[T_co]
-) -> T_co:
+def _resolve_value(value: T_co | _Factory[T_co] | None, default_factory: _Factory[T_co]) -> T_co:
     if value is None:
         return default_factory()
     if _is_factory(value):
-        return cast(T_co, value())
-    return cast(T_co, value)
+        return cast("T_co", value())
+    return cast("T_co", value)
 
 
-def _build_redis_client(env: Mapping[str, str]) -> "Redis" | None:
+def _build_redis_client(env: Mapping[str, str]) -> Redis | None:
     if Redis is None:
         logger.warning(
             "Redis backend requested but redis-py is not installed; falling back to in-memory stores"
@@ -331,9 +321,7 @@ def add_webhooks(
         )
         app.state.webhooks_delivery_handler = handler
     elif scheduler is not None and schedule_tick:
-        logger.warning(
-            "Scheduler provided without queue; skipping outbox tick registration"
-        )
+        logger.warning("Scheduler provided without queue; skipping outbox tick registration")
 
 
 __all__ = ["add_webhooks"]

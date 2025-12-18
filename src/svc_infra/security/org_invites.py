@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 try:
@@ -50,7 +50,7 @@ async def issue_invitation(
                 .scalars()
                 .all()
             )
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             for r in rows:
                 r.revoked_at = now
         except Exception:  # pragma: no cover
@@ -58,8 +58,8 @@ async def issue_invitation(
     else:
         # FakeDB path: revoke in-memory invites
         if hasattr(db, "added"):
-            now = datetime.now(timezone.utc)
-            for r in list(getattr(db, "added")):
+            now = datetime.now(UTC)
+            for r in list(db.added):
                 if (
                     isinstance(r, OrganizationInvitation)
                     and r.org_id == org_id
@@ -75,9 +75,9 @@ async def issue_invitation(
         email=email.lower().strip(),
         role=role,
         token_hash=_hash_token(raw),
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=ttl_hours),
+        expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours),
         created_by=created_by,
-        last_sent_at=datetime.now(timezone.utc),
+        last_sent_at=datetime.now(UTC),
         resend_count=0,
     )
     if hasattr(db, "add"):
@@ -90,7 +90,7 @@ async def issue_invitation(
 async def resend_invitation(db: Any, *, invitation: OrganizationInvitation) -> str:
     raw = _new_token()
     invitation.token_hash = _hash_token(raw)
-    invitation.last_sent_at = datetime.now(timezone.utc)
+    invitation.last_sent_at = datetime.now(UTC)
     invitation.resend_count = (invitation.resend_count or 0) + 1
     if hasattr(db, "flush"):
         await db.flush()
@@ -103,7 +103,7 @@ async def accept_invitation(
     invitation: OrganizationInvitation,
     user_id: uuid.UUID,
 ) -> OrganizationMembership:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if invitation.revoked_at or invitation.used_at:
         raise ValueError("invitation_unusable")
     if invitation.expires_at and invitation.expires_at < now:
@@ -113,9 +113,7 @@ async def accept_invitation(
     invitation.used_at = now
 
     # create membership (upsert-like enforced by DB unique constraint)
-    mem = OrganizationMembership(
-        org_id=invitation.org_id, user_id=user_id, role=invitation.role
-    )
+    mem = OrganizationMembership(org_id=invitation.org_id, user_id=user_id, role=invitation.role)
     if hasattr(db, "add"):
         db.add(mem)
         if hasattr(db, "flush"):

@@ -1,10 +1,11 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence, Tuple, Union
+from typing import Union
 
 KeySpec = Union[str, Sequence[str]]
 
 
-def as_tuple(spec: KeySpec) -> Tuple[str, ...]:
+def as_tuple(spec: KeySpec) -> tuple[str, ...]:
     return (spec,) if isinstance(spec, str) else tuple(spec)
 
 

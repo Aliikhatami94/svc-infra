@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from svc_infra.cache.backend import DEFAULT_READINESS_TIMEOUT
 from svc_infra.cache.backend import get_cache as _get_cache
@@ -111,9 +112,7 @@ def add_cache(
             try:
                 setattr(app.state, state_key, _instance())
             except Exception:
-                logger.debug(
-                    "Unable to expose cache instance on app.state", exc_info=True
-                )
+                logger.debug("Unable to expose cache instance on app.state", exc_info=True)
 
     async def _shutdown():
         try:
@@ -146,16 +145,14 @@ def add_cache(
     # Mark wired and expose state immediately if desired
     if hasattr(app, "state"):
         try:
-            setattr(app.state, "_svc_cache_wired", True)
+            app.state._svc_cache_wired = True
             if expose_state and not hasattr(app.state, state_key):
                 setattr(app.state, state_key, _instance())
         except Exception:
             pass
 
     if register_ok:
-        logger.info(
-            "Cache wired: url=%s namespace=%s", eff_url, f"{eff_prefix}:{eff_version}"
-        )
+        logger.info("Cache wired: url=%s namespace=%s", eff_url, f"{eff_prefix}:{eff_version}")
     else:
         # If we cannot register handlers, at least initialize now
         try:

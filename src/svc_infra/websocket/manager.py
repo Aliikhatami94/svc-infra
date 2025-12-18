@@ -27,8 +27,9 @@ import asyncio
 import logging
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from .models import ConnectionInfo
 
@@ -64,8 +65,8 @@ class ConnectionManager:
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
         # user_id -> list of (connection_id, WebSocket, ConnectionInfo)
-        self._connections: dict[str, list[tuple[str, WebSocket, ConnectionInfo]]] = (
-            defaultdict(list)
+        self._connections: dict[str, list[tuple[str, WebSocket, ConnectionInfo]]] = defaultdict(
+            list
         )
         # room -> set of user_ids
         self._rooms: dict[str, set[str]] = defaultdict(set)
@@ -97,7 +98,7 @@ class ConnectionManager:
             await websocket.accept()
 
         connection_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         info = ConnectionInfo(
             user_id=user_id,
             connection_id=connection_id,
@@ -121,9 +122,7 @@ class ConnectionManager:
 
         return connection_id
 
-    async def disconnect(
-        self, user_id: str, websocket: WebSocket | None = None
-    ) -> None:
+    async def disconnect(self, user_id: str, websocket: WebSocket | None = None) -> None:
         """
         Remove connection(s) for a user.
 
@@ -186,7 +185,7 @@ class ConnectionManager:
             try:
                 await self._send_message(ws, message)
                 # Update last activity
-                info.last_activity = datetime.now(timezone.utc)
+                info.last_activity = datetime.now(UTC)
                 sent += 1
             except Exception as e:
                 logger.debug("Failed to send to user %s: %s", user_id, e)
@@ -216,7 +215,7 @@ class ConnectionManager:
         for uid, ws, info in all_connections:
             try:
                 await self._send_message(ws, message)
-                info.last_activity = datetime.now(timezone.utc)
+                info.last_activity = datetime.now(UTC)
                 sent += 1
             except Exception as e:
                 logger.debug("Failed to broadcast to user %s: %s", uid, e)

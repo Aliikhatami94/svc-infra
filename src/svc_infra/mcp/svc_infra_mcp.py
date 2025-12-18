@@ -18,7 +18,7 @@ async def svc_infra_cmd_help() -> dict[Any, Any]:
     - Prepares project env without chdir (so we can 'cd' in the command itself).
     - Tries poetry → console script → python -m svc_infra.cli_shim.
     """
-    return cast(dict[Any, Any], await cli_cmd_help(CLI_PROG))
+    return cast("dict[Any, Any]", await cli_cmd_help(CLI_PROG))
 
 
 # No dedicated 'docs list' function — users can use 'docs --help' to discover topics.
@@ -97,7 +97,7 @@ async def svc_infra_subcmd_help(subcommand: Subcommand) -> dict[Any, Any]:
     """
     tokens = subcommand.value.split()
     if len(tokens) == 1:
-        return cast(dict[Any, Any], await cli_subcmd_help(CLI_PROG, subcommand))
+        return cast("dict[Any, Any]", await cli_subcmd_help(CLI_PROG, subcommand))
 
     root = prepare_env()
     text = await run_from_root(root, CLI_PROG, [*tokens, "--help"])

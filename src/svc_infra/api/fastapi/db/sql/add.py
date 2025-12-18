@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
-from typing import Sequence
 
 from fastapi import FastAPI
 
@@ -17,9 +17,7 @@ from .session import dispose_session, initialize_session
 
 def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
     for r in resources:
-        repo = SqlRepository(
-            model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete
-        )
+        repo = SqlRepository(model=r.model, id_attr=r.id_attr, soft_delete=r.soft_delete)
 
         if r.service_factory:
             svc = r.service_factory(repo)
@@ -73,9 +71,7 @@ def add_sql_resources(app: FastAPI, resources: Sequence[SqlResource]) -> None:
         app.include_router(router)
 
 
-def add_sql_db(
-    app: FastAPI, *, url: str | None = None, dsn_env: str = "SQL_URL"
-) -> None:
+def add_sql_db(app: FastAPI, *, url: str | None = None, dsn_env: str = "SQL_URL") -> None:
     """Configure DB lifecycle for the app (either explicit URL or from env).
 
     This preserves any existing lifespan context (like user-defined lifespans)
@@ -106,9 +102,7 @@ def add_sql_db(
     async def lifespan_from_env(_app: FastAPI):
         env_url = os.getenv(dsn_env)
         if not env_url:
-            raise RuntimeError(
-                f"Missing environment variable {dsn_env} for database URL"
-            )
+            raise RuntimeError(f"Missing environment variable {dsn_env} for database URL")
         initialize_session(env_url)
         try:
             if existing_lifespan is not None:
@@ -125,9 +119,7 @@ def add_sql_db(
 def add_sql_health(
     app: FastAPI, *, prefix: str = "/_sql/health", include_in_schema: bool = False
 ) -> None:
-    app.include_router(
-        _make_db_health_router(prefix=prefix, include_in_schema=include_in_schema)
-    )
+    app.include_router(_make_db_health_router(prefix=prefix, include_in_schema=include_in_schema))
 
 
 def setup_sql(

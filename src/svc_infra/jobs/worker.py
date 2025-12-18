@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from .queue import Job, JobQueue
 

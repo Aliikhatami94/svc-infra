@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
@@ -73,7 +74,7 @@ class WebSocketClient:
         self._connection: ClientConnection | None = None
         self._closed = False
 
-    async def __aenter__(self) -> "WebSocketClient":
+    async def __aenter__(self) -> WebSocketClient:
         await self.connect()
         return self
 

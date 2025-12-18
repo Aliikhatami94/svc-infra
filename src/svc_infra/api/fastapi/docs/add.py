@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from fastapi import FastAPI, Request
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -29,15 +29,13 @@ def add_docs(
     """
 
     # OpenAPI JSON route
-    async def openapi_handler() -> JSONResponse:  # noqa: ANN201
+    async def openapi_handler() -> JSONResponse:
         return JSONResponse(app.openapi())
 
-    app.add_api_route(
-        openapi_url, openapi_handler, methods=["GET"], include_in_schema=False
-    )
+    app.add_api_route(openapi_url, openapi_handler, methods=["GET"], include_in_schema=False)
 
     # Swagger UI route
-    async def swagger_ui(request: Request) -> HTMLResponse:  # noqa: ANN201
+    async def swagger_ui(request: Request) -> HTMLResponse:
         resp = get_swagger_ui_html(openapi_url=openapi_url, title="API Docs")
         theme = request.query_params.get("theme")
         if theme == "dark":
@@ -47,7 +45,7 @@ def add_docs(
     app.add_api_route(swagger_url, swagger_ui, methods=["GET"], include_in_schema=False)
 
     # Redoc route
-    async def redoc_ui(request: Request) -> HTMLResponse:  # noqa: ANN201
+    async def redoc_ui(request: Request) -> HTMLResponse:
         resp = get_redoc_html(openapi_url=openapi_url, title="API ReDoc")
         theme = request.query_params.get("theme")
         if theme == "dark":
@@ -80,15 +78,13 @@ def add_docs(
         if landing_path in existing_paths:
             landing_path = "/_docs"
 
-        async def _landing() -> HTMLResponse:  # noqa: ANN201
+        async def _landing() -> HTMLResponse:
             cards: list[CardSpec] = []
             # Root docs card using the provided paths
             cards.append(
                 CardSpec(
                     tag="",
-                    docs=DocTargets(
-                        swagger=swagger_url, redoc=redoc_url, openapi_json=openapi_url
-                    ),
+                    docs=DocTargets(swagger=swagger_url, redoc=redoc_url, openapi_json=openapi_url),
                 )
             )
             # Scoped docs (if any were registered via add_prefixed_docs)
@@ -96,9 +92,7 @@ def add_docs(
                 cards.append(
                     CardSpec(
                         tag=scope.strip("/"),
-                        docs=DocTargets(
-                            swagger=swagger, redoc=redoc, openapi_json=openapi_json
-                        ),
+                        docs=DocTargets(swagger=swagger, redoc=redoc, openapi_json=openapi_json),
                     )
                 )
             html = render_index_html(
@@ -106,9 +100,7 @@ def add_docs(
             )
             return HTMLResponse(html)
 
-        app.add_api_route(
-            landing_path, _landing, methods=["GET"], include_in_schema=False
-        )
+        app.add_api_route(landing_path, _landing, methods=["GET"], include_in_schema=False)
 
 
 def _with_dark_mode(resp: HTMLResponse) -> HTMLResponse:
@@ -130,9 +122,7 @@ def _with_dark_mode(resp: HTMLResponse) -> HTMLResponse:
         body = body.replace("</head>", f"<style>\n{css}\n</style></head>", 1)
     # add class to body to allow stronger selectors
     body = body.replace("<body>", '<body class="dark">', 1)
-    return HTMLResponse(
-        content=body, status_code=resp.status_code, headers=dict(resp.headers)
-    )
+    return HTMLResponse(content=body, status_code=resp.status_code, headers=dict(resp.headers))
 
 
 _DARK_CSS = """
@@ -163,7 +153,7 @@ def add_sdk_generation_stub(
     router = public_router(prefix="/_docs", include_in_schema=False)
 
     @router.post("/generate-sdk")
-    async def _generate() -> dict:  # noqa: ANN201
+    async def _generate() -> dict:
         on_generate()
         return {"status": "ok"}
 

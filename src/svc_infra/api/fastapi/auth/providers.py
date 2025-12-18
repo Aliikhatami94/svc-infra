@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 
 
-def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
+def providers_from_settings(settings: Any) -> dict[str, dict[str, Any]]:
     """
     Returns a registry of providers:
       {
@@ -20,7 +20,7 @@ def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
         }
       }
     """
-    reg: Dict[str, Dict[str, Any]] = {}
+    reg: dict[str, dict[str, Any]] = {}
 
     # Google (OIDC)
     if getattr(settings, "google_client_id", None) and getattr(
@@ -64,9 +64,7 @@ def providers_from_settings(settings: Any) -> Dict[str, Dict[str, Any]]:
         }
 
     # LinkedIn (non-OIDC)
-    if getattr(settings, "li_client_id", None) and getattr(
-        settings, "li_client_secret", None
-    ):
+    if getattr(settings, "li_client_id", None) and getattr(settings, "li_client_secret", None):
         reg["linkedin"] = {
             "kind": "linkedin",
             "authorize_url": "https://www.linkedin.com/oauth/v2/authorization",

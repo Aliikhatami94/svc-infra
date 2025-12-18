@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Callable
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True)
@@ -27,12 +27,10 @@ def verify_backups(
             retention_days=retention_days,
             message="no_backup_seen",
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     age_days = (now - last_success).total_seconds() / 86400.0
     ok = retention_days is None or age_days <= max(1, retention_days)
-    return BackupHealthReport(
-        ok=ok, last_success=last_success, retention_days=retention_days
-    )
+    return BackupHealthReport(ok=ok, last_success=last_success, retention_days=retention_days)
 
 
 __all__ = ["BackupHealthReport", "verify_backups"]

@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+from datetime import UTC
 
 import pyotp
 
@@ -38,6 +39,6 @@ def _hash(s: str) -> str:
 
 
 def _now_utc_ts() -> int:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return int(datetime.now(timezone.utc).timestamp())
+    return int(datetime.now(UTC).timestamp())

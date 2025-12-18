@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Iterable
+from collections.abc import Iterable
 
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -110,9 +110,7 @@ def _prune_to_paths(
 
     if "tags" in schema and isinstance(schema["tags"], list):
         schema["tags"] = [
-            t
-            for t in schema["tags"]
-            if isinstance(t, dict) and t.get("name") in used_tags
+            t for t in schema["tags"] if isinstance(t, dict) and t.get("name") in used_tags
         ]
 
     info = dict(schema.get("info") or {})
@@ -131,9 +129,7 @@ def _build_filtered_schema(
 ) -> dict:
     paths = full_schema.get("paths", {}) or {}
     keep_paths = {
-        p: v
-        for p, v in paths.items()
-        if _path_included(p, include_prefixes, exclude_prefixes)
+        p: v for p, v in paths.items() if _path_included(p, include_prefixes, exclude_prefixes)
     }
 
     # Determine the server prefix for scoped docs
@@ -154,9 +150,7 @@ def _build_filtered_schema(
                 stripped_paths[path] = spec
         keep_paths = stripped_paths
 
-    return _prune_to_paths(
-        full_schema, keep_paths, title_suffix, server_prefix=server_prefix
-    )
+    return _prune_to_paths(full_schema, keep_paths, title_suffix, server_prefix=server_prefix)
 
 
 def _ensure_original_openapi_saved(app: FastAPI) -> None:
@@ -179,7 +173,7 @@ def _install_root_filter(app: FastAPI, exclude_prefixes: list[str]) -> None:
             full_schema, exclude_prefixes=app.state._scoped_root_exclusions
         )
 
-    setattr(app, "openapi", root_filtered_openapi)
+    app.openapi = root_filtered_openapi
 
 
 def _current_registered_scopes() -> list[str]:
@@ -260,7 +254,5 @@ def add_prefixed_docs(
     DOC_SCOPES.append((scope, swagger_path, redoc_path, openapi_path, title))
 
 
-def replace_root_openapi_with_exclusions(
-    app: FastAPI, *, exclude_prefixes: list[str]
-) -> None:
+def replace_root_openapi_with_exclusions(app: FastAPI, *, exclude_prefixes: list[str]) -> None:
     _install_root_filter(app, exclude_prefixes)

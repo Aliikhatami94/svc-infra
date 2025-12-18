@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Sequence, Union
+from collections.abc import Callable, Iterable, Sequence
+from typing import Any, Union
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -73,9 +74,7 @@ def dedupe_sql_service(
 
         return clauses
 
-    async def _precheck(
-        session, data: dict[str, Any], *, exclude_id: Any | None
-    ) -> None:
+    async def _precheck(session, data: dict[str, Any], *, exclude_id: Any | None) -> None:
         # Check CI specs first to catch the broadest conflicts, then CS.
         for ci, spec_list in ((True, unique_ci), (False, unique_cs)):
             for spec in spec_list:
@@ -99,9 +98,7 @@ def dedupe_sql_service(
                 return await self.repo.create(session, data)
             except IntegrityError as e:
                 # Race fallback: let DB constraint be the last line of defense.
-                raise HTTPException(
-                    status_code=409, detail="Record already exists."
-                ) from e
+                raise HTTPException(status_code=409, detail="Record already exists.") from e
 
         async def update(self, session, id_value, data):
             data = await self.pre_update(data)
@@ -109,8 +106,6 @@ def dedupe_sql_service(
             try:
                 return await self.repo.update(session, id_value, data)
             except IntegrityError as e:
-                raise HTTPException(
-                    status_code=409, detail="Record already exists."
-                ) from e
+                raise HTTPException(status_code=409, detail="Record already exists.") from e
 
     return _Svc(repo, pre_create=pre_create, pre_update=pre_update)

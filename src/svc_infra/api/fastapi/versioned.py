@@ -9,7 +9,8 @@ See: svc-infra/docs/versioned-integrations.md
 
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 from unittest.mock import patch
 
 from fastapi import APIRouter, FastAPI
@@ -78,7 +79,7 @@ def extract_router(
         nonlocal captured_router
         captured_router = router
 
-    setattr(mock_app, "include_router", _capture_router)
+    mock_app.include_router = _capture_router
 
     # Patch add_prefixed_docs to prevent separate card (no-op if function doesn't call it)
     def _noop_docs(*args: Any, **kwargs: Any) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.params import Depends
@@ -44,7 +45,7 @@ class DualAPIRouter(APIRouter):
                     **kwargs,
                 )
                 # only add the "/" twin for *safe* methods
-                if set(m.upper() for m in methods) <= safe_methods:
+                if {m.upper() for m in methods} <= safe_methods:
                     self.add_api_route(
                         "/", func, methods=methods, include_in_schema=False, **kwargs
                     )
@@ -59,15 +60,13 @@ class DualAPIRouter(APIRouter):
                 **kwargs,
             )
             if alt != primary:
-                self.add_api_route(
-                    alt, func, methods=methods, include_in_schema=False, **kwargs
-                )
+                self.add_api_route(alt, func, methods=methods, include_in_schema=False, **kwargs)
             return func
 
         return decorator
 
     def add_api_route(self, path, endpoint, **kwargs):
-        methods = set((kwargs.get("methods") or []))
+        methods = set(kwargs.get("methods") or [])
         for r in self.routes:
             if getattr(r, "path", None) == path and methods & (
                 getattr(r, "methods", set()) or set()
@@ -78,39 +77,25 @@ class DualAPIRouter(APIRouter):
     # ---------- HTTP method shorthands ----------
 
     def get(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
-        return self._dual_decorator(
-            path, ["GET"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["GET"], show_in_schema=show_in_schema, **kwargs)
 
     def post(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
-        return self._dual_decorator(
-            path, ["POST"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["POST"], show_in_schema=show_in_schema, **kwargs)
 
     def patch(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
-        return self._dual_decorator(
-            path, ["PATCH"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["PATCH"], show_in_schema=show_in_schema, **kwargs)
 
     def delete(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
-        return self._dual_decorator(
-            path, ["DELETE"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["DELETE"], show_in_schema=show_in_schema, **kwargs)
 
     def put(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
-        return self._dual_decorator(
-            path, ["PUT"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["PUT"], show_in_schema=show_in_schema, **kwargs)
 
     def options(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
-        return self._dual_decorator(
-            path, ["OPTIONS"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["OPTIONS"], show_in_schema=show_in_schema, **kwargs)
 
     def head(self, path: str, *_, show_in_schema: bool = True, **kwargs: Any):
-        return self._dual_decorator(
-            path, ["HEAD"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["HEAD"], show_in_schema=show_in_schema, **kwargs)
 
     def list(
         self,
@@ -155,9 +140,7 @@ class DualAPIRouter(APIRouter):
         kwargs["response_model"] = kwargs.get("response_model") or response_model
 
         # we still want the dual-registration behavior
-        return self._dual_decorator(
-            path, ["GET"], show_in_schema=show_in_schema, **kwargs
-        )
+        return self._dual_decorator(path, ["GET"], show_in_schema=show_in_schema, **kwargs)
 
     # ---------- WebSocket ----------
 

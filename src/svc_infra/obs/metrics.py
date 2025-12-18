@@ -7,7 +7,7 @@ functions.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 # Function variables so applications/tests can replace them at runtime.
 on_rate_limit_exceeded: Callable[[str, int, int], None] | None = None

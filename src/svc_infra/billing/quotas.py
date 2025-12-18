@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -13,10 +13,8 @@ from svc_infra.api.fastapi.tenancy.context import TenantId
 from .models import PlanEntitlement, Subscription, UsageAggregate
 
 
-async def _current_subscription(
-    session: AsyncSession, tenant_id: str
-) -> Subscription | None:
-    now = datetime.now(tz=timezone.utc)
+async def _current_subscription(session: AsyncSession, tenant_id: str) -> Subscription | None:
+    now = datetime.now(tz=UTC)
     row = (
         (
             await session.execute(
@@ -59,7 +57,7 @@ def require_quota(metric: str, *, window: str = "day", soft: bool = True):
             # no entitlement → unlimited
             return
         # compute current window start
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         if window == "day":
             period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             granularity = "day"

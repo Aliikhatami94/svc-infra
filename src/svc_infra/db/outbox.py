@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Iterable, Protocol
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
 
 @dataclass
@@ -10,7 +11,7 @@ class OutboxMessage:
     id: int
     topic: str
     payload: dict[str, Any]
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     attempts: int = 0
     processed_at: datetime | None = None
 
@@ -19,9 +20,7 @@ class OutboxStore(Protocol):
     def enqueue(self, topic: str, payload: dict[str, Any]) -> OutboxMessage:
         pass
 
-    def fetch_next(
-        self, *, topics: Iterable[str] | None = None
-    ) -> OutboxMessage | None:
+    def fetch_next(self, *, topics: Iterable[str] | None = None) -> OutboxMessage | None:
         """Return the next undispatched, unprocessed message (FIFO per-topic), or None.
 
         Notes:
@@ -50,9 +49,7 @@ class InMemoryOutboxStore:
         self._messages.append(msg)
         return msg
 
-    def fetch_next(
-        self, *, topics: Iterable[str] | None = None
-    ) -> OutboxMessage | None:
+    def fetch_next(self, *, topics: Iterable[str] | None = None) -> OutboxMessage | None:
         allowed = set(topics) if topics else None
         for msg in self._messages:
             if msg.processed_at is not None:
@@ -68,7 +65,7 @@ class InMemoryOutboxStore:
     def mark_processed(self, msg_id: int) -> None:
         for msg in self._messages:
             if msg.id == msg_id:
-                msg.processed_at = datetime.now(timezone.utc)
+                msg.processed_at = datetime.now(UTC)
                 return
 
     def mark_failed(self, msg_id: int) -> None:

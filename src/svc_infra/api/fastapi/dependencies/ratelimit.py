@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import HTTPException
 from starlette.requests import Request
@@ -63,7 +63,7 @@ class RateLimiter:
             except Exception:
                 eff_limit = self.limit
 
-        count, store_limit, reset = self.store.incr(str(key), self.window)
+        count, _store_limit, reset = self.store.incr(str(key), self.window)
         if count > eff_limit:
             retry = max(0, reset - int(time.time()))
             try:

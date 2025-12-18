@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from urllib.parse import urlencode, urlparse
 
@@ -44,9 +44,7 @@ def _gen_pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
-def _validate_redirect(
-    url: str, allow_hosts: list[str], *, require_https: bool
-) -> None:
+def _validate_redirect(url: str, allow_hosts: list[str], *, require_https: bool) -> None:
     """Validate that a redirect URL is allowed and secure."""
     p = urlparse(url)
     if not p.netloc:
@@ -71,13 +69,13 @@ def _coerce_expires_at(token: dict | None) -> datetime | None:
             v = float(token["expires_at"])
             if v > 1e12:  # ms -> s
                 v /= 1000.0
-            return datetime.fromtimestamp(v, tz=timezone.utc)
+            return datetime.fromtimestamp(v, tz=UTC)
         except Exception:
             pass
     if token.get("expires_in") is not None:
         try:
             secs = int(token["expires_in"])
-            return datetime.now(timezone.utc) + timedelta(seconds=secs)
+            return datetime.now(UTC) + timedelta(seconds=secs)
         except Exception:
             pass
     return None
@@ -86,11 +84,7 @@ def _coerce_expires_at(token: dict | None) -> datetime | None:
 def _cookie_name(st) -> str:
     """Get the cookie name with appropriate security prefix."""
     name = getattr(st, "auth_cookie_name", "svc_auth")
-    if (
-        st.session_cookie_secure
-        and not st.session_cookie_domain
-        and not name.startswith("__Host-")
-    ):
+    if st.session_cookie_secure and not st.session_cookie_domain and not name.startswith("__Host-"):
         name = "__Host-" + name
     return name
 
@@ -101,9 +95,7 @@ def _cookie_domain(st):
     return d or None
 
 
-def _register_oauth_providers(
-    oauth: OAuth, providers: dict[str, dict[str, Any]]
-) -> None:
+def _register_oauth_providers(oauth: OAuth, providers: dict[str, dict[str, Any]]) -> None:
     """Register all OAuth providers with the OAuth client."""
     for name, cfg in providers.items():
         kind = cfg.get("kind")
@@ -202,9 +194,7 @@ async def _extract_user_info_github(
     """Extract user information from GitHub provider."""
     u = (await client.get("user", token=token)).json()
     emails_resp = (await client.get("user/emails", token=token)).json()
-    primary = next(
-        (e for e in emails_resp if e.get("primary") and e.get("verified")), None
-    )
+    primary = next((e for e in emails_resp if e.get("primary") and e.get("verified")), None)
 
     if not primary:
         raise HTTPException(400, "unverified_email")
@@ -212,9 +202,7 @@ async def _extract_user_info_github(
     email = primary["email"]
     email_verified = True
     full_name = u.get("name") or u.get("login")
-    provider_user_id = (
-        str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
-    )
+    provider_user_id = str(u.get("id")) if isinstance(u, dict) and u.get("id") is not None else None
 
     return email, full_name, provider_user_id, email_verified, {"user": u}
 
@@ -229,9 +217,7 @@ async def _extract_user_info_linkedin(
     )
 
     em = (
-        await client.get(
-            "emailAddress?q=members&projection=(elements*(handle~))", token=token
-        )
+        await client.get("emailAddress?q=members&projection=(elements*(handle~))", token=token)
     ).json()
 
     email = None
@@ -270,15 +256,9 @@ async def _extract_user_info_from_provider(
         raise HTTPException(400, "Unsupported provider kind")
 
 
-async def _find_or_create_user(
-    session, user_model, email: str, full_name: str | None
-) -> Any:
+async def _find_or_create_user(session, user_model, email: str, full_name: str | None) -> Any:
     """Find existing user by email or create a new one."""
-    existing = (
-        (await session.execute(select(user_model).filter_by(email=email)))
-        .scalars()
-        .first()
-    )
+    existing = (await session.execute(select(user_model).filter_by(email=email))).scalars().first()
 
     if existing:
         return existing
@@ -300,7 +280,7 @@ async def _find_or_create_user(
         user.password_hash = PasswordHelper().hash(random_password)
 
     if full_name and hasattr(user, "full_name"):
-        setattr(user, "full_name", full_name)
+        user.full_name = full_name
 
     session.add(user)
     await session.flush()  # ensure user.id exists
@@ -365,11 +345,11 @@ async def _update_provider_account(
     expires_at = _coerce_expires_at(tok)
 
     if not link:
-        values = dict(
-            user_id=user.id,
-            provider=provider,
-            provider_account_id=provider_user_id,
-        )
+        values = {
+            "user_id": user.id,
+            "provider": provider,
+            "provider_account_id": provider_user_id,
+        }
         if hasattr(provider_account_model, "access_token"):
             values["access_token"] = access_token
         if hasattr(provider_account_model, "refresh_token"):
@@ -384,18 +364,10 @@ async def _update_provider_account(
     else:
         # Update existing link if values have changed
         dirty = False
-        if (
-            hasattr(link, "access_token")
-            and access_token
-            and link.access_token != access_token
-        ):
+        if hasattr(link, "access_token") and access_token and link.access_token != access_token:
             link.access_token = access_token
             dirty = True
-        if (
-            hasattr(link, "refresh_token")
-            and refresh_token
-            and link.refresh_token != refresh_token
-        ):
+        if hasattr(link, "refresh_token") and refresh_token and link.refresh_token != refresh_token:
             link.refresh_token = refresh_token
             dirty = True
         if hasattr(link, "expires_at") and expires_at and link.expires_at != expires_at:
@@ -408,24 +380,18 @@ async def _update_provider_account(
             await session.flush()
 
 
-def _determine_final_redirect_url(
-    request: Request, provider: str, post_login_redirect: str
-) -> str:
+def _determine_final_redirect_url(request: Request, provider: str, post_login_redirect: str) -> str:
     """Determine the final redirect URL after successful authentication."""
     st = get_auth_settings()
     # Prioritize the parameter passed to the router over settings
     redirect_url = str(post_login_redirect or getattr(st, "post_login_redirect", "/"))
-    allow_hosts = parse_redirect_allow_hosts(
-        getattr(st, "redirect_allow_hosts_raw", None)
-    )
+    allow_hosts = parse_redirect_allow_hosts(getattr(st, "redirect_allow_hosts_raw", None))
     require_https = bool(getattr(st, "session_cookie_secure", False))
 
     _validate_redirect(redirect_url, allow_hosts, require_https=require_https)
 
     # Prefer ?next or the stashed value from /login
-    nxt = request.query_params.get("next") or request.session.pop(
-        f"oauth:{provider}:next", None
-    )
+    nxt = request.query_params.get("next") or request.session.pop(f"oauth:{provider}:next", None)
     if nxt:
         try:
             _validate_redirect(nxt, allow_hosts, require_https=require_https)
@@ -436,9 +402,7 @@ def _determine_final_redirect_url(
     return redirect_url
 
 
-async def _validate_oauth_state(
-    request: Request, provider: str
-) -> tuple[str | None, str | None]:
+async def _validate_oauth_state(request: Request, provider: str) -> tuple[str | None, str | None]:
     """Validate OAuth state and extract session values."""
     provided_state = request.query_params.get("state")
     expected_state = request.session.pop(f"oauth:{provider}:state", None)
@@ -451,9 +415,7 @@ async def _validate_oauth_state(
     return verifier, nonce
 
 
-async def _exchange_code_for_token(
-    client, request: Request, verifier: str | None, provider: str
-):
+async def _exchange_code_for_token(client, request: Request, verifier: str | None, provider: str):
     """Exchange OAuth authorization code for access token."""
     try:
         return await client.authorize_access_token(request, code_verifier=verifier)
@@ -500,9 +462,7 @@ async def _validate_and_decode_jwt_token(raw_token: str) -> str:
     """Validate and decode JWT token to extract user ID."""
     st = get_auth_settings()
     jwt_settings = getattr(st, "jwt", None)
-    jwt_secret = (
-        getattr(jwt_settings, "secret", None) if jwt_settings is not None else None
-    )
+    jwt_secret = getattr(jwt_settings, "secret", None) if jwt_settings is not None else None
     if jwt_secret:
         secret = jwt_secret.get_secret_value()
     else:
@@ -522,7 +482,7 @@ async def _validate_and_decode_jwt_token(raw_token: str) -> str:
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(401, "invalid_token")
-        return cast(str, user_id)
+        return cast("str", user_id)
     except Exception:
         raise HTTPException(401, "invalid_token")
 
@@ -539,12 +499,10 @@ async def _set_cookie_on_response(
     jwt_token = await strategy.write_token(user)
 
     same_site_lit = cast(
-        Literal["lax", "strict", "none"], str(st.session_cookie_samesite).lower()
+        "Literal['lax', 'strict', 'none']", str(st.session_cookie_samesite).lower()
     )
     if same_site_lit == "none" and not bool(st.session_cookie_secure):
-        raise HTTPException(
-            500, "session_cookie_samesite=None requires session_cookie_secure=True"
-        )
+        raise HTTPException(500, "session_cookie_samesite=None requires session_cookie_secure=True")
 
     # Access/Auth cookie (short-lived JWT)
     resp.set_cookie(
@@ -586,9 +544,7 @@ async def _handle_mfa_redirect(
 
     pre = await get_mfa_pre_jwt_writer().write(user)
     qs = urlencode({"mfa": "required", "pre_token": pre})
-    return RedirectResponse(
-        url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND
-    )
+    return RedirectResponse(url=f"{redirect_url}?{qs}", status_code=status.HTTP_302_FOUND)
 
 
 def oauth_router_with_backend(
@@ -697,9 +653,7 @@ def _create_oauth_router(
             provider_user_id,
             email_verified,
             raw_claims,
-        ) = await _extract_user_info_from_provider(
-            request, client, token, provider, cfg, nonce
-        )
+        ) = await _extract_user_info_from_provider(request, client, token, provider, cfg, nonce)
 
         if email_verified is False:
             raise HTTPException(400, "unverified_email")
@@ -726,9 +680,7 @@ def _create_oauth_router(
             raise HTTPException(401, "account_disabled")
 
         # Determine final redirect URL
-        redirect_url = _determine_final_redirect_url(
-            request, provider, post_login_redirect
-        )
+        redirect_url = _determine_final_redirect_url(request, provider, post_login_redirect)
 
         # Handle MFA if required (do NOT set last_login yet; do it after MFA)
         mfa_response = await _handle_mfa_redirect(policy, user, redirect_url)
@@ -737,7 +689,7 @@ def _create_oauth_router(
             return mfa_response
 
         # NEW: set last_login only when we are actually logging in now
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
         await session.commit()
 
         # Create session + initial refresh token
@@ -804,7 +756,7 @@ def _create_oauth_router(
         user_id = await _validate_and_decode_jwt_token(raw_auth)
 
         # Load user
-        user = await cast(Any, session).get(user_model, user_id)
+        user = await cast("Any", session).get(user_model, user_id)
         if not user:
             raise HTTPException(401, "invalid_token")
 
@@ -832,7 +784,7 @@ def _create_oauth_router(
         if (
             not found
             or found.revoked_at
-            or (found.expires_at and found.expires_at < datetime.now(timezone.utc))
+            or (found.expires_at and found.expires_at < datetime.now(UTC))
         ):
             raise HTTPException(401, "invalid_refresh_token")
 

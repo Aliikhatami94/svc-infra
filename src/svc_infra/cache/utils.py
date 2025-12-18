@@ -8,7 +8,8 @@ hashing complex objects, and formatting key templates.
 import hashlib
 import json
 import logging
-from typing import Any, Iterable, Union
+from collections.abc import Iterable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,7 @@ def stable_hash(*args: Any, **kwargs: Any) -> str:
     """
     try:
         # Use JSON serialization for stable, deterministic output
-        raw = json.dumps(
-            [args, kwargs], default=str, sort_keys=True, separators=(",", ":")
-        )
+        raw = json.dumps([args, kwargs], default=str, sort_keys=True, separators=(",", ":"))
     except (TypeError, ValueError) as e:
         # Fallback to repr if JSON serialization fails
         logger.warning(f"JSON serialization failed for hash input, using repr: {e}")
@@ -44,7 +43,7 @@ def stable_hash(*args: Any, **kwargs: Any) -> str:
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
-def join_key(parts: Iterable[Union[str, int, None]]) -> str:
+def join_key(parts: Iterable[str | int | None]) -> str:
     """
     Join key parts into a cache key, filtering out empty values.
 
@@ -100,7 +99,7 @@ def format_tuple_key(key_tuple: tuple[str, ...], **kwargs) -> str:
         raise ValueError(f"Failed to format key template: {e}") from e
 
 
-def normalize_cache_key(key: Union[str, tuple[str, ...]], **kwargs) -> str:
+def normalize_cache_key(key: str | tuple[str, ...], **kwargs) -> str:
     """
     Normalize a cache key from various input formats.
 

@@ -1,6 +1,6 @@
 import logging
 import traceback
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import httpx
 from fastapi import Request
@@ -49,7 +49,7 @@ def problem_response(
     trace_id: str | None = None,
     headers: dict[str, str] | None = None,
 ) -> Response:
-    body: Dict[str, Any] = {
+    body: dict[str, Any] = {
         "type": type_uri,
         "title": title,
         "status": status,
@@ -64,9 +64,7 @@ def problem_response(
         body["errors"] = errors
     if trace_id:
         body["trace_id"] = trace_id
-    return JSONResponse(
-        status_code=status, content=body, media_type=PROBLEM_MT, headers=headers
-    )
+    return JSONResponse(status_code=status, content=body, media_type=PROBLEM_MT, headers=headers)
 
 
 def register_error_handlers(app):
@@ -78,11 +76,7 @@ def register_error_handlers(app):
         return problem_response(
             status=504,
             title="Gateway Timeout",
-            detail=(
-                "Upstream request timed out."
-                if IS_PROD
-                else (str(exc) or "httpx timeout")
-            ),
+            detail=("Upstream request timed out." if IS_PROD else (str(exc) or "httpx timeout")),
             code="GATEWAY_TIMEOUT",
             instance=str(request.url),
             trace_id=trace_id,
@@ -142,7 +136,7 @@ def register_error_handlers(app):
         try:
             if getattr(exc, "headers", None):
                 # FastAPI/Starlette exceptions store headers as a dict[str, str]
-                hdrs = dict(getattr(exc, "headers"))
+                hdrs = dict(exc.headers)
         except Exception:
             hdrs = None
         return problem_response(
@@ -156,9 +150,7 @@ def register_error_handlers(app):
         )
 
     @app.exception_handler(StarletteHTTPException)
-    async def handle_starlette_http_exception(
-        request: Request, exc: StarletteHTTPException
-    ):
+    async def handle_starlette_http_exception(request: Request, exc: StarletteHTTPException):
         trace_id = _trace_id_from_request(request)
         title = {
             401: "Unauthorized",
@@ -174,7 +166,7 @@ def register_error_handlers(app):
         hdrs: dict[str, str] | None = None
         try:
             if getattr(exc, "headers", None):
-                hdrs = dict(getattr(exc, "headers"))
+                hdrs = dict(exc.headers)
         except Exception:
             hdrs = None
         return problem_response(

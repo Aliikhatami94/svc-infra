@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 try:  # optional SQLAlchemy import for environments without SA
     from sqlalchemy import select
@@ -57,13 +58,12 @@ async def verify_chain_for_tenant(
             events = []
     elif hasattr(db, "added"):
         try:
-            pool = getattr(db, "added")
+            pool = db.added
             # Preserve insertion order for in-memory fake DBs where primary keys may be None
             events = [
                 e
                 for e in pool
-                if isinstance(e, AuditLog)
-                and (tenant_id is None or e.tenant_id == tenant_id)
+                if isinstance(e, AuditLog) and (tenant_id is None or e.tenant_id == tenant_id)
             ]
         except Exception:  # pragma: no cover
             events = []
