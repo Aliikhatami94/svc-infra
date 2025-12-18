@@ -172,14 +172,34 @@ svc-infra/
 
 ## Commit Messages
 
-Use conventional commits format:
+Use [Conventional Commits](https://www.conventionalcommits.org/) format. This enables automated CHANGELOG generation.
 
+**Format:** `type(scope): description`
+
+**Types:**
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation only
+- `refactor:` Code change that neither fixes a bug nor adds a feature
+- `perf:` Performance improvement
+- `test:` Adding or updating tests
+- `ci:` CI/CD changes
+- `chore:` Maintenance tasks
+
+**Examples:**
 ```
 feat: add Redis cache backend
 fix: handle connection timeout in database pool
 docs: update authentication guide
-test: add unit tests for webhook signing
 refactor: extract retry logic to shared utility
+test: add unit tests for webhook signing
+```
+
+**Bad examples (will be grouped as "Other Changes"):**
+```
+Refactor code for improved readability  ← Missing type prefix!
+updating docs                           ← Missing type prefix!
+bug fix                                 ← Missing type prefix!
 ```
 
 ## Questions?
