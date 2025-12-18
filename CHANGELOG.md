@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 This file is auto-generated from conventional commits using [git-cliff](https://git-cliff.org/).
 
-## [Unreleased]
+## [0.1.711] - 2025-12-18
 
 
 ### Features
