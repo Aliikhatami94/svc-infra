@@ -2,9 +2,14 @@
 
 # svc-infra
 
-### Production-ready FastAPI infrastructure in one import
+[![CI](https://github.com/nfraxlab/svc-infra/actions/workflows/ci.yml/badge.svg)](https://github.com/nfraxlab/svc-infra/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/svc-infra.svg)](https://pypi.org/project/svc-infra/)
+[![Python](https://img.shields.io/pypi/pyversions/svc-infra.svg)](https://pypi.org/project/svc-infra/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Downloads](https://img.shields.io/pypi/dm/svc-infra.svg)](https://pypi.org/project/svc-infra/)
+[![codecov](https://codecov.io/gh/nfraxlab/svc-infra/branch/main/graph/badge.svg)](https://codecov.io/gh/nfraxlab/svc-infra)
 
-[![PyPI](https://img.shields.io/pypi/v/svc-infra.svg)](https://pypi.org/project/svc-infra/) [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT) [![Downloads](https://static.pepy.tech/badge/svc-infra/month)](https://pepy.tech/project/svc-infra)
+### Production-ready FastAPI infrastructure in one import
 
 **Stop rebuilding auth, billing, webhooks, and background jobs for every project.**
 

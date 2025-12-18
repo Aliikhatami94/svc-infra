@@ -118,6 +118,7 @@ s3 = ["aioboto3"]
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
 pytest-asyncio = ">=0.23.0"
+pytest-cov = ">=4.0.0"
 ruff = ">=0.6.0"
 mypy = ">=1.10.0"
 types-requests = ">=2.31.0"
@@ -127,6 +128,7 @@ fakeredis = ">=2.20.0"
 moto = {extras = ["s3"], version = ">=5.0.0"}
 aiosqlite = ">=0.19.0"  # Required for acceptance tests using SQLite
 pre-commit = ">=3.0.0"
+bandit = ">=1.7.0"
 # Documentation
 mkdocs = ">=1.6.0"
 mkdocs-material = ">=9.5.0"
@@ -214,6 +216,20 @@ known-first-party = ["svc_infra"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "venv"]
+skips = ["B101", "B311"]  # B101: assert used, B311: random for non-crypto
+
+[tool.coverage.run]
+source = ["src/svc_infra"]
+branch = true
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+fail_under = 70
+show_missing = true
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

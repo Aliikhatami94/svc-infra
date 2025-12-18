@@ -36,7 +36,7 @@ conventional_commits = true
 filter_unconventional = false
 split_commits = false
 commit_preprocessors = [
-    { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/nfraxio/svc-infra/pull/${1}))" },
+    { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/nfraxlab/svc-infra/pull/${1}))" },
 ]
 commit_parsers = [
     { message = "^feat", group = "Features" },

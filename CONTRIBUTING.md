@@ -202,6 +202,76 @@ updating docs                           ← Missing type prefix!
 bug fix                                 ← Missing type prefix!
 ```
 
+## Deprecation Guidelines
+
+When removing or changing public APIs, follow our [Deprecation Policy](DEPRECATION.md).
+
+### When to Deprecate vs Remove
+
+- **Deprecate first** if the feature has any external users
+- **Immediate removal** only for security vulnerabilities (see DEPRECATION.md)
+- **Never remove** without at least 2 minor versions of deprecation warnings
+
+### How to Add Deprecation Warnings
+
+Use the `@deprecated` decorator:
+
+```python
+from svc_infra.utils.deprecation import deprecated
+
+@deprecated(
+    version="1.2.0",
+    reason="Use new_function() instead",
+    removal_version="1.4.0"
+)
+def old_function():
+    ...
+```
+
+For deprecated parameters:
+
+```python
+from svc_infra.utils.deprecation import deprecated_parameter
+
+def my_function(new_param: str, old_param: str | None = None):
+    if old_param is not None:
+        deprecated_parameter(
+            name="old_param",
+            version="1.2.0",
+            reason="Use new_param instead"
+        )
+        new_param = old_param
+    ...
+```
+
+### Documentation Requirements
+
+When deprecating a feature, you must:
+
+1. Add `@deprecated` decorator or call `deprecated_parameter()`
+2. Update the docstring with deprecation notice
+3. Add entry to "Deprecated Features Registry" in DEPRECATION.md
+4. Add entry to CHANGELOG.md under "Deprecated" section
+
+### Migration Guide Requirements
+
+For significant deprecations, create a migration guide:
+
+1. Create `docs/migrations/v{version}.md`
+2. Explain what changed and why
+3. Provide before/after code examples
+4. Link from the deprecation warning message
+
+## Required Checks Before PR
+
+- [ ] No hardcoded secrets or default fallbacks
+- [ ] No silent exception swallowing
+- [ ] Parameterized SQL queries (no string interpolation)
+- [ ] `ruff check` passes
+- [ ] `mypy src` passes
+- [ ] `pytest` passes
+- [ ] Deprecations follow the deprecation policy
+
 ## Questions?
 
 - Open an issue for bugs or feature requests
