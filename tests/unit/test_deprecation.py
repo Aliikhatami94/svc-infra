@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import warnings
 
-from svc_infra.utils.deprecation import (
+from svc_infra.utils import (
     DeprecatedWarning,
     deprecated,
     deprecated_parameter,
