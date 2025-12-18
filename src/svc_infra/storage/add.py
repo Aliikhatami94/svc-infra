@@ -6,7 +6,7 @@ Provides helpers to integrate storage backends with FastAPI applications.
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional, cast
+from typing import cast
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def add_storage(
     app: FastAPI,
-    backend: Optional[StorageBackend] = None,
+    backend: StorageBackend | None = None,
     serve_files: bool = False,
     file_route_prefix: str = "/files",
 ) -> StorageBackend:

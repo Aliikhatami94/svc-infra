@@ -6,7 +6,6 @@ with custom metadata for your application domain.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,9 +25,9 @@ class DocumentMetadata(BaseModel):
 
     category: DocumentCategory = Field(..., description="Document category")
     tags: list[str] = Field(default_factory=list, description="Search tags")
-    department: Optional[str] = Field(None, description="Department/team")
-    project: Optional[str] = Field(None, description="Related project")
-    year: Optional[int] = Field(None, description="Document year")
+    department: str | None = Field(None, description="Department/team")
+    project: str | None = Field(None, description="Related project")
+    year: int | None = Field(None, description="Document year")
 
 
 class DocumentUploadRequest(BaseModel):
@@ -39,9 +38,9 @@ class DocumentUploadRequest(BaseModel):
     content: str = Field(..., description="File content (base64 or text)")
     category: DocumentCategory = Field(..., description="Document category")
     tags: list[str] = Field(default_factory=list, description="Search tags")
-    department: Optional[str] = Field(None, description="Department/team")
-    project: Optional[str] = Field(None, description="Related project")
-    year: Optional[int] = Field(None, description="Document year")
+    department: str | None = Field(None, description="Department/team")
+    project: str | None = Field(None, description="Related project")
+    year: int | None = Field(None, description="Document year")
 
 
 class DocumentResponse(BaseModel):
@@ -55,9 +54,9 @@ class DocumentResponse(BaseModel):
     storage_path: str = Field(..., description="Storage path")
     category: DocumentCategory = Field(..., description="Document category")
     tags: list[str] = Field(default_factory=list, description="Search tags")
-    department: Optional[str] = Field(None, description="Department/team")
-    project: Optional[str] = Field(None, description="Related project")
-    year: Optional[int] = Field(None, description="Document year")
+    department: str | None = Field(None, description="Department/team")
+    project: str | None = Field(None, description="Related project")
+    year: int | None = Field(None, description="Document year")
     uploaded_at: datetime = Field(..., description="Upload timestamp")
 
     class Config:

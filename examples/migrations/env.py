@@ -8,7 +8,6 @@ import pathlib
 import pkgutil
 import sys
 import traceback
-from typing import List, Tuple
 
 from alembic import context
 from sqlalchemy import MetaData
@@ -124,15 +123,15 @@ FORCE_PAYMENTS = os.getenv("ALEMBIC_FORCE_PAYMENTS", "").lower() in {"1", "true"
 PAYMENT_TABLES = {"pay_customers", "pay_intents", "pay_events", "ledger_entries"}
 
 # metadata discovery (scan ALL attrs; do not shadow site-packages)
-DISCOVER_PACKAGES: List[str] = []  # do not seed payments by default
+DISCOVER_PACKAGES: list[str] = []  # do not seed payments by default
 ENV_DISCOVER = os.getenv("ALEMBIC_DISCOVER_PACKAGES")
 if ENV_DISCOVER:
     DISCOVER_PACKAGES = [s.strip() for s in ENV_DISCOVER.split(",") if s.strip()]
 
 
 def _collect_metadata() -> list[object]:
-    tried: list[Tuple[str, str]] = []
-    errors: list[Tuple[str, str]] = []
+    tried: list[tuple[str, str]] = []
+    errors: list[tuple[str, str]] = []
     found: list[object] = []
 
     def _note(name: str, ok: bool, err: str | None = None):
@@ -248,7 +247,7 @@ def _collect_metadata() -> list[object]:
 
     # Core security models (AuthSession, RefreshToken, etc.)
     try:
-        import svc_infra.security.models  # noqa: F401
+        import svc_infra.security.models
 
         _note("svc_infra.security.models", True, None)
     except Exception:

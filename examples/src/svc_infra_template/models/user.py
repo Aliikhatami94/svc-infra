@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
-from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
+from typing import Any
 
 from cryptography.fernet import Fernet  # <-- for refresh_token encryption
 from fastapi_users.password import PasswordHelper
@@ -40,13 +41,13 @@ if not _FERNET_KEY:
 _f = Fernet(_FERNET_KEY.encode())
 
 
-def _encrypt(value: Optional[str]) -> Optional[str]:
+def _encrypt(value: str | None) -> str | None:
     if value is None:
         return None
     return _f.encrypt(value.encode()).decode()
 
 
-def _decrypt(value: Optional[str]) -> Optional[str]:
+def _decrypt(value: str | None) -> str | None:
     if value is None:
         return None
     try:
@@ -67,7 +68,7 @@ class User(ModelBase):
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
 
     email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)
-    full_name: Mapped[Optional[str]] = mapped_column(String(255))
+    full_name: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -93,11 +94,11 @@ class User(ModelBase):
         # Accept pre-hashed assignments (FastAPI Users sets hashed_password directly)
         self.password_hash = value
 
-    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    disabled_reason: Mapped[Optional[str]] = mapped_column(Text)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    disabled_reason: Mapped[str | None] = mapped_column(Text)
 
     # org / roles
-    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
     roles: Mapped[list[str]] = mapped_column(MutableList.as_mutable(JSON), default=list)
 
     # MFA (TOTP)
@@ -112,7 +113,7 @@ class User(ModelBase):
     extra: Mapped[dict] = mapped_column("metadata", MutableDict.as_mutable(JSON), default=dict)
 
     # OAuth links
-    provider_accounts: Mapped[list["ProviderAccount"]] = relationship(
+    provider_accounts: Mapped[list[ProviderAccount]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -162,7 +163,7 @@ class ProviderAccount(ModelBase):
     user_id: Mapped[uuid.UUID] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped["User"] = relationship(
+    user: Mapped[User] = relationship(
         back_populates="provider_accounts",
         lazy="selectin",
     )
@@ -175,21 +176,21 @@ class ProviderAccount(ModelBase):
     )  # sub/oid (OIDC) or id (github/linkedin)
 
     # Optional token material
-    access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Store encrypted refresh_token in the same column name for DB compatibility.
-    _refresh_token: Mapped[Optional[str]] = mapped_column("refresh_token", Text, nullable=True)
+    _refresh_token: Mapped[str | None] = mapped_column("refresh_token", Text, nullable=True)
 
     @property
-    def refresh_token(self) -> Optional[str]:
+    def refresh_token(self) -> str | None:
         return _decrypt(self._refresh_token)
 
     @refresh_token.setter
-    def refresh_token(self, value: Optional[str]) -> None:
+    def refresh_token(self, value: str | None) -> None:
         self._refresh_token = _encrypt(value)
 
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    raw_claims: Mapped[Optional[dict]] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    raw_claims: Mapped[dict | None] = mapped_column(MutableDict.as_mutable(JSON), nullable=True)
 
     created_at = mapped_column(
         DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False
@@ -212,11 +213,11 @@ class ProviderAccount(ModelBase):
 
 # --- Auth service factory ------------------------------------------------------
 
-PreHook = Callable[[Dict[str, Any]], Dict[str, Any]]
-ColumnSpec = Union[str, Sequence[str]]
+PreHook = Callable[[dict[str, Any]], dict[str, Any]]
+ColumnSpec = str | Sequence[str]
 
 
-def _map_auth_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+def _map_auth_fields(data: dict[str, Any]) -> dict[str, Any]:
     """Normalize inbound payload for the auth model."""
     d = dict(data)
     # password -> password_hash
@@ -230,10 +231,10 @@ def _map_auth_fields(data: Dict[str, Any]) -> Dict[str, Any]:
     return d
 
 
-def _compose(*hooks: Optional[PreHook]) -> PreHook:
+def _compose(*hooks: PreHook | None) -> PreHook:
     """Chain multiple pre-hooks left-to-right, skipping Nones."""
 
-    def _runner(payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _runner(payload: dict[str, Any]) -> dict[str, Any]:
         out = payload
         for h in hooks:
             if h:
@@ -248,12 +249,12 @@ def create_auth_service(
     *,
     # Uniqueness settings (rarely changed)
     unique_ci: Iterable[ColumnSpec] = ("email",),
-    tenant_field: Optional[str] = "tenant_id",
+    tenant_field: str | None = "tenant_id",
     # Optional: caller can inject extra transforms/validation
-    extra_pre_create: Optional[PreHook] = None,
-    extra_pre_update: Optional[PreHook] = None,
+    extra_pre_create: PreHook | None = None,
+    extra_pre_update: PreHook | None = None,
     # Optional: customize 409 messages per spec if you want
-    messages: Optional[dict[Tuple[str, ...], str]] = None,
+    messages: dict[tuple[str, ...], str] | None = None,
 ):
     """
     Build an auth-aware Service that:

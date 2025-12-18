@@ -1,6 +1,6 @@
 import logging
 import traceback
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from fastapi import Request
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 PROBLEM_MT = "application/problem+json"
 
 
-def _trace_id_from_request(request: Request) -> Optional[str]:
+def _trace_id_from_request(request: Request) -> str | None:
     # Try common headers first; fall back to None
     for h in ("x-request-id", "x-correlation-id", "x-trace-id"):
         v = request.headers.get(h)
@@ -134,9 +134,10 @@ def register_error_handlers(app):
         # Preserve headers set on the exception (e.g., Retry-After for rate limits)
         hdrs: dict[str, str] | None = None
         try:
-            if getattr(exc, "headers", None):
+            exc_headers = getattr(exc, "headers", None)
+            if exc_headers is not None:
                 # FastAPI/Starlette exceptions store headers as a dict[str, str]
-                hdrs = dict(exc.headers)
+                hdrs = dict(exc_headers)
         except Exception:
             hdrs = None
         return problem_response(
@@ -165,8 +166,9 @@ def register_error_handlers(app):
         )
         hdrs: dict[str, str] | None = None
         try:
-            if getattr(exc, "headers", None):
-                hdrs = dict(exc.headers)
+            exc_headers = getattr(exc, "headers", None)
+            if exc_headers is not None:
+                hdrs = dict(exc_headers)
         except Exception:
             hdrs = None
         return problem_response(

@@ -196,9 +196,7 @@ ignore = [
     "SIM117",  # single with statement (sometimes clearer separate)
     "SIM118",  # key in dict vs dict.keys() (minor)
     "UP028",   # yield from (sometimes clearer with explicit yield)
-    "UP038",   # isinstance(x, (A, B)) is valid Python and often clearer
-    "UP045",   # X | None (runtime Optional needed for Pydantic create_model)
-    "UP007",   # Union[X, Y] (runtime Union needed for type aliases)
+    "UP038",   # isinstance(x, (A, B)) - deprecated rule, requires unsafe fixes
     "RUF001",  # ambiguous unicode char in string (intentional in docs)
     "RUF002",  # ambiguous unicode char in docstring (intentional curly quotes)
     "RUF003",  # ambiguous unicode char in comment (intentional curly quotes)

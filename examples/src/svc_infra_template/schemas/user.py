@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
 from fastapi_users.schemas import BaseUser, BaseUserCreate, BaseUserUpdate
@@ -40,48 +40,48 @@ class ProviderAccountRead(ProviderAccountBase, Timestamped):
 class UserBase(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     email: EmailStr
-    full_name: Optional[str] = None
+    full_name: str | None = None
     is_active: bool = True
     is_superuser: bool = False
     is_verified: bool = False
-    tenant_id: Optional[str] = None
-    roles: List[str] = Field(default_factory=list)
+    tenant_id: str | None = None
+    roles: list[str] = Field(default_factory=list)
     mfa_enabled: bool = False
-    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")  # matches model.extra
+    metadata: dict[str, Any] | None = Field(default=None, alias="extra")  # matches model.extra
 
 
 class UserRead(BaseUser[UUID], Timestamped):
     # BaseUser[UUID] already provides: id, email, is_active, is_superuser, is_verified
-    full_name: Optional[str] = None
-    tenant_id: Optional[str] = None
-    roles: List[str] = Field(default_factory=list)
+    full_name: str | None = None
+    tenant_id: str | None = None
+    roles: list[str] = Field(default_factory=list)
     mfa_enabled: bool = False
-    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="extra")
-    provider_accounts: List[ProviderAccountRead] = Field(default_factory=list)
-    last_login: Optional[datetime] = None
-    disabled_reason: Optional[str] = None
+    metadata: dict[str, Any] | None = Field(default=None, alias="extra")
+    provider_accounts: list[ProviderAccountRead] = Field(default_factory=list)
+    last_login: datetime | None = None
+    disabled_reason: str | None = None
 
 
 class UserCreate(BaseUserCreate):
     # BaseUserCreate already has: email, password
-    full_name: Optional[str] = None
-    tenant_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    full_name: str | None = None
+    tenant_id: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class UserUpdate(BaseUserUpdate):
     # BaseUserUpdate already has: email?, password?
-    full_name: Optional[str] = None
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
-    is_verified: Optional[bool] = None
-    tenant_id: Optional[str] = None
-    roles: Optional[List[str]] = None
-    mfa_enabled: Optional[bool] = None
-    metadata: Optional[Dict[str, Any]] = None
-    disabled_reason: Optional[str] = None
+    full_name: str | None = None
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+    is_verified: bool | None = None
+    tenant_id: str | None = None
+    roles: list[str] | None = None
+    mfa_enabled: bool | None = None
+    metadata: dict[str, Any] | None = None
+    disabled_reason: str | None = None
 
 
 class UserPasswordUpdate(BaseModel):
-    current_password: Optional[str] = None
+    current_password: str | None = None
     new_password: str = Field(min_length=8)

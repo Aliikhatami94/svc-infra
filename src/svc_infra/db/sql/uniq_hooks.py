@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, Union
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -12,7 +12,7 @@ from svc_infra.db.sql.service_with_hooks import SqlServiceWithHooks
 
 from .uniq import _as_tuple
 
-ColumnSpec = Union[str, Sequence[str]]
+ColumnSpec = str | Sequence[str]
 
 
 def _all_present(data: dict[str, Any], fields: Sequence[str]) -> bool:

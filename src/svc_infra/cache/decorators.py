@@ -154,7 +154,7 @@ def cache_read(
                 raise RuntimeError(f"Failed to apply cache decorator: {error_msgs[-1]}") from e
 
         # Attach key variants renderer for cache writers
-        wrapped.__svc_key_variants__ = build_key_variants_renderer(template)
+        wrapped.__svc_key_variants__ = build_key_variants_renderer(template)  # type: ignore[attr-defined]
 
         # If tags were provided as a callable, populate cashews tag sets manually.
         # This is best-effort and only affects invalidation-by-tag behavior.
@@ -191,7 +191,7 @@ def cache_read(
 
             return result
 
-        _wrapped_with_dynamic_tags.__svc_key_variants__ = getattr(
+        _wrapped_with_dynamic_tags.__svc_key_variants__ = getattr(  # type: ignore[attr-defined]
             wrapped, "__svc_key_variants__", None
         )
         return _wrapped_with_dynamic_tags

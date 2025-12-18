@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 
-def run(cmd: str, description: str = None) -> bool:
+def run(cmd: str, description: str | None = None) -> bool:
     """Run a command and return success status."""
     if description:
         print(f"\n🔧 {description}...")

@@ -38,7 +38,6 @@ Auth Endpoints Added:
 """
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from fastapi_users import schemas
@@ -77,12 +76,12 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     __tablename__ = "users"
 
     # Multi-tenancy support
-    tenant_id: Mapped[Optional[str]] = mapped_column(
+    tenant_id: Mapped[str | None] = mapped_column(
         String(64), index=True, nullable=True, comment="Tenant ID for multi-tenancy isolation"
     )
 
     # Soft delete support
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="Soft delete timestamp"
     )
 
@@ -115,7 +114,7 @@ class UserRead(schemas.BaseUser[UUID]):
     Add custom fields that should be readable.
     """
 
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     # Add custom readable fields
     # phone_number: Optional[str] = None
     # avatar_url: Optional[str] = None
@@ -135,7 +134,7 @@ class UserCreate(schemas.BaseUserCreate):
     Add custom fields that can be set during registration.
     """
 
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     # Add custom creation fields
     # phone_number: Optional[str] = None
 

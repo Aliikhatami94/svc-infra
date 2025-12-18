@@ -10,17 +10,17 @@ from svc_infra_template.models.task import Task
 
 # 2. Import models that depend on User/Organization
 # 1. Import User and Organization first (they have no foreign key dependencies to other models)
-from svc_infra_template.models.user import AuthSession  # FK to User
-from svc_infra_template.models.user import FailedAuthAttempt  # FK to User
-from svc_infra_template.models.user import OrganizationInvitation  # FK to Organization, User
-from svc_infra_template.models.user import OrganizationMembership  # FK to Organization, User
-from svc_infra_template.models.user import ProviderAccount  # FK to User
-from svc_infra_template.models.user import RefreshToken  # FK to AuthSession
-from svc_infra_template.models.user import Team  # FK to Organization
 from svc_infra_template.models.user import (
+    AuthSession,  # FK to User
+    FailedAuthAttempt,  # FK to User
     Organization,
+    OrganizationInvitation,  # FK to Organization, User
+    OrganizationMembership,  # FK to Organization, User
+    ProviderAccount,  # FK to User
+    RefreshToken,  # FK to AuthSession
     RefreshTokenRevocation,
     RolePermission,
+    Team,  # FK to Organization
     User,
 )
 

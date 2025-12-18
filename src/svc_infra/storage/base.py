@@ -4,7 +4,7 @@ Base storage abstractions and exceptions.
 Defines the StorageBackend protocol that all storage implementations must follow.
 """
 
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class StorageError(Exception):
@@ -60,7 +60,7 @@ class StorageBackend(Protocol):
         key: str,
         data: bytes,
         content_type: str,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> str:
         """
         Store file content and return its URL.

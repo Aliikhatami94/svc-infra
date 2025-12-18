@@ -4,7 +4,7 @@ Common test utilities and helpers for svc-infra tests.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import Mock
 
 from fastapi import FastAPI
@@ -75,7 +75,7 @@ def assert_json_response(response_data: dict[str, Any], expected_status: int = 2
 def assert_error_response(
     response_data: dict[str, Any],
     expected_status: int,
-    error_code: Optional[str] = None,
+    error_code: str | None = None,
 ) -> None:
     """Assert that a response is an error response."""
     assert "detail" in response_data

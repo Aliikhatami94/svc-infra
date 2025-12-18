@@ -9,7 +9,6 @@ import asyncio
 import inspect
 import logging
 from collections.abc import Callable
-from typing import Optional
 
 from cashews import cache as _cache
 
@@ -42,8 +41,8 @@ class Resource:
         *,
         suffix: str,
         ttl: int,
-        key_template: Optional[str] = None,
-        tags_template: Optional[tuple[str, ...]] = None,
+        key_template: str | None = None,
+        tags_template: tuple[str, ...] | None = None,
         lock: bool = True,
     ):
         """
@@ -74,7 +73,7 @@ class Resource:
     def cache_write(
         self,
         *,
-        recache: Optional[list[tuple[Callable, Callable]]] = None,
+        recache: list[tuple[Callable, Callable]] | None = None,
         recache_max_concurrency: int = 5,
     ):
         """

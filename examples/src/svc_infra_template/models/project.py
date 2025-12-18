@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
+from collections.abc import Callable, Iterable, Sequence
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, Boolean, DateTime, String, Text, text
 from sqlalchemy.ext.mutable import MutableDict
@@ -28,9 +29,9 @@ class Project(ModelBase):
 
     # core fields
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
 
-    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # misc (avoid attr name "metadata" clash)
     extra: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSON), default=dict)
@@ -59,11 +60,11 @@ for _ix in make_unique_sql_indexes(Project, unique_ci=["name"], tenant_field="te
 
 # ----------------------- Service factory (entity) -----------------------------
 
-PreHook = Callable[[Dict[str, Any]], Dict[str, Any]]
-ColumnSpec = Union[str, Sequence[str]]
+PreHook = Callable[[dict[str, Any]], dict[str, Any]]
+ColumnSpec = str | Sequence[str]
 
 
-def _map_entity_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+def _map_entity_fields(data: dict[str, Any]) -> dict[str, Any]:
     """
     Basic payload normalization common to most entities:
       - metadata (schema alias) -> extra (column)
@@ -78,10 +79,10 @@ def _map_entity_fields(data: Dict[str, Any]) -> Dict[str, Any]:
     return d
 
 
-def _compose(*hooks: Optional[PreHook]) -> PreHook:
+def _compose(*hooks: PreHook | None) -> PreHook:
     """Chain multiple pre-hooks left-to-right, skipping Nones."""
 
-    def _runner(payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _runner(payload: dict[str, Any]) -> dict[str, Any]:
         out = payload
         for h in hooks:
             if h:
@@ -92,16 +93,16 @@ def _compose(*hooks: Optional[PreHook]) -> PreHook:
 
 
 def create_entity_service(
-    repo: "SqlRepository",
+    repo: SqlRepository,
     *,
     # Uniqueness defaults (match the indexes above)
     unique_ci: Iterable[ColumnSpec] = ("name",),
-    tenant_field: Optional[str] = "tenant_id",
+    tenant_field: str | None = "tenant_id",
     # Allow projects to extend behavior without writing a whole service
-    extra_pre_create: Optional[PreHook] = None,
-    extra_pre_update: Optional[PreHook] = None,
+    extra_pre_create: PreHook | None = None,
+    extra_pre_update: PreHook | None = None,
     # Optional: override 409 messages per-spec, e.g. {("name",): "Project name already exists."}
-    messages: Optional[dict[Tuple[str, ...], str]] = None,
+    messages: dict[tuple[str, ...], str] | None = None,
 ):
     """
     Build a generic entity Service that:

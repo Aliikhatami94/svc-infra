@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
@@ -48,9 +46,9 @@ def test_emit_suspect_payload_hook_called(monkeypatch):
     def echo(body: dict):
         return body
 
-    captured2: list[tuple[Optional[str], int]] = []
+    captured2: list[tuple[str | None, int]] = []
 
-    def capture2(path: Optional[str], size: int) -> None:
+    def capture2(path: str | None, size: int) -> None:
         captured2.append((path, size))
 
     monkeypatch.setattr(metrics, "on_suspect_payload", capture2, raising=False)

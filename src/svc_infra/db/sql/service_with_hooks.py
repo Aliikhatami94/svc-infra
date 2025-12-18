@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 from svc_infra.db.sql.service import SqlService
 
@@ -10,8 +10,8 @@ class SqlServiceWithHooks(SqlService):
     def __init__(
         self,
         repo,
-        pre_create: Optional[PreHook] = None,
-        pre_update: Optional[PreHook] = None,
+        pre_create: PreHook | None = None,
+        pre_update: PreHook | None = None,
     ):
         super().__init__(repo)
         self._pre_create = pre_create

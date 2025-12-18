@@ -1,6 +1,3 @@
-from typing import Optional
-
-
 class FastApiException(Exception):
     """
     Application error that should be rendered as Problem Details.
@@ -9,7 +6,7 @@ class FastApiException(Exception):
     def __init__(
         self,
         title: str,
-        detail: Optional[str] = None,
+        detail: str | None = None,
         status_code: int = 400,
         *,
         code: str | None = None,

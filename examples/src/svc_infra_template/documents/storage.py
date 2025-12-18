@@ -4,8 +4,6 @@ This module demonstrates how to use svc-infra's document storage Layer 1
 for generic file management with custom metadata.
 """
 
-from typing import Optional
-
 from svc_infra.documents import delete_document, download_document, list_documents, upload_document
 from svc_infra.storage.base import StorageBackend
 
@@ -176,7 +174,7 @@ def list_docs(
     return filtered
 
 
-async def get_doc(storage: StorageBackend, document_id: str) -> Optional[DocumentResponse]:
+async def get_doc(storage: StorageBackend, document_id: str) -> DocumentResponse | None:
     """Get document by ID.
 
     Args:

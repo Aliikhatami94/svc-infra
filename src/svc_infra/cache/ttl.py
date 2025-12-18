@@ -6,7 +6,6 @@ via environment variables with sensible defaults.
 """
 
 import os
-from typing import Optional
 
 
 def _get_env_int(key: str, default: int) -> int:
@@ -36,7 +35,7 @@ TTL_SHORT: int = _get_env_int("CACHE_TTL_SHORT", 30)  # 30 seconds
 TTL_LONG: int = _get_env_int("CACHE_TTL_LONG", 3600)  # 1 hour
 
 
-def get_ttl(duration_type: str) -> Optional[int]:
+def get_ttl(duration_type: str) -> int | None:
     """
     Get TTL value by duration type name.
 
@@ -60,7 +59,7 @@ def get_ttl(duration_type: str) -> Optional[int]:
     return ttl_map.get(duration_type.lower())
 
 
-def validate_ttl(ttl: Optional[int]) -> int:
+def validate_ttl(ttl: int | None) -> int:
     """
     Validate and normalize a TTL value.
 

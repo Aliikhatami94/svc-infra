@@ -1,10 +1,10 @@
 """Example database models showcasing svc-infra patterns."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import String, Text, inspect
 from sqlalchemy.orm import Mapped, mapped_column
+
 from svc_infra_template.db.base import Base, SoftDeleteMixin, TimestampMixin
 
 
@@ -22,7 +22,7 @@ class Project(Base, TimestampMixin, SoftDeleteMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
 
     # Status tracking
@@ -49,7 +49,7 @@ class Task(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Status: 'pending', 'in_progress', 'completed', 'cancelled'
     status: Mapped[str] = mapped_column(
@@ -60,11 +60,11 @@ class Task(Base, TimestampMixin):
     )
 
     # Optional: Link to project (in a real app, use foreign key)
-    project_id: Mapped[Optional[int]] = mapped_column(nullable=True, index=True)
-    assigned_to: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    project_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    assigned_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Completion tracking
-    completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     def __repr__(self) -> str:
         state = inspect(self)

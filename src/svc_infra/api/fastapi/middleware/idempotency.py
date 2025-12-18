@@ -2,7 +2,7 @@ import base64
 import hashlib
 import json
 import time
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import Header, HTTPException, Request
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -23,9 +23,9 @@ class IdempotencyMiddleware:
         self,
         app: ASGIApp,
         ttl_seconds: int = 24 * 3600,
-        store: Optional[IdempotencyStore] = None,
+        store: IdempotencyStore | None = None,
         header_name: str = "Idempotency-Key",
-        skip_paths: Optional[list[str]] = None,
+        skip_paths: list[str] | None = None,
     ):
         self.app = app
         self.ttl = ttl_seconds
@@ -115,11 +115,7 @@ class IdempotencyMiddleware:
                     },
                 )
                 return
-            if (
-                existing
-                and existing.status is not None
-                and existing.body_b64 is not None
-            ):
+            if existing and existing.status is not None and existing.body_b64 is not None:
                 await self._send_cached_response(send, existing)
                 return
 
@@ -182,9 +178,7 @@ class IdempotencyMiddleware:
         await send({"type": "http.response.body", "body": body, "more_body": False})
 
     async def _send_cached_response(self, send, existing) -> None:
-        headers = [
-            (k.encode(), v.encode()) for k, v in (existing.headers or {}).items()
-        ]
+        headers = [(k.encode(), v.encode()) for k, v in (existing.headers or {}).items()]
         if existing.media_type:
             headers.append((b"content-type", existing.media_type.encode()))
         await send(
@@ -208,6 +202,4 @@ async def require_idempotency_key(
     request: Request,
 ) -> None:
     if not idempotency_key.strip():
-        raise HTTPException(
-            status_code=400, detail="Idempotency-Key must not be empty."
-        )
+        raise HTTPException(status_code=400, detail="Idempotency-Key must not be empty.")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, Request
 
@@ -101,7 +101,7 @@ async def require_tenant_id(
 
 # DX aliases
 TenantId = Annotated[str, Depends(require_tenant_id)]
-OptionalTenantId = Annotated[Optional[str], Depends(resolve_tenant_id)]
+OptionalTenantId = Annotated[str | None, Depends(resolve_tenant_id)]
 
 
 __all__ = [

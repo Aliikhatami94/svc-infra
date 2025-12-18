@@ -1,8 +1,7 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Union
 
-KeySpec = Union[str, Sequence[str]]
+KeySpec = str | Sequence[str]
 
 
 def as_tuple(spec: KeySpec) -> tuple[str, ...]:

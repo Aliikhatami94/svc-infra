@@ -9,15 +9,15 @@ from datetime import datetime
 from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
+from svc_infra.api.fastapi.dual.public import public_router
 from svc_infra_template.db.models import Project, Task
 
 # Import documents and storage demo routers
 from svc_infra_template.documents import router as documents_router
 from svc_infra_template.settings import settings
 from svc_infra_template.storage import router as storage_demo_router
-
-from svc_infra.api.fastapi.db.sql.session import SqlSessionDep
-from svc_infra.api.fastapi.dual.public import public_router
 
 router = public_router()
 

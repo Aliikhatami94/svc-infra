@@ -173,7 +173,7 @@ def _install_root_filter(app: FastAPI, exclude_prefixes: list[str]) -> None:
             full_schema, exclude_prefixes=app.state._scoped_root_exclusions
         )
 
-    app.openapi = root_filtered_openapi
+    app.openapi = root_filtered_openapi  # type: ignore[method-assign]
 
 
 def _current_registered_scopes() -> list[str]:

@@ -1,5 +1,5 @@
 from collections.abc import Callable, Sequence
-from typing import Annotated, Any, Optional, TypeVar, cast
+from typing import Annotated, Any, TypeVar, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
@@ -35,9 +35,9 @@ def make_crud_router_plus_sql(
     update_schema: type[UpdateModel],
     prefix: str,
     tags: list[str] | None = None,
-    search_fields: Optional[Sequence[str]] = None,
-    default_ordering: Optional[str] = None,
-    allowed_order_fields: Optional[list[str]] = None,
+    search_fields: Sequence[str] | None = None,
+    default_ordering: str | None = None,
+    allowed_order_fields: list[str] | None = None,
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
     router_prefix = ("/_sql" + prefix) if mount_under_db_prefix else prefix
@@ -59,7 +59,7 @@ def make_crud_router_plus_sql(
                 return v
         return v
 
-    def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:
+    def _parse_ordering_to_fields(order_spec: str | None) -> list[str]:
         if not order_spec:
             return []
         pieces = [p.strip() for p in order_spec.split(",") if p.strip()]
@@ -185,9 +185,9 @@ def make_tenant_crud_router_plus_sql(
     prefix: str,
     tenant_field: str = "tenant_id",
     tags: list[str] | None = None,
-    search_fields: Optional[Sequence[str]] = None,
-    default_ordering: Optional[str] = None,
-    allowed_order_fields: Optional[list[str]] = None,
+    search_fields: Sequence[str] | None = None,
+    default_ordering: str | None = None,
+    allowed_order_fields: list[str] | None = None,
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
     """Like make_crud_router_plus_sql, but requires TenantId and scopes all operations."""
@@ -217,7 +217,7 @@ def make_tenant_crud_router_plus_sql(
                 return v
         return v
 
-    def _parse_ordering_to_fields(order_spec: Optional[str]) -> list[str]:
+    def _parse_ordering_to_fields(order_spec: str | None) -> list[str]:
         if not order_spec:
             return []
         pieces = [p.strip() for p in order_spec.split(",") if p.strip()]

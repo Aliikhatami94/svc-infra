@@ -5,7 +5,7 @@ Works with AWS S3, DigitalOcean Spaces, Wasabi, Backblaze B2, Minio, and
 any S3-compatible object storage service.
 """
 
-from typing import Optional, cast
+from typing import cast
 
 try:
     import aioboto3
@@ -68,9 +68,9 @@ class S3Backend:
         self,
         bucket: str,
         region: str = "us-east-1",
-        endpoint: Optional[str] = None,
-        access_key: Optional[str] = None,
-        secret_key: Optional[str] = None,
+        endpoint: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
     ):
         if aioboto3 is None:
             raise ImportError(
@@ -117,7 +117,7 @@ class S3Backend:
         key: str,
         data: bytes,
         content_type: str,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> str:
         """Store file in S3."""
         self._validate_key(key)

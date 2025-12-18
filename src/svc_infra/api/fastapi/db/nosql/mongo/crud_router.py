@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Annotated, Any, Optional, cast
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
@@ -28,7 +28,7 @@ DBDep = Annotated[AsyncIOMotorDatabase, Depends(acquire_db)]
 
 
 def _parse_sort(
-    order_spec: Optional[str], allowed_order_fields: Optional[list[str]]
+    order_spec: str | None, allowed_order_fields: list[str] | None
 ) -> list[tuple[str, int]]:
     if not order_spec:
         return []
@@ -49,9 +49,9 @@ def make_crud_router_plus_mongo(
     update_schema: type[Any],
     prefix: str,
     tags: list[str] | None = None,
-    search_fields: Optional[Sequence[str]] = None,
-    default_ordering: Optional[str] = None,
-    allowed_order_fields: Optional[list[str]] = None,
+    search_fields: Sequence[str] | None = None,
+    default_ordering: str | None = None,
+    allowed_order_fields: list[str] | None = None,
     mount_under_db_prefix: bool = True,
 ) -> APIRouter:
     read_model = cast("Any", read_schema)

@@ -10,7 +10,7 @@ import json
 import secrets
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import aiofiles
@@ -50,7 +50,7 @@ class LocalBackend:
         self,
         base_path: str = "/data/uploads",
         base_url: str = "http://localhost:8000/files",
-        signing_secret: Optional[str] = None,
+        signing_secret: str | None = None,
     ):
         self.base_path = Path(base_path)
         self.base_url = base_url.rstrip("/")
@@ -105,7 +105,7 @@ class LocalBackend:
         key: str,
         data: bytes,
         content_type: str,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> str:
         """Store file on local filesystem."""
         self._validate_key(key)

@@ -1,12 +1,9 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
 # --- Email OTP store (replace with Redis in prod) ---
-EMAIL_OTP_STORE: dict[
-    str, dict
-] = {}  # key = uid (or jti), value={hash,exp,attempts,next_send}
+EMAIL_OTP_STORE: dict[str, dict] = {}  # key = uid (or jti), value={hash,exp,attempts,next_send}
 
 
 class StartSetupOut(BaseModel):
@@ -56,9 +53,9 @@ class MFAProof(BaseModel):
 
 
 class DisableAccountIn(BaseModel):
-    reason: Optional[str] = None
-    mfa: Optional[MFAProof] = None
+    reason: str | None = None
+    mfa: MFAProof | None = None
 
 
 class DeleteAccountIn(BaseModel):
-    mfa: Optional[MFAProof] = None
+    mfa: MFAProof | None = None

@@ -10,7 +10,7 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from inspect import Parameter, signature
-from typing import Any, Optional, Union
+from typing import Any
 
 from cashews import cache as _cache
 
@@ -35,19 +35,19 @@ class RecachePlan:
     """
 
     getter: Callable[..., Awaitable[Any]]
-    include: Optional[Iterable[str]] = None
-    rename: Optional[dict[str, str]] = None
-    extra: Optional[dict[str, Any]] = None
-    key: Optional[str | tuple[str, ...]] = None
+    include: Iterable[str] | None = None
+    rename: dict[str, str] | None = None
+    extra: dict[str, Any] | None = None
+    key: str | tuple[str, ...] | None = None
 
 
 def recache(
     getter: Callable[..., Awaitable[Any]],
     *,
-    include: Optional[Iterable[str]] = None,
-    rename: Optional[dict[str, str]] = None,
-    extra: Optional[dict[str, Any]] = None,
-    key: Optional[str | tuple[str, ...]] = None,
+    include: Iterable[str] | None = None,
+    rename: dict[str, str] | None = None,
+    extra: dict[str, Any] | None = None,
+    key: str | tuple[str, ...] | None = None,
 ) -> RecachePlan:
     """
     Create a recache plan for cache warming after invalidation.
@@ -65,11 +65,11 @@ def recache(
     return RecachePlan(getter=getter, include=include, rename=rename, extra=extra, key=key)
 
 
-RecacheSpec = Union[
-    Callable[..., Awaitable[Any]],
-    RecachePlan,
-    tuple[Callable[..., Awaitable[Any]], Any],  # Legacy format
-]
+RecacheSpec = (
+    Callable[..., Awaitable[Any]]
+    | RecachePlan
+    | tuple[Callable[..., Awaitable[Any]], Any]  # Legacy format
+)
 
 
 def generate_key_variants(template: str | tuple[str, ...], params: dict[str, Any]) -> list[str]:

@@ -252,7 +252,7 @@ def _import_callable(path: str):
             # Example: tests use a global `called` dict; point legacy to unit
             try:
                 if hasattr(unit_mod, "called"):
-                    mod.called = unit_mod.called
+                    mod.called = unit_mod.called  # type: ignore[attr-defined]
             except Exception:
                 pass
         # If legacy mod missing but unit exists, use unit

@@ -4,8 +4,6 @@ This demonstrates how to create REST endpoints using svc-infra's
 document storage with custom business logic and metadata.
 """
 
-from typing import Optional
-
 from fastapi import Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
@@ -75,10 +73,10 @@ async def upload_file_endpoint(
     user_id: str = Form(...),
     category: DocumentCategory = Form(...),
     file: UploadFile = File(...),
-    tags: Optional[str] = Form(None),  # Comma-separated
-    department: Optional[str] = Form(None),
-    project: Optional[str] = Form(None),
-    year: Optional[int] = Form(None),
+    tags: str | None = Form(None),  # Comma-separated
+    department: str | None = Form(None),
+    project: str | None = Form(None),
+    year: int | None = Form(None),
     storage: StorageBackend = Depends(get_storage),
 ) -> DocumentResponse:
     """Upload a document file with multipart form data.
@@ -117,11 +115,11 @@ async def upload_file_endpoint(
 @router.get("/list", response_model=list[DocumentResponse])
 async def list_documents_endpoint(
     user_id: str,
-    category: Optional[DocumentCategory] = None,
-    tags: Optional[str] = None,  # Comma-separated
-    department: Optional[str] = None,
-    project: Optional[str] = None,
-    year: Optional[int] = None,
+    category: DocumentCategory | None = None,
+    tags: str | None = None,  # Comma-separated
+    department: str | None = None,
+    project: str | None = None,
+    year: int | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[DocumentResponse]:

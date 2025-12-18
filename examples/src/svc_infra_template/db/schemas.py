@@ -1,7 +1,6 @@
 """Pydantic schemas for API serialization/validation."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -14,7 +13,7 @@ class ProjectBase(BaseModel):
     """Base project fields."""
 
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     owner_email: EmailStr
     is_active: bool = True
 
@@ -28,10 +27,10 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     """Schema for updating a project (all fields optional)."""
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    owner_email: Optional[EmailStr] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    owner_email: EmailStr | None = None
+    is_active: bool | None = None
 
 
 class ProjectRead(ProjectBase):
@@ -40,7 +39,7 @@ class ProjectRead(ProjectBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime] = None
+    deleted_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -54,11 +53,11 @@ class TaskBase(BaseModel):
     """Base task fields."""
 
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     status: str = "pending"
-    project_id: Optional[int] = None
-    assigned_to: Optional[str] = None
-    completed_at: Optional[datetime] = None
+    project_id: int | None = None
+    assigned_to: str | None = None
+    completed_at: datetime | None = None
 
 
 class TaskCreate(TaskBase):
@@ -70,12 +69,12 @@ class TaskCreate(TaskBase):
 class TaskUpdate(BaseModel):
     """Schema for updating a task (all fields optional)."""
 
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[str] = None
-    project_id: Optional[int] = None
-    assigned_to: Optional[str] = None
-    completed_at: Optional[datetime] = None
+    title: str | None = None
+    description: str | None = None
+    status: str | None = None
+    project_id: int | None = None
+    assigned_to: str | None = None
+    completed_at: datetime | None = None
 
 
 class TaskRead(TaskBase):

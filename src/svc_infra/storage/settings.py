@@ -5,7 +5,7 @@ Handles environment-based configuration and auto-detection of storage backends.
 """
 
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -52,11 +52,9 @@ class StorageSettings(BaseSettings):
     """
 
     # Backend selection
-    storage_backend: Optional[Literal["local", "s3", "gcs", "cloudinary", "memory"]] = (
-        Field(
-            default=None,
-            description="Storage backend type (auto-detected if not set)",
-        )
+    storage_backend: Literal["local", "s3", "gcs", "cloudinary", "memory"] | None = Field(
+        default=None,
+        description="Storage backend type (auto-detected if not set)",
     )
 
     # Local backend settings
@@ -68,13 +66,13 @@ class StorageSettings(BaseSettings):
         default="http://localhost:8000/files",
         description="Base URL for serving files",
     )
-    storage_signing_secret: Optional[str] = Field(
+    storage_signing_secret: str | None = Field(
         default=None,
         description="Secret key for URL signing (auto-generated if not set)",
     )
 
     # S3 backend settings
-    storage_s3_bucket: Optional[str] = Field(
+    storage_s3_bucket: str | None = Field(
         default=None,
         description="S3 bucket name",
     )
@@ -82,43 +80,43 @@ class StorageSettings(BaseSettings):
         default="us-east-1",
         description="AWS region",
     )
-    storage_s3_endpoint: Optional[str] = Field(
+    storage_s3_endpoint: str | None = Field(
         default=None,
         description="Custom S3 endpoint (for DigitalOcean Spaces, Wasabi, etc.)",
     )
-    storage_s3_access_key: Optional[str] = Field(
+    storage_s3_access_key: str | None = Field(
         default=None,
         description="S3 access key (falls back to AWS_ACCESS_KEY_ID)",
     )
-    storage_s3_secret_key: Optional[str] = Field(
+    storage_s3_secret_key: str | None = Field(
         default=None,
         description="S3 secret key (falls back to AWS_SECRET_ACCESS_KEY)",
     )
 
     # GCS backend settings
-    storage_gcs_bucket: Optional[str] = Field(
+    storage_gcs_bucket: str | None = Field(
         default=None,
         description="Google Cloud Storage bucket name",
     )
-    storage_gcs_project: Optional[str] = Field(
+    storage_gcs_project: str | None = Field(
         default=None,
         description="GCP project ID",
     )
-    storage_gcs_credentials_path: Optional[str] = Field(
+    storage_gcs_credentials_path: str | None = Field(
         default=None,
         description="Path to GCP service account JSON",
     )
 
     # Cloudinary backend settings
-    storage_cloudinary_cloud_name: Optional[str] = Field(
+    storage_cloudinary_cloud_name: str | None = Field(
         default=None,
         description="Cloudinary cloud name",
     )
-    storage_cloudinary_api_key: Optional[str] = Field(
+    storage_cloudinary_api_key: str | None = Field(
         default=None,
         description="Cloudinary API key",
     )
-    storage_cloudinary_api_secret: Optional[str] = Field(
+    storage_cloudinary_api_secret: str | None = Field(
         default=None,
         description="Cloudinary API secret",
     )
@@ -176,7 +174,7 @@ class StorageSettings(BaseSettings):
         # Default to memory (for development/testing)
         return "memory"
 
-    def get_s3_credentials(self) -> tuple[Optional[str], Optional[str]]:
+    def get_s3_credentials(self) -> tuple[str | None, str | None]:
         """
         Get S3 credentials with fallback to AWS environment variables.
 

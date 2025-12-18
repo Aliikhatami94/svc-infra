@@ -6,7 +6,6 @@ WARNING: Data is not persisted across restarts. Use only for testing or developm
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Optional
 
 from ..base import FileNotFoundError, InvalidKeyError, QuotaExceededError
 
@@ -72,7 +71,7 @@ class MemoryBackend:
         key: str,
         data: bytes,
         content_type: str,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> str:
         """Store file in memory."""
         self._validate_key(key)

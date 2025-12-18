@@ -5,7 +5,7 @@ All configuration is loaded from environment variables (.env file).
 Type-safe with validation and defaults.
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # ========================================================================
     # Database
     # ========================================================================
-    sql_url: Optional[str] = Field(
+    sql_url: str | None = Field(
         default=None,
         description="Database connection string",
     )
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     # ========================================================================
     # Cache (Redis)
     # ========================================================================
-    redis_url: Optional[str] = Field(default=None)
+    redis_url: str | None = Field(default=None)
     cache_prefix: str = Field(default="svc_infra_template")
     cache_version: str = Field(default="v1")
     cache_default_ttl: int = Field(default=3600)
@@ -78,24 +78,24 @@ class Settings(BaseSettings):
     auth_verification_token_expire_hours: int = Field(default=24)
 
     # OAuth
-    auth_google_client_id: Optional[str] = Field(default=None)
-    auth_google_client_secret: Optional[str] = Field(default=None)
-    auth_github_client_id: Optional[str] = Field(default=None)
-    auth_github_client_secret: Optional[str] = Field(default=None)
+    auth_google_client_id: str | None = Field(default=None)
+    auth_google_client_secret: str | None = Field(default=None)
+    auth_github_client_id: str | None = Field(default=None)
+    auth_github_client_secret: str | None = Field(default=None)
 
     # ========================================================================
     # Payments
     # ========================================================================
-    payment_provider: Optional[Literal["stripe", "adyen", "fake"]] = Field(default=None)
+    payment_provider: Literal["stripe", "adyen", "fake"] | None = Field(default=None)
 
     # Stripe
-    stripe_secret_key: Optional[str] = Field(default=None)
-    stripe_publishable_key: Optional[str] = Field(default=None)
-    stripe_webhook_secret: Optional[str] = Field(default=None)
+    stripe_secret_key: str | None = Field(default=None)
+    stripe_publishable_key: str | None = Field(default=None)
+    stripe_webhook_secret: str | None = Field(default=None)
 
     # Adyen
-    adyen_api_key: Optional[str] = Field(default=None)
-    adyen_merchant_account: Optional[str] = Field(default=None)
+    adyen_api_key: str | None = Field(default=None)
+    adyen_merchant_account: str | None = Field(default=None)
     adyen_environment: Literal["test", "live"] = Field(default="test")
 
     # ========================================================================
@@ -106,13 +106,13 @@ class Settings(BaseSettings):
 
     otel_enabled: bool = Field(default=False)
     otel_service_name: str = Field(default="svc-infra-template")
-    otel_exporter_otlp_endpoint: Optional[str] = Field(default=None)
+    otel_exporter_otlp_endpoint: str | None = Field(default=None)
 
     # Grafana Cloud
-    grafana_cloud_instance_id: Optional[str] = Field(default=None)
-    grafana_cloud_api_key: Optional[str] = Field(default=None)
-    grafana_cloud_prometheus_url: Optional[str] = Field(default=None)
-    grafana_cloud_tempo_url: Optional[str] = Field(default=None)
+    grafana_cloud_instance_id: str | None = Field(default=None)
+    grafana_cloud_api_key: str | None = Field(default=None)
+    grafana_cloud_prometheus_url: str | None = Field(default=None)
+    grafana_cloud_tempo_url: str | None = Field(default=None)
 
     # ========================================================================
     # Webhooks
@@ -151,15 +151,15 @@ class Settings(BaseSettings):
     # ========================================================================
     # Timeouts & Resource Limits
     # ========================================================================
-    timeout_handler_seconds: Optional[int] = Field(
+    timeout_handler_seconds: int | None = Field(
         default=None,
         description="Handler timeout in seconds (None = disabled)",
     )
-    timeout_body_read_seconds: Optional[int] = Field(
+    timeout_body_read_seconds: int | None = Field(
         default=None,
         description="Body read timeout in seconds (None = disabled)",
     )
-    request_max_size_mb: Optional[int] = Field(
+    request_max_size_mb: int | None = Field(
         default=None,
         description="Max request body size in MB (None = unlimited)",
     )
@@ -198,7 +198,7 @@ class Settings(BaseSettings):
     # ========================================================================
     data_retention_days: int = Field(default=365)
     data_archival_enabled: bool = Field(default=False)
-    data_archival_s3_bucket: Optional[str] = Field(default=None)
+    data_archival_s3_bucket: str | None = Field(default=None)
     data_auto_migrate: bool = Field(default=True, description="Run migrations on startup")
 
     gdpr_enabled: bool = Field(default=False)
@@ -208,7 +208,7 @@ class Settings(BaseSettings):
     # CORS
     # ========================================================================
     cors_enabled: bool = Field(default=True)
-    cors_origins: Optional[str] = Field(
+    cors_origins: str | None = Field(
         default=None,
         description="Comma-separated list of allowed origins",
     )
@@ -227,36 +227,36 @@ class Settings(BaseSettings):
     # ========================================================================
     # Email
     # ========================================================================
-    smtp_host: Optional[str] = Field(default=None)
+    smtp_host: str | None = Field(default=None)
     smtp_port: int = Field(default=587)
-    smtp_username: Optional[str] = Field(default=None)
-    smtp_password: Optional[str] = Field(default=None)
-    smtp_from: Optional[str] = Field(default=None)
+    smtp_username: str | None = Field(default=None)
+    smtp_password: str | None = Field(default=None)
+    smtp_from: str | None = Field(default=None)
     smtp_from_name: str = Field(default="SVC Infra Template")
 
     # ========================================================================
     # Storage (File Upload/Download)
     # ========================================================================
     storage_enabled: bool = Field(default=True)
-    storage_backend: Optional[Literal["s3", "local", "memory"]] = Field(
+    storage_backend: Literal["s3", "local", "memory"] | None = Field(
         default=None,
         description="Storage backend (auto-detected if not set)",
     )
     storage_max_upload_size_mb: int = Field(default=100)
 
     # Local storage
-    storage_local_base_path: Optional[str] = Field(default=None)
-    storage_local_signing_secret: Optional[str] = Field(default=None)
+    storage_local_base_path: str | None = Field(default=None)
+    storage_local_signing_secret: str | None = Field(default=None)
 
     # S3-compatible storage (AWS S3, DigitalOcean Spaces, Wasabi, etc.)
-    storage_s3_bucket: Optional[str] = Field(default=None)
+    storage_s3_bucket: str | None = Field(default=None)
     storage_s3_region: str = Field(default="us-east-1")
-    storage_s3_endpoint: Optional[str] = Field(
+    storage_s3_endpoint: str | None = Field(
         default=None,
         description="Custom S3 endpoint for DigitalOcean Spaces, Wasabi, MinIO, etc.",
     )
-    storage_s3_access_key: Optional[str] = Field(default=None)
-    storage_s3_secret_key: Optional[str] = Field(default=None)
+    storage_s3_access_key: str | None = Field(default=None)
+    storage_s3_secret_key: str | None = Field(default=None)
 
     # Memory storage (for testing)
     storage_memory_max_size: int = Field(default=104857600, description="Max size in bytes (100MB)")
@@ -265,7 +265,7 @@ class Settings(BaseSettings):
     # Billing & Subscriptions
     # ========================================================================
     billing_enabled: bool = Field(default=False)
-    billing_provider: Optional[Literal["stripe", "fake"]] = Field(default=None)
+    billing_provider: Literal["stripe", "fake"] | None = Field(default=None)
 
     # Subscription plans
     billing_plans: str = Field(
@@ -285,11 +285,11 @@ class Settings(BaseSettings):
     # ========================================================================
     # External Services
     # ========================================================================
-    sentry_dsn: Optional[str] = Field(default=None)
-    sentry_environment: Optional[str] = Field(default=None)
+    sentry_dsn: str | None = Field(default=None)
+    sentry_environment: str | None = Field(default=None)
 
-    aws_access_key_id: Optional[str] = Field(default=None)
-    aws_secret_access_key: Optional[str] = Field(default=None)
+    aws_access_key_id: str | None = Field(default=None)
+    aws_secret_access_key: str | None = Field(default=None)
     aws_region: str = Field(default="us-east-1")
 
     # ========================================================================
@@ -338,7 +338,7 @@ class Settings(BaseSettings):
         )
 
     @property
-    def jobs_redis_url(self) -> Optional[str]:
+    def jobs_redis_url(self) -> str | None:
         """Get Redis URL for jobs (defaults to main Redis URL if not specified)."""
         return self.redis_url if self.jobs_driver == "redis" else None
 

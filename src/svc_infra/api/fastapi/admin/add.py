@@ -211,7 +211,7 @@ def add_admin(
             )
             target = await _res if inspect.isawaitable(_res) else _res
             # Swap user but keep actor for audit if needed
-            base.actor = getattr(base, "user", None)
+            base.actor = getattr(base, "user", None)  # type: ignore[attr-defined]
             # If target lacks roles, inherit actor roles to maintain permission checks
             try:
                 if not getattr(target, "roles", None):

@@ -6,7 +6,6 @@ Simplifies storage backend initialization with sensible defaults.
 
 import logging
 import os
-from typing import Optional
 
 from .backends import LocalBackend, MemoryBackend, S3Backend
 from .base import StorageBackend
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def easy_storage(
-    backend: Optional[str] = None,
+    backend: str | None = None,
     **kwargs,
 ) -> StorageBackend:
     """
@@ -135,9 +134,7 @@ def easy_storage(
         secret_key = kwargs.get("secret_key")
 
         if not access_key or not secret_key:
-            access_key_from_settings, secret_key_from_settings = (
-                settings.get_s3_credentials()
-            )
+            access_key_from_settings, secret_key_from_settings = settings.get_s3_credentials()
             access_key = access_key or access_key_from_settings
             secret_key = secret_key or secret_key_from_settings
 
@@ -165,14 +162,13 @@ def easy_storage(
     elif backend_type == "gcs":
         # Google Cloud Storage backend
         raise NotImplementedError(
-            "GCS backend not yet implemented. " "Use 'local' or 's3' backend for now."
+            "GCS backend not yet implemented. Use 'local' or 's3' backend for now."
         )
 
     elif backend_type == "cloudinary":
         # Cloudinary backend
         raise NotImplementedError(
-            "Cloudinary backend not yet implemented. "
-            "Use 'local' or 's3' backend for now."
+            "Cloudinary backend not yet implemented. Use 'local' or 's3' backend for now."
         )
 
     else:

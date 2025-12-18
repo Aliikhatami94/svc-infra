@@ -28,13 +28,12 @@ Some features are commented out and require additional setup (database models, e
 """
 
 # Import settings for configuration
-from svc_infra_template.settings import settings
-
 from svc_infra.api.fastapi import APIVersionSpec, ServiceInfo, setup_service_api
 from svc_infra.api.fastapi.openapi.models import Contact, License
 from svc_infra.api.fastapi.ops.add import add_maintenance_mode, add_probes
 from svc_infra.app import LogLevelOptions, pick, setup_logging
 from svc_infra.security.add import add_security
+from svc_infra_template.settings import settings
 
 # ============================================================================
 # STEP 1: Logging Setup
@@ -203,6 +202,8 @@ async def shutdown_event():
 
 # --- 4.1 Database (SQLAlchemy 2.0 + Alembic Migrations) ---
 if settings.database_configured:
+    from svc_infra.api.fastapi.db.sql.add import add_sql_db, add_sql_health, add_sql_resources
+    from svc_infra.db.sql.resource import SqlResource
     from svc_infra_template.db import Base, get_engine
     from svc_infra_template.db.models import Project, Task
     from svc_infra_template.db.schemas import (
@@ -213,9 +214,6 @@ if settings.database_configured:
         TaskRead,
         TaskUpdate,
     )
-
-    from svc_infra.api.fastapi.db.sql.add import add_sql_db, add_sql_health, add_sql_resources
-    from svc_infra.db.sql.resource import SqlResource
 
     # Add database session management
     add_sql_db(app, url=settings.sql_url)
@@ -540,10 +538,9 @@ if settings.billing_enabled and settings.database_configured:
 #   DELETE /auth/api-keys/{key_id}     - Revoke API key
 
 if settings.auth_enabled and settings.database_configured:
+    from svc_infra.api.fastapi.auth.add import add_auth_users
     from svc_infra_template.models.user import User
     from svc_infra_template.schemas.user import UserCreate, UserRead, UserUpdate
-
-    from svc_infra.api.fastapi.auth.add import add_auth_users
 
     add_auth_users(
         app,
