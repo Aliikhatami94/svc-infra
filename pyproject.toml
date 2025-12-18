@@ -127,6 +127,10 @@ fakeredis = ">=2.20.0"
 moto = {extras = ["s3"], version = ">=5.0.0"}
 aiosqlite = ">=0.19.0"  # Required for acceptance tests using SQLite
 pre-commit = ">=3.0.0"
+# Documentation
+mkdocs = ">=1.6.0"
+mkdocs-material = ">=9.5.0"
+mkdocstrings = {extras = ["python"], version = ">=0.25.0"}
 
 [tool.poetry.scripts]
 svc-infra = "svc_infra.cli:main"

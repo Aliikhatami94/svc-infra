@@ -1,0 +1,105 @@
+site_name: svc-infra Documentation
+site_description: Infrastructure for building and deploying prod-ready services
+site_url: https://nfrax.com/svc-infra
+repo_url: https://github.com/nfraxlab/svc-infra
+repo_name: nfraxlab/svc-infra
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            signature_crossrefs: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: getting-started.md
+      - Environment: environment.md
+      - CLI: cli.md
+  - Core Features:
+      - API Framework: api.md
+      - Authentication: auth.md
+      - Database: database.md
+      - Caching: cache.md
+      - Security: security.md
+  - Advanced:
+      - Background Jobs: jobs.md
+      - Webhooks: webhooks.md
+      - WebSockets: websocket.md
+      - Rate Limiting: rate-limiting.md
+      - Billing: billing.md
+      - Storage: storage.md
+  - Operations:
+      - Observability: observability.md
+      - Ops & SLOs: ops.md
+      - Timeouts & Limits: timeouts-and-resource-limits.md
+      - Data Lifecycle: data-lifecycle.md
+  - Multi-tenancy:
+      - Tenancy: tenancy.md
+      - Admin: admin.md
+  - Reference:
+      - API Reference: reference/api.md
+      - Idempotency: idempotency.md
+      - Versioned Integrations: versioned-integrations.md
+      - Documents: documents.md
+      - Loaders: loaders.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nfraxlab/svc-infra
