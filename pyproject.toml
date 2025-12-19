@@ -219,7 +219,13 @@ convention = "google"
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", "venv"]
-skips = ["B101", "B311"]  # B101: assert used, B311: random for non-crypto
+skips = [
+    "B101",  # assert used (intentional in tests and contracts)
+    "B104",  # hardcoded_bind_all_interfaces (intentional for container deployments)
+    "B310",  # urllib urlopen (URL is validated/trusted in our code)
+    "B311",  # random for non-crypto (intentional)
+    "B324",  # SHA1/MD5 hash - used for cache keys and HIBP API, not security
+]
 
 [tool.coverage.run]
 source = ["src/svc_infra"]
