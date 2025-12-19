@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This file is auto-generated from conventional commits using [git-cliff](https://git-cliff.org/).
 
+## [0.1.713] - 2025-12-19
+
+
+### Bug Fixes
+
+- Lower coverage threshold to 50% to match current state
+- Update bandit config to skip false positive security warnings
+- Merge deprecation utilities into utils.py
+
+
+### Features
+
+- Add deprecation policy and helpers
+
+
+### Miscellaneous
+
+- Update poetry.lock
+
 ## [0.1.711] - 2025-12-18
 
 
