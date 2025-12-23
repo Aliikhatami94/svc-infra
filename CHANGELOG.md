@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This file is auto-generated from conventional commits using [git-cliff](https://git-cliff.org/).
 
+## [0.1.714] - 2025-12-23
+
+
+### Features
+
+- Add skip_paths parameter for middleware to exclude specific endpoints
+
 ## [0.1.713] - 2025-12-19
 
 
