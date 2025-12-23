@@ -148,8 +148,33 @@ def easy_service_api(
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
     root_include_api_key: bool | None = None,
+    skip_paths: list[str] | None = None,
     **fastapi_kwargs,  # Forward all other FastAPI kwargs
 ) -> FastAPI:
+    """
+    Create a FastAPI application with standard service configuration.
+
+    Args:
+        name: Service name for OpenAPI docs and logging.
+        release: Version string for the service.
+        versions: List of (tag, routers_package, public_base_url) tuples for API versioning.
+        root_routers: Router module(s) to mount at root level.
+        public_cors_origins: Origins to allow for CORS.
+        root_public_base_url: Public base URL for root-level routes.
+        root_include_api_key: Whether to include API key auth for root routes.
+        skip_paths: Path prefixes to exclude from timeout/rate-limit middleware.
+            Uses prefix matching: "/v1/chat" matches "/v1/chat" and "/v1/chat/stream"
+            but not "/api/v1/chat". Falls back to SKIP_MIDDLEWARE_PATHS env var.
+        **fastapi_kwargs: Additional kwargs passed to FastAPI constructor.
+
+    Returns:
+        Configured FastAPI application.
+    """
+    # Env fallback for skip_paths
+    effective_skip = (
+        skip_paths if skip_paths is not None else _env_csv_paths("SKIP_MIDDLEWARE_PATHS")
+    )
+
     service = ServiceInfo(name=name, release=release)
     specs = [
         APIVersionSpec(tag=str(tag), routers_package=pkg, public_base_url=base)
@@ -162,6 +187,7 @@ def easy_service_api(
         public_cors_origins=public_cors_origins,
         root_public_base_url=root_public_base_url,
         root_include_api_key=root_include_api_key,
+        skip_paths=effective_skip,
         **fastapi_kwargs,  # Forward to setup_service_api
     )
 
@@ -175,26 +201,47 @@ def easy_service_app(
     public_cors_origins: list[str] | str | None = None,
     root_public_base_url: str | None = None,
     root_include_api_key: bool | None = None,
+    skip_paths: list[str] | None = None,
     options: EasyAppOptions | None = None,
     enable_logging: bool | None = None,
     enable_observability: bool | None = None,
     **fastapi_kwargs,  # Forward all other FastAPI kwargs (lifespan, etc.)
 ) -> FastAPI:
     """
-    One-call bootstrap with env + options + flags:
+    One-call bootstrap with env + options + flags.
 
-      Precedence (strongest → weakest):
+    Args:
+        name: Service name for OpenAPI docs and logging.
+        release: Version string for the service.
+        versions: List of (tag, routers_package, public_base_url) tuples for API versioning.
+        root_routers: Router module(s) to mount at root level.
+        public_cors_origins: Origins to allow for CORS.
+        root_public_base_url: Public base URL for root-level routes.
+        root_include_api_key: Whether to include API key auth for root routes.
+        skip_paths: Path prefixes to exclude from timeout/rate-limit middleware.
+            Uses prefix matching: "/v1/chat" matches "/v1/chat" and "/v1/chat/stream"
+            but not "/api/v1/chat". Falls back to SKIP_MIDDLEWARE_PATHS env var.
+        options: EasyAppOptions for logging/observability configuration.
+        enable_logging: Override to enable/disable logging.
+        enable_observability: Override to enable/disable observability.
+        **fastapi_kwargs: Additional kwargs passed to FastAPI constructor.
+
+    Precedence (strongest → weakest):
         1) enable_logging / enable_observability args
         2) `options=` object (per-field)
         3) `EasyAppOptions.from_env()`
 
-      Env recognized:
+    Env recognized:
         ENABLE_LOGGING=true|false
         ENABLE_OBS=true|false
         LOG_LEVEL=DEBUG|INFO|...
         LOG_FORMAT=json|plain
         METRICS_PATH=/metrics
         OBS_SKIP_PATHS=/metrics,/health,/internal
+        SKIP_MIDDLEWARE_PATHS=/v1/chat,/v1/stream (for timeout/rate-limit skip)
+
+    Returns:
+        Configured FastAPI application with logging and observability.
     """
     # 0) Start from env
     env_opts = EasyAppOptions.from_env()
@@ -229,6 +276,7 @@ def easy_service_app(
         public_cors_origins=public_cors_origins,
         root_public_base_url=root_public_base_url,
         root_include_api_key=root_include_api_key,
+        skip_paths=skip_paths,
         **fastapi_kwargs,  # Forward FastAPI kwargs (lifespan, etc.)
     )
 

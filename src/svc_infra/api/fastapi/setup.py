@@ -286,8 +286,8 @@ class RouteLoggerMiddleware:
         path = scope.get("path", "")
         method = scope.get("method", "")
 
-        # Skip specified paths
-        if any(skip in path for skip in self.skip_paths):
+        # Skip specified paths using prefix matching
+        if any(path.startswith(skip) for skip in self.skip_paths):
             await self.app(scope, receive, send)
             return
 

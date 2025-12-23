@@ -23,6 +23,9 @@ class SimpleRateLimitMiddleware:
 
     Applies per-key rate limits with configurable windows. Use skip_paths for
     endpoints that should bypass rate limiting (e.g., health checks, webhooks).
+
+    Matching uses prefix matching: "/v1/chat" matches "/v1/chat", "/v1/chat/stream",
+    but not "/api/v1/chat" or "/v1/chatter".
     """
 
     def __init__(
@@ -60,8 +63,8 @@ class SimpleRateLimitMiddleware:
 
         path = scope.get("path", "")
 
-        # Skip specified paths
-        if any(skip in path for skip in self.skip_paths):
+        # Skip specified paths using prefix matching
+        if any(path.startswith(skip) for skip in self.skip_paths):
             await self.app(scope, receive, send)
             return
 

@@ -17,6 +17,9 @@ class IdempotencyMiddleware:
     Caches responses for requests with Idempotency-Key header to ensure
     duplicate requests return the same response. Use skip_paths for endpoints
     where idempotency caching is not appropriate (e.g., streaming responses).
+
+    Matching uses prefix matching: "/v1/chat" matches "/v1/chat", "/v1/chat/stream",
+    but not "/api/v1/chat" or "/v1/chatter".
     """
 
     def __init__(
@@ -45,8 +48,8 @@ class IdempotencyMiddleware:
         path = scope.get("path", "")
         method = scope.get("method", "GET")
 
-        # Skip specified paths
-        if any(skip in path for skip in self.skip_paths):
+        # Skip specified paths using prefix matching
+        if any(path.startswith(skip) for skip in self.skip_paths):
             await self.app(scope, receive, send)
             return
 

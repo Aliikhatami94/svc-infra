@@ -37,6 +37,9 @@ class HandlerTimeoutMiddleware:
 
     Use skip_paths for endpoints that may run longer than the timeout
     (e.g., streaming responses, long-polling, file uploads).
+
+    Matching uses prefix matching: "/v1/chat" matches "/v1/chat", "/v1/chat/stream",
+    but not "/api/v1/chat" or "/v1/chatter".
     """
 
     def __init__(
@@ -58,8 +61,8 @@ class HandlerTimeoutMiddleware:
 
         path = scope.get("path", "")
 
-        # Skip specified paths (e.g., long-running endpoints)
-        if any(skip in path for skip in self.skip_paths):
+        # Skip specified paths using prefix matching (e.g., long-running endpoints)
+        if any(path.startswith(skip) for skip in self.skip_paths):
             await self.app(scope, receive, send)
             return
 
