@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This file is auto-generated from conventional commits using [git-cliff](https://git-cliff.org/).
 
+## [0.1.715] - 2025-12-24
+
+
+### Documentation
+
+- Update changelog [skip ci]
+
+
+### Other Changes
+
+- Add comprehensive tests for object_router functionality
+
+- Implement tests for method-to-endpoint mapping, HTTP verb inference, and path generation.
+- Include tests for request/response model generation and exception mapping.
+- Cover async method handling and decorator-based configuration.
+- Test edge cases, including empty classes and classes with only private methods.
+- Validate auth_required parameter functionality and path parameter handling.
+
 ## [0.1.714] - 2025-12-23
 
 
