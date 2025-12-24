@@ -233,6 +233,41 @@ async def secure_ws(websocket: WebSocket, user: WSIdentity):
 
 **See**: [WebSocket Guide](websocket.md) for comprehensive documentation.
 
+### Object Router (`router_from_object`)
+
+Convert any Python object's methods into FastAPI endpoints automatically.
+
+```python
+from fastapi import FastAPI
+from svc_infra.api.fastapi import router_from_object
+
+class Calculator:
+    def add(self, a: float, b: float) -> float:
+        """Add two numbers together."""
+        return a + b
+
+    def get_history(self) -> list[str]:
+        """Get calculation history."""
+        return []
+
+app = FastAPI()
+router = router_from_object(Calculator(), prefix="/calc")
+app.include_router(router)
+
+# Generated endpoints:
+# POST /calc/add       - { "a": 1, "b": 2 } -> 3.0
+# GET  /calc/history   - [] -> []
+```
+
+**Features**:
+- HTTP verb inference from method names (`get_*` → GET, `create_*` → POST, etc.)
+- Automatic request/response model generation from type hints
+- Exception mapping to HTTP status codes
+- Decorator support (`@endpoint`, `@endpoint_exclude`)
+- WebSocket endpoints via `@websocket_endpoint`
+
+**See**: [Object Router Guide](object-router.md) for comprehensive documentation.
+
 ### Jobs (`easy_jobs`)
 
 Initialize job queue and scheduler.

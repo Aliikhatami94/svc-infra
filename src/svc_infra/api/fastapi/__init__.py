@@ -4,6 +4,16 @@ from svc_infra.api.fastapi.dual import (
     dualize_public,
     dualize_user,
 )
+from svc_infra.api.fastapi.object_router import (
+    DEFAULT_EXCEPTION_MAP,
+    STATUS_TITLES,
+    endpoint,
+    endpoint_exclude,
+    map_exception_to_http,
+    router_from_object,
+    router_from_object_with_websocket,
+    websocket_endpoint,
+)
 from svc_infra.api.fastapi.openapi.models import APIVersionSpec, ServiceInfo
 from svc_infra.health import (
     add_dependency_health,
@@ -43,4 +53,13 @@ __all__ = [
     "text_filter",
     "sort_by",
     "cursor_window",
+    # Object Router
+    "router_from_object",
+    "router_from_object_with_websocket",
+    "endpoint",
+    "endpoint_exclude",
+    "websocket_endpoint",
+    "map_exception_to_http",
+    "DEFAULT_EXCEPTION_MAP",
+    "STATUS_TITLES",
 ]
