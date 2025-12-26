@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This file is auto-generated from conventional commits using [git-cliff](https://git-cliff.org/).
 
+## [0.1.716] - 2025-12-26
+
+
+### Bug Fixes
+
+- Fix mypy missing return statement in circuit breaker protect decorator
+- Prevent docs-changelog race condition with publish workflow
+
+
+### Documentation
+
+- Update changelog [skip ci]
+
+
+### Features
+
+- Add resilience patterns documentation and implement retry and circuit breaker utilities
+
 ## [0.1.715] - 2025-12-24
 
 
