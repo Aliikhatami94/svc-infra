@@ -302,7 +302,8 @@ class CircuitBreaker:
         @functools.wraps(fn)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             async with self:
-                return await fn(*args, **kwargs)
+                result = await fn(*args, **kwargs)
+            return result
 
         return wrapper
 
