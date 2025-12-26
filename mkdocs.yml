@@ -87,6 +87,7 @@ nav:
   - Operations:
       - Observability: observability.md
       - Ops & SLOs: ops.md
+      - Resilience: resilience.md
       - Timeouts & Limits: timeouts-and-resource-limits.md
       - Data Lifecycle: data-lifecycle.md
   - Multi-tenancy:
