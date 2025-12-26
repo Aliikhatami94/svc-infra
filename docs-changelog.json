@@ -185,9 +185,21 @@
       "lastUpdated": "2025-12-24",
       "updateCount": 1,
       "title": "Object Router — Convert Objects to FastAPI Endpoints"
+    },
+    "resilience.md": {
+      "created": "2025-12-26",
+      "lastUpdated": "2025-12-26",
+      "updateCount": 1,
+      "title": "Resilience Patterns"
     }
   },
   "history": [
+    {
+      "date": "2025-12-26",
+      "file": "resilience.md",
+      "type": "new",
+      "title": "Resilience Patterns"
+    },
     {
       "date": "2025-12-24",
       "file": "object-router.md",
