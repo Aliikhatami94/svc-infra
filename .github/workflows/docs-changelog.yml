@@ -1,14 +1,16 @@
 name: Update Docs Changelog
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Auto publish to PyPI on main"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'docs/**'
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
   update-changelog:
+    # Only run after successful publish, not on every push
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
