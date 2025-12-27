@@ -90,9 +90,14 @@ nav:
       - Resilience: resilience.md
       - Timeouts & Limits: timeouts-and-resource-limits.md
       - Data Lifecycle: data-lifecycle.md
+      - Deployment: deploy.md
+      - Logging: logging.md
   - Multi-tenancy:
       - Tenancy: tenancy.md
       - Admin: admin.md
+  - Development:
+      - Testing: testing.md
+      - Developer Experience: dx.md
   - Reference:
       - API Reference: reference/api.md
       - Idempotency: idempotency.md

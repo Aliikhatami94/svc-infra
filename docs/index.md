@@ -56,6 +56,38 @@ svc-infra is a comprehensive Python package that provides all the backend primit
 
     [:octicons-arrow-right-24: Webhooks docs](webhooks.md)
 
+-   :material-cloud-upload:{ .lg .middle } **Deployment**
+
+    ---
+
+    Platform detection for Railway, Render, AWS, GCP, Azure with environment resolution.
+
+    [:octicons-arrow-right-24: Deploy docs](deploy.md)
+
+-   :material-text-box:{ .lg .middle } **Logging**
+
+    ---
+
+    Structured JSON logging, context injection, and container-optimized output.
+
+    [:octicons-arrow-right-24: Logging docs](logging.md)
+
+-   :material-test-tube:{ .lg .middle } **Testing**
+
+    ---
+
+    Mock cache, mock job queue, and fixture factories for testing without external services.
+
+    [:octicons-arrow-right-24: Testing docs](testing.md)
+
+-   :material-wrench:{ .lg .middle } **Developer Experience**
+
+    ---
+
+    CI workflow generation, changelog tools, and code quality checks.
+
+    [:octicons-arrow-right-24: DX docs](dx.md)
+
 </div>
 
 ## Quick Start
