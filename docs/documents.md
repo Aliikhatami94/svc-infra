@@ -695,3 +695,722 @@ add_documents(app)
 - [API Scaffolding](./api.md) - FastAPI integration patterns
 - [Security](./security.md) - Authentication and RBAC
 - [Acceptance Matrix](./acceptance-matrix.md) - Test scenarios
+
+---
+
+## AI Integration (Coming Soon)
+
+> **Status**: Planned integration with ai-infra for document processing
+
+svc-infra's document module is designed to integrate seamlessly with ai-infra for AI-powered document processing. While these features are in development, here's the planned architecture:
+
+### OCR Integration
+
+Extract text from images and PDFs using ai-infra's vision capabilities:
+
+```python
+# Planned API
+from svc_infra.documents import DocumentManager
+from ai_infra.llm import LLM
+
+async def extract_text_from_document(doc_id: str) -> str:
+    """Extract text from document using OCR."""
+    manager = easy_documents()
+
+    # Download document
+    file_bytes = await manager.download(doc_id)
+    doc = manager.get(doc_id)
+
+    # Use ai-infra vision model for OCR
+    llm = LLM(model="gpt-4o")  # Vision-capable model
+
+    if doc.content_type.startswith("image/"):
+        # Direct image OCR
+        result = await llm.generate(
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Extract all text from this image. Return only the extracted text, no commentary."},
+                    {"type": "image", "data": file_bytes}
+                ]
+            }]
+        )
+        return result.text
+
+    elif doc.content_type == "application/pdf":
+        # PDF: Extract pages as images, OCR each
+        from pdf2image import convert_from_bytes
+        pages = convert_from_bytes(file_bytes)
+
+        extracted_text = []
+        for i, page in enumerate(pages):
+            page_bytes = page_to_bytes(page)
+            result = await llm.generate(
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"Extract all text from page {i+1}. Return only the extracted text."},
+                        {"type": "image", "data": page_bytes}
+                    ]
+                }]
+            )
+            extracted_text.append(result.text)
+
+        return "\n\n---\n\n".join(extracted_text)
+
+    else:
+        raise ValueError(f"Unsupported content type for OCR: {doc.content_type}")
+```
+
+### Document Classification
+
+Automatically classify documents using AI:
+
+```python
+# Planned API
+from pydantic import BaseModel
+from ai_infra.llm import LLM
+
+class DocumentClassification(BaseModel):
+    """Document classification result."""
+    category: str  # invoice, receipt, contract, report, letter, etc.
+    subcategory: str | None
+    language: str  # ISO 639-1 code
+    confidence: float  # 0.0 - 1.0
+
+async def classify_document(doc_id: str) -> DocumentClassification:
+    """Classify document type using AI."""
+    manager = easy_documents()
+
+    # Get document content (via OCR if needed)
+    text = await extract_text_from_document(doc_id)
+
+    # Use structured output for classification
+    llm = LLM(model="gpt-4o-mini")
+
+    result = await llm.generate(
+        messages=[{
+            "role": "user",
+            "content": f"""Classify this document:
+
+{text[:4000]}
+
+Provide:
+- category: The document type (invoice, receipt, contract, report, letter, form, manual, other)
+- subcategory: More specific type if applicable
+- language: ISO 639-1 language code (e.g., "en", "es", "fr")
+- confidence: Your confidence score (0.0 to 1.0)"""
+        }],
+        response_format=DocumentClassification
+    )
+
+    return result.parsed
+```
+
+### Entity Extraction
+
+Extract structured data from documents:
+
+```python
+# Planned API
+from pydantic import BaseModel
+
+class InvoiceData(BaseModel):
+    """Extracted invoice data."""
+    vendor_name: str
+    invoice_number: str
+    invoice_date: str
+    due_date: str | None
+    total_amount: float
+    currency: str
+    line_items: list[dict]
+
+async def extract_invoice_data(doc_id: str) -> InvoiceData:
+    """Extract structured data from invoice document."""
+    text = await extract_text_from_document(doc_id)
+
+    llm = LLM(model="gpt-4o")
+
+    result = await llm.generate(
+        messages=[{
+            "role": "user",
+            "content": f"""Extract invoice data from this document:
+
+{text}
+
+Extract all relevant fields. For line_items, include description, quantity, unit_price, and total for each item."""
+        }],
+        response_format=InvoiceData
+    )
+
+    return result.parsed
+```
+
+### Semantic Search Integration
+
+Index documents for semantic search with ai-infra Retriever:
+
+```python
+# Planned API
+from ai_infra import Retriever
+from svc_infra.documents import easy_documents
+
+async def index_documents_for_search(user_id: str, retriever: Retriever):
+    """Index all user documents for semantic search."""
+    manager = easy_documents()
+    docs = manager.list(user_id)
+
+    for doc in docs:
+        # Extract text (OCR if needed)
+        text = await extract_text_from_document(doc.id)
+
+        # Add to retriever with metadata
+        retriever.add_text(
+            text,
+            metadata={
+                "source": f"document://{doc.id}",
+                "document_id": doc.id,
+                "filename": doc.filename,
+                "user_id": doc.user_id,
+                "upload_date": doc.upload_date.isoformat(),
+                **doc.metadata
+            }
+        )
+
+    return len(docs)
+
+async def search_documents(
+    user_id: str,
+    query: str,
+    retriever: Retriever,
+    limit: int = 10
+) -> list[dict]:
+    """Search user's documents semantically."""
+    results = retriever.search(
+        query,
+        filter={"user_id": user_id},
+        limit=limit
+    )
+
+    # Enrich with document metadata
+    manager = easy_documents()
+    enriched = []
+
+    for result in results:
+        doc_id = result.metadata.get("document_id")
+        if doc_id:
+            doc = manager.get(doc_id)
+            enriched.append({
+                "document": doc,
+                "snippet": result.text[:500],
+                "score": result.score
+            })
+
+    return enriched
+```
+
+### Document Summarization
+
+Generate summaries of documents:
+
+```python
+# Planned API
+async def summarize_document(
+    doc_id: str,
+    max_length: int = 500,
+    style: str = "concise"  # concise, detailed, bullet_points
+) -> str:
+    """Generate a summary of the document."""
+    text = await extract_text_from_document(doc_id)
+
+    llm = LLM(model="gpt-4o-mini")
+
+    style_prompts = {
+        "concise": f"Summarize in {max_length} characters or less:",
+        "detailed": f"Provide a detailed summary (max {max_length} chars):",
+        "bullet_points": f"Summarize as bullet points (max {max_length} chars):"
+    }
+
+    result = await llm.generate(
+        messages=[{
+            "role": "user",
+            "content": f"""{style_prompts.get(style, style_prompts['concise'])}
+
+{text}"""
+        }]
+    )
+
+    return result.text
+
+# Store summary in metadata
+async def summarize_and_store(doc_id: str):
+    """Summarize document and store in metadata."""
+    summary = await summarize_document(doc_id)
+
+    # Update document metadata
+    manager = easy_documents()
+    doc = manager.get(doc_id)
+    doc.metadata["ai_summary"] = summary
+    doc.metadata["summarized_at"] = datetime.utcnow().isoformat()
+
+    return summary
+```
+
+### Batch Processing Pipeline
+
+Process documents in batch with rate limiting:
+
+```python
+# Planned API
+import asyncio
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+async def process_documents_batch(
+    doc_ids: list[str],
+    processor: Callable[[str], T],
+    *,
+    concurrency: int = 5,
+    delay_seconds: float = 0.1
+) -> list[T | Exception]:
+    """Process documents in batch with rate limiting."""
+    semaphore = asyncio.Semaphore(concurrency)
+    results = []
+
+    async def process_one(doc_id: str) -> T | Exception:
+        async with semaphore:
+            try:
+                result = await processor(doc_id)
+                await asyncio.sleep(delay_seconds)  # Rate limiting
+                return result
+            except Exception as e:
+                return e
+
+    tasks = [process_one(doc_id) for doc_id in doc_ids]
+    results = await asyncio.gather(*tasks)
+
+    return results
+
+# Usage
+async def batch_classify():
+    manager = easy_documents()
+    docs = manager.list("user_123")
+    doc_ids = [doc.id for doc in docs]
+
+    results = await process_documents_batch(
+        doc_ids,
+        classify_document,
+        concurrency=3  # Limit concurrent AI calls
+    )
+
+    for doc_id, result in zip(doc_ids, results):
+        if isinstance(result, Exception):
+            print(f"Failed to classify {doc_id}: {result}")
+        else:
+            print(f"{doc_id}: {result.category}")
+```
+
+### Integration with fin-infra
+
+For financial documents, fin-infra provides specialized extractors:
+
+```python
+# fin-infra extension pattern
+from fin_infra.documents import (
+    extract_w2_data,
+    extract_1099_data,
+    extract_bank_statement,
+    extract_receipt,
+)
+
+# Specialized extractors with financial validation
+w2_data = await extract_w2_data(doc_id)  # Validates SSN format, amounts, etc.
+receipt = await extract_receipt(doc_id)   # Extracts vendor, items, tax, total
+
+# See fin-infra documentation for details
+```
+
+---
+
+## Webhook Notifications
+
+Configure webhooks to receive document events:
+
+```python
+# Planned API
+from svc_infra.documents import DocumentManager
+from svc_infra.webhooks import WebhookConfig
+
+async def setup_document_webhooks(app, webhook_url: str):
+    """Configure webhooks for document events."""
+    manager = add_documents(app)
+
+    # Configure webhook notifications
+    webhook_config = WebhookConfig(
+        url=webhook_url,
+        events=["document.uploaded", "document.deleted", "document.processed"],
+        secret="webhook-signing-secret"
+    )
+
+    # Hook into manager events
+    original_upload = manager.upload
+
+    async def upload_with_webhook(*args, **kwargs):
+        doc = await original_upload(*args, **kwargs)
+
+        # Send webhook
+        await send_webhook(webhook_config, {
+            "event": "document.uploaded",
+            "document_id": doc.id,
+            "filename": doc.filename,
+            "user_id": doc.user_id,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+        return doc
+
+    manager.upload = upload_with_webhook
+```
+
+### Event Payloads
+
+| Event | Payload |
+|-------|---------|
+| `document.uploaded` | `{document_id, filename, user_id, content_type, file_size}` |
+| `document.deleted` | `{document_id, filename, user_id}` |
+| `document.processed` | `{document_id, processing_type, result}` |
+| `document.shared` | `{document_id, shared_with, permissions}` |
+
+---
+
+## Audit Logging
+
+Track document access and modifications:
+
+```python
+# Planned API
+from svc_infra.documents import DocumentManager
+from svc_infra.audit import AuditLog
+
+class AuditedDocumentManager(DocumentManager):
+    """Document manager with audit logging."""
+
+    def __init__(self, storage, audit_log: AuditLog):
+        super().__init__(storage)
+        self.audit = audit_log
+
+    async def upload(self, user_id: str, file: bytes, filename: str, **kwargs):
+        doc = await super().upload(user_id, file, filename, **kwargs)
+
+        await self.audit.log({
+            "action": "document.upload",
+            "actor_id": user_id,
+            "resource_type": "document",
+            "resource_id": doc.id,
+            "details": {
+                "filename": filename,
+                "size": len(file),
+                "content_type": doc.content_type
+            }
+        })
+
+        return doc
+
+    async def download(self, document_id: str, *, actor_id: str = None):
+        file_bytes = await super().download(document_id)
+
+        await self.audit.log({
+            "action": "document.download",
+            "actor_id": actor_id,
+            "resource_type": "document",
+            "resource_id": document_id,
+        })
+
+        return file_bytes
+
+    async def delete(self, document_id: str, *, actor_id: str = None):
+        doc = self.get(document_id)
+        success = await super().delete(document_id)
+
+        if success:
+            await self.audit.log({
+                "action": "document.delete",
+                "actor_id": actor_id,
+                "resource_type": "document",
+                "resource_id": document_id,
+                "details": {"filename": doc.filename}
+            })
+
+        return success
+```
+
+### Audit Log Schema
+
+```sql
+CREATE TABLE document_audit_log (
+    id UUID PRIMARY KEY,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    action VARCHAR(50) NOT NULL,       -- document.upload, document.download, etc.
+    actor_id VARCHAR(100),             -- User who performed action
+    resource_id VARCHAR(100) NOT NULL, -- Document ID
+    details JSONB,                     -- Additional context
+    ip_address INET,
+    user_agent TEXT
+);
+
+CREATE INDEX idx_audit_document ON document_audit_log(resource_id);
+CREATE INDEX idx_audit_actor ON document_audit_log(actor_id);
+CREATE INDEX idx_audit_timestamp ON document_audit_log(timestamp DESC);
+```
+
+---
+
+## Virus Scanning
+
+Integrate virus scanning for uploaded documents:
+
+```python
+# Planned API
+import clamd  # ClamAV client
+
+class VirusScanningDocumentManager(DocumentManager):
+    """Document manager with virus scanning."""
+
+    def __init__(self, storage, clamav_socket: str = "/var/run/clamav/clamd.sock"):
+        super().__init__(storage)
+        self.scanner = clamd.ClamdUnixSocket(clamav_socket)
+
+    async def upload(self, user_id: str, file: bytes, filename: str, **kwargs):
+        # Scan file before upload
+        scan_result = self.scanner.instream(file)
+
+        if scan_result["stream"][0] == "FOUND":
+            virus_name = scan_result["stream"][1]
+            raise ValueError(f"Virus detected: {virus_name}")
+
+        # Safe to upload
+        return await super().upload(user_id, file, filename, **kwargs)
+
+# Environment setup
+# 1. Install ClamAV: apt-get install clamav clamav-daemon
+# 2. Start daemon: systemctl start clamav-daemon
+# 3. Install Python client: pip install pyclamd
+```
+
+### Scanning Results
+
+| Result | Action |
+|--------|--------|
+| `OK` | Proceed with upload |
+| `FOUND` | Reject upload, log incident |
+| `ERROR` | Log warning, allow upload (fail-open) or reject (fail-closed) |
+
+---
+
+## Document Retention Policies
+
+Implement automatic document retention and deletion:
+
+```python
+# Planned API
+from dataclasses import dataclass
+from datetime import timedelta
+
+@dataclass
+class RetentionPolicy:
+    """Document retention policy."""
+    name: str
+    retention_days: int
+    applies_to: dict  # Metadata filter
+    action: str = "delete"  # delete, archive, notify
+
+# Define policies
+policies = [
+    RetentionPolicy(
+        name="temp_uploads",
+        retention_days=7,
+        applies_to={"category": "temporary"},
+        action="delete"
+    ),
+    RetentionPolicy(
+        name="tax_documents",
+        retention_days=365 * 7,  # 7 years
+        applies_to={"category": "tax"},
+        action="archive"
+    ),
+    RetentionPolicy(
+        name="contracts",
+        retention_days=365 * 10,  # 10 years
+        applies_to={"category": "legal", "type": "contract"},
+        action="notify"  # Notify before deletion
+    ),
+]
+
+async def apply_retention_policies(policies: list[RetentionPolicy]):
+    """Apply retention policies to all documents."""
+    manager = easy_documents()
+
+    for policy in policies:
+        cutoff = datetime.utcnow() - timedelta(days=policy.retention_days)
+
+        # Find matching documents
+        all_docs = manager.list()
+        for doc in all_docs:
+            # Check if policy applies
+            if not matches_filter(doc.metadata, policy.applies_to):
+                continue
+
+            # Check if past retention period
+            if doc.upload_date >= cutoff:
+                continue
+
+            # Apply action
+            if policy.action == "delete":
+                await manager.delete(doc.id)
+                print(f"Deleted {doc.filename} (policy: {policy.name})")
+
+            elif policy.action == "archive":
+                await archive_document(doc)
+                print(f"Archived {doc.filename} (policy: {policy.name})")
+
+            elif policy.action == "notify":
+                await notify_retention(doc, policy)
+                print(f"Notified about {doc.filename} (policy: {policy.name})")
+
+# Run daily via cron or scheduler
+# 0 2 * * * python -c "from myapp import apply_retention_policies; ..."
+```
+
+---
+
+## Version History
+
+Track document versions with change history:
+
+```python
+# Planned API
+from svc_infra.documents import Document
+
+class DocumentVersion(BaseModel):
+    """A specific version of a document."""
+    version_id: str
+    document_id: str
+    version_number: int
+    storage_path: str
+    created_at: datetime
+    created_by: str
+    change_summary: str | None
+
+class VersionedDocumentManager(DocumentManager):
+    """Document manager with version history."""
+
+    async def upload_version(
+        self,
+        document_id: str,
+        file: bytes,
+        *,
+        user_id: str,
+        change_summary: str = None
+    ) -> DocumentVersion:
+        """Upload a new version of existing document."""
+        doc = self.get(document_id)
+
+        # Get next version number
+        versions = self.list_versions(document_id)
+        next_version = max(v.version_number for v in versions) + 1 if versions else 1
+
+        # Upload new version
+        version_path = f"{doc.storage_path}/v{next_version}"
+        await self.storage.upload(file, version_path)
+
+        # Create version record
+        version = DocumentVersion(
+            version_id=f"ver_{uuid4().hex[:12]}",
+            document_id=document_id,
+            version_number=next_version,
+            storage_path=version_path,
+            created_at=datetime.utcnow(),
+            created_by=user_id,
+            change_summary=change_summary
+        )
+
+        # Update document to point to latest version
+        doc.storage_path = version_path
+        doc.metadata["current_version"] = next_version
+
+        return version
+
+    def list_versions(self, document_id: str) -> list[DocumentVersion]:
+        """List all versions of a document."""
+        # Implementation depends on metadata storage
+        ...
+
+    async def download_version(
+        self,
+        document_id: str,
+        version_number: int
+    ) -> bytes:
+        """Download a specific version."""
+        versions = self.list_versions(document_id)
+        version = next(
+            (v for v in versions if v.version_number == version_number),
+            None
+        )
+
+        if not version:
+            raise ValueError(f"Version {version_number} not found")
+
+        return await self.storage.download(version.storage_path)
+
+    async def restore_version(
+        self,
+        document_id: str,
+        version_number: int,
+        *,
+        user_id: str
+    ) -> DocumentVersion:
+        """Restore a previous version as the current version."""
+        old_content = await self.download_version(document_id, version_number)
+
+        return await self.upload_version(
+            document_id,
+            old_content,
+            user_id=user_id,
+            change_summary=f"Restored from version {version_number}"
+        )
+```
+
+### Version Comparison
+
+```python
+async def compare_versions(
+    document_id: str,
+    version_a: int,
+    version_b: int
+) -> dict:
+    """Compare two document versions."""
+    manager = VersionedDocumentManager(storage)
+
+    content_a = await manager.download_version(document_id, version_a)
+    content_b = await manager.download_version(document_id, version_b)
+
+    # For text documents, show diff
+    if document_id_is_text(document_id):
+        import difflib
+        diff = difflib.unified_diff(
+            content_a.decode().splitlines(),
+            content_b.decode().splitlines(),
+            fromfile=f"v{version_a}",
+            tofile=f"v{version_b}"
+        )
+        return {"type": "text_diff", "diff": "\n".join(diff)}
+
+    # For binary documents, show size comparison
+    return {
+        "type": "binary",
+        "size_a": len(content_a),
+        "size_b": len(content_b),
+        "size_diff": len(content_b) - len(content_a)
+    }
+```

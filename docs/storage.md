@@ -974,6 +974,732 @@ GET /_ops/health
 }
 ```
 
+---
+
+## CDN Integration
+
+### CloudFront with S3
+
+Amazon CloudFront provides global edge caching for your S3 files:
+
+#### 1. Create CloudFront Distribution
+
+```bash
+aws cloudfront create-distribution \
+  --origin-domain-name myapp-uploads.s3.amazonaws.com \
+  --default-root-object index.html
+```
+
+#### 2. Configure Signed URLs
+
+```python
+import datetime
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization
+import base64
+
+def sign_cloudfront_url(
+    url: str,
+    key_pair_id: str,
+    private_key_path: str,
+    expires_at: datetime.datetime,
+) -> str:
+    """Generate CloudFront signed URL."""
+    policy = {
+        "Statement": [{
+            "Resource": url,
+            "Condition": {
+                "DateLessThan": {
+                    "AWS:EpochTime": int(expires_at.timestamp())
+                }
+            }
+        }]
+    }
+
+    policy_json = json.dumps(policy, separators=(",", ":"))
+    policy_b64 = base64.b64encode(policy_json.encode()).decode()
+    # URL-safe base64
+    policy_b64 = policy_b64.replace("+", "-").replace("=", "_").replace("/", "~")
+
+    with open(private_key_path, "rb") as f:
+        private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+    signature = private_key.sign(
+        policy_json.encode(),
+        padding.PKCS1v15(),
+        hashes.SHA1()
+    )
+    signature_b64 = base64.b64encode(signature).decode()
+    signature_b64 = signature_b64.replace("+", "-").replace("=", "_").replace("/", "~")
+
+    return f"{url}?Policy={policy_b64}&Signature={signature_b64}&Key-Pair-Id={key_pair_id}"
+```
+
+#### 3. Integration with Storage Backend
+
+```python
+from svc_infra.storage import StorageBackend
+from fastapi import Depends
+
+class CDNStorageWrapper:
+    """Wrapper that returns CDN URLs instead of S3 presigned URLs."""
+
+    def __init__(
+        self,
+        backend: StorageBackend,
+        cdn_domain: str,
+        key_pair_id: str,
+        private_key_path: str,
+    ):
+        self.backend = backend
+        self.cdn_domain = cdn_domain
+        self.key_pair_id = key_pair_id
+        self.private_key_path = private_key_path
+
+    async def put(self, key: str, data: bytes, content_type: str, metadata=None) -> str:
+        # Store in S3
+        await self.backend.put(key, data, content_type, metadata)
+        # Return CDN URL
+        return f"https://{self.cdn_domain}/{key}"
+
+    async def get_url(self, key: str, expires_in: int = 3600, download: bool = False) -> str:
+        url = f"https://{self.cdn_domain}/{key}"
+        if download:
+            url += "?response-content-disposition=attachment"
+
+        expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=expires_in)
+        return sign_cloudfront_url(
+            url, self.key_pair_id, self.private_key_path, expires_at
+        )
+
+    # Delegate other methods
+    async def get(self, key: str) -> bytes:
+        return await self.backend.get(key)
+
+    async def delete(self, key: str) -> bool:
+        return await self.backend.delete(key)
+
+    async def exists(self, key: str) -> bool:
+        return await self.backend.exists(key)
+```
+
+### Cloudflare R2 with Workers
+
+Cloudflare R2 is S3-compatible with zero egress fees:
+
+```bash
+# Environment configuration
+STORAGE_BACKEND=s3
+STORAGE_S3_BUCKET=myapp-uploads
+STORAGE_S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com
+STORAGE_S3_ACCESS_KEY=...
+STORAGE_S3_SECRET_KEY=...
+```
+
+#### Custom Domain with Cloudflare
+
+```python
+# R2 URLs can be served via custom domain
+CDN_DOMAIN = "cdn.example.com"
+
+async def get_cdn_url(storage: StorageBackend, key: str) -> str:
+    # For public files
+    return f"https://{CDN_DOMAIN}/{key}"
+
+    # For private files, use R2 presigned URL
+    return await storage.get_url(key, expires_in=3600)
+```
+
+### DigitalOcean Spaces CDN
+
+Spaces includes built-in CDN:
+
+```bash
+# Enable CDN in Spaces settings, then use CDN endpoint
+# Original: https://nyc3.digitaloceanspaces.com/mybucket/file.jpg
+# CDN: https://mybucket.nyc3.cdn.digitaloceanspaces.com/file.jpg
+
+CDN_ENDPOINT=mybucket.nyc3.cdn.digitaloceanspaces.com
+```
+
+```python
+async def get_spaces_cdn_url(key: str) -> str:
+    return f"https://{os.environ['CDN_ENDPOINT']}/{key}"
+```
+
+### BunnyCDN (Any Origin)
+
+BunnyCDN works with any storage backend:
+
+```python
+import hashlib
+import time
+
+def sign_bunny_url(
+    url: str,
+    security_key: str,
+    expires_in: int = 3600,
+) -> str:
+    """Generate BunnyCDN signed URL."""
+    expires = int(time.time()) + expires_in
+
+    # Extract path from URL
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    path = parsed.path
+
+    # Generate token
+    token_base = f"{security_key}{path}{expires}"
+    token = hashlib.md5(token_base.encode()).digest()
+    token_b64 = base64.b64encode(token).decode()
+    token_b64 = token_b64.replace("\n", "").replace("+", "-").replace("/", "_").replace("=", "")
+
+    return f"{url}?token={token_b64}&expires={expires}"
+
+# Usage
+CDN_URL = "https://myzone.b-cdn.net"
+SECURITY_KEY = os.environ["BUNNY_SECURITY_KEY"]
+
+async def get_bunny_url(key: str, expires_in: int = 3600) -> str:
+    url = f"{CDN_URL}/{key}"
+    return sign_bunny_url(url, SECURITY_KEY, expires_in)
+```
+
+### Cache Invalidation
+
+When files are updated, invalidate CDN cache:
+
+```python
+import httpx
+
+class CDNInvalidator:
+    """Invalidate CDN cache when files change."""
+
+    async def invalidate_cloudfront(self, distribution_id: str, paths: list[str]):
+        """Invalidate CloudFront cache."""
+        import boto3
+        client = boto3.client("cloudfront")
+        client.create_invalidation(
+            DistributionId=distribution_id,
+            InvalidationBatch={
+                "Paths": {"Quantity": len(paths), "Items": paths},
+                "CallerReference": str(time.time()),
+            }
+        )
+
+    async def invalidate_bunny(self, url: str, api_key: str):
+        """Invalidate BunnyCDN cache."""
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "https://api.bunny.net/purge",
+                params={"url": url},
+                headers={"AccessKey": api_key},
+            )
+
+    async def invalidate_cloudflare(self, zone_id: str, api_token: str, urls: list[str]):
+        """Invalidate Cloudflare cache."""
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache",
+                json={"files": urls},
+                headers={"Authorization": f"Bearer {api_token}"},
+            )
+
+# Integrate with storage operations
+async def put_with_invalidation(
+    storage: StorageBackend,
+    invalidator: CDNInvalidator,
+    key: str,
+    data: bytes,
+    content_type: str,
+) -> str:
+    # Upload new version
+    url = await storage.put(key, data, content_type)
+
+    # Invalidate old cache
+    await invalidator.invalidate_cloudfront(
+        DISTRIBUTION_ID,
+        [f"/{key}"]
+    )
+
+    return url
+```
+
+---
+
+## Cost Optimization
+
+### Storage Backend Cost Comparison
+
+| Provider | Storage (GB/mo) | Egress (GB) | Requests (10K) | Best For |
+|----------|-----------------|-------------|----------------|----------|
+| **AWS S3 Standard** | $0.023 | $0.09 | $0.005 GET | General purpose |
+| **AWS S3 IA** | $0.0125 | $0.09 | $0.01 GET | Infrequent access |
+| **AWS S3 Glacier** | $0.004 | $0.09 | $0.05 GET | Archives |
+| **Cloudflare R2** | $0.015 | **$0.00** | $0.36/million | High egress |
+| **Backblaze B2** | $0.006 | $0.01 | Free | Budget-friendly |
+| **DigitalOcean Spaces** | $5/250GB | Included | Included | Simplicity |
+| **Wasabi** | $0.0059 | **$0.00** | Free | Cold storage |
+
+### Choosing the Right Backend
+
+```python
+def recommend_storage_backend(
+    monthly_storage_gb: float,
+    monthly_egress_gb: float,
+    access_pattern: str,  # "hot", "warm", "cold"
+) -> str:
+    """Recommend optimal storage backend based on usage."""
+
+    # Calculate costs
+    costs = {}
+
+    # AWS S3 Standard
+    costs["s3_standard"] = (monthly_storage_gb * 0.023) + (monthly_egress_gb * 0.09)
+
+    # Cloudflare R2 (no egress)
+    costs["r2"] = monthly_storage_gb * 0.015
+
+    # Backblaze B2
+    costs["b2"] = (monthly_storage_gb * 0.006) + (monthly_egress_gb * 0.01)
+
+    # Wasabi (no egress but 90-day minimum)
+    costs["wasabi"] = monthly_storage_gb * 0.0059
+
+    # Add access pattern considerations
+    if access_pattern == "hot" and monthly_egress_gb > 100:
+        # High egress → R2 wins
+        return "Cloudflare R2"
+    elif access_pattern == "cold":
+        # Archive → Wasabi or Glacier
+        return "Wasabi or S3 Glacier"
+    elif monthly_storage_gb < 50 and monthly_egress_gb < 100:
+        # Small scale → DigitalOcean Spaces for simplicity
+        return "DigitalOcean Spaces"
+    else:
+        # General → pick cheapest
+        return min(costs, key=costs.get)
+```
+
+### S3 Storage Classes
+
+Use lifecycle policies to automatically transition files:
+
+```python
+import boto3
+
+def setup_lifecycle_policy(bucket: str):
+    """Configure S3 lifecycle for cost optimization."""
+    s3 = boto3.client("s3")
+
+    s3.put_bucket_lifecycle_configuration(
+        Bucket=bucket,
+        LifecycleConfiguration={
+            "Rules": [
+                {
+                    "ID": "TransitionToIA",
+                    "Status": "Enabled",
+                    "Filter": {"Prefix": "documents/"},
+                    "Transitions": [
+                        {
+                            "Days": 30,
+                            "StorageClass": "STANDARD_IA"
+                        }
+                    ]
+                },
+                {
+                    "ID": "TransitionToGlacier",
+                    "Status": "Enabled",
+                    "Filter": {"Prefix": "archives/"},
+                    "Transitions": [
+                        {
+                            "Days": 90,
+                            "StorageClass": "GLACIER_IR"
+                        }
+                    ]
+                },
+                {
+                    "ID": "ExpireOldVersions",
+                    "Status": "Enabled",
+                    "Filter": {"Prefix": ""},
+                    "NoncurrentVersionExpiration": {
+                        "NoncurrentDays": 30
+                    }
+                },
+                {
+                    "ID": "CleanupMultipartUploads",
+                    "Status": "Enabled",
+                    "Filter": {"Prefix": ""},
+                    "AbortIncompleteMultipartUpload": {
+                        "DaysAfterInitiation": 7
+                    }
+                }
+            ]
+        }
+    )
+```
+
+### Intelligent Tiering
+
+Let AWS automatically move files between tiers:
+
+```python
+async def put_with_intelligent_tiering(
+    storage: S3Backend,
+    key: str,
+    data: bytes,
+    content_type: str,
+) -> str:
+    """Store with Intelligent-Tiering for automatic cost optimization."""
+    await storage._client.put_object(
+        Bucket=storage.bucket,
+        Key=key,
+        Body=data,
+        ContentType=content_type,
+        StorageClass="INTELLIGENT_TIERING",
+    )
+    return await storage.get_url(key)
+```
+
+### Compression
+
+Compress before storing to reduce costs:
+
+```python
+import gzip
+import zlib
+
+async def put_compressed(
+    storage: StorageBackend,
+    key: str,
+    data: bytes,
+    content_type: str,
+) -> tuple[str, int]:
+    """Store compressed data, return URL and savings percentage."""
+    original_size = len(data)
+
+    # Skip compression for already-compressed formats
+    skip_compression = {
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "video/mp4", "video/webm",
+        "application/zip", "application/gzip",
+    }
+
+    if content_type in skip_compression:
+        url = await storage.put(key, data, content_type)
+        return url, 0
+
+    # Compress with gzip
+    compressed = gzip.compress(data, compresslevel=6)
+
+    # Only use compressed if it's actually smaller
+    if len(compressed) < original_size * 0.9:  # At least 10% savings
+        url = await storage.put(
+            key + ".gz",
+            compressed,
+            content_type,
+            metadata={"original-content-type": content_type, "compressed": "gzip"},
+        )
+        savings = int((1 - len(compressed) / original_size) * 100)
+        return url, savings
+    else:
+        url = await storage.put(key, data, content_type)
+        return url, 0
+
+# Decompress on retrieval
+async def get_decompressed(storage: StorageBackend, key: str) -> bytes:
+    """Retrieve and decompress if needed."""
+    data = await storage.get(key)
+
+    if key.endswith(".gz"):
+        return gzip.decompress(data)
+    return data
+```
+
+### Deduplication
+
+Avoid storing duplicate files:
+
+```python
+import hashlib
+
+async def put_deduplicated(
+    storage: StorageBackend,
+    key: str,
+    data: bytes,
+    content_type: str,
+    session,  # Database session
+) -> str:
+    """Store file with deduplication based on content hash."""
+    # Calculate content hash
+    content_hash = hashlib.sha256(data).hexdigest()
+
+    # Check if we already have this content
+    existing = await session.execute(
+        select(FileRecord).where(FileRecord.content_hash == content_hash)
+    )
+    existing_file = existing.scalars().first()
+
+    if existing_file:
+        # Create reference to existing file
+        await session.execute(
+            insert(FileRecord).values(
+                key=key,
+                content_hash=content_hash,
+                storage_key=existing_file.storage_key,  # Point to same storage
+                size=len(data),
+            )
+        )
+        return await storage.get_url(existing_file.storage_key)
+
+    # Store new file
+    storage_key = f"content/{content_hash[:2]}/{content_hash}"
+    url = await storage.put(storage_key, data, content_type)
+
+    await session.execute(
+        insert(FileRecord).values(
+            key=key,
+            content_hash=content_hash,
+            storage_key=storage_key,
+            size=len(data),
+        )
+    )
+
+    return url
+
+# Delete with reference counting
+async def delete_deduplicated(storage: StorageBackend, key: str, session) -> bool:
+    """Delete file reference, only delete storage if no more references."""
+    file_record = await session.get(FileRecord, key)
+    if not file_record:
+        return False
+
+    # Count other references
+    count = await session.execute(
+        select(func.count()).where(
+            FileRecord.storage_key == file_record.storage_key,
+            FileRecord.key != key,
+        )
+    )
+    other_refs = count.scalar()
+
+    # Delete record
+    await session.delete(file_record)
+
+    # Delete from storage only if no other references
+    if other_refs == 0:
+        await storage.delete(file_record.storage_key)
+
+    return True
+```
+
+### Monitoring Storage Costs
+
+```python
+from prometheus_client import Gauge, Counter
+
+storage_bytes = Gauge(
+    "storage_bytes_total",
+    "Total bytes stored",
+    ["backend", "tenant_id"],
+)
+
+storage_egress_bytes = Counter(
+    "storage_egress_bytes_total",
+    "Total bytes transferred out",
+    ["backend"],
+)
+
+async def put_with_metrics(
+    storage: StorageBackend,
+    tenant_id: str,
+    key: str,
+    data: bytes,
+    content_type: str,
+) -> str:
+    url = await storage.put(key, data, content_type)
+    storage_bytes.labels(
+        backend=type(storage).__name__,
+        tenant_id=tenant_id,
+    ).inc(len(data))
+    return url
+
+async def get_with_metrics(storage: StorageBackend, key: str) -> bytes:
+    data = await storage.get(key)
+    storage_egress_bytes.labels(
+        backend=type(storage).__name__,
+    ).inc(len(data))
+    return data
+```
+
+### Cost Alerts
+
+```python
+# Prometheus alerting rule
+ALERT StorageCostHigh
+  expr: increase(storage_egress_bytes_total[24h]) > 100 * 1024 * 1024 * 1024  # 100GB/day
+  for: 1h
+  labels:
+    severity: warning
+  annotations:
+    summary: "High storage egress detected"
+    description: "Egress {{ $value | humanize1024 }} in last 24h"
+```
+
+---
+
+## Provider-Specific Optimizations
+
+### AWS S3
+
+#### Transfer Acceleration
+
+For global uploads, enable S3 Transfer Acceleration:
+
+```bash
+aws s3api put-bucket-accelerate-configuration \
+  --bucket myapp-uploads \
+  --accelerate-configuration Status=Enabled
+```
+
+```python
+# Use accelerated endpoint
+STORAGE_S3_ENDPOINT=https://myapp-uploads.s3-accelerate.amazonaws.com
+```
+
+#### Multipart Uploads for Large Files
+
+```python
+async def upload_large_file(
+    storage: S3Backend,
+    key: str,
+    file_path: str,
+    chunk_size: int = 100 * 1024 * 1024,  # 100MB chunks
+) -> str:
+    """Upload large file using multipart upload."""
+    import aioboto3
+
+    session = aioboto3.Session()
+    async with session.client("s3") as s3:
+        # Initiate multipart upload
+        response = await s3.create_multipart_upload(
+            Bucket=storage.bucket,
+            Key=key,
+        )
+        upload_id = response["UploadId"]
+
+        parts = []
+        part_number = 1
+
+        async with aiofiles.open(file_path, "rb") as f:
+            while chunk := await f.read(chunk_size):
+                # Upload part
+                part = await s3.upload_part(
+                    Bucket=storage.bucket,
+                    Key=key,
+                    PartNumber=part_number,
+                    UploadId=upload_id,
+                    Body=chunk,
+                )
+                parts.append({
+                    "PartNumber": part_number,
+                    "ETag": part["ETag"],
+                })
+                part_number += 1
+
+        # Complete multipart upload
+        await s3.complete_multipart_upload(
+            Bucket=storage.bucket,
+            Key=key,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": parts},
+        )
+
+    return await storage.get_url(key)
+```
+
+### Cloudflare R2
+
+#### Workers Integration
+
+```javascript
+// Cloudflare Worker for image resizing
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const key = url.pathname.slice(1);
+
+    // Check for resize parameters
+    const width = url.searchParams.get("w");
+    const height = url.searchParams.get("h");
+
+    const object = await env.BUCKET.get(key);
+    if (!object) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    if (width || height) {
+      // Use Cloudflare Image Resizing
+      return fetch(request, {
+        cf: {
+          image: {
+            width: parseInt(width) || undefined,
+            height: parseInt(height) || undefined,
+            fit: "contain",
+          },
+        },
+      });
+    }
+
+    return new Response(object.body, {
+      headers: {
+        "content-type": object.httpMetadata.contentType,
+        "cache-control": "public, max-age=31536000",
+      },
+    });
+  },
+};
+```
+
+### Backblaze B2
+
+#### Native API for Lower Costs
+
+```python
+from b2sdk.v2 import InMemoryAccountInfo, B2Api
+
+def get_b2_api() -> B2Api:
+    """Get Backblaze B2 native API (lower cost than S3 compatibility)."""
+    info = InMemoryAccountInfo()
+    b2_api = B2Api(info)
+    b2_api.authorize_account(
+        "production",
+        os.environ["B2_APPLICATION_KEY_ID"],
+        os.environ["B2_APPLICATION_KEY"],
+    )
+    return b2_api
+
+async def upload_to_b2_native(
+    key: str,
+    data: bytes,
+    content_type: str,
+) -> str:
+    """Upload using native B2 API (no S3 compatibility overhead)."""
+    b2_api = get_b2_api()
+    bucket = b2_api.get_bucket_by_name(os.environ["B2_BUCKET_NAME"])
+
+    file_info = bucket.upload_bytes(
+        data,
+        key,
+        content_type=content_type,
+    )
+
+    return f"https://f002.backblazeb2.com/file/{bucket.name}/{key}"
+```
+
+---
+
 ## See Also
 
 - [API Integration Guide](./api.md) - FastAPI integration patterns

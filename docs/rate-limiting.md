@@ -1,97 +1,428 @@
 # Rate Limiting & Abuse Protection
 
-This guide shows how to enable and tune the built-in rate limiter and request-size guard, and how to hook simple metrics for abuse detection.
+svc-infra provides production-ready rate limiting with multiple enforcement strategies,
+pluggable storage backends, and abuse detection primitives.
 
-## Features
+---
 
-- Global middleware-based rate limiting with standard headers
-- Per-route dependency for fine-grained limits
-- 429 responses include `Retry-After`
-- Pluggable store interface (in-memory provided; Redis store available)
-- Request size limit middleware returning 413
-- Metrics hooks for rate-limiting events and suspect payloads
+## Quick Start
 
-## Global middleware
+### Global Middleware
+
+Apply rate limits to all endpoints:
 
 ```python
+from fastapi import FastAPI
 from svc_infra.api.fastapi.middleware.ratelimit import SimpleRateLimitMiddleware
 
+app = FastAPI()
 app.add_middleware(
     SimpleRateLimitMiddleware,
-    limit=120,   # requests
-    window=60,   # seconds
-    key_fn=lambda r: r.headers.get("X-API-Key") or r.client.host,
+    limit=120,   # requests per window
+    window=60,   # window in seconds
 )
 ```
 
-Responses include headers:
-- `X-RateLimit-Limit`
-- `X-RateLimit-Remaining`
-- `X-RateLimit-Reset` (epoch seconds)
+### Per-Route Limits
 
-When exceeded, responses are 429 with `Retry-After` and the same headers.
-
-Advanced options:
-- `scope_by_tenant=True` to automatically include tenant id in the key if tenancy is configured.
-- `limit_resolver=request -> int | None` to override the limit dynamically per request (e.g., per-plan quotas).
-- `allow_untrusted_tenant_header=False` (default) — **Security**: When `True`, allows the `X-Tenant-Id` header to be trusted for unauthenticated requests. **This is disabled by default** to prevent attackers from spoofing tenant IDs to evade per-tenant rate limits. Only enable if you have a trusted proxy that sets this header.
-
-## Per-route dependency
+Apply different limits to specific endpoints:
 
 ```python
 from fastapi import Depends
 from svc_infra.api.fastapi.dependencies.ratelimit import rate_limiter
 
-limiter = rate_limiter(limit=10, window=60, key_fn=lambda r: r.client.host)
+# Strict limit for expensive operations
+expensive_limiter = rate_limiter(limit=10, window=60)
 
-@app.get("/resource", dependencies=[Depends(limiter)])
-def get_resource():
-    return {"ok": True}
+@app.post("/api/generate", dependencies=[Depends(expensive_limiter)])
+async def generate():
+    return {"result": "..."}
+
+# Relaxed limit for read operations  
+read_limiter = rate_limiter(limit=1000, window=60)
+
+@app.get("/api/items", dependencies=[Depends(read_limiter)])
+async def list_items():
+    return {"items": [...]}
 ```
 
-The dependency supports the same options as the middleware: `scope_by_tenant`, `limit_resolver`, and a custom `store`.
+---
 
-## Store interface
+## How It Works
 
-The limiter uses a store abstraction so you can inject Redis or other backends.
+### Fixed-Window Algorithm
 
-- Default: `InMemoryRateLimitStore` (best-effort, single-process)
-- Interface: `RateLimitStore` with `incr(key, window) -> (count, limit, resetEpoch)`
+The default algorithm uses fixed time windows:
 
-### Redis store
+```
+Window 1 (0-60s)     Window 2 (60-120s)
+├──────────────────┼──────────────────┤
+│ Request 1-120    │ Counter resets   │
+│ 121st → 429      │ Request 1-120 OK │
+└──────────────────┴──────────────────┘
+```
 
-Use `RedisRateLimitStore` for multi-instance deployments. It implements a fixed-window counter
-with atomic increments and sets expiry to the end of the window.
+**Pros:**
+- Simple, low overhead
+- Easy to reason about
+- Works well with Redis
+
+**Cons:**
+- Potential burst at window boundary (up to 2x limit in 2 seconds)
+
+### Sliding Window (Future)
+
+For smoother limits, sliding window or token bucket can be implemented.
+The current fixed-window is sufficient for most use cases.
+
+---
+
+## Configuration Options
+
+### Middleware Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | int | 120 | Maximum requests per window |
+| `window` | int | 60 | Window duration in seconds |
+| `key_fn` | callable | API key or IP | Function to extract rate limit key from request |
+| `store` | RateLimitStore | InMemory | Storage backend for counters |
+| `skip_paths` | list[str] | [] | Paths to skip (prefix matching) |
+| `scope_by_tenant` | bool | False | Include tenant ID in rate limit key |
+| `limit_resolver` | callable | None | Dynamic limit based on request/tenant |
+| `allow_untrusted_tenant_header` | bool | False | Trust X-Tenant-Id header (security risk!) |
+
+### Key Function Examples
+
+```python
+# By API key (preferred for authenticated APIs)
+key_fn = lambda r: r.headers.get("X-API-Key") or "anonymous"
+
+# By user ID from JWT
+key_fn = lambda r: getattr(r.state, "user_id", r.client.host)
+
+# By IP address (fallback)
+key_fn = lambda r: r.client.host if r.client else "unknown"
+
+# Composite key
+key_fn = lambda r: f"{r.headers.get('X-API-Key')}:{r.url.path}"
+```
+
+---
+
+## Response Headers
+
+All responses include rate limit information:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in window |
+| `X-RateLimit-Remaining` | Requests remaining in current window |
+| `X-RateLimit-Reset` | Unix timestamp when window resets |
+| `Retry-After` | Seconds until rate limit resets (only on 429) |
+
+### 429 Response Format
+
+```json
+{
+  "title": "Too Many Requests",
+  "status": 429,
+  "detail": "Rate limit exceeded.",
+  "code": "RATE_LIMITED"
+}
+```
+
+---
+
+## Storage Backends
+
+### InMemoryRateLimitStore
+
+Default store for single-instance deployments:
+
+```python
+from svc_infra.api.fastapi.middleware.ratelimit_store import InMemoryRateLimitStore
+
+store = InMemoryRateLimitStore(limit=120)
+app.add_middleware(SimpleRateLimitMiddleware, limit=120, window=60, store=store)
+```
+
+**Warning**: Not suitable for production multi-instance deployments.
+Data is lost on restart and not shared between instances.
+
+### RedisRateLimitStore
+
+Production-ready store with atomic operations:
 
 ```python
 import redis
 from svc_infra.api.fastapi.middleware.ratelimit_store import RedisRateLimitStore
-from svc_infra.api.fastapi.middleware.ratelimit import SimpleRateLimitMiddleware
 
-r = redis.Redis.from_url("redis://localhost:6379/0")
-store = RedisRateLimitStore(r, limit=120, prefix="rl")
+redis_client = redis.Redis.from_url("redis://localhost:6379/0")
+store = RedisRateLimitStore(redis_client, limit=120, prefix="rl")
 
-app.add_middleware(SimpleRateLimitMiddleware, limit=120, window=60, store=store)
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    limit=120,
+    window=60,
+    store=store,
+)
 ```
 
-Notes:
-- Fixed-window counters are simple and usually sufficient. For smoother limits, consider
-  sliding window or token bucket in a future iteration.
-- Use a namespace/prefix per environment/tenant if needed.
+**Features:**
+- Atomic INCR with automatic expiry
+- Shared across all instances
+- Survives restarts
+- Namespace support with prefix
 
-## Request size guard
+### Backend Comparison
+
+| Feature | InMemory | Redis |
+|---------|----------|-------|
+| Multi-instance | ❌ | ✅ |
+| Persistence | ❌ | ✅ |
+| Latency | ~0ms | ~1-5ms |
+| Production ready | ❌ | ✅ |
+| Setup complexity | None | Low |
+
+---
+
+## Per-Tenant Rate Limits
+
+### Automatic Tenant Scoping
+
+```python
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    limit=1000,
+    window=60,
+    scope_by_tenant=True,  # Each tenant gets their own bucket
+)
+```
+
+This creates separate rate limit buckets per tenant:
+- `api-key-123:tenant:tenant_abc` → 1000 req/min
+- `api-key-123:tenant:tenant_xyz` → 1000 req/min
+
+### Dynamic Limits by Plan
+
+Different limits for different subscription tiers:
+
+```python
+async def get_limit_for_request(request, tenant_id):
+    """Resolve rate limit based on tenant's plan."""
+    if not tenant_id:
+        return 100  # Anonymous/free tier
+
+    plan = await get_tenant_plan(tenant_id)
+    return {
+        "free": 100,
+        "starter": 1000,
+        "pro": 10000,
+        "enterprise": None,  # Unlimited
+    }.get(plan, 100)
+
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    limit=100,  # Default fallback
+    window=60,
+    scope_by_tenant=True,
+    limit_resolver=get_limit_for_request,
+)
+```
+
+### Security: Untrusted Headers
+
+**Never enable `allow_untrusted_tenant_header=True` unless you have a trusted proxy.**
+
+```python
+# ❌ DANGEROUS: Attackers can spoof X-Tenant-Id to evade limits
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    allow_untrusted_tenant_header=True,  # DON'T DO THIS
+)
+
+# ✅ SAFE: Tenant ID resolved from authenticated session only
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    scope_by_tenant=True,  # Uses resolve_tenant_id() from auth
+)
+```
+
+---
+
+## Cost-Based Rate Limiting
+
+For APIs where some operations are more expensive:
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class CostTracker:
+    costs = {"generate": 10, "search": 2, "read": 1}
+
+    def get_cost(self, path: str) -> int:
+        for pattern, cost in self.costs.items():
+            if pattern in path:
+                return cost
+        return 1
+
+cost_tracker = CostTracker()
+
+# Custom key function that includes operation cost
+def cost_aware_key(request):
+    base_key = request.headers.get("X-API-Key", request.client.host)
+    cost = cost_tracker.get_cost(request.url.path)
+    # Record multiple "hits" for expensive operations
+    return f"{base_key}:{cost}"
+```
+
+Alternative: Use different limiters per route category:
+
+```python
+# Expensive operations: 10 per minute
+expensive = rate_limiter(limit=10, window=60)
+
+# Normal operations: 100 per minute  
+normal = rate_limiter(limit=100, window=60)
+
+# Cheap operations: 1000 per minute
+cheap = rate_limiter(limit=1000, window=60)
+
+@app.post("/generate", dependencies=[Depends(expensive)])
+async def generate(): ...
+
+@app.get("/search", dependencies=[Depends(normal)])
+async def search(): ...
+
+@app.get("/items/{id}", dependencies=[Depends(cheap)])
+async def get_item(id: str): ...
+```
+
+---
+
+## Burst Handling
+
+### Allowing Bursts
+
+For APIs that need to handle traffic spikes:
+
+```python
+# Layer 1: Per-second burst limit
+burst_limiter = rate_limiter(limit=20, window=1)
+
+# Layer 2: Per-minute sustained limit
+sustained_limiter = rate_limiter(limit=100, window=60)
+
+@app.get("/api/data", dependencies=[
+    Depends(burst_limiter),      # Max 20 req/sec
+    Depends(sustained_limiter),  # Max 100 req/min
+])
+async def get_data():
+    return {"data": "..."}
+```
+
+### Token Bucket Pattern (Manual)
+
+For more sophisticated burst handling:
+
+```python
+import time
+from dataclasses import dataclass
+
+@dataclass
+class TokenBucket:
+    capacity: int
+    refill_rate: float  # tokens per second
+    tokens: float = None
+    last_refill: float = None
+
+    def __post_init__(self):
+        self.tokens = self.capacity
+        self.last_refill = time.time()
+
+    def consume(self, tokens: int = 1) -> bool:
+        now = time.time()
+        # Refill tokens based on elapsed time
+        elapsed = now - self.last_refill
+        self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_rate)
+        self.last_refill = now
+
+        if self.tokens >= tokens:
+            self.tokens -= tokens
+            return True
+        return False
+```
+
+---
+
+## DDoS Protection Patterns
+
+### Layered Defense
+
+```python
+# Layer 1: Request size limit (early rejection)
+from svc_infra.api.fastapi.middleware.request_size_limit import RequestSizeLimitMiddleware
+app.add_middleware(RequestSizeLimitMiddleware, max_bytes=1_000_000)
+
+# Layer 2: Global rate limit (IP-based)
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    limit=1000,
+    window=60,
+    key_fn=lambda r: r.client.host,
+)
+
+# Layer 3: Per-route limits (stricter for expensive endpoints)
+expensive = rate_limiter(limit=10, window=60)
+```
+
+### Skip Paths
+
+Exclude health checks and internal endpoints:
+
+```python
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    limit=100,
+    window=60,
+    skip_paths=[
+        "/health",
+        "/ready",
+        "/metrics",
+        "/_ops/",
+    ],
+)
+```
+
+### Request Size Guard
+
+Block oversized payloads early:
 
 ```python
 from svc_infra.api.fastapi.middleware.request_size_limit import RequestSizeLimitMiddleware
 
-app.add_middleware(RequestSizeLimitMiddleware, max_bytes=1_000_000)
+app.add_middleware(RequestSizeLimitMiddleware, max_bytes=1_000_000)  # 1MB
 ```
 
-- Returns 413 with a Problem+JSON-like structure when `Content-Length` exceeds `max_bytes`.
+Returns 413 with Problem+JSON:
 
-## Metrics hooks
+```json
+{
+  "title": "Payload Too Large",
+  "status": 413,
+  "detail": "Request body exceeds 1000000 bytes."
+}
+```
 
-Hooks live in `svc_infra.obs.metrics` and are no-ops by default. Assign them to log or emit metrics.
+---
+
+## Metrics and Monitoring
+
+### Rate Limit Events
+
+Hook into rate limit events for monitoring:
 
 ```python
 import logging
@@ -99,28 +430,134 @@ import svc_infra.obs.metrics as metrics
 
 logger = logging.getLogger(__name__)
 
+# Log when clients hit rate limits
 metrics.on_rate_limit_exceeded = lambda key, limit, retry: logger.warning(
-    "rate_limited", extra={"key": key, "limit": limit, "retry_after": retry}
+    "rate_limited",
+    extra={"key": key, "limit": limit, "retry_after": retry}
 )
 
+# Track in Prometheus
+from prometheus_client import Counter
+
+rate_limit_counter = Counter(
+    "rate_limit_exceeded_total",
+    "Total rate limit violations",
+    ["key_prefix"]
+)
+
+def track_rate_limit(key, limit, retry):
+    prefix = key.split(":")[0] if ":" in key else key[:20]
+    rate_limit_counter.labels(key_prefix=prefix).inc()
+
+metrics.on_rate_limit_exceeded = track_rate_limit
+```
+
+### Suspect Payload Detection
+
+```python
+# Log unusually large payloads
 metrics.on_suspect_payload = lambda path, size: logger.warning(
-    "suspect_payload", extra={"path": path, "size": size}
+    "suspect_payload",
+    extra={"path": path, "size": size}
 )
 ```
 
-## Tuning tips
+---
 
-- Prefer API key or user ID for `key_fn`; fall back to IP if unauthenticated.
-- Keep windows small (e.g., 60s); layer multiple limits when needed.
-- For distributed deployments, use `RedisRateLimitStore` for atomic increments.
-- Consider separate limits for read vs write routes.
-- Combine with request size limits and auth lockout for layered defense.
+## Testing Rate Limits
 
-## Related
+### Unit Tests
 
-- Timeouts & Resource Limits: `./timeouts-and-resource-limits.md` — complements rate limits by bounding slow uploads, long handlers, and downstream timeouts.
+```python
+import pytest
+from fastapi.testclient import TestClient
 
-## Testing
+def test_rate_limit_enforced(client):
+    # Make requests up to limit
+    for i in range(120):
+        response = client.get("/api/resource")
+        assert response.status_code == 200
+        assert "X-RateLimit-Remaining" in response.headers
 
-- Use `-m ratelimit` to select rate-limiting tests.
-- `-m security` also includes these in this repo by default.
+    # Next request should be rate limited
+    response = client.get("/api/resource")
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
+    assert response.json()["code"] == "RATE_LIMITED"
+
+def test_rate_limit_headers(client):
+    response = client.get("/api/resource")
+
+    assert response.headers["X-RateLimit-Limit"] == "120"
+    assert int(response.headers["X-RateLimit-Remaining"]) <= 119
+    assert response.headers["X-RateLimit-Reset"].isdigit()
+
+def test_rate_limit_reset(client, time_machine):
+    # Exhaust limit
+    for _ in range(120):
+        client.get("/api/resource")
+
+    # Should be rate limited
+    assert client.get("/api/resource").status_code == 429
+
+    # Advance time past window
+    time_machine.move_to(datetime.now() + timedelta(seconds=61))
+
+    # Should be allowed again
+    assert client.get("/api/resource").status_code == 200
+```
+
+### Load Testing
+
+```bash
+# Using wrk
+wrk -t4 -c100 -d30s http://localhost:8000/api/resource
+
+# Using hey
+hey -n 10000 -c 50 http://localhost:8000/api/resource
+```
+
+---
+
+## Best Practices
+
+### Key Selection
+
+1. **Authenticated APIs**: Use API key or user ID
+2. **Public APIs**: Use IP address with care (NAT, proxies)
+3. **Mixed**: Try API key first, fall back to IP
+
+```python
+key_fn = lambda r: (
+    r.headers.get("X-API-Key")
+    or getattr(r.state, "user_id", None)
+    or r.client.host
+)
+```
+
+### Window Size
+
+| Use Case | Recommended Window |
+|----------|-------------------|
+| Real-time APIs | 1-10 seconds |
+| Standard APIs | 60 seconds |
+| Batch operations | 300-3600 seconds |
+
+### Limit Values
+
+| Tier | Typical Limit (per minute) |
+|------|---------------------------|
+| Anonymous | 10-50 |
+| Free | 100-500 |
+| Starter | 500-1000 |
+| Pro | 1000-5000 |
+| Enterprise | 10000+ or unlimited |
+
+---
+
+## See Also
+
+- [Timeouts & Resource Limits](timeouts-and-resource-limits.md) — Complement rate limits with timeout controls
+- [Idempotency](idempotency.md) — Handle retries safely after rate limiting
+- [Observability](observability.md) — Monitor rate limit metrics
+- [Tenancy](tenancy.md) — Per-tenant rate limiting patterns

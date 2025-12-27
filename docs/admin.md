@@ -416,6 +416,552 @@ async def admin_summary():
     return {"total_users": 1234}
 ```
 
+## External Admin UI Integration
+
+### React Admin
+
+[React Admin](https://marmelab.com/react-admin/) is a popular admin framework that works well with svc-infra's REST patterns.
+
+#### Data Provider Setup
+
+```typescript
+// src/dataProvider.ts
+import { fetchUtils } from 'react-admin';
+import simpleRestDataProvider from 'ra-data-simple-rest';
+
+const httpClient = (url: string, options: fetchUtils.Options = {}) => {
+    const token = localStorage.getItem('admin_token');
+    const headers = new Headers(options.headers);
+    headers.set('Authorization', `Bearer ${token}`);
+    headers.set('Accept', 'application/json');
+    return fetchUtils.fetchJson(url, { ...options, headers });
+};
+
+export const dataProvider = simpleRestDataProvider(
+    'https://api.example.com/admin',
+    httpClient
+);
+```
+
+#### Authentication Provider
+
+```typescript
+// src/authProvider.ts
+import { AuthProvider } from 'react-admin';
+
+export const authProvider: AuthProvider = {
+    login: async ({ username, password }) => {
+        const response = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email: username, password }),
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error('Login failed');
+        }
+        const { access_token } = await response.json();
+        localStorage.setItem('admin_token', access_token);
+    },
+    logout: () => {
+        localStorage.removeItem('admin_token');
+        return Promise.resolve();
+    },
+    checkAuth: () => {
+        return localStorage.getItem('admin_token')
+            ? Promise.resolve()
+            : Promise.reject();
+    },
+    checkError: (error) => {
+        if (error.status === 401 || error.status === 403) {
+            localStorage.removeItem('admin_token');
+            return Promise.reject();
+        }
+        return Promise.resolve();
+    },
+    getPermissions: async () => {
+        const token = localStorage.getItem('admin_token');
+        if (!token) return [];
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.roles || [];
+    },
+};
+```
+
+#### User Resource
+
+```typescript
+// src/resources/users.tsx
+import { List, Datagrid, TextField, EmailField, DateField, Edit, SimpleForm, TextInput, BooleanField, BooleanInput } from 'react-admin';
+
+export const UserList = () => (
+    <List>
+        <Datagrid rowClick="edit">
+            <TextField source="id" />
+            <EmailField source="email" />
+            <TextField source="first_name" />
+            <TextField source="last_name" />
+            <BooleanField source="is_active" />
+            <DateField source="created_at" />
+        </Datagrid>
+    </List>
+);
+
+export const UserEdit = () => (
+    <Edit>
+        <SimpleForm>
+            <TextInput source="email" disabled />
+            <TextInput source="first_name" />
+            <TextInput source="last_name" />
+            <BooleanInput source="is_active" />
+        </SimpleForm>
+    </Edit>
+);
+```
+
+### Retool
+
+[Retool](https://retool.com/) connects directly to your API. Configure these settings:
+
+```yaml
+# Retool Resource Configuration
+resource_type: REST API
+base_url: https://api.example.com
+auth_type: Bearer Token
+headers:
+  Content-Type: application/json
+  Accept: application/json
+```
+
+#### Common Query Examples
+
+```javascript
+// List users with pagination
+GET /admin/users?page={{ table1.page }}&per_page={{ table1.pageSize }}
+
+// Search users
+GET /admin/users?email={{ textInput1.value }}
+
+// Update user
+PATCH /admin/users/{{ table1.selectedRow.id }}
+Body: { "is_active": {{ switch1.value }} }
+```
+
+### Appsmith
+
+[Appsmith](https://www.appsmith.com/) is an open-source alternative. Setup:
+
+```javascript
+// API Configuration
+export default {
+    baseUrl: 'https://api.example.com',
+    headers: {
+        'Authorization': `Bearer ${appsmith.store.adminToken}`,
+        'Content-Type': 'application/json',
+    },
+};
+
+// Users query
+export const getUsers = () => Api1.run({
+    method: 'GET',
+    url: '/admin/users',
+    params: {
+        page: Table1.pageNo,
+        per_page: Table1.pageSize,
+    },
+});
+```
+
+### Backend Routes for Admin UIs
+
+Add dedicated admin endpoints that match common admin UI expectations:
+
+```python
+from fastapi import APIRouter, Query, Depends
+from svc_infra.api.fastapi.admin import admin_router
+from svc_infra.security.permissions import RequirePermission
+
+router = admin_router(prefix="/admin", tags=["admin"])
+
+@router.get("/users", dependencies=[RequirePermission("user.read")])
+async def list_users(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=1, le=100),
+    email: str | None = None,
+    is_active: bool | None = None,
+    session = Depends(get_session),
+):
+    """List users with filtering and pagination for admin UIs."""
+    stmt = select(User)
+    if email:
+        stmt = stmt.where(User.email.ilike(f"%{email}%"))
+    if is_active is not None:
+        stmt = stmt.where(User.is_active == is_active)
+
+    # Get total count
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await session.execute(count_stmt)).scalar()
+
+    # Apply pagination
+    offset = (page - 1) * per_page
+    stmt = stmt.offset(offset).limit(per_page)
+    result = await session.execute(stmt)
+    users = result.scalars().all()
+
+    return {
+        "data": [user.to_dict() for user in users],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
+
+@router.get("/users/{user_id}", dependencies=[RequirePermission("user.read")])
+async def get_user(user_id: str, session = Depends(get_session)):
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    return {"data": user.to_dict()}
+
+@router.patch("/users/{user_id}", dependencies=[RequirePermission("user.write")])
+async def update_user(
+    user_id: str,
+    updates: UserUpdateSchema,
+    session = Depends(get_session),
+):
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    for field, value in updates.model_dump(exclude_unset=True).items():
+        setattr(user, field, value)
+
+    await session.commit()
+    return {"data": user.to_dict()}
+```
+
+---
+
+## Audit Log Querying
+
+### Hash-Chain Verification
+
+svc-infra uses hash-chain audit logs for tamper detection:
+
+```python
+from svc_infra.security.audit_service import verify_chain_for_tenant
+
+# Verify all events for a tenant
+ok, broken_indices = await verify_chain_for_tenant(session, tenant_id="t_123")
+if not ok:
+    logger.critical(f"Audit log tampering detected at indices: {broken_indices}")
+    await alert_security_team(tenant_id, broken_indices)
+```
+
+### Querying Audit Events
+
+```python
+from sqlalchemy import select, and_
+from svc_infra.security.models import AuditLog
+from datetime import datetime, timedelta
+
+# Recent impersonation events
+async def get_impersonation_events(
+    session,
+    days: int = 30,
+    limit: int = 100,
+) -> list[AuditLog]:
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    stmt = (
+        select(AuditLog)
+        .where(and_(
+            AuditLog.event_type.in_([
+                "admin.impersonation.started",
+                "admin.impersonation.stopped"
+            ]),
+            AuditLog.ts >= cutoff,
+        ))
+        .order_by(AuditLog.ts.desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+# Events by actor
+async def get_actor_activity(
+    session,
+    actor_id: str,
+    event_types: list[str] | None = None,
+) -> list[AuditLog]:
+    stmt = select(AuditLog).where(AuditLog.actor_id == actor_id)
+    if event_types:
+        stmt = stmt.where(AuditLog.event_type.in_(event_types))
+    stmt = stmt.order_by(AuditLog.ts.desc()).limit(500)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+# Events for a resource
+async def get_resource_history(
+    session,
+    resource_ref: str,
+) -> list[AuditLog]:
+    stmt = (
+        select(AuditLog)
+        .where(AuditLog.resource_ref == resource_ref)
+        .order_by(AuditLog.ts.asc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+```
+
+### Compliance Reports
+
+#### Monthly Admin Activity Report
+
+```python
+from sqlalchemy import select, func
+from collections import defaultdict
+
+async def generate_admin_activity_report(
+    session,
+    year: int,
+    month: int,
+) -> dict:
+    """Generate monthly summary of admin activities."""
+    start = datetime(year, month, 1)
+    if month == 12:
+        end = datetime(year + 1, 1, 1)
+    else:
+        end = datetime(year, month + 1, 1)
+
+    stmt = (
+        select(AuditLog)
+        .where(and_(
+            AuditLog.ts >= start,
+            AuditLog.ts < end,
+            AuditLog.event_type.like("admin.%"),
+        ))
+        .order_by(AuditLog.ts.asc())
+    )
+    result = await session.execute(stmt)
+    events = list(result.scalars().all())
+
+    # Group by actor
+    by_actor = defaultdict(list)
+    for e in events:
+        by_actor[e.actor_id].append(e)
+
+    # Group by event type
+    by_type = defaultdict(int)
+    for e in events:
+        by_type[e.event_type] += 1
+
+    # Impersonation summary
+    impersonations = [e for e in events if "impersonation" in e.event_type]
+    unique_targets = set(
+        e.event_metadata.get("target_id")
+        for e in impersonations
+        if e.event_metadata
+    )
+
+    return {
+        "period": f"{year}-{month:02d}",
+        "total_events": len(events),
+        "unique_actors": len(by_actor),
+        "events_by_type": dict(by_type),
+        "impersonation_count": len([e for e in impersonations if e.event_type == "admin.impersonation.started"]),
+        "unique_impersonation_targets": len(unique_targets),
+        "actors": [
+            {
+                "actor_id": actor_id,
+                "event_count": len(actor_events),
+                "event_types": list(set(e.event_type for e in actor_events)),
+            }
+            for actor_id, actor_events in by_actor.items()
+        ],
+    }
+```
+
+#### Audit Export for DSAR
+
+```python
+async def export_audit_for_dsar(
+    session,
+    user_id: str,
+) -> list[dict]:
+    """Export all audit events related to a user for Data Subject Access Request."""
+    # Events where user was the actor
+    actor_events = await session.execute(
+        select(AuditLog).where(AuditLog.actor_id == user_id)
+    )
+
+    # Events where user was the target (impersonation, profile updates, etc.)
+    target_events = await session.execute(
+        select(AuditLog).where(
+            AuditLog.resource_ref.like(f"user:{user_id}%")
+        )
+    )
+
+    all_events = list(actor_events.scalars()) + list(target_events.scalars())
+    all_events.sort(key=lambda e: e.ts)
+
+    return [
+        {
+            "timestamp": e.ts.isoformat(),
+            "event_type": e.event_type,
+            "resource": e.resource_ref,
+            "metadata": e.event_metadata,
+        }
+        for e in all_events
+    ]
+```
+
+---
+
+## Impersonation Cookbook
+
+### Common Use Cases
+
+#### 1. Debugging User-Reported Issues
+
+```python
+# Support workflow
+@router.post("/support/investigate")
+async def investigate_user_issue(
+    ticket_id: str,
+    user_id: str,
+    request: Request,
+    session = Depends(get_session),
+    principal = Depends(RequirePermission("admin.impersonate")),
+):
+    """Start investigation with automatic audit trail."""
+    # Fetch ticket for reason
+    ticket = await get_support_ticket(session, ticket_id)
+
+    # Log investigation start
+    await append_audit_event(
+        session,
+        actor_id=principal.user.id,
+        event_type="support.investigation.started",
+        resource_ref=f"ticket:{ticket_id}",
+        metadata={
+            "target_user_id": user_id,
+            "ticket_summary": ticket.summary,
+        },
+    )
+
+    # Start impersonation
+    response = await start_impersonation(
+        request,
+        user_id=user_id,
+        reason=f"Support ticket #{ticket_id}: {ticket.summary}",
+    )
+
+    return response
+```
+
+#### 2. Verifying User Permissions
+
+```python
+@router.get("/admin/verify-access/{user_id}")
+async def verify_user_access(
+    user_id: str,
+    resource_type: str,
+    resource_id: str,
+    session = Depends(get_session),
+    principal = Depends(RequirePermission("admin.impersonate")),
+):
+    """Check what a user can access without full impersonation."""
+    user = await get_user(session, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    # Create temporary principal for the target user
+    target_principal = Identity(user=user)
+    perms = principal_permissions(target_principal)
+
+    # Check specific resource access
+    resource = await get_resource(session, resource_type, resource_id)
+    can_access = await check_resource_access(target_principal, resource)
+
+    return {
+        "user_id": user_id,
+        "permissions": list(perms),
+        "resource": f"{resource_type}:{resource_id}",
+        "can_access": can_access,
+    }
+```
+
+#### 3. Bulk User Operations
+
+```python
+@router.post("/admin/bulk-action")
+async def bulk_user_action(
+    user_ids: list[str],
+    action: str,  # "deactivate", "reset_mfa", "force_logout"
+    reason: str,
+    session = Depends(get_session),
+    principal = Depends(RequirePermission("user.write")),
+):
+    """Perform bulk operations with comprehensive audit trail."""
+    results = []
+
+    for user_id in user_ids:
+        try:
+            if action == "deactivate":
+                await deactivate_user(session, user_id)
+            elif action == "reset_mfa":
+                await reset_user_mfa(session, user_id)
+            elif action == "force_logout":
+                await revoke_all_sessions(session, user_id)
+
+            await append_audit_event(
+                session,
+                actor_id=principal.user.id,
+                event_type=f"admin.user.{action}",
+                resource_ref=f"user:{user_id}",
+                metadata={"reason": reason, "bulk_operation": True},
+            )
+            results.append({"user_id": user_id, "status": "success"})
+        except Exception as e:
+            results.append({"user_id": user_id, "status": "failed", "error": str(e)})
+
+    await session.commit()
+
+    return {
+        "action": action,
+        "total": len(user_ids),
+        "successful": len([r for r in results if r["status"] == "success"]),
+        "results": results,
+    }
+```
+
+#### 4. Tenant-Scoped Admin Access
+
+```python
+from svc_infra.tenancy import TenantId
+
+@router.get("/admin/tenant/{tenant_id}/users")
+async def list_tenant_users(
+    tenant_id: str,
+    session = Depends(get_session),
+    principal = Depends(RequirePermission("user.read")),
+):
+    """List users for a specific tenant (super-admin only)."""
+    # Verify admin has cross-tenant access
+    if not has_permission(principal, "admin.cross_tenant"):
+        # Check if admin belongs to this tenant
+        admin_tenant = getattr(principal.user, "tenant_id", None)
+        if admin_tenant != tenant_id:
+            raise HTTPException(403, "Cannot access other tenant's users")
+
+    stmt = select(User).where(User.tenant_id == tenant_id)
+    result = await session.execute(stmt)
+    users = result.scalars().all()
+
+    return {"tenant_id": tenant_id, "users": [u.to_dict() for u in users]}
+```
+
+---
+
 ## Further Reading
 
 - [Security & Auth Hardening](./security.md)
