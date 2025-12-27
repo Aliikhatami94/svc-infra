@@ -6,46 +6,27 @@ This file is auto-generated from conventional commits using [git-cliff](https://
 
 ## [1.0.0] - 2025-12-27
 
-### 🎉 First Stable Release
 
-**svc-infra** reaches v1.0.0! This release marks production-ready status for the FastAPI infrastructure SDK.
+### Miscellaneous
 
-### Highlights
+- Release v1.0.0
 
-- **717 releases** of iterative improvements since 0.1.0
-- **1128 unit tests** with 52%+ code coverage
-- **Full type safety** with strict mypy checking
-- **Comprehensive documentation** for all modules
 
-### Breaking Changes
+### Other Changes
 
-- **Removed `BillingService`** (sync version) - Use `AsyncBillingService` instead
-  - Migration: Replace `BillingService(...)` with `await AsyncBillingService.create(...)`
-  - See [DEPRECATION.md](DEPRECATION.md) for full migration guide
+- Add logging and testing guides, implement data lifecycle management, enhance developer experience utilities, and introduce background job and security modules
 
-### Features
+- Added comprehensive logging guide with structured logging utilities for containerized environments.
+- Introduced testing guide with mock implementations and test fixtures for svc-infra applications.
+- Implemented data lifecycle management module for backup verification, retention, and GDPR erasure.
+- Developed developer experience utilities for CI workflows, changelog generation, and code quality checks.
+- Created background jobs module with queue abstractions and worker utilities for job processing.
+- Established security module providing authentication, authorization, and protection utilities.
 
-- **Authentication**: JWT, sessions, OAuth/OIDC, MFA, API keys
-- **Billing**: Usage tracking, subscriptions, invoices, Stripe integration
-- **Database**: PostgreSQL + MongoDB, migrations, inbox/outbox patterns
-- **Jobs**: Background tasks, scheduling, retries, dead letter queue
-- **Webhooks**: Subscriptions, HMAC signing, delivery retries
-- **Cache**: Redis/memory backends, decorators, namespacing
-- **Observability**: Prometheus, Grafana dashboards, OpenTelemetry
-- **Storage**: S3, local, memory backends
-- **Multi-tenancy**: Tenant isolation, scoped queries
-- **Rate Limiting**: Per-user, per-endpoint, response headers
-- **Security**: CORS, CSP, HSTS, input validation
-- **DX**: CLI tools, hot reload, debug utilities
 
-### Documentation
+### Refactor
 
-- Complete API reference for all modules
-- Getting started guides
-- Deployment documentation
-- Testing and observability guides
-
----
+- Remove deprecated BillingService and update documentation for migration to AsyncBillingService
 
 ## [0.1.717] - 2025-12-27
 
