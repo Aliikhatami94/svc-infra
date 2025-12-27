@@ -1,133 +1,688 @@
 # Environment Reference
 
-This guide consolidates every environment variable consumed by the svc-infra helpers in FastAPI, jobs, observability, security, and webhooks. Defaults shown below reflect the library's fallbacks when a variable is absent. Where a helper relies on `svc_infra.app.pick`, the note column calls out the environment-specific behavior.
+**svc-infra** uses environment variables for configuration with sensible defaults, environment-aware behavior, and secure secret handling.
 
-## FastAPI helpers
+---
 
-### App bootstrap (`easy_service_app` / `setup_service_api`)
+## Quick Start
 
-| Variable | Default | Consumed by | Notes |
-| --- | --- | --- | --- |
-| `ENABLE_LOGGING` | `true` | `EasyAppOptions.from_env()` | Disables `setup_logging` when set to false. |
-| `LOG_LEVEL` | Auto (`INFO` in prod/test, `DEBUG` in dev/local via `pick()`) | `easy_service_app()` | Overrides the log level chosen by `svc_infra.app.pick`. |
-| `LOG_FORMAT` | Auto (JSON in prod, plain elsewhere) | `easy_service_app()` | Explicit `json` or `plain` format overrides auto-detection. |
-| `ENABLE_OBS` | `true` | `EasyAppOptions.from_env()` / `easy_service_app()` | Turns observability instrumentation on/off. |
-| `METRICS_PATH` | `None` → falls back to Observability settings | `EasyAppOptions.from_env()` | Use to expose metrics at a non-default path. |
-| `OBS_SKIP_PATHS` | `None` → defaults to metrics + health endpoints | `EasyAppOptions.from_env()` | Comma/space-separated list of paths skipped by Prometheus middleware. |
-| `CORS_ALLOW_ORIGINS` | `""` (no origins) | `_setup_cors()` | Adds `CORSMiddleware` allow-list when non-empty. |
+```bash
+# Minimal production configuration
+export APP_ENV=prod
+export SQL_URL=postgresql://user:pass@db:5432/mydb
+export AUTH_JWT__SECRET=$(openssl rand -hex 32)
+export REDIS_URL=redis://redis:6379/0
+```
 
-### SQL helpers (`add_sql_db`, `setup_sql`)
+---
 
-| Variable | Default | Consumed by | Notes |
-| --- | --- | --- | --- |
-| `SQL_URL` (overridable via `dsn_env`) | _required_ | `add_sql_db()` / `setup_sql()` | Missing value raises `RuntimeError`; point at your primary database URL. |
+## Configuration Philosophy
 
-### Mongo helpers (`add_mongo_db`, `init_mongo`)
+1. **Explicit over implicit** — Critical settings require explicit configuration
+2. **Fail loudly in production** — Missing secrets raise errors, not silent defaults
+3. **Environment-aware** — Different defaults for dev/test/prod
+4. **Secret file support** — `*_FILE` suffix pattern for Docker/K8s secrets
 
-| Variable | Default | Consumed by | Notes |
-| --- | --- | --- | --- |
-| `MONGO_URL` / `MONGODB_URL` | `mongodb://localhost:27017` | `MongoSettings`, `add_mongo_db()` | Primary Mongo connection string; `_FILE` suffix or `MONGO_URL_FILE` allow secret mounts. |
-| `MONGO_DB` / `MONGODB_DB` / `MONGO_DATABASE` | unset (optional) | `get_mongo_dbname_from_env()` | When set, verified against the connected database name. |
-| `MONGO_APPNAME` | `svc-infra` | `MongoSettings` | Sets the Mongo client `appname`. |
-| `MONGO_MIN_POOL` | `0` | `MongoSettings` | Minimum Motor/Mongo client pool size. |
-| `MONGO_MAX_POOL` | `100` | `MongoSettings` | Maximum Motor/Mongo client pool size. |
-| `MONGO_URL_FILE` | unset | `get_mongo_url_from_env()` | Alternate secret file path when not using `_FILE` suffix envs. |
-| `/run/secrets/mongo_url` | unset | `get_mongo_url_from_env()` | Auto-mounted Docker/K8s secret fallback for the URL. |
+---
 
-### Auth settings (`get_auth_settings` → `AuthSettings`)
+## Environment Detection
 
-Pydantic loads these with the `AUTH_` prefix and `__` as the nested delimiter.
+### APP_ENV
 
-| Variable | Default | Consumed by | Notes |
-| --- | --- | --- | --- |
-| `AUTH_JWT__SECRET` | _required when JWT auth enabled_ | `AuthSettings.jwt.secret` | Primary HS256 signing secret. |
-| `AUTH_JWT__LIFETIME_SECONDS` | `604800` (7 days) | `AuthSettings.jwt.lifetime_seconds` | Adjusts refresh token lifetime. |
-| `AUTH_JWT__OLD_SECRETS__*` | `[]` | `AuthSettings.jwt.old_secrets` | Accepted legacy secrets during rotation. |
-| `AUTH_PASSWORD_CLIENTS__{n}__CLIENT_ID` | `[]` | `AuthSettings.password_clients[*].client_id` | Register password clients (list entries indexed by `{n}`). |
-| `AUTH_PASSWORD_CLIENTS__{n}__CLIENT_SECRET` | `[]` | `AuthSettings.password_clients[*].client_secret` | Secret per password client. |
-| `AUTH_REQUIRE_CLIENT_SECRET_ON_PASSWORD_LOGIN` | `false` | `AuthSettings.require_client_secret_on_password_login` | Enforces client secret on password grant. |
-| `AUTH_MFA_DEFAULT_ENABLED_FOR_NEW_USERS` | `false` | `AuthSettings.mfa_default_enabled_for_new_users` | Enable TOTP by default on signup. |
-| `AUTH_MFA_ENFORCE_FOR_ALL_USERS` | `false` | `AuthSettings.mfa_enforce_for_all_users` | Force MFA globally. |
-| `AUTH_MFA_ENFORCE_FOR_TENANTS` | `[]` | `AuthSettings.mfa_enforce_for_tenants` | Tenant allow-list requiring MFA. |
-| `AUTH_MFA_ISSUER` | `"svc-infra"` | `AuthSettings.mfa_issuer` | Label for TOTP apps. |
-| `AUTH_MFA_PRE_TOKEN_LIFETIME_SECONDS` | `300` | `AuthSettings.mfa_pre_token_lifetime_seconds` | Lifespan of MFA pre-token. |
-| `AUTH_MFA_RECOVERY_CODES` | `8` | `AuthSettings.mfa_recovery_codes` | Number of recovery codes issued. |
-| `AUTH_MFA_RECOVERY_CODE_LENGTH` | `10` | `AuthSettings.mfa_recovery_code_length` | Digits per recovery code. |
-| `AUTH_EMAIL_OTP_TTL_SECONDS` | `300` | `AuthSettings.email_otp_ttl_seconds` | Email OTP validity window. |
-| `AUTH_EMAIL_OTP_COOLDOWN_SECONDS` | `60` | `AuthSettings.email_otp_cooldown_seconds` | Cooldown between OTP sends. |
-| `AUTH_EMAIL_OTP_ATTEMPTS` | `5` | `AuthSettings.email_otp_attempts` | Maximum OTP attempts before lock. |
-| `AUTH_SMTP_HOST` | `None` | `AuthSettings.smtp_host` | SMTP hostname (required for prod email). |
-| `AUTH_SMTP_PORT` | `587` | `AuthSettings.smtp_port` | SMTP port. |
-| `AUTH_SMTP_USERNAME` | `None` | `AuthSettings.smtp_username` | SMTP username. |
-| `AUTH_SMTP_PASSWORD` | `None` | `AuthSettings.smtp_password` | SMTP password/secret. |
-| `AUTH_SMTP_FROM` | `None` | `AuthSettings.smtp_from` | Default From address. |
-| `AUTH_AUTO_VERIFY_IN_DEV` | `true` | `AuthSettings.auto_verify_in_dev` | Auto-confirms accounts outside prod. |
-| `AUTH_GOOGLE_CLIENT_ID` | `None` | `AuthSettings.google_client_id` | Built-in Google OAuth client ID. |
-| `AUTH_GOOGLE_CLIENT_SECRET` | `None` | `AuthSettings.google_client_secret` | Built-in Google OAuth secret. |
-| `AUTH_GITHUB_CLIENT_ID` | `None` | `AuthSettings.github_client_id` | GitHub OAuth client ID. |
-| `AUTH_GITHUB_CLIENT_SECRET` | `None` | `AuthSettings.github_client_secret` | GitHub OAuth secret. |
-| `AUTH_MS_CLIENT_ID` | `None` | `AuthSettings.ms_client_id` | Microsoft OAuth client ID. |
-| `AUTH_MS_CLIENT_SECRET` | `None` | `AuthSettings.ms_client_secret` | Microsoft OAuth secret. |
-| `AUTH_MS_TENANT` | `None` | `AuthSettings.ms_tenant` | Microsoft tenant ID. |
-| `AUTH_LI_CLIENT_ID` | `None` | `AuthSettings.li_client_id` | LinkedIn OAuth client ID. |
-| `AUTH_LI_CLIENT_SECRET` | `None` | `AuthSettings.li_client_secret` | LinkedIn OAuth secret. |
-| `AUTH_OIDC_PROVIDERS__{n}__NAME` | `[]` | `AuthSettings.oidc_providers[*].name` | Custom OIDC providers (list entries indexed by `{n}`). |
-| `AUTH_OIDC_PROVIDERS__{n}__ISSUER` | `[]` | `AuthSettings.oidc_providers[*].issuer` | OIDC issuer URL. |
-| `AUTH_OIDC_PROVIDERS__{n}__CLIENT_ID` | `[]` | `AuthSettings.oidc_providers[*].client_id` | OIDC client ID. |
-| `AUTH_OIDC_PROVIDERS__{n}__CLIENT_SECRET` | `[]` | `AuthSettings.oidc_providers[*].client_secret` | OIDC client secret. |
-| `AUTH_OIDC_PROVIDERS__{n}__SCOPE` | `"openid email profile"` | `AuthSettings.oidc_providers[*].scope` | Additional OIDC scopes. |
-| `AUTH_POST_LOGIN_REDIRECT` | `http://localhost:3000/app` | `AuthSettings.post_login_redirect` | Default redirect after login. |
-| `AUTH_REDIRECT_ALLOW_HOSTS_RAW` | `"localhost,127.0.0.1"` | `AuthSettings.redirect_allow_hosts_raw` | CSV/JSON allow-list for redirects. |
-| `AUTH_SESSION_COOKIE_NAME` | `"svc_session"` | `AuthSettings.session_cookie_name` | Session cookie key. |
-| `AUTH_AUTH_COOKIE_NAME` | `"svc_auth"` | `AuthSettings.auth_cookie_name` | Auth cookie key. |
-| `AUTH_SESSION_COOKIE_SECURE` | `false` | `AuthSettings.session_cookie_secure` | Marks session cookie `Secure`. |
-| `AUTH_SESSION_COOKIE_SAMESITE` | `"lax"` | `AuthSettings.session_cookie_samesite` | SameSite policy. |
-| `AUTH_SESSION_COOKIE_DOMAIN` | `None` | `AuthSettings.session_cookie_domain` | Explicit cookie domain. |
-| `AUTH_SESSION_COOKIE_MAX_AGE_SECONDS` | `14400` (4 hours) | `AuthSettings.session_cookie_max_age_seconds` | Session cookie lifetime. |
+The primary environment selector:
 
-## Jobs helpers
+```bash
+export APP_ENV=local    # Local development
+export APP_ENV=dev      # Development server
+export APP_ENV=test     # Staging/preview
+export APP_ENV=prod     # Production
+```
 
-| Variable | Default | Consumed by | Notes |
-| --- | --- | --- | --- |
-| `JOBS_DRIVER` | `memory` | `JobsConfig`, `easy_jobs()` | Choose `redis` to activate Redis-backed queue. |
-| `REDIS_URL` | `redis://localhost:6379/0` | `easy_jobs()` (Redis driver) | Redis connection string when `JOBS_DRIVER=redis`. |
-| `JOBS_SCHEDULE_JSON` | unset | `schedule_from_env()` | JSON array of scheduler tasks (name, interval_seconds, target). |
+**Aliases recognized:**
 
-## Observability helpers
+| Alias | Maps To |
+|-------|---------|
+| `development` | `dev` |
+| `staging`, `preview`, `uat` | `test` |
+| `production` | `prod` |
 
-| Variable | Default | Consumed by | Notes |
-| --- | --- | --- | --- |
-| `METRICS_ENABLED` | `true` | `ObservabilitySettings` | Gate for Prometheus middleware registration. |
-| `METRICS_PATH` | `/metrics` | `ObservabilitySettings`, `add_observability()` | Metrics endpoint path. |
-| `METRICS_DEFAULT_BUCKETS` | `0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.0,5.0,10.0` | `ObservabilitySettings` | Histogram buckets for request latency. |
-| `SVC_INFRA_DISABLE_PROMETHEUS` | unset (`"1"` disables) | `metrics.asgi` | Skip Prometheus setup when toggled. |
-| `SVC_INFRA_RATE_WINDOW` | unset | `cloud_dash.push_dashboards_from_pkg()` | Overrides `$__rate_interval` in dashboards. |
-| `SVC_INFRA_DASHBOARD_REFRESH` | `5s` | `cloud_dash.push_dashboards_from_pkg()` | Grafana dashboard auto-refresh interval. |
-| `SVC_INFRA_DASHBOARD_RANGE` | `now-6h` | `cloud_dash.push_dashboards_from_pkg()` | Default Grafana time range start. |
+### Environment Detection Order
 
-## Security helpers
+```python
+# Precedence:
+# 1. APP_ENV
+# 2. RAILWAY_ENVIRONMENT_NAME (Railway.app auto-detection)
+# 3. Defaults to "local"
+```
 
-The primitives under `svc_infra.security` rely on configuration objects passed from application code; they do not read environment variables directly beyond the shared `AuthSettings` listed above.
+### Using pick() for Environment-Specific Values
 
-### require_secret()
+```python
+from svc_infra.app.env import pick
 
-Use `require_secret()` to safely load secrets with environment-aware defaults:
+# Choose values by environment
+log_level = pick(prod="INFO", nonprod="DEBUG")
+debug_mode = pick(prod=False, nonprod=True)
+db_pool_size = pick(prod=20, test=5, local=2)
+
+# With explicit overrides
+cache_ttl = pick(
+    prod=3600,
+    test=300,
+    dev=60,
+    local=10,
+)
+```
+
+---
+
+## Environment Variables Reference
+
+### App Bootstrap
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_ENV` | `local` | Environment name |
+| `ENABLE_LOGGING` | `true` | Enable structured logging |
+| `LOG_LEVEL` | Auto | `INFO` in prod, `DEBUG` elsewhere |
+| `LOG_FORMAT` | Auto | `json` in prod, `plain` elsewhere |
+| `ENABLE_OBS` | `true` | Enable observability (metrics, tracing) |
+| `CORS_ALLOW_ORIGINS` | `""` | Comma-separated allowed origins |
+
+### Database (SQL)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SQL_URL` | *required* | PostgreSQL connection URL |
+| `SQL_URL_FILE` | — | Path to file containing SQL_URL |
+| `SQL_POOL_SIZE` | `5` | Connection pool size |
+| `SQL_MAX_OVERFLOW` | `10` | Max connections beyond pool |
+| `SQL_POOL_TIMEOUT` | `30` | Pool checkout timeout (seconds) |
+| `SQL_STATEMENT_TIMEOUT` | `30000` | Query timeout (milliseconds) |
+
+### Database (MongoDB)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MONGO_URL` | `mongodb://localhost:27017` | MongoDB connection URL |
+| `MONGO_URL_FILE` | — | Path to file containing URL |
+| `MONGO_DB` | — | Database name |
+| `MONGO_APPNAME` | `svc-infra` | Client app name |
+| `MONGO_MIN_POOL` | `0` | Minimum pool size |
+| `MONGO_MAX_POOL` | `100` | Maximum pool size |
+
+### Authentication
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTH_JWT__SECRET` | *required in prod* | JWT signing secret |
+| `AUTH_JWT__LIFETIME_SECONDS` | `604800` | Token lifetime (7 days) |
+| `AUTH_JWT__OLD_SECRETS__0` | — | Previous secret for rotation |
+| `AUTH_SESSION_COOKIE_NAME` | `svc_session` | Session cookie key |
+| `AUTH_SESSION_COOKIE_SECURE` | `false` | Secure flag for cookies |
+| `AUTH_SESSION_COOKIE_SAMESITE` | `lax` | SameSite policy |
+| `AUTH_SESSION_COOKIE_MAX_AGE_SECONDS` | `14400` | Session lifetime (4 hours) |
+
+### OAuth Providers
+
+| Variable | Description |
+|----------|-------------|
+| `AUTH_GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `AUTH_GOOGLE_CLIENT_SECRET` | Google OAuth secret |
+| `AUTH_GITHUB_CLIENT_ID` | GitHub OAuth client ID |
+| `AUTH_GITHUB_CLIENT_SECRET` | GitHub OAuth secret |
+| `AUTH_MS_CLIENT_ID` | Microsoft OAuth client ID |
+| `AUTH_MS_CLIENT_SECRET` | Microsoft OAuth secret |
+| `AUTH_MS_TENANT` | Microsoft tenant ID |
+
+### MFA/TOTP
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTH_MFA_ISSUER` | `svc-infra` | TOTP issuer label |
+| `AUTH_MFA_DEFAULT_ENABLED_FOR_NEW_USERS` | `false` | Enable MFA on signup |
+| `AUTH_MFA_ENFORCE_FOR_ALL_USERS` | `false` | Force MFA globally |
+| `AUTH_MFA_RECOVERY_CODES` | `8` | Recovery codes count |
+| `AUTH_MFA_PRE_TOKEN_LIFETIME_SECONDS` | `300` | MFA pre-token lifetime |
+
+### Email (SMTP)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTH_SMTP_HOST` | — | SMTP hostname |
+| `AUTH_SMTP_PORT` | `587` | SMTP port |
+| `AUTH_SMTP_USERNAME` | — | SMTP username |
+| `AUTH_SMTP_PASSWORD` | — | SMTP password |
+| `AUTH_SMTP_FROM` | — | Default from address |
+| `AUTH_AUTO_VERIFY_IN_DEV` | `true` | Skip email verification in dev |
+
+### Jobs
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JOBS_DRIVER` | `memory` | Queue driver (`redis` or `memory`) |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis URL for jobs |
+| `JOBS_SCHEDULE_JSON` | — | JSON array of scheduled tasks |
+
+### Observability
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `METRICS_ENABLED` | `true` | Enable Prometheus metrics |
+| `METRICS_PATH` | `/metrics` | Metrics endpoint path |
+| `METRICS_DEFAULT_BUCKETS` | `0.005,...,10.0` | Histogram buckets |
+| `OBS_SKIP_PATHS` | — | Paths to skip in middleware |
+| `SVC_INFRA_DISABLE_PROMETHEUS` | — | Set to `1` to disable |
+
+### Cache
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CACHE_URL` | `memory://` | Cache backend URL |
+| `CACHE_PREFIX` | `svc:` | Key prefix |
+| `CACHE_DEFAULT_TTL` | `3600` | Default TTL (seconds) |
+
+### Tenancy
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TENANT_HEADER` | `X-Tenant-ID` | Header for tenant ID |
+| `TENANT_REQUIRED` | `false` | Require tenant on all requests |
+
+---
+
+## Environment-Specific Examples
+
+### Development (.env)
+
+```bash
+# .env (local development)
+APP_ENV=local
+LOG_LEVEL=DEBUG
+LOG_FORMAT=plain
+
+# Database
+SQL_URL=postgresql://localhost:5432/myapp_dev
+
+# Auth (dev defaults work)
+# No AUTH_JWT__SECRET needed - uses dev fallback
+
+# Jobs (in-memory)
+JOBS_DRIVER=memory
+
+# Cache (in-memory)
+CACHE_URL=memory://
+
+# CORS for frontend
+CORS_ALLOW_ORIGINS=http://localhost:3000
+```
+
+### Staging
+
+```bash
+# staging.env
+APP_ENV=test
+LOG_LEVEL=DEBUG
+LOG_FORMAT=json
+
+# Database
+SQL_URL_FILE=/run/secrets/sql_url
+
+# Auth (required)
+AUTH_JWT__SECRET_FILE=/run/secrets/jwt_secret
+AUTH_GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+AUTH_GOOGLE_CLIENT_SECRET_FILE=/run/secrets/google_secret
+
+# Jobs (Redis)
+JOBS_DRIVER=redis
+REDIS_URL_FILE=/run/secrets/redis_url
+
+# Email
+AUTH_SMTP_HOST=smtp.sendgrid.net
+AUTH_SMTP_USERNAME=apikey
+AUTH_SMTP_PASSWORD_FILE=/run/secrets/sendgrid_key
+AUTH_SMTP_FROM=noreply@staging.example.com
+```
+
+### Production
+
+```bash
+# production.env
+APP_ENV=prod
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+
+# Database (secrets via files)
+SQL_URL_FILE=/run/secrets/sql_url
+SQL_POOL_SIZE=20
+SQL_MAX_OVERFLOW=30
+
+# Auth (all secrets required)
+AUTH_JWT__SECRET_FILE=/run/secrets/jwt_secret
+AUTH_JWT__OLD_SECRETS__0_FILE=/run/secrets/jwt_secret_old
+AUTH_SESSION_COOKIE_SECURE=true
+AUTH_SESSION_COOKIE_SAMESITE=strict
+
+# OAuth
+AUTH_GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+AUTH_GOOGLE_CLIENT_SECRET_FILE=/run/secrets/google_secret
+AUTH_GITHUB_CLIENT_ID=xxx
+AUTH_GITHUB_CLIENT_SECRET_FILE=/run/secrets/github_secret
+
+# Jobs (Redis Cluster)
+JOBS_DRIVER=redis
+REDIS_URL_FILE=/run/secrets/redis_url
+
+# Cache (Redis)
+CACHE_URL_FILE=/run/secrets/redis_url
+
+# Email (production SMTP)
+AUTH_SMTP_HOST=smtp.sendgrid.net
+AUTH_SMTP_PORT=587
+AUTH_SMTP_USERNAME=apikey
+AUTH_SMTP_PASSWORD_FILE=/run/secrets/sendgrid_key
+AUTH_SMTP_FROM=noreply@example.com
+AUTH_AUTO_VERIFY_IN_DEV=false
+
+# Observability
+METRICS_ENABLED=true
+
+# CORS (specific origins)
+CORS_ALLOW_ORIGINS=https://app.example.com,https://admin.example.com
+```
+
+---
+
+## Secret Management
+
+### *_FILE Suffix Pattern
+
+For any secret variable, append `_FILE` to read from a file:
+
+```bash
+# Instead of:
+export AUTH_JWT__SECRET=my-secret-value
+
+# Use file mount:
+export AUTH_JWT__SECRET_FILE=/run/secrets/jwt_secret
+```
+
+This is the preferred pattern for Docker Swarm and Kubernetes secrets.
+
+### Docker Secrets
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  api:
+    image: myapp
+    environment:
+      - SQL_URL_FILE=/run/secrets/sql_url
+      - AUTH_JWT__SECRET_FILE=/run/secrets/jwt_secret
+    secrets:
+      - sql_url
+      - jwt_secret
+
+secrets:
+  sql_url:
+    file: ./secrets/sql_url.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+```
+
+### Kubernetes Secrets
+
+```yaml
+# secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+type: Opaque
+stringData:
+  sql_url: "postgresql://user:pass@db:5432/mydb"
+  jwt_secret: "your-jwt-secret-here"
+---
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          image: myapp
+          env:
+            - name: SQL_URL_FILE
+              value: /run/secrets/sql_url
+            - name: AUTH_JWT__SECRET_FILE
+              value: /run/secrets/jwt_secret
+          volumeMounts:
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+      volumes:
+        - name: secrets
+          secret:
+            secretName: app-secrets
+```
+
+### require_secret() for Safe Loading
 
 ```python
 from svc_infra.app.env import require_secret, MissingSecretError
 import os
 
-# In production: raises MissingSecretError if not set
-# In development: uses dev_default if provided
+# ✅ Safe: Fails in production if not set
 secret = require_secret(
     os.getenv("SESSION_SECRET"),
     "SESSION_SECRET",
-    dev_default="dev-only-secret",  # NEVER used in production
+    dev_default="dev-only-secret-not-for-production",
+)
+
+# ❌ NEVER do this: Silent fallback in production
+secret = os.getenv("SESSION_SECRET") or "default"  # SECURITY RISK!
+```
+
+**Behavior:**
+- In `prod`/`staging`: Raises `MissingSecretError` if not set
+- In `local`/`dev`: Uses `dev_default` if provided
+- Always: Raises if no value and no default
+
+---
+
+## Deployment Platforms
+
+### Railway
+
+Railway auto-sets `RAILWAY_ENVIRONMENT_NAME`:
+
+```bash
+# Railway environment mapping
+RAILWAY_ENVIRONMENT_NAME=production  → APP_ENV=prod
+RAILWAY_ENVIRONMENT_NAME=staging     → APP_ENV=test
+```
+
+**Railway variables:**
+```bash
+# Set in Railway dashboard
+SQL_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+AUTH_JWT__SECRET=${{shared.JWT_SECRET}}
+```
+
+### Render
+
+```yaml
+# render.yaml
+services:
+  - type: web
+    name: api
+    env: python
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: SQL_URL
+        fromDatabase:
+          name: mydb
+          property: connectionString
+      - key: AUTH_JWT__SECRET
+        generateValue: true
+      - key: REDIS_URL
+        fromService:
+          name: redis
+          type: redis
+          property: connectionString
+```
+
+### AWS ECS/Fargate
+
+```json
+{
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "myapp",
+      "environment": [
+        {"name": "APP_ENV", "value": "prod"},
+        {"name": "LOG_FORMAT", "value": "json"}
+      ],
+      "secrets": [
+        {
+          "name": "SQL_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456:secret:prod/db-url"
+        },
+        {
+          "name": "AUTH_JWT__SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456:secret:prod/jwt"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Kubernetes ConfigMap + Secret
+
+```yaml
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_ENV: "prod"
+  LOG_FORMAT: "json"
+  METRICS_ENABLED: "true"
+  CORS_ALLOW_ORIGINS: "https://app.example.com"
+---
+# deployment.yaml
+spec:
+  containers:
+    - name: api
+      envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secrets
+```
+
+---
+
+## Validation
+
+### Startup Validation
+
+svc-infra validates critical settings on startup:
+
+```python
+# Automatic validation examples:
+# - SQL_URL must be set (raises RuntimeError)
+# - AUTH_JWT__SECRET required in prod (raises MissingSecretError)
+# - REDIS_URL required if JOBS_DRIVER=redis
+```
+
+### Required vs Optional
+
+| Type | Behavior in Production |
+|------|------------------------|
+| Required | Raises error if missing |
+| Required with fallback | Uses fallback, logs warning |
+| Optional | Uses default or None |
+
+### Type Coercion
+
+```bash
+# Boolean values
+ENABLE_LOGGING=true    # true, 1, yes, y → True
+ENABLE_LOGGING=false   # false, 0, no, n → False
+
+# Integer values
+SQL_POOL_SIZE=20       # Parsed as int
+
+# List values
+CORS_ALLOW_ORIGINS=https://a.com,https://b.com  # Comma-separated
+```
+
+---
+
+## Override Priorities
+
+Configuration resolution order (highest priority first):
+
+1. **Explicit function parameters**
+   ```python
+   add_sql_db(app, dsn="postgresql://...")  # Highest priority
+   ```
+
+2. **Environment variables**
+   ```bash
+   export SQL_URL=postgresql://...
+   ```
+
+3. **Environment file (.env)**
+   ```
+   SQL_URL=postgresql://...
+   ```
+
+4. **Library defaults**
+   ```python
+   # Built into svc-infra
+   MONGO_MAX_POOL = 100
+   ```
+
+---
+
+## Common Errors
+
+### MissingSecretError
+
+```
+SECURITY ERROR: AUTH_JWT__SECRET must be set in production/staging environments.
+Current environment: prod (raw: 'production')
+```
+
+**Solution:** Set the required secret in your environment.
+
+### SQL_URL Not Set
+
+```
+RuntimeError: SQL_URL environment variable is required
+```
+
+**Solution:** Export `SQL_URL` or use `SQL_URL_FILE`.
+
+### Invalid Environment
+
+```
+RuntimeWarning: Unrecognized environment 'staging2', defaulting to 'local'.
+```
+
+**Solution:** Use a recognized environment name (local, dev, test, prod).
+
+### File Mount Not Found
+
+```
+FileNotFoundError: [Errno 2] No such file: '/run/secrets/jwt_secret'
+```
+
+**Solution:** Ensure secrets are mounted correctly in your container.
+
+---
+
+## Troubleshooting
+
+### Environment Not Detected
+
+**Symptom:** App running as `local` when it should be `prod`.
+
+**Diagnosis:**
+```python
+from svc_infra.app.env import get_current_environment
+print(get_current_environment())  # Check actual environment
+```
+
+**Solution:**
+```bash
+export APP_ENV=prod
+# Or for Railway:
+# Environment is auto-detected from RAILWAY_ENVIRONMENT_NAME
+```
+
+### Secrets Not Loading
+
+**Symptom:** `MissingSecretError` despite setting variable.
+
+**Diagnosis:**
+```bash
+# Check if variable is set
+echo $AUTH_JWT__SECRET
+# Check file exists (if using _FILE suffix)
+cat /run/secrets/jwt_secret
+```
+
+**Solution:** Verify the secret is exported in the shell or mounted correctly.
+
+### Wrong Default Values
+
+**Symptom:** Production using development defaults.
+
+**Diagnosis:**
+```python
+from svc_infra.app.env import IS_PROD
+print(f"IS_PROD: {IS_PROD}")  # Should be True
+```
+
+**Solution:** Ensure `APP_ENV=prod` is set before app starts.
+
+---
+
+## API Reference
+
+### Environment Functions
+
+```python
+from svc_infra.app.env import (
+    get_current_environment,  # Returns Environment enum
+    get_environment_flags,    # Returns EnvironmentFlags
+    pick,                     # Environment-aware value selection
+    require_secret,           # Safe secret loading
+    MissingSecretError,       # Error for missing secrets
 )
 ```
 
-**Critical**: Never use hardcoded fallbacks like `os.getenv("SECRET") or "default"` — this silently uses insecure defaults in production. Always use `require_secret()` which fails loudly.
+### Environment Enum
 
-## Webhook helpers
+```python
+from svc_infra.app.env import Environment
 
-Current webhook helpers (`fastapi.require_signature`, `InMemoryWebhookSubscriptions`, `WebhookService`) rely on dependency injection for secrets and stores and do not read environment variables directly.
+Environment.LOCAL  # "local"
+Environment.DEV    # "dev"
+Environment.TEST   # "test"
+Environment.PROD   # "prod"
+```
+
+### EnvironmentFlags
+
+```python
+from svc_infra.app.env import get_environment_flags
+
+flags = get_environment_flags()
+flags.is_prod   # True if production
+flags.is_test   # True if staging/test
+flags.is_dev    # True if development
+flags.is_local  # True if local
+```
+
+---
+
+## See Also
+
+- [Auth Guide](auth.md) — Authentication configuration
+- [Database Guide](database.md) — SQL and MongoDB setup
+- [Jobs Guide](jobs.md) — Background job configuration
+- [Observability](observability.md) — Metrics and logging
+- [Security](security.md) — Security best practices
