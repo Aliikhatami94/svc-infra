@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 This file is auto-generated from conventional commits using [git-cliff](https://git-cliff.org/).
 
+## [0.1.717] - 2025-12-27
+
+
+### Bug Fixes
+
+- Correct expected output string in test_docs_topic_command_prints_file_contents
+
+
+### Documentation
+
+- Enhance idempotency documentation for clarity and structure
+
+
+### Other Changes
+
+- Add Redis Pub/Sub support for WebSocket scaling and message broadcasting
+
+- Introduced RedisConnectionManager for managing WebSocket connections across multiple instances.
+- Implemented message broadcasting, room membership, and presence tracking using Redis.
+- Added support for persistent message delivery with Redis Streams.
+- Included consumer group functionality for distributed task processing.
+- Enhanced FastAPI integration with Redis-backed WebSocket management.
+- Provided NGINX and HAProxy configurations for load balancing WebSocket connections.
+- Added Prometheus metrics for monitoring WebSocket connections and message processing.
+- Included real-world examples for multi-player games, collaborative documents, and stock tickers.
+- Refactor documentation for Operations & Reliability and Multi-Tenant Architecture
+
+- Updated ops.md to enhance clarity on health probes, circuit breakers, maintenance mode, and SLO monitoring.
+- Added code examples for quick start and detailed health checks.
+- Expanded sections on circuit breaker usage, maintenance mode, and observability.
+- Revised tenancy.md to provide a comprehensive overview of multi-tenant architecture, including tenant resolution, database integration, and rate limiting.
+- Included code snippets for tenant-aware CRUD operations and custom tenant resolution logic.
+- Improved structure and readability across both documents.
+
 ## [0.1.716] - 2025-12-26
 
 
