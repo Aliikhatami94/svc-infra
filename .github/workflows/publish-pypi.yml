@@ -106,3 +106,23 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
+
+      # Create GitHub Release from the tag
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.new_version }}
+          name: v${{ steps.bump.outputs.new_version }}
+          body: |
+            ## Release v${{ steps.bump.outputs.new_version }}
+
+            See [CHANGELOG.md](https://github.com/nfraxlab/svc-infra/blob/main/CHANGELOG.md) for details.
+
+            ### Install
+            ```bash
+            pip install svc-infra==${{ steps.bump.outputs.new_version }}
+            ```
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
