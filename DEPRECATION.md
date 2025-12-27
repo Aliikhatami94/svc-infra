@@ -102,6 +102,32 @@ Security-related removals will be:
 |---------|---------------|------------|-------------|
 | *None currently* | — | — | — |
 
+## Removed in v1.0.0
+
+The following deprecated features were removed in v1.0.0:
+
+| Feature | Was Deprecated In | Replacement |
+|---------|-------------------|-------------|
+| `BillingService` (sync) | v0.x | `AsyncBillingService` |
+
+### Migration: BillingService → AsyncBillingService
+
+**Before (removed):**
+```python
+from svc_infra.billing import BillingService
+
+service = BillingService(session=sync_session, tenant_id="tenant_123")
+service.record_usage(...)
+```
+
+**After:**
+```python
+from svc_infra.billing import AsyncBillingService
+
+service = AsyncBillingService(session=async_session, tenant_id="tenant_123")
+await service.record_usage(...)
+```
+
 ## Questions?
 
 If you have questions about deprecations or need help migrating, please:

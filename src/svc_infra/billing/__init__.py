@@ -1,10 +1,7 @@
 """Billing module for usage tracking, metering, and invoicing.
 
 Primary API:
-    AsyncBillingService - Async billing service (recommended)
-
-Deprecated:
-    BillingService - Sync billing service (use AsyncBillingService instead)
+    AsyncBillingService - Async billing service
 
 Models:
     UsageEvent, UsageAggregate, Invoice, InvoiceLine, Plan, Subscription, etc.
@@ -27,10 +24,9 @@ from .models import (
     UsageAggregate,
     UsageEvent,
 )
-from .service import BillingService  # Deprecated - kept for backward compatibility
 
 __all__ = [
-    # Primary API (recommended)
+    # Primary API
     "AsyncBillingService",
     # Models
     "UsageEvent",
@@ -41,6 +37,4 @@ __all__ = [
     "Price",
     "Invoice",
     "InvoiceLine",
-    # Deprecated (use AsyncBillingService instead)
-    "BillingService",
 ]

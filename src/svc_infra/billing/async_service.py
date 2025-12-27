@@ -17,7 +17,6 @@ Usage:
         )
 
 See also:
-    - BillingService: Deprecated sync version (use this instead)
     - models: Invoice, UsageEvent, UsageAggregate, etc.
 """
 
