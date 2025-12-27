@@ -107,8 +107,21 @@ jobs:
         with:
           packages-dir: dist
 
-      # Create GitHub Release from the tag
+      # Check if this is a minor/major release (patch version is 0)
+      - name: Check if minor/major release
+        id: check_release
+        run: |
+          VERSION="${{ steps.bump.outputs.new_version }}"
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+          if [ "$PATCH" = "0" ]; then
+            echo "is_minor_major=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_minor_major=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Create GitHub Release only for minor/major versions (x.y.0)
       - name: Create GitHub Release
+        if: steps.check_release.outputs.is_minor_major == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.bump.outputs.new_version }}
