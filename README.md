@@ -2,6 +2,7 @@
 
 # svc-infra
 
+[![v1.0.0](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
 [![CI](https://github.com/nfraxlab/svc-infra/actions/workflows/ci.yml/badge.svg)](https://github.com/nfraxlab/svc-infra/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/svc-infra.svg)](https://pypi.org/project/svc-infra/)
 [![Python](https://img.shields.io/pypi/pyversions/svc-infra.svg)](https://pypi.org/project/svc-infra/)
@@ -13,7 +14,7 @@
 
 **Stop rebuilding auth, billing, webhooks, and background jobs for every project.**
 
-[Documentation](docs/) · [Examples](examples/) · [PyPI](https://pypi.org/project/svc-infra/)
+[Documentation](docs/) · [Examples](examples/) · [PyPI](https://pypi.org/project/svc-infra/) · [Changelog](CHANGELOG.md)
 
 </div>
 
