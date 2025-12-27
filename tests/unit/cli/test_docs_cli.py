@@ -14,7 +14,7 @@ def test_docs_topic_command_prints_file_contents():
     assert result.exit_code == 0
     out = result.stdout
     # basic content smoke check
-    assert "Cache guide" in out
+    assert "Caching Guide" in out
     assert "cashews" in out
 
 
